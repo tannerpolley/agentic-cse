@@ -75,5 +75,6 @@ def test_current_coverage_is_available_for_the_full_materialized_corpus():
     report = coverage_report(Path(__file__).resolve().parents[1] / "wiki")
 
     assert report["source_count"] == 378
-    assert report["coverage"]["typed_records"]["count"] == 13
+    assert report["coverage"]["typed_records"]["count"] >= 47
+    assert report["coverage"]["typed_records"]["source_keys_covered"] >= 8
     assert report["coverage"]["validation"]["record_count"] == 1

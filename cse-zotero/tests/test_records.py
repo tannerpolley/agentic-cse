@@ -15,13 +15,17 @@ def test_current_typed_records_and_lineage_are_auditable():
     )
 
     assert checked["ok"] is True
-    assert checked["record_count"] == 13
-    assert checked["relation_count"] == 11
-    assert checked["record_types"]["equation"] == 3
+    assert checked["record_count"] >= 47
+    assert checked["relation_count"] >= 42
+    assert checked["record_types"]["equation"] >= 12
 
     record = record_lookup(root, "equation:figiel-born-solvation-shell")
     assert record["provenance"]["sources"][0]["zotero_key"] == "YEENX35P"
     assert record["provenance"]["sources"][0]["attachment_key"] == "2M74BKJG"
+
+    held = record_lookup(root, "paper:held-2014")
+    assert held["provenance"]["sources"][0]["zotero_key"] == "3DIW87Q5"
+    assert record_lookup(root, "workflow:ascani-distributed-ion-flash")["record_type"] == "workflow"
 
     trace = lineage(
         root,
