@@ -86,8 +86,11 @@ uv run zotero-wiki wiki-evidence ABCD2345 --query "Born diameter" --json
 uv run zotero-wiki wiki-context epcsaft-equilibrium --json
 uv run zotero-wiki wiki-context --global --query "Born activity coefficient" --json
 uv run zotero-wiki wiki-record equation:figiel-born-solvation-shell --json
+uv run zotero-wiki wiki-record-template equation --zotero-key YEENX35P --json
+uv run zotero-wiki wiki-paper-template YEENX35P --json
 uv run zotero-wiki wiki-lineage dataset:hamer-1972-aqueous-coefficients --json
 uv run zotero-wiki wiki-health --stale-source 28NPJ5H6 --json
+uv run zotero-wiki wiki-coverage --json
 uv run zotero-wiki wiki-lint --registry-root ../thermophysical-data-registry --json
 uv run zotero-wiki wiki-release --registry-root ../thermophysical-data-registry --json
 uv run zotero-wiki wiki-refresh --json
@@ -167,6 +170,11 @@ uv run python scripts/benchmark_wiki.py --json
 `wiki-release` is dry-run by default. `wiki-release --apply` writes only the
 repository-local `wiki/release-manifest.json`; it does not write to Zotero or
 the thermophysical-data registry.
+
+`wiki-coverage` is the broad-corpus progress view. It reports classification,
+evidence, brief, typed-record, registry, and validation coverage plus bounded
+examples for each gap. Missing coverage is expected and reviewable; it is not
+permission to invent summaries or convert PDFs in bulk.
 
 `wiki-evidence` searches only the declared Markdown/Mathpix Markdown companions
 in an evidence manifest. It returns short line-located passages, attachment

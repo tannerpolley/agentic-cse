@@ -41,6 +41,11 @@ the boundary of the Zotero corpus.
    equations, datasets, parameters, ideas, workflows, implementations, and
    validation records before opening a full PDF. Run `wiki-health` when a
    source or registry dependency may have changed; it is read-only.
+8. Use `wiki-coverage --json` to choose bounded corpus work, and
+   `wiki-record-template <record_type> --zotero-key <KEY> --json` or
+   `wiki-paper-template <KEY> --json` when a new curated page is needed. These
+   templates are read-only and must be filled with exact evidence before a
+   record or brief is added.
 
 ## Evidence and curation
 
@@ -124,7 +129,8 @@ print, commit, or copy Mathpix authentication tokens.
 
 ## Maintenance
 
-After a Zotero refresh, run `wiki-verify` and `wiki-stale`. Append significant
+After a Zotero refresh, run `wiki-verify`, `wiki-stale`, and `wiki-coverage`.
+Append significant
 ingests, synthesis updates, and lint results to `wiki/log.md`; do not rewrite
 old log entries. `wiki-refresh` is explicit and repository-only: review its
 dry-run output first, then use `wiki-refresh --apply` only when the generated

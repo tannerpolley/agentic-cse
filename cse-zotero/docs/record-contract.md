@@ -83,6 +83,8 @@ re-OCRs a PDF.
 
 ```bash
 uv run zotero-wiki wiki-record equation:figiel-born-solvation-shell --json
+uv run zotero-wiki wiki-record-template equation --zotero-key YEENX35P --json
+uv run zotero-wiki wiki-paper-template YEENX35P --json
 uv run zotero-wiki wiki-lineage equation:figiel-born-solvation-shell --json
 uv run zotero-wiki wiki-lint --registry-root ../thermophysical-data-registry --json
 uv run zotero-wiki wiki-context --global --query "Born activity coefficients" --json
