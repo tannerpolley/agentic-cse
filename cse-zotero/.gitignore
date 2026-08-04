@@ -1,0 +1,16 @@
+.venv/
+dist/
+*.egg-info/
+__pycache__/
+.pytest_cache/
+.ruff_cache/
+*.egg-info/
+*.py[cod]
+
+# Local credentials and generated reports
+.env
+reports/
+
+# Rebuildable local search index; source records and manifests are reviewable.
+wiki/index.sqlite
+wiki/.index.sqlite.tmp

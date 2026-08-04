@@ -1,0 +1,47 @@
+[
+  {
+    "id": "figiel-born-equation",
+    "query": "Born solvation shell",
+    "evidence_query": "Born term solvation shell",
+    "source_keys": ["YEENX35P"],
+    "expected_record_id": "equation:figiel-born-solvation-shell",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "hamer-activity-basis",
+    "query": "osmotic activity coefficients",
+    "evidence_query": "osmotic coefficient mean activity coefficient",
+    "source_keys": ["28NPJ5H6"],
+    "expected_record_id": "dataset:hamer-1972-aqueous-coefficients",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": true
+  },
+  {
+    "id": "registry-parameter-trace",
+    "query": "Born diameter SSM DS",
+    "evidence_query": "model parameters Born diameter",
+    "source_keys": ["YEENX35P"],
+    "expected_record_id": "parameter:figiel-born-diameter-ssm-ds",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": true
+  },
+  {
+    "id": "cross-paper-insight",
+    "query": "activity basis model dependency",
+    "evidence_query": "activity coefficient basis",
+    "source_keys": ["28NPJ5H6", "YEENX35P"],
+    "expected_record_id": "insight:source-basis-is-model-dependency",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "validation-acceptance-gate",
+    "query": "validation acceptance inputs",
+    "evidence_query": "validation results limitations",
+    "source_keys": ["YEENX35P"],
+    "expected_record_id": "validation:figiel-2025-eos-reproduction",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  }
+]

@@ -1,0 +1,7 @@
+interface:
+  display_name: "Mathpix"
+  short_description: "Convert PDFs to Markdown with Mathpix"
+  default_prompt: "Use the repository Mathpix workflow to convert this PDF into a companion Markdown or Mathpix Markdown file."
+
+policy:
+  allow_implicit_invocation: true
