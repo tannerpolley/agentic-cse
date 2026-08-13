@@ -41,6 +41,9 @@ The canonical broad-corpus architecture and delivery roadmap is
 domain vocabulary is [CONTEXT.md](CONTEXT.md). All Zotero sources remain
 discoverable; the current project pages are only initial views, while relevant
 papers can be connected to multiple projects, domains, and research threads.
+The reusable agent operating protocol is
+[.agent/skills/zotero-wiki/SKILL.md](.agent/skills/zotero-wiki/SKILL.md), with
+the answer-grounding rubric in [docs/agent-answer-rubric.md](docs/agent-answer-rubric.md).
 
 The retrieval and curation slices now build indexed Markdown evidence chunks,
 an all-source triage queue, reviewable domain/thread classification, and
@@ -143,6 +146,10 @@ When a query is supplied, wiki-context also returns evidence_hits from the
 rebuildable index and an evidence_coverage report. The hits are limited to
 declared Markdown/Mathpix Markdown companions, retain attachment keys,
 locators, hashes, and sections, and never read or convert PDFs.
+The global route additionally returns `matched_source_keys`, matching brief
+paths, and source-to-evidence coverage so an agent can choose its next read
+without scanning the folder layout. `wiki-source KEY` exposes the same
+brief/evidence routes under `wiki` without embedding PDF text.
 
 ```bash
 uv run zotero-wiki wiki-context epcsaft-equilibrium \
@@ -165,6 +172,7 @@ uv run zotero-wiki wiki-verify --json
 uv run zotero-wiki wiki-manifest-lint --registry-root ../thermophysical-data-registry --json
 uv run zotero-wiki wiki-release --registry-root ../thermophysical-data-registry --json
 uv run python scripts/benchmark_wiki.py --json
+uv run python scripts/agent_smoke.py --json
 ```
 
 `wiki-release` is dry-run by default. `wiki-release --apply` writes only the

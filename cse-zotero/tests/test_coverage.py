@@ -74,7 +74,10 @@ def test_metadata_brief_scaffolds_remain_in_the_unbriefed_queue(tmp_path: Path):
 def test_current_coverage_is_available_for_the_full_materialized_corpus():
     report = coverage_report(Path(__file__).resolve().parents[1] / "wiki")
 
-    assert report["source_count"] == 378
+    # The Zotero library is a live corpus; new top-level items must not make
+    # the repository's coverage regression test fail solely because the count
+    # increased after a read-only refresh.
+    assert report["source_count"] >= 378
     assert report["coverage"]["typed_records"]["count"] >= 47
     assert report["coverage"]["typed_records"]["source_keys_covered"] >= 8
     assert report["coverage"]["validation"]["record_count"] == 1

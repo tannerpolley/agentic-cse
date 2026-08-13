@@ -95,6 +95,9 @@ def test_materialize_search_context_and_verify(tmp_path):
     assert applied["changed"] == 2
     assert (root / "manifest.json").exists()
     assert (root / "sources/EQ123456/record.json").exists()
+    source_index = (root / "sources/index.md").read_text(encoding="utf-8")
+    assert "Chemical potential and phase equilibrium" in source_index
+    assert "EQ123456/source.md" in source_index
     assert (root / "index.sqlite").exists()
 
     repeat = materialize_snapshot(snapshot(), root, apply=True)
@@ -103,7 +106,11 @@ def test_materialize_search_context_and_verify(tmp_path):
 
     results = search_wiki(root, query="chemical potential", project="epcsaft-equilibrium")
     assert [result["zotero_key"] for result in results] == ["EQ123456"]
-    assert source_record(root, "EQ123456")["doi"] == "10.1234/example"
+    source = source_record(root, "EQ123456")
+    assert source["doi"] == "10.1234/example"
+    assert source["wiki"]["brief"] is None
+    assert source["wiki"]["evidence"]["available"] is False
+    assert "text" not in source["wiki"]
 
     context = context_pack(root, project="epcsaft-equilibrium")
     assert context["sources"][0]["zotero_key"] == "EQ123456"

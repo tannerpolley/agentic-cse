@@ -3,6 +3,10 @@
 This repository maintains a persistent, provenance-first research wiki for
 the local Zotero library.
 
+For the reusable agent operating protocol, read
+`.agent/skills/zotero-wiki/SKILL.md` before a research task that crosses
+Zotero evidence, equations, data, implementation, or validation.
+
 ## Start of a research task
 
 Use the read-only wiki-triage command to find relevant sources that still need
@@ -46,6 +50,12 @@ the boundary of the Zotero corpus.
    `wiki-paper-template <KEY> --json` when a new curated page is needed. These
    templates are read-only and must be filled with exact evidence before a
    record or brief is added.
+9. Run `wiki-evidence-sync --json` to discover existing Zotero `.md`/`.mmd`
+   companions across the whole corpus. Review the plan before using
+   `wiki-evidence-sync --apply --json`; this copies only existing companions
+   into the repository, never reads or copies PDFs, never runs Mathpix, and
+   never writes to Zotero. Changed or conflicting evidence is refused rather
+   than overwritten.
 
 ## Evidence and curation
 
