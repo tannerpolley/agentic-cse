@@ -23,7 +23,7 @@ test("cleanup plan separates automatic and manual assignments", () => {
 
 test("configuration exposes explicit confirmation tokens", () => {
   const config = plan.getConfig();
-  assert.equal(config.applyToken, "ZOTERO-WIKI-APPLY-v1");
-  assert.equal(config.searchToken, "ZOTERO-WIKI-SEARCHES-v1");
+  assert.equal(config.applyToken, "ZOTERO-COMPANION-APPLY-v1");
+  assert.equal(config.searchToken, "ZOTERO-COMPANION-SEARCHES-v1");
   assert.equal(config.workflowSearches.length, 4);
 });

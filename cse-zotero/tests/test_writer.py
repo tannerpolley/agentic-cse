@@ -4,7 +4,7 @@ from urllib.parse import urlsplit
 
 import pytest
 
-from zotero_wiki.writer import (
+from zotero_companion.writer import (
     KeyFileError,
     WriterHTTPError,
     ZoteroLocalAPIWriter,

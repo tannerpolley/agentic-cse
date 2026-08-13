@@ -1,4 +1,4 @@
-from zotero_wiki.report import summarize_items
+from zotero_companion.report import summarize_items
 
 
 def item(item_type, filename="", tags=()):

@@ -1,7 +1,8 @@
-"""Build the bootstrapped Zotero-Wiki plugin XPI."""
+"""Build the bootstrapped Zotero Companion plugin XPI."""
 
 from __future__ import annotations
 
+import argparse
 from pathlib import Path
 from zipfile import ZIP_DEFLATED, ZipFile
 
@@ -9,16 +10,19 @@ from zipfile import ZIP_DEFLATED, ZipFile
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugin"
 DIST = ROOT / "dist"
-OUTPUT = DIST / "zotero-wiki-0.1.0.xpi"
-FILES = ("manifest.json", "bootstrap.js", "cleanup-plan.js", "zotero-wiki.js")
+OUTPUT = DIST / "zotero-companion-1.0.0.xpi"
+FILES = ("manifest.json", "bootstrap.js", "cleanup-plan.js", "zotero-companion.js")
 
 
 def main() -> None:
-    DIST.mkdir(exist_ok=True)
-    with ZipFile(OUTPUT, "w", ZIP_DEFLATED) as archive:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--output", type=Path, default=OUTPUT)
+    output = parser.parse_args().output
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with ZipFile(output, "w", ZIP_DEFLATED) as archive:
         for name in FILES:
             archive.write(PLUGIN / name, name)
-    print(OUTPUT)
+    print(output)
 
 
 if __name__ == "__main__":

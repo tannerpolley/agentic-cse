@@ -1,7 +1,7 @@
 from pathlib import Path
 
-from zotero_wiki.coverage import coverage_report
-from zotero_wiki.wiki import WikiSnapshot, index_wiki, materialize_snapshot
+from zotero_companion.coverage import coverage_report
+from zotero_companion.wiki import WikiSnapshot, index_wiki, materialize_snapshot
 
 
 def _snapshot() -> WikiSnapshot:

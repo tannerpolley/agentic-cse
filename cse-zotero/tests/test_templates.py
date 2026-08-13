@@ -1,8 +1,8 @@
-from zotero_wiki.records import validate_record
+from zotero_companion.records import validate_record
 import json
 from pathlib import Path
 
-from zotero_wiki.templates import paper_brief_template, record_template
+from zotero_companion.templates import paper_brief_template, record_template
 
 
 def test_record_template_is_read_only_and_structurally_valid():

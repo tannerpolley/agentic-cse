@@ -2,7 +2,7 @@ import hashlib
 import json
 import sqlite3
 
-from zotero_wiki.wiki import (
+from zotero_companion.wiki import (
     WikiSnapshot,
     build_source_records,
     classify_source,

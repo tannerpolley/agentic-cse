@@ -1,16 +1,17 @@
 from pathlib import Path
 
-from zotero_wiki.health import health_report
+from zotero_companion.health import health_report
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+REGISTRY_ROOT = REPO_ROOT / "data/domains/thermophysical/source/registry"
 
 
 def test_health_propagates_stale_source_to_linked_records_without_writes():
     report = health_report(
         REPO_ROOT / "wiki",
         stale_source_keys=["28NPJ5H6"],
-        registry_root=REPO_ROOT.parent / "thermophysical-data-registry",
+        registry_root=REGISTRY_ROOT,
     )
 
     assert report["read_only"] is True
@@ -26,7 +27,7 @@ def test_health_matches_registry_ids_and_reports_attention_records():
     report = health_report(
         REPO_ROOT / "wiki",
         changed_registry_ids=["registry:figiel2025-table1-water-relative-dielectric-constant"],
-        registry_root=REPO_ROOT.parent / "thermophysical-data-registry",
+        registry_root=REGISTRY_ROOT,
     )
 
     queue = {entry["record_id"]: entry for entry in report["review_queue"]}

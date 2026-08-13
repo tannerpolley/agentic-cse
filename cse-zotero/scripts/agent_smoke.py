@@ -1,4 +1,4 @@
-"""Exercise the public Zotero-Wiki CLI as a read-only agent workflow.
+"""Exercise the public Zotero Companion CLI as a read-only agent workflow.
 
 This is intentionally deterministic and local.  It checks that an agent can
 discover a typed record, retrieve a source and its companion evidence, and
@@ -35,7 +35,7 @@ def _cli(wiki_root: Path, arguments: list[str]) -> dict[str, Any]:
         source_path + os.pathsep + environment.get("PYTHONPATH", "")
     )
     completed = subprocess.run(
-        [sys.executable, "-m", "zotero_wiki.cli", *arguments],
+        [sys.executable, "-m", "zotero_companion.cli", *arguments],
         cwd=ROOT,
         env=environment,
         check=False,

@@ -1,10 +1,12 @@
-# Zotero-Wiki agent contract
+# Zotero Companion agent contract
 
-This repository maintains a persistent, provenance-first research wiki for
-the local Zotero library.
+Repository Profile: scientific-computing
+
+This repository maintains source-linked research synthesis and scientific data
+for the local Zotero library. Zotero remains the bibliographic authority.
 
 For the reusable agent operating protocol, read
-`.agent/skills/zotero-wiki/SKILL.md` before a research task that crosses
+`.agent/skills/zotero-companion/SKILL.md` before a research task that crosses
 Zotero evidence, equations, data, implementation, or validation.
 
 ## Start of a research task
@@ -12,27 +14,27 @@ Zotero evidence, equations, data, implementation, or validation.
 Use the read-only wiki-triage command to find relevant sources that still need
 a paper brief:
 
-    uv run zotero-wiki wiki-triage --queue unbriefed_relevant --json
+    uv run zotero-companion wiki-triage --queue unbriefed_relevant --json
 
 For broader-corpus review, inspect sources whose domain/thread classification is
 still unassigned:
 
-    uv run zotero-wiki wiki-triage --queue needs_classification --json
+    uv run zotero-companion wiki-triage --queue needs_classification --json
 
 When a task crosses paper evidence, data, equations, implementation, or
-validation boundaries, first read docs/zotero-llm-wiki-plan.md and CONTEXT.md
+validation boundaries, first read docs/zotero-companion-design.md and CONTEXT.md
 in addition to wiki/index.md. The current project slugs are initial views, not
 the boundary of the Zotero corpus.
 
 1. Read `wiki/index.md` and the relevant file under `wiki/projects/`.
 2. Use the local source index before searching the web:
-   `uv run zotero-wiki wiki-context <project> --query "<terms>" --json`.
+   `uv run zotero-companion wiki-context <project> --query "<terms>" --json`.
    For cross-project questions start with
-   `uv run zotero-wiki wiki-context --global --query "<terms>" --json`.
+   `uv run zotero-companion wiki-context --global --query "<terms>" --json`.
 3. Retrieve the full normalized source with
-   `uv run zotero-wiki wiki-source <ZOTERO_KEY> --json`.
+   `uv run zotero-companion wiki-source <ZOTERO_KEY> --json`.
 4. Retrieve source passages from existing companions with
-   `uv run zotero-wiki wiki-evidence <ZOTERO_KEY> --query "<terms>" --json`.
+   `uv run zotero-companion wiki-evidence <ZOTERO_KEY> --query "<terms>" --json`.
    This searches only declared `.md`/`.mmd` evidence files and never converts
    PDFs.
 5. Inspect the `freshness` object in `wiki-context`. A stale or unavailable
@@ -96,8 +98,8 @@ print, commit, or copy Mathpix authentication tokens.
 
 ## Paper acquisition and publisher access
 
-- Before any remote paper acquisition or Zotero Connector save, run
-  `python "/home/user/Workspaces/Scientific-Codex-Skills/scientific-computing/zotero/scripts/zotero.py" vpn-status --require-active --json`.
+- Before any remote paper acquisition or Zotero Connector save, invoke the
+  canonical `zotero` skill and run its VPN status check.
   If the result is `inactive` or `unknown`, stop and ask the user to connect
   the VPN. Do not start, stop, or reconfigure the VPN, and do not discover or
   report a public IP address.

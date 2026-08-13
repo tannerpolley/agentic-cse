@@ -1,17 +1,18 @@
 import json
 from pathlib import Path
 
-from zotero_wiki.manifests import lint_manifests, manifest_lookup
+from zotero_companion.manifests import lint_manifests, manifest_lookup
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+REGISTRY_ROOT = REPO_ROOT / "data/domains/thermophysical/source/registry"
 
 
 def test_project_manifests_pin_records_and_registry_paths():
     root = REPO_ROOT / "wiki"
     checked = lint_manifests(
         root,
-        registry_root=REPO_ROOT.parent / "thermophysical-data-registry",
+        registry_root=REGISTRY_ROOT,
     )
 
     assert checked["ok"] is True
@@ -19,7 +20,7 @@ def test_project_manifests_pin_records_and_registry_paths():
     assert checked["projects"] == ["epcsaft-equilibrium", "lithium-extraction", "mea-thermodynamics"]
     manifest = manifest_lookup(root, "epcsaft-equilibrium")
     assert "validation:figiel-2025-eos-reproduction" in manifest["validation_runs"]
-    assert manifest["registry"]["revision"] == "working-tree"
+    assert manifest["registry"]["revision"] == "30e57a7442741df2c278191b999996e3f44ceff1"
 
 
 def test_manifest_lint_rejects_unknown_record_and_bad_registry_path(tmp_path):

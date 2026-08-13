@@ -1,7 +1,7 @@
 import json
 from pathlib import Path
 
-from zotero_wiki.records import (
+from zotero_companion.records import (
     global_context,
     lineage,
     lint_records,
@@ -9,17 +9,18 @@ from zotero_wiki.records import (
     record_lookup,
     search_records,
 )
-from zotero_wiki.wiki import source_record
+from zotero_companion.wiki import source_record
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+REGISTRY_ROOT = REPO_ROOT / "data/domains/thermophysical/source/registry"
 
 
 def test_current_typed_records_and_lineage_are_auditable():
     root = REPO_ROOT / "wiki"
     checked = lint_records(
         root,
-        registry_root=REPO_ROOT.parent / "thermophysical-data-registry",
+        registry_root=REGISTRY_ROOT,
     )
 
     assert checked["ok"] is True
@@ -38,7 +39,7 @@ def test_current_typed_records_and_lineage_are_auditable():
     trace = lineage(
         root,
         "dataset:hamer-1972-aqueous-coefficients",
-        registry_root=REPO_ROOT.parent / "thermophysical-data-registry",
+        registry_root=REGISTRY_ROOT,
     )
     upstream_ids = {entry["record_id"] for entry in trace["upstream"]}
     assert "paper:hamer-1972" in upstream_ids
@@ -51,7 +52,7 @@ def test_global_agent_context_exposes_the_whole_corpus_and_curated_matches():
         REPO_ROOT / "wiki",
         query="Born",
         limit=5,
-        registry_root=REPO_ROOT.parent / "thermophysical-data-registry",
+        registry_root=REGISTRY_ROOT,
     )
 
     assert context["scope"] == "global"

@@ -1,7 +1,28 @@
-# Zotero-Wiki
+# Zotero Companion
 
-Staged automation for the local Zotero library used by the Engineering
-workspaces.
+Zotero Companion adds source-linked synthesis and scientific data to a local
+Zotero library. Zotero remains the authority for citations, collections, and
+attachments. Companion preserves exact source locators, typed scientific
+records, transformations, uncertainty, lineage, and domain data.
+
+The domain-neutral model is defined in
+[`schema/companion.yaml`](schema/companion.yaml). Scientific domains extend it;
+the first pack is [`schema/thermophysical.yaml`](schema/thermophysical.yaml).
+DataLad records the dataset history, LinkML validates record shape, and DuckDB
+queries retained CSV, Parquet, or JSON tables without a second database.
+All current files are smaller than 10 MB and remain ordinary Git content so the
+private GitHub repository is a complete recovery source. Before retaining a
+larger file, configure and verify a private git-annex content remote, then
+replace the current `annex.largefiles=nothing` rule with an explicit threshold.
+A local annex key alone is not accepted as recoverable storage.
+
+```bash
+uv run zotero-companion schema-validate data/examples/core-records.yaml --json
+uv run zotero-companion data-query \
+  data/domains/thermophysical/normalized/registry-records.csv \
+  --sql "SELECT record_type, count(*) AS count FROM records GROUP BY record_type" --json
+uv run datalad status
+```
 
 ## Stages
 
@@ -19,7 +40,7 @@ The Stage 1 client intentionally exposes only read requests. Zotero 10 beta
 supports authenticated local write requests, but those are kept out of the
 read-only audit layer. The API runs at `http://127.0.0.1:23119` and requires
 Zotero's local API preference to be enabled. The writer reads the remembered
-local API key from `/home/user/.config/zotero-wiki/local-api-key`,
+local API key from `~/.config/zotero-companion/local-api-key`,
 keeps the key out of output, and uses server-ID and version preconditions for
 writes.
 
@@ -28,7 +49,7 @@ writes.
 From this directory:
 
 ```bash
-python -m zotero_wiki audit --json
+python -m zotero_companion audit --json
 ```
 
 The audit reports Zotero item/collection/tag counts and Markdown attachment
@@ -37,12 +58,12 @@ counts. It does not modify Zotero, files, or preferences.
 ## Agent wiki
 
 The canonical broad-corpus architecture and delivery roadmap is
-[docs/zotero-llm-wiki-plan.md](docs/zotero-llm-wiki-plan.md). The shared
+[docs/zotero-companion-design.md](docs/zotero-companion-design.md). The shared
 domain vocabulary is [CONTEXT.md](CONTEXT.md). All Zotero sources remain
 discoverable; the current project pages are only initial views, while relevant
 papers can be connected to multiple projects, domains, and research threads.
 The reusable agent operating protocol is
-[.agent/skills/zotero-wiki/SKILL.md](.agent/skills/zotero-wiki/SKILL.md), with
+[.agent/skills/zotero-companion/SKILL.md](.agent/skills/zotero-companion/SKILL.md), with
 the answer-grounding rubric in [docs/agent-answer-rubric.md](docs/agent-answer-rubric.md).
 
 The retrieval and curation slices now build indexed Markdown evidence chunks,
@@ -53,9 +74,9 @@ different from scientific conclusions.
 Inspect the bounded queues with:
 
 ~~~bash
-uv run zotero-wiki wiki-triage --queue unbriefed_relevant --limit 20 --json
-uv run zotero-wiki wiki-triage --queue needs_classification --limit 20 --json
-uv run zotero-wiki wiki-triage --domain electrolyte-thermodynamics --json
+uv run zotero-companion wiki-triage --queue unbriefed_relevant --limit 20 --json
+uv run zotero-companion wiki-triage --queue needs_classification --limit 20 --json
+uv run zotero-companion wiki-triage --domain electrolyte-thermodynamics --json
 ~~~
 
 The `wiki/` directory is the durable agent-facing layer. Zotero remains the
@@ -74,31 +95,31 @@ remain metadata-based discovery aids until an assignment is recorded.
 The first sync is intentionally a dry run:
 
 ```bash
-uv run zotero-wiki wiki-sync --json
-uv run zotero-wiki wiki-sync --apply --json
+uv run zotero-companion wiki-sync --json
+uv run zotero-companion wiki-sync --apply --json
 ```
 
 The apply flag writes only repository files and never writes to Zotero. The
 generated SQLite index is ignored and can be rebuilt at any time:
 
 ```bash
-uv run zotero-wiki wiki-search "phase equilibrium" --json
-uv run zotero-wiki wiki-search "activity coefficient" --project epcsaft-equilibrium --json
-uv run zotero-wiki wiki-source ABCD2345 --json
-uv run zotero-wiki wiki-evidence ABCD2345 --query "Born diameter" --json
-uv run zotero-wiki wiki-context epcsaft-equilibrium --json
-uv run zotero-wiki wiki-context --global --query "Born activity coefficient" --json
-uv run zotero-wiki wiki-record equation:figiel-born-solvation-shell --json
-uv run zotero-wiki wiki-record-template equation --zotero-key YEENX35P --json
-uv run zotero-wiki wiki-paper-template YEENX35P --json
-uv run zotero-wiki wiki-lineage dataset:hamer-1972-aqueous-coefficients --json
-uv run zotero-wiki wiki-health --stale-source 28NPJ5H6 --json
-uv run zotero-wiki wiki-coverage --json
-uv run zotero-wiki wiki-lint --registry-root ../thermophysical-data-registry --json
-uv run zotero-wiki wiki-release --registry-root ../thermophysical-data-registry --json
-uv run zotero-wiki wiki-refresh --json
-uv run zotero-wiki wiki-verify --json
-uv run zotero-wiki wiki-stale --json
+uv run zotero-companion wiki-search "phase equilibrium" --json
+uv run zotero-companion wiki-search "activity coefficient" --project epcsaft-equilibrium --json
+uv run zotero-companion wiki-source ABCD2345 --json
+uv run zotero-companion wiki-evidence ABCD2345 --query "Born diameter" --json
+uv run zotero-companion wiki-context epcsaft-equilibrium --json
+uv run zotero-companion wiki-context --global --query "Born activity coefficient" --json
+uv run zotero-companion wiki-record equation:figiel-born-solvation-shell --json
+uv run zotero-companion wiki-record-template equation --zotero-key YEENX35P --json
+uv run zotero-companion wiki-paper-template YEENX35P --json
+uv run zotero-companion wiki-lineage dataset:hamer-1972-aqueous-coefficients --json
+uv run zotero-companion wiki-health --stale-source 28NPJ5H6 --json
+uv run zotero-companion wiki-coverage --json
+uv run zotero-companion wiki-lint --registry-root data/domains/thermophysical/source/registry --json
+uv run zotero-companion wiki-release --registry-root data/domains/thermophysical/source/registry --json
+uv run zotero-companion wiki-refresh --json
+uv run zotero-companion wiki-verify --json
+uv run zotero-companion wiki-stale --json
 ```
 
 Agent authority rules are deliberately explicit:
@@ -113,7 +134,7 @@ Agent authority rules are deliberately explicit:
 
 The project slugs currently scaffolded are `epcsaft-equilibrium`,
 `lithium-extraction`, and `mea-thermodynamics`. See [wiki/README.md](wiki/README.md)
-for the artifact contract.
+for the retained-file contract.
 
 The first full-text evidence candidate is [Figiel 2025](wiki/papers/Figiel2025.md).
 Its main article and supporting information already had companion Markdown
@@ -152,7 +173,7 @@ without scanning the folder layout. `wiki-source KEY` exposes the same
 brief/evidence routes under `wiki` without embedding PDF text.
 
 ```bash
-uv run zotero-wiki wiki-context epcsaft-equilibrium \
+uv run zotero-companion wiki-context epcsaft-equilibrium \
   --query "Born term mixed solvent" --json
 ```
 
@@ -168,9 +189,9 @@ are reviewed.
 Before a review or handoff, run the local-only checks:
 
 ```bash
-uv run zotero-wiki wiki-verify --json
-uv run zotero-wiki wiki-manifest-lint --registry-root ../thermophysical-data-registry --json
-uv run zotero-wiki wiki-release --registry-root ../thermophysical-data-registry --json
+uv run zotero-companion wiki-verify --json
+uv run zotero-companion wiki-manifest-lint --registry-root data/domains/thermophysical/source/registry --json
+uv run zotero-companion wiki-release --registry-root data/domains/thermophysical/source/registry --json
 uv run python scripts/benchmark_wiki.py --json
 uv run python scripts/agent_smoke.py --json
 ```
@@ -193,8 +214,8 @@ It never refreshes the repository implicitly. Use the explicit refresh gate
 only after reviewing its dry-run output:
 
 ```bash
-uv run zotero-wiki wiki-refresh --json
-uv run zotero-wiki wiki-refresh --apply --json
+uv run zotero-companion wiki-refresh --json
+uv run zotero-companion wiki-refresh --apply --json
 ```
 
 `wiki-refresh --apply` updates only generated source records, the catalog,
@@ -209,20 +230,20 @@ Build the bootstrapped plugin package with:
 uv run python scripts/build_plugin.py
 ```
 
-Install `dist/zotero-wiki-0.1.0.xpi` from Zotero's Add-ons manager, then
+Install `dist/zotero-companion-1.0.0.xpi` from Zotero's Add-ons manager, then
 restart Zotero once. The plugin runs in the background and adds these
 loopback-only endpoints to Zotero's existing local server:
 
-- `GET /zotero-wiki/status`
-- `POST /zotero-wiki/tag-cleanup` (dry-run unless an exact confirmation token is supplied)
-- `POST /zotero-wiki/saved-searches` (dry-run unless an exact confirmation token is supplied)
+- `GET /zotero-companion/status`
+- `POST /zotero-companion/tag-cleanup` (dry-run unless an exact confirmation token is supplied)
+- `POST /zotero-companion/saved-searches` (dry-run unless an exact confirmation token is supplied)
 
 The CLI never controls the desktop pointer or keyboard:
 
 ```bash
-uv run zotero-wiki plugin-status --json
-uv run zotero-wiki plugin-tag-cleanup --json
-uv run zotero-wiki plugin-searches --json
+uv run zotero-companion plugin-status --json
+uv run zotero-companion plugin-tag-cleanup --json
+uv run zotero-companion plugin-searches --json
 ```
 
 Mutating commands are deliberately separate and explicit (`--apply`). They
@@ -233,22 +254,22 @@ are not run as part of installation or startup.
 Check the key file and local API without changing Zotero:
 
 ```bash
-uv run zotero-wiki local-status --json
+uv run zotero-companion local-status --json
 ```
 
 The REST organization commands are dry-run by default:
 
 ```bash
-uv run zotero-wiki local-tag-cleanup --json
-uv run zotero-wiki local-searches --json
+uv run zotero-companion local-tag-cleanup --json
+uv run zotero-companion local-searches --json
 ```
 
 Only run an apply command after reviewing its dry-run output and confirming
 the intended scope:
 
 ```bash
-uv run zotero-wiki local-tag-cleanup --apply --json
-uv run zotero-wiki local-searches --apply --json
+uv run zotero-companion local-tag-cleanup --apply --json
+uv run zotero-companion local-searches --apply --json
 ```
 
 Item tag updates preserve unrelated tags and use the item's version when the

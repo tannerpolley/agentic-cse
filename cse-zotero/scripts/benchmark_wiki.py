@@ -20,8 +20,8 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
-from zotero_wiki.records import lineage, record_lookup, search_records  # noqa: E402
-from zotero_wiki.wiki import search_evidence_chunks  # noqa: E402
+from zotero_companion.records import lineage, record_lookup, search_records  # noqa: E402
+from zotero_companion.wiki import search_evidence_chunks  # noqa: E402
 
 
 def _read_tasks(path: Path) -> list[dict[str, Any]]:

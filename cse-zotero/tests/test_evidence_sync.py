@@ -2,8 +2,8 @@ import json
 from pathlib import Path
 from urllib.parse import unquote
 
-from zotero_wiki.evidence_sync import sync_evidence
-from zotero_wiki.wiki import WikiSnapshot, materialize_snapshot
+from zotero_companion.evidence_sync import sync_evidence
+from zotero_companion.wiki import WikiSnapshot, materialize_snapshot
 
 
 class CompanionAPI:

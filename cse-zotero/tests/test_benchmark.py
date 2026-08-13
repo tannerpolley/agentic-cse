@@ -7,7 +7,7 @@ REPO_ROOT = Path(__file__).resolve().parents[1]
 
 def _benchmark_module():
     path = REPO_ROOT / "scripts/benchmark_wiki.py"
-    spec = importlib.util.spec_from_file_location("zotero_wiki_benchmark", path)
+    spec = importlib.util.spec_from_file_location("zotero_companion_benchmark", path)
     assert spec is not None and spec.loader is not None
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)

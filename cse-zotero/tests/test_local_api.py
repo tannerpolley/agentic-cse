@@ -1,6 +1,6 @@
 import json
 
-from zotero_wiki.local_api import ZoteroLocalAPI
+from zotero_companion.local_api import ZoteroLocalAPI
 
 
 class FakeResponse:

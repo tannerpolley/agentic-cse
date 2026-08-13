@@ -3,14 +3,19 @@ requires = ["setuptools>=68"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "zotero-wiki"
-version = "0.1.0"
-description = "Read-only Zotero inventory, agent wiki materialization, and staged automation"
+name = "zotero-companion"
+version = "1.0.0"
+description = "Source-linked research synthesis and scientific data companion for Zotero"
 requires-python = ">=3.11"
-dependencies = []
+dependencies = [
+    "datalad>=1.3,<2",
+    "duckdb>=1.4,<2",
+    "linkml>=1.9,<2",
+]
 
 [project.scripts]
-zotero-wiki = "zotero_wiki.cli:main"
+zotero-companion = "zotero_companion.cli:main"
 
 [tool.pytest.ini_options]
+pythonpath = ["src", "."]
 testpaths = ["tests"]
