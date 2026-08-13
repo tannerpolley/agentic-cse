@@ -1,0 +1,3 @@
+*.svg linguist-generated=true
+analyses/**/results/*.csv linguist-generated=true
+analyses/**/results/*.parquet linguist-generated=true
