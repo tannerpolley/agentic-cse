@@ -18,7 +18,7 @@ first finding and do not infer its contents.
 
 ## Review method
 
-Start with the plugin repository. Read its manifest, README, AGENTS.md, all eight
+Start with the plugin repository. Read its manifest, README, AGENTS.md, all ten
 public skill files, all shared references, validation scripts, and tests. Then
 read the design documents under docs/design/. After that, inspect the example's
 PROFILE.md, README.md, docs/scientific/CONTEXT.md, formulation.tex, methods.tex,
@@ -61,14 +61,14 @@ Assess the following dimensions against the repository evidence:
    distinguish code verification, solution verification, model validation,
    numerical uncertainty, and physical uncertainty without overpromising?
 4. **Skill routing and continuity.** Do setup, research, construct, build,
-   analyze, summarize, write, and review form a coherent route? Are the
+   analyze, summarize, write, review, zotero, and mathpix form a coherent route? Are the
    continuation rules useful, or do entrypoint overlap and repeated alignment
    questions create friction?
 5. **Grilling quality.** Are the material questions strong enough to expose
    missing scientific context and weak claims without turning every task into a
    rigid questionnaire or blocking ordinary work?
 6. **Sources and Zotero Companion.** Is the authority boundary between Zotero,
-   Companion, repository snapshots, remote search, and optional DataLad clear?
+   Companion, repository snapshots, and remote search clear?
    Are paper acquisition, exact locators, private attachments, provenance, and
    correction permissions safe and practical?
 7. **Writing and plotting support.** Do the notebook, manuscript, bibliography,
@@ -121,14 +121,14 @@ If a priority level has no findings, say so explicitly.
 
 ### Scientific workflow coverage
 
-Map the eight skills and the example to the work they actually support. Identify
+Map the ten skills and the example to the work they actually support. Identify
 missing workflows and explain which should be added, clarified, delegated to the
 user's repository, or deliberately left out.
 
 ### Self-containment, privacy, and installation review
 
 Check the runtime boundary, private-repository assumptions, Zotero and Companion
-permissions, optional DataLad gate, manifest, validation, deployment, and
+permissions, capability gates, manifest, validation, deployment, and
 fresh-task behavior. Cite the exact files. State any claim that is only an
 inference from local scripts rather than a verified live behavior.
 
@@ -143,8 +143,8 @@ scientific examples, or evaluation evidence over generic refactoring.
 Answer plainly:
 
 - Would you keep using this plugin for a new numerical research repository?
-- Would you recommend it for external review or early private testing?
-- What evidence is still needed before calling it ready for broader release?
+- Would you keep using it for Tanner's intended private scientific work?
+- What evidence is still needed before calling it genuinely useful and well built for that purpose?
 
 Keep the review independent, specific, and scientifically grounded. Do not make
 repository changes as part of this review.

@@ -34,7 +34,7 @@ Scientific Codex does not:
 - require Project Truss, Superpowers, Matt Pocock skills, a generic workflow,
   GitHub Actions, issue hierarchy, coverage percentages, or a lifecycle
   database;
-- install DataLad, mutate Zotero, automate publisher pages, or guess full-text
+- prescribe dataset versioning, mutate Zotero, automate publisher pages, or guess full-text
   URLs without the user-controlled route; or
 - force every project into the heat-equation example's equations, units,
   tolerances, or claim boundary.
@@ -58,10 +58,10 @@ skills stay intentionally thin and route through shared references:
 - [`github-and-git.md`](../../references/github-and-git.md) defines the
   authoritative GitHub lifecycle and guarded synchronization and cleanup.
 - [`zotero-companion.md`](../../references/zotero-companion.md) defines the
-  Zotero authority, source lineage, optional Companion layers, and DataLad
-  gate.
+  Zotero authority, Companion capability contract, exact source lineage,
+  bibliography, and on-demand extraction boundaries.
 
-The eight public entrypoints are:
+The ten public entrypoints are:
 
 | Entry point | Main endpoint | Next route when work continues |
 | --- | --- | --- |
@@ -73,15 +73,17 @@ The eight public entrypoints are:
 | [`summarize`](../../skills/summarize/SKILL.md) | A durable research-notebook slice | `write` or `review` |
 | [`write`](../../skills/write/SKILL.md) | Evidence-supported papers, reports, captions, and LaTeX | `review` |
 | [`review`](../../skills/review/SKILL.md) | Whole-chain scientific and repository review | Route material corrections to the owning skill |
+| [`zotero`](../../skills/zotero/SKILL.md) | Live and curated Zotero evidence with exact locators | Return evidence to the invoking skill or route a missing Markdown child to `mathpix` |
+| [`mathpix`](../../skills/mathpix/SKILL.md) | Last-resort source-linked PDF transcription | Return the verified companion to the invoking skill |
 
-Every front door first inspects the repository and asks at least one material
-question round. After confirmation it continues in the same task. This is
-adaptive alignment, not a stage-by-stage stop ritual.
+The initial front door inspects the repository and asks a material question
+round. After confirmation, internal handoffs inherit decisions and ask only
+delta questions. This is adaptive alignment, not a stage-by-stage stop ritual.
 
 At runtime the plugin is self-contained. It does not invoke Project Truss,
 Superpowers, Matt Pocock skills, or another workflow family. The installed
 surface is Markdown, YAML, and JSON. Repository work can use the local shell,
-Git, `gh`, Python, LaTeX, Zotero, Companion, and DataLad when the user's
+Git, `gh`, Python, LaTeX, Zotero, and the separately installed Companion when the user's
 repository and environment provide them; those are workflow capabilities, not
 hidden plugin dependencies.
 
@@ -89,7 +91,7 @@ hidden plugin dependencies.
 
 ```text
 .codex-plugin/plugin.json       installable manifest and interface metadata
-skills/<entrypoint>/SKILL.md    eight public routes and their agent metadata
+skills/<entrypoint>/SKILL.md    ten public routes and their agent metadata
 references/*.md                 shared scientific, numerical, Git, and source doctrine
 scripts/validate.sh             source validation and contract checks
 scripts/sync-live.sh             guarded source-to-marketplace deployment
@@ -143,7 +145,7 @@ currently:
 
 The contract tests in
 [`tests/test_contract.py`](../../tests/test_contract.py) protect the manifest,
-the exact eight-skill surface, thin skills, shared-reference links, opening
+the exact ten-skill surface, thin skills, shared-reference links, opening
 alignment anchors, numerical doctrine, optional GitHub features, forbidden
 runtime workflow names, and the absence of generic coverage assumptions.
 [`tests/test_scripts.py`](../../tests/test_scripts.py) exercises bibliography
@@ -176,10 +178,10 @@ and leave Zotero corrections and paper acquisition to a previewed,
 user-controlled route. Private paths and PDFs should not enter the plugin cache
 or a public repository.
 
-Retained source and large data normally use DataLad and git-annex. Setup checks
-both capabilities and asks before installation. A local Better BibTeX export
-may be recorded in user configuration and synchronized one way into a
-repository snapshot; the snapshot is never hand-edited.
+Each project declares its data authority, formats, lineage, retention,
+versioning, and recovery. Companion provides a local corpus, LinkML schema,
+DuckDB indexes, and a path-sanitized Better BibTeX export. Project snapshots
+contain only cited records and are never hand-edited.
 
 ## Limitations and high-value review questions
 
@@ -198,7 +200,7 @@ An external review would be most valuable on these questions:
 - Do the numerical and uncertainty rules distinguish code correctness,
   discretization error, physical validation, and scientific acceptance in
   practice?
-- Do the eight skills form a coherent route with useful continuity, or do they
+- Do the ten skills form a coherent route with useful continuity, or do they
   duplicate concepts and create unnecessary friction?
 - Is the grilling quality material and adaptive without blocking ordinary work?
 - Is the Zotero and Companion boundary safe, understandable, and useful for

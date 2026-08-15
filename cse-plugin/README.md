@@ -2,7 +2,7 @@
 
 Scientific Codex gives Codex a science-first working method for computational research. It keeps attention on the scientific question, equations, numerical method, reference cases, uncertainty, interpretation, and supported writing.
 
-The plugin exposes eight front doors:
+The plugin exposes ten front doors:
 
 - `setup` establishes repository vocabulary and scientific conventions.
 - `research` investigates literature, theory, and data.
@@ -12,8 +12,10 @@ The plugin exposes eight front doors:
 - `summarize` records a complete analysis slice.
 - `write` develops an evidence-supported manuscript.
 - `review` examines the complete scientific reasoning chain.
+- `zotero` retrieves and manages source-linked Zotero evidence through Companion.
+- `mathpix` extracts equation-rich Zotero PDFs only when no Markdown child exists.
 
-Every front door inspects the current state, asks at least one material question round, confirms its interpretation, and then continues to the requested endpoint or a precise blocker. Scientific Codex does not require Project Truss, Matt Pocock skills, Superpowers, GitHub Actions, issue hierarchy, or coverage targets.
+The initial front door inspects current state, asks a material question round, confirms its interpretation, and then continues to the requested endpoint or a precise blocker. Internal handoffs inherit confirmed decisions and ask only delta questions. Scientific Codex does not require Project Truss, Matt Pocock skills, Superpowers, generic Zotero or Mathpix skills, GitHub Actions, issue hierarchy, or coverage targets.
 
 ## Validate
 
