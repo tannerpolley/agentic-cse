@@ -16,7 +16,11 @@ python3 "$plugin_validator" "$plugin_root"
 for skill in "$plugin_root"/skills/*; do
   python3 "$skill_validator" "$skill"
 done
-python3 -m unittest discover -s "$plugin_root/tests" -v
+if [[ -d "$plugin_root/tests" ]]; then
+  python3 -m unittest discover -s "$plugin_root/tests" -v
+else
+  echo "Source-only contract tests are absent from this installed payload; structural validation continues."
+fi
 python3 "$plugin_root/scripts/check_prose.py" \
   "$plugin_root/.codex-plugin" "$plugin_root/skills" "$plugin_root/references" \
   "$plugin_root/assets" "$plugin_root/README.md" "$plugin_root/AGENTS.md"
