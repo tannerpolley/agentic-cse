@@ -22,6 +22,7 @@ from .corpus_migration import CorpusMigrationError, migrate_corpus
 from .coverage import CoverageError, coverage_report
 from .evidence_sync import EvidenceSyncError, sync_evidence
 from .local_api import LocalAPIError, ZoteroLocalAPI
+from .mathpix_ops import MathpixOperationError, mathpix_conversion
 from .manifests import ManifestError, lint_manifests, load_manifests, manifest_lookup
 from .plugin_client import PluginClientError, ZoteroPluginClient
 from .health import health_report
@@ -37,6 +38,7 @@ from .release import ReleaseError, release_plan
 from .registry_migration import RegistryMigrationError, build_registry_pack
 from .report import audit_payload
 from .scientific_data import ScientificDataError, query_table, validate_catalog
+from .source_ops import attachment_path, search_sources, source_children
 from .templates import paper_brief_template, record_template
 from .wiki import (
     WikiError,
@@ -96,6 +98,28 @@ def main() -> int:
     bibliography.add_argument("--config", type=Path, default=default_config_path())
     bibliography.add_argument("--apply", action="store_true")
     bibliography.add_argument("--json", action="store_true")
+    zotero_search = subparsers.add_parser("zotero-search", help="search live top-level Zotero sources")
+    zotero_search.add_argument("query")
+    zotero_search.add_argument("--limit", type=int, default=25)
+    zotero_search.add_argument("--json", action="store_true")
+    zotero_children = subparsers.add_parser("zotero-children", help="list live children of one Zotero parent")
+    zotero_children.add_argument("parent_key")
+    zotero_children.add_argument("--json", action="store_true")
+    zotero_path = subparsers.add_parser("zotero-attachment-path", help="resolve one live Zotero attachment path")
+    zotero_path.add_argument("attachment_key")
+    zotero_path.add_argument("--json", action="store_true")
+    mathpix_convert = subparsers.add_parser("mathpix-convert", help="plan or convert one confirmed Zotero PDF")
+    mathpix_convert.add_argument("parent_key")
+    mathpix_convert.add_argument("pdf_key")
+    mathpix_convert.add_argument("--out", type=Path)
+    mathpix_convert.add_argument("--config", type=Path, default=default_config_path())
+    mathpix_convert.add_argument("--apply", action="store_true")
+    mathpix_convert.add_argument("--json", action="store_true")
+    zotero_attach = subparsers.add_parser("zotero-attach-companion", help="plan or attach one linked Markdown child")
+    zotero_attach.add_argument("parent_key")
+    zotero_attach.add_argument("companion", type=Path)
+    zotero_attach.add_argument("--apply", action="store_true")
+    add_writer_options(zotero_attach)
     corpus_migrate = subparsers.add_parser(
         "corpus-migrate",
         help="plan or copy the checkout corpus into configured user-owned storage",
@@ -380,6 +404,38 @@ def main() -> int:
     wiki_stale = subparsers.add_parser("wiki-stale", help="compare the wiki with a fresh Zotero read")
     add_wiki_options(wiki_stale)
     args = parser.parse_args()
+    if args.command in {
+        "zotero-search",
+        "zotero-children",
+        "zotero-attachment-path",
+        "mathpix-convert",
+        "zotero-attach-companion",
+    }:
+        try:
+            if args.command == "zotero-search":
+                payload = search_sources(args.query, limit=args.limit)
+            elif args.command == "zotero-children":
+                payload = source_children(args.parent_key)
+            elif args.command == "zotero-attachment-path":
+                payload = attachment_path(args.attachment_key)
+            elif args.command == "mathpix-convert":
+                payload = mathpix_conversion(
+                    args.parent_key,
+                    args.pdf_key,
+                    load_config(args.config),
+                    destination=args.out,
+                    apply=args.apply,
+                )
+            else:
+                payload = ZoteroLocalAPIWriter(key_path=args.key_file).linked_attachment(
+                    args.parent_key,
+                    args.companion,
+                    apply=args.apply,
+                )
+        except (ConfigError, LocalAPIError, MathpixOperationError, WriterError, OSError, ValueError) as exc:
+            parser.error(str(exc))
+        emit_json(payload)
+        return 0 if payload.get("ok", True) else 1
     if args.command in {"doctor", "init", "bibliography-export", "corpus-migrate"}:
         try:
             if args.command == "init":

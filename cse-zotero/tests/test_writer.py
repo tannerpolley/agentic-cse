@@ -273,3 +273,38 @@ def test_search_apply_uses_library_version_precondition(tmp_path):
 
     assert result["mode"] == "apply"
     assert result["precondition"] == {"library_version": 8}
+
+
+def test_linked_companion_is_dry_run_first_and_returns_child_key(tmp_path):
+    calls = []
+    companion = tmp_path / "paper.mmd"
+    companion.write_text("# extracted\n", encoding="utf-8")
+
+    def opener(request, timeout):
+        calls.append(request)
+        path = urlsplit(request.full_url).path
+        if request.method == "GET" and path.endswith("/items/PARENT1"):
+            return FakeResponse(
+                value={"key": "PARENT1", "data": {"itemType": "journalArticle"}},
+                headers={"Last-Modified-Version": "22"},
+            )
+        if request.method == "GET" and path == "/api/":
+            return FakeResponse(headers={"Zotero-Server-ID": SERVER_ID}, body=b"")
+        if request.method == "POST" and path == "/api/users/0/items":
+            assert request_header(request, "If-Unmodified-Since-Version") == "22"
+            attachment = json.loads(request.data)[0]
+            assert attachment["parentItem"] == "PARENT1"
+            assert attachment["path"] == str(companion.resolve())
+            return FakeResponse(
+                value={"successful": {"0": {"key": "CHILD123"}}},
+                headers={"Zotero-Server-ID": SERVER_ID},
+            )
+        raise AssertionError(f"unexpected request {request.method} {path}")
+
+    writer = ZoteroLocalAPIWriter(key_path=write_key(tmp_path), opener=opener)
+    plan = writer.linked_attachment("PARENT1", companion)
+    assert plan["mode"] == "dry-run"
+    assert len(calls) == 1
+
+    applied = writer.linked_attachment("PARENT1", companion, apply=True)
+    assert applied["attachment_key"] == "CHILD123"

@@ -449,6 +449,73 @@ class ZoteroLocalAPIWriter:
             write_token=uuid.uuid4().hex,
         )
 
+    def linked_attachment(
+        self,
+        parent_key: str,
+        companion: Path,
+        *,
+        apply: bool = False,
+    ) -> dict[str, Any]:
+        """Plan or create one linked Markdown child attachment."""
+        parent_key = parent_key.strip()
+        companion = Path(companion).expanduser().resolve()
+        if not parent_key:
+            raise WriterError("parent Zotero key must not be empty")
+        if companion.suffix.casefold() not in {".md", ".mmd"} or not companion.is_file():
+            raise WriterError(f"Companion must be an existing .md or .mmd file: {companion}")
+        response = self._request(
+            f"/api/users/0/items/{urllib.parse.quote(parent_key, safe='')}",
+            method="GET",
+        )
+        parent = _json_body(response.body)
+        if not isinstance(parent, dict) or str(parent.get("key", "")) != parent_key:
+            raise WriterError(f"Zotero parent item is unavailable: {parent_key}")
+        version_raw = _header(response.headers, "Last-Modified-Version")
+        try:
+            library_version = int(version_raw) if version_raw is not None else None
+        except ValueError:
+            library_version = None
+        if library_version is None:
+            raise WriterError("Refusing attachment creation without a library version precondition")
+        payload = {
+            "itemType": "attachment",
+            "parentItem": parent_key,
+            "linkMode": "linked_file",
+            "contentType": "text/markdown",
+            "path": str(companion),
+            "title": companion.name,
+            "tags": [],
+            "note": "",
+            "relations": {},
+        }
+        result: dict[str, Any] = {
+            "ok": True,
+            "mode": "apply" if apply else "dry-run",
+            "parent_key": parent_key,
+            "companion": str(companion),
+            "content_type": "text/markdown",
+            "link_mode": "linked_file",
+            "precondition": {"library_version": library_version},
+            "would_create": payload,
+        }
+        if apply:
+            created = self._request(
+                "/api/users/0/items",
+                method="POST",
+                payload=[payload],
+                authenticate=True,
+                if_unmodified_version=library_version,
+                write_token=uuid.uuid4().hex,
+            )
+            response_payload = _json_body(created.body)
+            successful = response_payload.get("successful", {}) if isinstance(response_payload, dict) else {}
+            first = successful.get("0", successful.get(0, {})) if isinstance(successful, dict) else {}
+            key = str(first.get("key", "")) if isinstance(first, dict) else ""
+            if not key:
+                raise WriterError("Zotero did not return a child key for the linked companion")
+            result.update({"written": True, "attachment_key": key})
+        return result
+
     def tag_cleanup(self, *, apply: bool = False) -> dict[str, Any]:
         """Plan or explicitly apply the approved manual-tag mapping."""
 

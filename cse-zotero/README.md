@@ -41,6 +41,16 @@ BibTeX export and atomically refreshes that file. The request enforces
 attachment path is still present. Refresh is task-triggered, not a background
 daemon, and the command never rewrites project bibliography consumers.
 
+## Scientific source front doors
+
+The installed CLI exposes live, read-only `zotero-search`, `zotero-children`,
+and `zotero-attachment-path` commands so callers do not need a second Zotero
+helper. `mathpix-convert` is dry-run first, requires recorded library consent,
+honors configured denied tags and collections, refuses a PDF with an existing
+Markdown child, and never mutates Zotero. `zotero-attach-companion` is a
+separate dry-run-first authenticated write for making an approved generated
+Markdown file visible as a linked Zotero child.
+
 ## Stages
 
 - **Stage 1:** read-only local API inventory and dry-run reports.

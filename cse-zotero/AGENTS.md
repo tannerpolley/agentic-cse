@@ -15,6 +15,11 @@ The canonical full-library Better BibTeX export is the path reported by
 the dry-run plan. The command enforces omission of local `file` paths and never
 updates project consumers; consumer snapshots are separate project changes.
 
+Use `zotero-search`, `zotero-children`, and `zotero-attachment-path` for live
+source reads. Use `mathpix-convert` only after its dry-run proves that no usable
+Markdown child exists and the consent denylist permits conversion. Attaching
+the result is a distinct `zotero-attach-companion` write with its own approval.
+
 ## Start of a research task
 
 Run `uv run zotero-companion doctor --json` first. Use the read-only wiki-triage

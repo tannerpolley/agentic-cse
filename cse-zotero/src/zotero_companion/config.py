@@ -19,6 +19,7 @@ CAPABILITIES = (
     "exact-source-locators-v1",
     "mathpix-on-demand-v1",
     "project-views-v1",
+    "zotero-linked-companion-v1",
     "zotero-local-api-v1",
 )
 
