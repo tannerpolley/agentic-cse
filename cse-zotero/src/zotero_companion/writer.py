@@ -357,6 +357,18 @@ class ZoteroLocalAPIWriter:
         self._server_id = discovered
         return discovered
 
+    def _current_library_version(self) -> int:
+        """Read the library-wide version used for optimistic write guards."""
+        response = self._request("/api/users/0/items?limit=1", method="GET")
+        version_raw = _header(response.headers, "Last-Modified-Version")
+        try:
+            library_version = int(version_raw) if version_raw is not None else None
+        except ValueError:
+            library_version = None
+        if library_version is None:
+            raise WriterError("Zotero local API did not report the current library version")
+        return library_version
+
     def status(self) -> dict[str, Any]:
         """Check API readiness and key-file readability without mutating Zotero."""
 
@@ -470,13 +482,7 @@ class ZoteroLocalAPIWriter:
         parent = _json_body(response.body)
         if not isinstance(parent, dict) or str(parent.get("key", "")) != parent_key:
             raise WriterError(f"Zotero parent item is unavailable: {parent_key}")
-        version_raw = _header(response.headers, "Last-Modified-Version")
-        try:
-            library_version = int(version_raw) if version_raw is not None else None
-        except ValueError:
-            library_version = None
-        if library_version is None:
-            raise WriterError("Refusing attachment creation without a library version precondition")
+        library_version = self._current_library_version()
         payload = {
             "itemType": "attachment",
             "parentItem": parent_key,

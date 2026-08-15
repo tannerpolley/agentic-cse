@@ -288,10 +288,13 @@ def test_linked_companion_is_dry_run_first_and_returns_child_key(tmp_path):
                 value={"key": "PARENT1", "data": {"itemType": "journalArticle"}},
                 headers={"Last-Modified-Version": "22"},
             )
+        if request.method == "GET" and path == "/api/users/0/items":
+            assert urlsplit(request.full_url).query == "limit=1"
+            return FakeResponse(value=[], headers={"Last-Modified-Version": "23"})
         if request.method == "GET" and path == "/api/":
             return FakeResponse(headers={"Zotero-Server-ID": SERVER_ID}, body=b"")
         if request.method == "POST" and path == "/api/users/0/items":
-            assert request_header(request, "If-Unmodified-Since-Version") == "22"
+            assert request_header(request, "If-Unmodified-Since-Version") == "23"
             attachment = json.loads(request.data)[0]
             assert attachment["parentItem"] == "PARENT1"
             assert attachment["path"] == str(companion.resolve())
@@ -304,7 +307,8 @@ def test_linked_companion_is_dry_run_first_and_returns_child_key(tmp_path):
     writer = ZoteroLocalAPIWriter(key_path=write_key(tmp_path), opener=opener)
     plan = writer.linked_attachment("PARENT1", companion)
     assert plan["mode"] == "dry-run"
-    assert len(calls) == 1
+    assert plan["precondition"] == {"library_version": 23}
+    assert len(calls) == 2
 
     applied = writer.linked_attachment("PARENT1", companion, apply=True)
     assert applied["attachment_key"] == "CHILD123"
