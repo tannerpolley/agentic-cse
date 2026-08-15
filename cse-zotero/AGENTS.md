@@ -2,17 +2,23 @@
 
 Repository Profile: scientific-computing
 
-This repository maintains source-linked research synthesis and scientific data
-for the local Zotero library. Zotero remains the bibliographic authority.
+This repository maintains the installable source-linked research companion for
+the local Zotero library. Zotero remains the bibliographic authority. The
+active corpus is configured user-owned state outside this package checkout.
 
 For the reusable agent operating protocol, read
 `.agent/skills/zotero-companion/SKILL.md` before a research task that crosses
 Zotero evidence, equations, data, implementation, or validation.
 
+The canonical full-library Better BibTeX export is the path reported by
+`doctor`. Refresh it only with `bibliography-export --apply` after reviewing
+the dry-run plan. The command enforces omission of local `file` paths and never
+updates project consumers; consumer snapshots are separate project changes.
+
 ## Start of a research task
 
-Use the read-only wiki-triage command to find relevant sources that still need
-a paper brief:
+Run `uv run zotero-companion doctor --json` first. Use the read-only wiki-triage
+command to find relevant sources that still need a paper brief:
 
     uv run zotero-companion wiki-triage --queue unbriefed_relevant --json
 
@@ -23,10 +29,11 @@ still unassigned:
 
 When a task crosses paper evidence, data, equations, implementation, or
 validation boundaries, first read docs/zotero-companion-design.md and CONTEXT.md
-in addition to wiki/index.md. The current project slugs are initial views, not
-the boundary of the Zotero corpus.
+in addition to `wiki/index.md` in the configured corpus. The current project
+slugs are initial views, not the boundary of the Zotero corpus.
 
-1. Read `wiki/index.md` and the relevant file under `wiki/projects/`.
+1. Read `wiki/index.md` and the relevant file under `wiki/projects/` in the
+   configured corpus reported by `doctor`; CLI commands resolve it by default.
 2. Use the local source index before searching the web:
    `uv run zotero-companion wiki-context <project> --query "<terms>" --json`.
    For cross-project questions start with
@@ -55,7 +62,7 @@ the boundary of the Zotero corpus.
 9. Run `wiki-evidence-sync --json` to discover existing Zotero `.md`/`.mmd`
    companions across the whole corpus. Review the plan before using
    `wiki-evidence-sync --apply --json`; this copies only existing companions
-   into the repository, never reads or copies PDFs, never runs Mathpix, and
+   into the configured corpus, never reads or copies PDFs, never runs Mathpix, and
    never writes to Zotero. Changed or conflicting evidence is refused rather
    than overwritten.
 
@@ -144,9 +151,9 @@ print, commit, or copy Mathpix authentication tokens.
 After a Zotero refresh, run `wiki-verify`, `wiki-stale`, and `wiki-coverage`.
 Append significant
 ingests, synthesis updates, and lint results to `wiki/log.md`; do not rewrite
-old log entries. `wiki-refresh` is explicit and repository-only: review its
+old log entries. `wiki-refresh` is explicit and corpus-only: review its
 dry-run output first, then use `wiki-refresh --apply` only when the generated
 source layer should be updated. It never mutates Zotero and never refreshes
-curated claims, graphs, or evidence companions automatically. Repository-
+curated claims, graphs, or evidence companions automatically. Corpus-
 generated source records may be rebuilt, but curated claims and synthesis
 require deliberate review.

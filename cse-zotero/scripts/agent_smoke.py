@@ -16,7 +16,13 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from zotero_companion.config import load_config
+
 ROOT = Path(__file__).resolve().parents[1]
+
+
+def _default_wiki_root() -> Path:
+    return load_config().wiki_root
 
 
 def _read_tasks(path: Path) -> list[dict[str, Any]]:
@@ -239,7 +245,7 @@ def run_smoke(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--wiki-root", type=Path, default=ROOT / "wiki")
+    parser.add_argument("--wiki-root", type=Path, default=_default_wiki_root())
     parser.add_argument("--tasks", type=Path, default=ROOT / "benchmarks/agent_tasks.json")
     parser.add_argument("--task-limit", type=int)
     parser.add_argument("--out", type=Path, help="explicitly write the report to this path")

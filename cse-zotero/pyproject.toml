@@ -8,7 +8,6 @@ version = "1.0.0"
 description = "Source-linked research synthesis and scientific data companion for Zotero"
 requires-python = ">=3.11"
 dependencies = [
-    "datalad>=1.3,<2",
     "duckdb>=1.4,<2",
     "linkml>=1.9,<2",
 ]

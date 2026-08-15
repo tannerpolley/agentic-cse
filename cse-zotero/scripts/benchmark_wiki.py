@@ -21,7 +21,12 @@ if str(ROOT / "src") not in sys.path:
     sys.path.insert(0, str(ROOT / "src"))
 
 from zotero_companion.records import lineage, record_lookup, search_records  # noqa: E402
+from zotero_companion.config import load_config  # noqa: E402
 from zotero_companion.wiki import search_evidence_chunks  # noqa: E402
+
+
+def _default_wiki_root() -> Path:
+    return load_config().wiki_root
 
 
 def _read_tasks(path: Path) -> list[dict[str, Any]]:
@@ -143,7 +148,7 @@ def run_benchmark(
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--wiki-root", type=Path, default=ROOT / "wiki")
+    parser.add_argument("--wiki-root", type=Path, default=_default_wiki_root())
     parser.add_argument("--tasks", type=Path, default=ROOT / "benchmarks/agent_tasks.json")
     parser.add_argument("--out", type=Path, help="explicitly write the JSON result to this path")
     parser.add_argument("--json", action="store_true", help="emit JSON (the default output)")

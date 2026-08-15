@@ -2,6 +2,7 @@ from pathlib import Path
 
 from zotero_companion.coverage import coverage_report
 from zotero_companion.wiki import WikiSnapshot, index_wiki, materialize_snapshot
+from corpus_paths import WIKI_ROOT
 
 
 def _snapshot() -> WikiSnapshot:
@@ -72,7 +73,7 @@ def test_metadata_brief_scaffolds_remain_in_the_unbriefed_queue(tmp_path: Path):
 
 
 def test_current_coverage_is_available_for_the_full_materialized_corpus():
-    report = coverage_report(Path(__file__).resolve().parents[1] / "wiki")
+    report = coverage_report(WIKI_ROOT)
 
     # The Zotero library is a live corpus; new top-level items must not make
     # the repository's coverage regression test fail solely because the count

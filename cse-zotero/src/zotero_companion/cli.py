@@ -5,7 +5,20 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import shutil
 
+from .better_bibtex import BetterBibTeXClient, BetterBibTeXError, configure_export, export_plan
+from .config import (
+    CAPABILITIES,
+    PROTOCOL_VERSION,
+    ConfigError,
+    config_payload,
+    default_config_path,
+    load_config,
+    proposed_config,
+    write_config,
+)
+from .corpus_migration import CorpusMigrationError, migrate_corpus
 from .coverage import CoverageError, coverage_report
 from .evidence_sync import EvidenceSyncError, sync_evidence
 from .local_api import LocalAPIError, ZoteroLocalAPI
@@ -56,8 +69,8 @@ def add_wiki_options(command: argparse.ArgumentParser) -> None:
     command.add_argument(
         "--wiki-root",
         type=Path,
-        default=Path("wiki"),
-        help="agent wiki directory (default: ./wiki)",
+        default=None,
+        help="agent wiki directory (default: configured local corpus/wiki)",
     )
     command.add_argument("--json", action="store_true", help="emit JSON")
 
@@ -69,6 +82,28 @@ def emit_json(payload: object) -> None:
 def main() -> int:
     parser = argparse.ArgumentParser(prog="zotero-companion")
     subparsers = parser.add_subparsers(dest="command", required=True)
+    doctor = subparsers.add_parser("doctor", help="report installed protocol and capability readiness")
+    doctor.add_argument("--config", type=Path, default=default_config_path())
+    doctor.add_argument("--json", action="store_true")
+    initialize = subparsers.add_parser("init", help="plan or initialize user-owned Companion configuration")
+    initialize.add_argument("--config", type=Path, default=default_config_path())
+    initialize.add_argument("--corpus-root", type=Path)
+    initialize.add_argument("--apply", action="store_true")
+    initialize.add_argument("--json", action="store_true")
+    bibliography = subparsers.add_parser(
+        "bibliography-export", help="plan or refresh the canonical Better BibTeX library export"
+    )
+    bibliography.add_argument("--config", type=Path, default=default_config_path())
+    bibliography.add_argument("--apply", action="store_true")
+    bibliography.add_argument("--json", action="store_true")
+    corpus_migrate = subparsers.add_parser(
+        "corpus-migrate",
+        help="plan or copy the checkout corpus into configured user-owned storage",
+    )
+    corpus_migrate.add_argument("--config", type=Path, default=default_config_path())
+    corpus_migrate.add_argument("--source-root", type=Path, default=Path.cwd())
+    corpus_migrate.add_argument("--apply", action="store_true")
+    corpus_migrate.add_argument("--json", action="store_true")
     schema_validate = subparsers.add_parser(
         "schema-validate", help="validate scientific data against a LinkML class"
     )
@@ -345,6 +380,60 @@ def main() -> int:
     wiki_stale = subparsers.add_parser("wiki-stale", help="compare the wiki with a fresh Zotero read")
     add_wiki_options(wiki_stale)
     args = parser.parse_args()
+    if args.command in {"doctor", "init", "bibliography-export", "corpus-migrate"}:
+        try:
+            if args.command == "init":
+                config = proposed_config(corpus_root=args.corpus_root)
+                payload = (
+                    write_config(config, args.config)
+                    if args.apply
+                    else config_payload(config, args.config, mode="dry-run")
+                )
+            else:
+                config = load_config(args.config, allow_proposed=args.command == "doctor")
+                if args.command == "corpus-migrate":
+                    payload = migrate_corpus(args.source_root, config, apply=args.apply)
+                elif args.command == "bibliography-export":
+                    payload = (
+                        configure_export(config.bibliography_export)
+                        if args.apply
+                        else export_plan(config.bibliography_export)
+                    )
+                else:
+                    zotero_ok = False
+                    zotero_error = ""
+                    try:
+                        ZoteroLocalAPI().get("/api/users/0/items", {"limit": 1})
+                        zotero_ok = True
+                    except LocalAPIError as exc:
+                        zotero_error = str(exc)
+                    bbt_ok = False
+                    bbt_error = ""
+                    bbt_version: dict[str, object] = {}
+                    try:
+                        bbt_version = BetterBibTeXClient().ready()
+                        bbt_ok = True
+                    except BetterBibTeXError as exc:
+                        bbt_error = str(exc)
+                    payload = {
+                        **config_payload(config, args.config, mode="read-only"),
+                        "protocol_version": PROTOCOL_VERSION,
+                        "capabilities": list(CAPABILITIES),
+                        "zotero": {"ok": zotero_ok, "error": zotero_error},
+                        "better_bibtex": {"ok": bbt_ok, "error": bbt_error, **bbt_version},
+                        "mathpix": {"mpx_on_path": shutil.which("mpx") is not None},
+                        "configuration_exists": Path(args.config).is_file(),
+                    }
+                    payload["ok"] = zotero_ok and bbt_ok and Path(args.config).is_file()
+        except (ConfigError, CorpusMigrationError, BetterBibTeXError, OSError, ValueError) as exc:
+            parser.error(str(exc))
+        emit_json(payload)
+        return 0 if payload.get("ok", True) else 1
+    if hasattr(args, "wiki_root") and args.wiki_root is None:
+        try:
+            args.wiki_root = load_config().wiki_root
+        except ConfigError as exc:
+            parser.error(str(exc))
     if args.command in {"schema-validate", "data-query", "registry-migrate"}:
         try:
             if args.command == "schema-validate":

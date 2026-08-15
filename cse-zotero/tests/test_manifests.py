@@ -2,14 +2,11 @@ import json
 from pathlib import Path
 
 from zotero_companion.manifests import lint_manifests, manifest_lookup
-
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-REGISTRY_ROOT = REPO_ROOT / "data/domains/thermophysical/source/registry"
+from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
 
 
 def test_project_manifests_pin_records_and_registry_paths():
-    root = REPO_ROOT / "wiki"
+    root = WIKI_ROOT
     checked = lint_manifests(
         root,
         registry_root=REGISTRY_ROOT,

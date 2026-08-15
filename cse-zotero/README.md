@@ -5,24 +5,41 @@ Zotero library. Zotero remains the authority for citations, collections, and
 attachments. Companion preserves exact source locators, typed scientific
 records, transformations, uncertainty, lineage, and domain data.
 
-The domain-neutral model is defined in
-[`schema/companion.yaml`](schema/companion.yaml). Scientific domains extend it;
-the first pack is [`schema/thermophysical.yaml`](schema/thermophysical.yaml).
-DataLad records the dataset history, LinkML validates record shape, and DuckDB
-queries retained CSV, Parquet, or JSON tables without a second database.
-All current files are smaller than 10 MB and remain ordinary Git content so the
-private GitHub repository is a complete recovery source. Before retaining a
-larger file, configure and verify a private git-annex content remote, then
-replace the current `annex.largefiles=nothing` rule with an explicit threshold.
-A local annex key alone is not accepted as recoverable storage.
+The installable package contains the domain-neutral LinkML model in
+[`schema/companion.yaml`](schema/companion.yaml) and optional domain packs such
+as [`schema/thermophysical.yaml`](schema/thermophysical.yaml). The active corpus
+is user-owned local state under the configured XDG data directory, not package
+content. LinkML validates retained record shape and DuckDB builds rebuildable
+indexes over declared CSV, Parquet, or JSON sources without becoming a second
+scientific authority.
+
+Each scientific project declares its own data authority, formats, lineage,
+retention, versioning, and recovery strategy. Companion does not prescribe a
+dataset versioning system.
 
 ```bash
+uv run zotero-companion init --json
+uv run zotero-companion doctor --json
 uv run zotero-companion schema-validate data/examples/core-records.yaml --json
 uv run zotero-companion data-query \
-  data/domains/thermophysical/normalized/registry-records.csv \
+  "$HOME/.local/share/zotero-companion/corpus/data/domains/thermophysical/normalized/registry-records.csv" \
   --sql "SELECT record_type, count(*) AS count FROM records GROUP BY record_type" --json
-uv run datalad status
 ```
+
+`init` is dry-run by default. `init --apply` creates the private configuration
+and empty corpus directories. For the one-time migration from an older source
+checkout, review `corpus-migrate --json`, then use `corpus-migrate --apply
+--json`; it copies and verifies files without deleting the source checkout.
+
+## Canonical bibliography
+
+The configured bibliography target defaults to
+`~/Zotero/exports/references.bib`. `bibliography-export` is dry-run by default;
+`bibliography-export --apply --json` requests a whole-personal-library Better
+BibTeX export and atomically refreshes that file. The request enforces
+`skipFields=file`, and Companion refuses to replace the target if a local
+attachment path is still present. Refresh is task-triggered, not a background
+daemon, and the command never rewrites project bibliography consumers.
 
 ## Stages
 
@@ -79,14 +96,14 @@ uv run zotero-companion wiki-triage --queue needs_classification --limit 20 --js
 uv run zotero-companion wiki-triage --domain electrolyte-thermodynamics --json
 ~~~
 
-The `wiki/` directory is the durable agent-facing layer. Zotero remains the
+The configured `corpus/wiki/` directory is the durable agent-facing layer. Zotero remains the
 bibliographic source of truth; `wiki/sources/`, `wiki/catalog.json`, and
 `wiki/manifest.json` are generated from Zotero and can be rebuilt. Human or
 agent interpretation belongs in `wiki/projects/` and `wiki/claims/`, where it
 must cite a Zotero key or another explicitly identified source.
 
-Reviewable corpus classification belongs in
-[`wiki/curation/source-assignments.json`](wiki/curation/source-assignments.json).
+Reviewable corpus classification belongs in the active corpus at
+`wiki/curation/source-assignments.json`.
 Use `wiki-classify` to prepare one classification at a time; it is dry-run by
 default and `--apply` changes only the repository assignment file and generated
 triage/index artifacts. `suggested_domains` and `suggested_research_threads`
@@ -133,10 +150,12 @@ Agent authority rules are deliberately explicit:
   do not silently overwrite curated claims during a sync.
 
 The project slugs currently scaffolded are `epcsaft-equilibrium`,
-`lithium-extraction`, and `mea-thermodynamics`. See [wiki/README.md](wiki/README.md)
+`lithium-extraction`, and `mea-thermodynamics`. See the active corpus's
+`wiki/README.md`
 for the retained-file contract.
 
-The first full-text evidence candidate is [Figiel 2025](wiki/papers/Figiel2025.md).
+The first full-text evidence candidate is the active corpus's
+`wiki/papers/Figiel2025.md`.
 Its main article and supporting information already had companion Markdown
 attachments in Zotero, which are used directly by the repo evidence bundle.
 For future PDFs without companions, use the repository-local Mathpix workflow:
@@ -178,10 +197,11 @@ uv run zotero-companion wiki-context epcsaft-equilibrium \
 ```
 
 The Figiel 2025 graph is at
-[`wiki/graphs/Figiel2025.nodegraph.json`](wiki/graphs/Figiel2025.nodegraph.json),
-and its atomic claims are under [`wiki/claims/`](wiki/claims/README.md).
+`wiki/graphs/Figiel2025.nodegraph.json` in the active corpus, and its atomic
+claims are under that corpus's `wiki/claims/` directory.
 
-The second vertical-slice evidence candidate is [Hamer 1972](wiki/papers/Hamer1972.md),
+The second vertical-slice evidence candidate is the active corpus's
+`wiki/papers/Hamer1972.md`,
 using the existing Zotero Markdown companion under `wiki/evidence/28NPJ5H6/`.
 Its registry data remains a staging candidate until basis and row membership
 are reviewed.

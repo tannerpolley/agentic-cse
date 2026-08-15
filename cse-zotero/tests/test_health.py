@@ -1,15 +1,10 @@
-from pathlib import Path
-
 from zotero_companion.health import health_report
-
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-REGISTRY_ROOT = REPO_ROOT / "data/domains/thermophysical/source/registry"
+from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
 
 
 def test_health_propagates_stale_source_to_linked_records_without_writes():
     report = health_report(
-        REPO_ROOT / "wiki",
+        WIKI_ROOT,
         stale_source_keys=["28NPJ5H6"],
         registry_root=REGISTRY_ROOT,
     )
@@ -25,7 +20,7 @@ def test_health_propagates_stale_source_to_linked_records_without_writes():
 
 def test_health_matches_registry_ids_and_reports_attention_records():
     report = health_report(
-        REPO_ROOT / "wiki",
+        WIKI_ROOT,
         changed_registry_ids=["registry:figiel2025-table1-water-relative-dielectric-constant"],
         registry_root=REGISTRY_ROOT,
     )

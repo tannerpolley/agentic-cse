@@ -1,14 +1,11 @@
 from pathlib import Path
 
 from zotero_companion.release import RELEASE_FILENAME, release_plan
-
-
-REPO_ROOT = Path(__file__).resolve().parents[1]
-REGISTRY_ROOT = REPO_ROOT / "data/domains/thermophysical/source/registry"
+from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
 
 
 def test_release_dry_run_is_local_and_reports_reproducibility_state():
-    root = REPO_ROOT / "wiki"
+    root = WIKI_ROOT
     release_path = root / RELEASE_FILENAME
     before = release_path.read_bytes() if release_path.exists() else None
     output = release_plan(

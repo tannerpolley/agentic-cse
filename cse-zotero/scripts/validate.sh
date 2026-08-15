@@ -4,7 +4,11 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-registry_root="data/domains/thermophysical/source/registry"
+companion_status="$(uv run zotero-companion doctor --json || true)"
+wiki_root="$(jq -r '.wiki_root' <<<"$companion_status")"
+data_root="$(jq -r '.data_root' <<<"$companion_status")"
+registry_root="$data_root/domains/thermophysical/source/registry"
+normalized_records="$data_root/domains/thermophysical/normalized/registry-records.csv"
 
 uv run linkml-validate schema/companion.yaml schema/thermophysical.yaml
 uv run zotero-companion schema-validate data/examples/core-records.yaml --json \
@@ -34,10 +38,8 @@ uv run python scripts/build_plugin.py --output "$plugin_package" >/dev/null
 node --test tests/test_plugin_plan.mjs
 
 uv run zotero-companion data-query \
-  data/domains/thermophysical/normalized/registry-records.csv \
+  "$normalized_records" \
   --sql 'SELECT record_type, count(*) AS count FROM records GROUP BY record_type ORDER BY record_type' \
   --json | jq -e '.rows | length == 5' >/dev/null
-
-uv run datalad status --annex all >/dev/null
 
 echo "Zotero Companion validation passed."
