@@ -61,7 +61,7 @@ skills stay intentionally thin and route through shared references:
   Zotero authority, Companion capability contract, exact source lineage,
   bibliography, and on-demand extraction boundaries.
 
-The ten public entrypoints are:
+The twelve public entrypoints are:
 
 | Entry point | Main endpoint | Next route when work continues |
 | --- | --- | --- |
@@ -70,6 +70,8 @@ The ten public entrypoints are:
 | [`construct`](../../skills/construct/SKILL.md) | A complete question and native GitHub issue | `build`, `analyze`, or `write` |
 | [`build`](../../skills/build/SKILL.md) | Equations, models, numerical methods, solvers, or data transformations | `analyze`, then `summarize` or `review` |
 | [`analyze`](../../skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `summarize`, `write`, or `review` |
+| [`plot`](../../skills/plot/SKILL.md) | Model-versus-data figures with retained values and explicit visual semantics | `review` or `analyze` |
+| [`digitize`](../../skills/digitize/SKILL.md) | Calibrated extraction from source figures with QA and provenance | `analyze` or `review` |
 | [`summarize`](../../skills/summarize/SKILL.md) | A durable research-notebook slice | `write` or `review` |
 | [`write`](../../skills/write/SKILL.md) | Evidence-supported papers, reports, captions, and LaTeX | `review` |
 | [`review`](../../skills/review/SKILL.md) | Whole-chain scientific and repository review | Route material corrections to the owning skill |
@@ -91,7 +93,7 @@ hidden plugin dependencies.
 
 ```text
 .codex-plugin/plugin.json       installable manifest and interface metadata
-skills/<entrypoint>/SKILL.md    ten public routes and their agent metadata
+skills/<entrypoint>/SKILL.md    twelve public routes and their agent metadata
 references/*.md                 shared scientific, numerical, Git, and source doctrine
 scripts/validate.sh             source validation and contract checks
 scripts/sync-live.sh             guarded source-to-marketplace deployment

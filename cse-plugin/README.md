@@ -2,13 +2,15 @@
 
 Scientific Codex gives Codex a science-first working method for computational research. It keeps attention on the scientific question, equations, numerical method, reference cases, uncertainty, interpretation, and supported writing.
 
-The plugin exposes ten front doors:
+The plugin exposes twelve front doors:
 
 - `setup` establishes repository vocabulary and scientific conventions.
 - `research` investigates literature, theory, and data.
 - `construct` formulates substantive work and publishes its GitHub issue.
 - `build` implements models and numerical methods.
 - `analyze` runs numerical studies and creates figures.
+- `plot` creates clear model-versus-data figures from retained values.
+- `digitize` extracts calibrated values from source figures with QA evidence.
 - `summarize` records a complete analysis slice.
 - `write` develops an evidence-supported manuscript.
 - `review` examines the complete scientific reasoning chain.

@@ -61,7 +61,7 @@ Assess the following dimensions against the repository evidence:
    distinguish code verification, solution verification, model validation,
    numerical uncertainty, and physical uncertainty without overpromising?
 4. **Skill routing and continuity.** Do setup, research, construct, build,
-   analyze, summarize, write, review, zotero, and mathpix form a coherent route? Are the
+   analyze, plot, digitize, summarize, write, review, zotero, and mathpix form a coherent route? Are the
    continuation rules useful, or do entrypoint overlap and repeated alignment
    questions create friction?
 5. **Grilling quality.** Are the material questions strong enough to expose
