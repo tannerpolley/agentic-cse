@@ -61,7 +61,7 @@ skills stay intentionally thin and route through shared references:
   Zotero authority, Companion capability contract, exact source lineage,
   bibliography, and on-demand extraction boundaries.
 
-The twelve public entrypoints are:
+The eight workflow entrypoints are:
 
 | Entry point | Main endpoint | Next route when work continues |
 | --- | --- | --- |
@@ -70,15 +70,20 @@ The twelve public entrypoints are:
 | [`construct`](../../skills/construct/SKILL.md) | A complete question and native GitHub issue | `build`, `analyze`, or `write` |
 | [`build`](../../skills/build/SKILL.md) | Equations, models, numerical methods, solvers, or data transformations | `analyze`, then `summarize` or `review` |
 | [`analyze`](../../skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `summarize`, `write`, or `review` |
-| [`plot`](../../skills/plot/SKILL.md) | Model-versus-data figures with retained values and explicit visual semantics | `review` or `analyze` |
-| [`digitize`](../../skills/digitize/SKILL.md) | Calibrated extraction from source figures with QA and provenance | `analyze` or `review` |
 | [`summarize`](../../skills/summarize/SKILL.md) | A durable research-notebook slice | `write` or `review` |
 | [`write`](../../skills/write/SKILL.md) | Evidence-supported papers, reports, captions, and LaTeX | `review` |
 | [`review`](../../skills/review/SKILL.md) | Whole-chain scientific and repository review | Route material corrections to the owning skill |
-| [`zotero`](../../skills/zotero/SKILL.md) | Live and curated Zotero evidence with exact locators | Return evidence to the invoking skill or route a missing Markdown child to `mathpix` |
-| [`mathpix`](../../skills/mathpix/SKILL.md) | Last-resort source-linked PDF transcription | Return the verified companion to the invoking skill |
 
-The initial front door inspects the repository and asks a material question
+Supporting tools are public skills, but they are not workflow stages:
+
+| Tool | Role | Returns to |
+| --- | --- | --- |
+| [`zotero`](../../skills/zotero/SKILL.md) | Retrieve, inspect, and cite source evidence | Invoking workflow stage |
+| [`mathpix`](../../skills/mathpix/SKILL.md) | Create a source-linked Markdown companion from a confirmed Zotero PDF when no usable child exists | Invoking workflow stage |
+| [`plot`](../../skills/plot/SKILL.md) | Render or review figures from retained values with explicit visual semantics | `analyze`, `summarize`, `write`, or `review` |
+| [`digitize`](../../skills/digitize/SKILL.md) | Recover calibrated values from source figures with independent QA | `analyze` or `review` |
+
+The initial workflow entrypoint inspects the repository and asks a material question
 round. After confirmation, internal handoffs inherit decisions and ask only
 delta questions. This is adaptive alignment, not a stage-by-stage stop ritual.
 
@@ -93,7 +98,7 @@ hidden plugin dependencies.
 
 ```text
 .codex-plugin/plugin.json       installable manifest and interface metadata
-skills/<entrypoint>/SKILL.md    twelve public routes and their agent metadata
+skills/<stage-or-tool>/SKILL.md eight workflow routes plus four supporting tools
 references/*.md                 shared scientific, numerical, Git, and source doctrine
 scripts/validate.sh             source validation and contract checks
 scripts/sync-live.sh             guarded source-to-marketplace deployment
@@ -147,9 +152,10 @@ currently:
 
 The contract tests in
 [`tests/test_contract.py`](../../tests/test_contract.py) protect the manifest,
-the exact ten-skill surface, thin skills, shared-reference links, opening
-alignment anchors, numerical doctrine, optional GitHub features, forbidden
-runtime workflow names, and the absence of generic coverage assumptions.
+the exact eight-workflow/four-tool skill surface, thin skills, shared-reference
+links, opening alignment anchors, numerical doctrine, optional GitHub features,
+forbidden runtime workflow names, and the absence of generic coverage
+assumptions.
 [`tests/test_scripts.py`](../../tests/test_scripts.py) exercises bibliography
 synchronization, prose rejection, marketplace preservation, and deployment
 rollback. This is a front-door and scientific-doctrine suite, not a
@@ -202,8 +208,8 @@ An external review would be most valuable on these questions:
 - Do the numerical and uncertainty rules distinguish code correctness,
   discretization error, physical validation, and scientific acceptance in
   practice?
-- Do the ten skills form a coherent route with useful continuity, or do they
-  duplicate concepts and create unnecessary friction?
+- Do the eight workflow stages form a coherent route with useful continuity,
+  and do the four supporting tools avoid becoming competing stages?
 - Is the grilling quality material and adaptive without blocking ordinary work?
 - Is the Zotero and Companion boundary safe, understandable, and useful for
   source-linked research?

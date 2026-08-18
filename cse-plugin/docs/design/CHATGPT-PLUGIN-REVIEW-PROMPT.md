@@ -18,8 +18,8 @@ first finding and do not infer its contents.
 
 ## Review method
 
-Start with the plugin repository. Read its manifest, README, AGENTS.md, all ten
-public skill files, all shared references, validation scripts, and tests. Then
+Start with the plugin repository. Read its manifest, README, AGENTS.md, all
+twelve public skill files, all shared references, validation scripts, and tests. Then
 read the design documents under docs/design/. After that, inspect the example's
 PROFILE.md, README.md, docs/scientific/CONTEXT.md, formulation.tex, methods.tex,
 evidence.tex, writing rules, setup validator, bibliography helper, and the
@@ -61,9 +61,10 @@ Assess the following dimensions against the repository evidence:
    distinguish code verification, solution verification, model validation,
    numerical uncertainty, and physical uncertainty without overpromising?
 4. **Skill routing and continuity.** Do setup, research, construct, build,
-   analyze, plot, digitize, summarize, write, review, zotero, and mathpix form a coherent route? Are the
-   continuation rules useful, or do entrypoint overlap and repeated alignment
-   questions create friction?
+   analyze, summarize, write, and review form a coherent workflow spine? Do
+   plot, digitize, zotero, and mathpix return useful evidence or files to those
+   stages? Are the continuation rules useful, or do entrypoint overlap and
+   repeated alignment questions create friction?
 5. **Grilling quality.** Are the material questions strong enough to expose
    missing scientific context and weak claims without turning every task into a
    rigid questionnaire or blocking ordinary work?
@@ -121,7 +122,8 @@ If a priority level has no findings, say so explicitly.
 
 ### Scientific workflow coverage
 
-Map the ten skills and the example to the work they actually support. Identify
+Map the eight workflow stages, four supporting tools, and the example to the
+work they actually support. Identify
 missing workflows and explain which should be added, clarified, delegated to the
 user's repository, or deliberately left out.
 
