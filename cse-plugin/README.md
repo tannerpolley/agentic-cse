@@ -30,7 +30,11 @@ Tools support a workflow stage and return their evidence or files to that
 stage; they are not additional steps in the workflow spine. A task may start at
 the stage or tool that matches the user's request.
 
-The initial workflow entrypoint inspects current state, asks a material question round, confirms its interpretation, and then continues to the requested endpoint or a precise blocker. Internal handoffs inherit confirmed decisions and ask only delta questions. Scientific Codex does not require Project Truss, Matt Pocock skills, Superpowers, generic Zotero or Mathpix skills, GitHub Actions, issue hierarchy, or coverage targets.
+The plugin-wide language contract is in
+[`references/terminology.md`](references/terminology.md). Project-specific
+terms belong in the user's `docs/scientific/CONTEXT.md`.
+
+The starting workflow stage inspects current state, asks a material question round, confirms its interpretation, and then continues to the requested endpoint or a precise blocker. Internal continuations inherit confirmed decisions and ask only delta questions. Scientific Codex does not require Project Truss, Matt Pocock skills, Superpowers, generic Zotero or Mathpix skills, GitHub Actions, issue hierarchy, or coverage targets.
 
 ## Validate
 

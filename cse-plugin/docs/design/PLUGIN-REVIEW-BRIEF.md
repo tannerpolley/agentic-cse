@@ -60,6 +60,8 @@ skills stay intentionally thin and route through shared references:
 - [`zotero-companion.md`](../../references/zotero-companion.md) defines the
   Zotero authority, Companion capability contract, exact source lineage,
   bibliography, and on-demand extraction boundaries.
+- [`terminology.md`](../../references/terminology.md) defines canonical
+  workflow, tool, source, extraction, figure, and claim language.
 
 The eight workflow entrypoints are:
 
