@@ -1,11 +1,12 @@
-# Scientific Codex plugin repository
+# Agentic Computational Science and Engineering plugin repository
 
 Repository Profile: application-development
 
-This repository is the canonical source for the Scientific Codex plugin.
+This repository is the canonical source for the `cse` plugin, whose official
+name is Agentic Computational Science and Engineering.
 
 - Keep public skills thin and place shared doctrine under `references/`.
-- Keep Scientific Codex self-contained. Do not add runtime dependencies on another workflow or skill family.
+- Keep CSE self-contained. Do not add runtime dependencies on another workflow or skill family.
 - Use scientific language: questions, equations, methods, reference cases, numerical behavior, uncertainty, evidence, interpretation, and claims.
 - Reject generic coverage targets and helper-by-helper test expansion. Tests protect front-door behavior, scientific doctrine, installation, and destructive-operation safeguards.
 - Keep GitHub issues and live Git state authoritative. Do not create a lifecycle database.

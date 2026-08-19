@@ -2,9 +2,9 @@
 set -euo pipefail
 
 plugin_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-deploy_root="${SCIENTIFIC_CODEX_DEPLOY_ROOT:-$HOME/.codex/plugins/scientific-codex}"
-expected_root="$HOME/.codex/plugins/scientific-codex"
-validator="${SCIENTIFIC_CODEX_PLUGIN_VALIDATOR:-$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py}"
+deploy_root="${CSE_DEPLOY_ROOT:-$HOME/.codex/plugins/cse}"
+expected_root="$HOME/.codex/plugins/cse"
+validator="${CSE_PLUGIN_VALIDATOR:-$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py}"
 
 if [[ "${1:-}" != "--validate" || $# -ne 1 ]]; then
   echo "Usage: $0 --validate" >&2
@@ -21,7 +21,7 @@ fi
 
 "$plugin_root/scripts/validate.sh"
 mkdir -p "$(dirname "$deploy_root")"
-next_root="$(mktemp -d "$HOME/.codex/plugins/.scientific-codex.next.XXXXXX")"
+next_root="$(mktemp -d "$HOME/.codex/plugins/.cse.next.XXXXXX")"
 previous_root="${deploy_root}.previous.$$"
 cleanup() {
   [[ ! -d "$next_root" ]] || rm -rf -- "$next_root"
@@ -49,4 +49,4 @@ if ! python3 "$plugin_root/scripts/register_marketplace.py"; then
   exit 1
 fi
 [[ ! -e "$previous_root" ]] || rm -rf -- "$previous_root"
-echo "Deployed Scientific Codex to $deploy_root"
+echo "Deployed CSE to $deploy_root"

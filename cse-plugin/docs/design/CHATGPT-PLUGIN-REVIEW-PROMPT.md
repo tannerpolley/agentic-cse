@@ -1,11 +1,11 @@
-# ChatGPT prompt for an external Scientific Codex review
+# ChatGPT prompt for an external CSE review
 
 Copy and paste the prompt below after granting ChatGPT's GitHub app access to
 both private repositories.
 
 ~~~text
 You are conducting an independent, review-only product and scientific-workflow
-review of the private Codex plugin Scientific Codex. You have GitHub app access
+review of the private Codex plugin CSE. You have GitHub app access
 for both repositories below:
 
 1. First inspect the plugin source: https://github.com/tannerpolley/scientific-codex
@@ -48,7 +48,7 @@ contract.
 
 Assess the following dimensions against the repository evidence:
 
-1. **Scientific usefulness.** Does Scientific Codex help an agent move from a
+1. **Scientific usefulness.** Does CSE help an agent move from a
    scientific question and evidence to equations, methods, numerical behavior,
    uncertainty, interpretation, and defensible claims? What kinds of users and
    scientific work does it serve well or poorly?

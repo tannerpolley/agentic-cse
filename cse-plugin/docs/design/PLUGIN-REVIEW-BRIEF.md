@@ -1,8 +1,8 @@
-# Scientific Codex plugin review brief
+# CSE plugin review brief
 
 ## Purpose
 
-Scientific Codex is a private, MIT-licensed Codex plugin that gives scientific
+CSE is a private, MIT-licensed Codex plugin that gives scientific
 and mathematical repository work a science-first working method. It is aimed at
 computational scientists, engineers, mathematicians, researchers, students,
 and maintainers who need to move from a question and evidence to equations,
@@ -23,7 +23,7 @@ part of the review setup.
 
 ## Non-goals
 
-Scientific Codex does not:
+CSE does not:
 
 - replace domain expertise, physical experiments, accepted standards, or
   literature judgment;

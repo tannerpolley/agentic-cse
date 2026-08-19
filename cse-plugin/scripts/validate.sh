@@ -2,8 +2,8 @@
 set -euo pipefail
 
 plugin_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-plugin_validator="${SCIENTIFIC_CODEX_PLUGIN_VALIDATOR:-$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py}"
-skill_validator="${SCIENTIFIC_CODEX_SKILL_VALIDATOR:-$HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py}"
+plugin_validator="${CSE_PLUGIN_VALIDATOR:-$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py}"
+skill_validator="${CSE_SKILL_VALIDATOR:-$HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py}"
 
 for validator in "$plugin_validator" "$skill_validator"; do
   if [[ ! -f "$validator" ]]; then
@@ -31,4 +31,4 @@ if rg -n '\[TODO|TODO:' "$plugin_root/.codex-plugin" "$plugin_root/skills" "$plu
 fi
 
 bash -n "$plugin_root/scripts/validate.sh" "$plugin_root/scripts/sync-live.sh"
-echo "Scientific Codex validation passed."
+echo "CSE validation passed."

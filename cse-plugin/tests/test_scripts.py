@@ -51,7 +51,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                     {
                         "name": "personal",
                         "interface": {"displayName": "Mine"},
-                        "plugins": [{"name": "existing"}],
+                        "plugins": [{"name": "existing"}, {"name": "scientific-codex"}],
                     }
                 )
             )
@@ -59,7 +59,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             data = json.loads(path.read_text())
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(data["interface"]["displayName"], "Mine")
-        self.assertEqual([entry["name"] for entry in data["plugins"]], ["existing", "scientific-codex"])
+        self.assertEqual([entry["name"] for entry in data["plugins"]], ["existing", "cse"])
 
     def test_live_sync_restores_previous_deployment_when_registration_fails(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -78,13 +78,13 @@ class ScriptBehaviorTests(unittest.TestCase):
                 cwd=source,
                 check=True,
             )
-            deployed = home / ".codex/plugins/scientific-codex"
+            deployed = home / ".codex/plugins/cse"
             deployed.mkdir(parents=True)
             (deployed / "previous.txt").write_text("preserve\n")
             environment = os.environ | {
                 "HOME": str(home),
-                "SCIENTIFIC_CODEX_DEPLOY_ROOT": str(deployed),
-                "SCIENTIFIC_CODEX_PLUGIN_VALIDATOR": str(validator),
+                "CSE_DEPLOY_ROOT": str(deployed),
+                "CSE_PLUGIN_VALIDATOR": str(validator),
             }
             result = subprocess.run(
                 ["bash", str(source / "scripts/sync-live.sh"), "--validate"],

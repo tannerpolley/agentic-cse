@@ -1,6 +1,6 @@
-# Scientific Codex
+# Agentic Computational Science and Engineering
 
-Scientific Codex gives Codex a science-first working method for computational research. It keeps attention on the scientific question, equations, numerical method, reference cases, uncertainty, interpretation, and supported writing.
+Agentic Computational Science and Engineering (`cse`) gives Codex a disciplined working method for computational science and physical-world engineering. It supports mechanical, chemical, electrical, civil, and related work—not generic software engineering—by keeping attention on the scientific question, equations, numerical method, reference cases, uncertainty, interpretation, and supported writing.
 
 The plugin has eight workflow stages and four supporting tools.
 
@@ -34,7 +34,7 @@ The plugin-wide language contract is in
 [`references/terminology.md`](references/terminology.md). Project-specific
 terms belong in the user's `docs/scientific/CONTEXT.md`.
 
-The starting workflow stage inspects current state, asks a material question round, confirms its interpretation, and then continues to the requested endpoint or a precise blocker. Internal continuations inherit confirmed decisions and ask only delta questions. Scientific Codex does not require Project Truss, Matt Pocock skills, Superpowers, generic Zotero or Mathpix skills, GitHub Actions, issue hierarchy, or coverage targets.
+The starting workflow stage inspects current state, asks a material question round, confirms its interpretation, and then continues to the requested endpoint or a precise blocker. Internal continuations inherit confirmed decisions and ask only delta questions. CSE does not require Project Truss, Matt Pocock skills, Superpowers, generic Zotero or Mathpix skills, GitHub Actions, issue hierarchy, or coverage targets.
 
 ## Validate
 
@@ -46,7 +46,7 @@ The starting workflow stage inspects current state, asks a material question rou
 
 ```bash
 ./scripts/sync-live.sh --validate
-codex plugin add scientific-codex@personal --json
+codex plugin add cse@personal --json
 ```
 
 Start a fresh Codex task after installation so the task receives the new skills.
