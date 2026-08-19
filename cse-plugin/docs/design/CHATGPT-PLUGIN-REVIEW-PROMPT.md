@@ -62,7 +62,7 @@ Assess the following dimensions against the repository evidence:
    numerical uncertainty, and physical uncertainty without overpromising?
 4. **Skill routing and continuity.** Do setup, research, construct, build,
    analyze, summarize, write, and review form a coherent workflow spine? Do
-   plot, digitize, zotero, and mathpix return useful evidence or files to those
+   plot, digitize, zotero, mathpix, tikz, and pgfplots return useful evidence or files to those
    stages? Are the continuation rules useful, or do entrypoint overlap and
    repeated alignment questions create friction?
 5. **Grilling quality.** Are the material questions strong enough to expose
@@ -122,7 +122,7 @@ If a priority level has no findings, say so explicitly.
 
 ### Scientific workflow coverage
 
-Map the eight workflow stages, four supporting tools, and the example to the
+Map the eight workflow stages, six supporting tools, and the example to the
 work they actually support. Identify
 missing workflows and explain which should be added, clarified, delegated to the
 user's repository, or deliberately left out.

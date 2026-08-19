@@ -84,6 +84,8 @@ Supporting tools are public skills, but they are not workflow stages:
 | [`mathpix`](../../skills/mathpix/SKILL.md) | Create a source-linked Markdown companion from a confirmed Zotero PDF when no usable child exists | Invoking workflow stage |
 | [`plot`](../../skills/plot/SKILL.md) | Render or review figures from retained values with explicit visual semantics | `analyze`, `summarize`, `write`, or `review` |
 | [`digitize`](../../skills/digitize/SKILL.md) | Recover calibrated values from source figures with independent QA | `analyze` or `review` |
+| [`tikz`](../../skills/tikz/SKILL.md) | Create document-native LaTeX diagrams, schematics, geometry, and annotations | `write` or `review` |
+| [`pgfplots`](../../skills/pgfplots/SKILL.md) | Create table-driven LaTeX-native quantitative plots | `analyze`, `summarize`, `write`, or `review` |
 
 The initial workflow entrypoint inspects the repository and asks a material question
 round. After confirmation, internal handoffs inherit decisions and ask only
@@ -91,7 +93,7 @@ delta questions. This is adaptive alignment, not a stage-by-stage stop ritual.
 
 At runtime the plugin is self-contained. It does not invoke Project Truss,
 Superpowers, Matt Pocock skills, or another workflow family. The installed
-surface is Markdown, YAML, and JSON. Repository work can use the local shell,
+surface is Markdown, YAML, JSON, and reusable LaTeX templates. Repository work can use the local shell,
 Git, `gh`, Python, LaTeX, Zotero, and the separately installed Companion when the user's
 repository and environment provide them; those are workflow capabilities, not
 hidden plugin dependencies.
@@ -100,7 +102,7 @@ hidden plugin dependencies.
 
 ```text
 .codex-plugin/plugin.json       installable manifest and interface metadata
-skills/<stage-or-tool>/SKILL.md eight workflow routes plus four supporting tools
+skills/<stage-or-tool>/SKILL.md eight workflow routes plus six supporting tools
 references/*.md                 shared scientific, numerical, Git, and source doctrine
 scripts/validate.sh             source validation and contract checks
 scripts/sync-live.sh             guarded source-to-marketplace deployment
@@ -154,7 +156,7 @@ currently:
 
 The contract tests in
 [`tests/test_contract.py`](../../tests/test_contract.py) protect the manifest,
-the exact eight-workflow/four-tool skill surface, thin skills, shared-reference
+the exact eight-workflow/six-tool skill surface, thin skills, shared-reference
 links, opening alignment anchors, numerical doctrine, optional GitHub features,
 forbidden runtime workflow names, and the absence of generic coverage
 assumptions.
@@ -211,7 +213,7 @@ An external review would be most valuable on these questions:
   discretization error, physical validation, and scientific acceptance in
   practice?
 - Do the eight workflow stages form a coherent route with useful continuity,
-  and do the four supporting tools avoid becoming competing stages?
+  and do the six supporting tools avoid becoming competing stages?
 - Is the grilling quality material and adaptive without blocking ordinary work?
 - Is the Zotero and Companion boundary safe, understandable, and useful for
   source-linked research?
