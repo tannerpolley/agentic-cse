@@ -33,7 +33,8 @@ stage; they are not additional steps in the workflow spine. A task may start at
 the stage or tool that matches the user's request.
 
 The plugin-wide language contract is in
-[`references/terminology.md`](references/terminology.md). Project-specific
+[`references/terminology.md`](references/terminology.md), and vague agent
+language to replace is collected in [`BANNED.md`](BANNED.md). Project-specific
 terms belong in the user's `docs/scientific/CONTEXT.md`.
 
 The starting workflow stage inspects current state, asks a material question round, confirms its interpretation, and then continues to the requested endpoint or a precise blocker. Internal continuations inherit confirmed decisions and ask only delta questions. CSE does not require Project Truss, Matt Pocock skills, Superpowers, generic Zotero or Mathpix skills, GitHub Actions, issue hierarchy, or coverage targets.
