@@ -12,7 +12,7 @@ The default agent path is:
 
 - `setup` establishes repository vocabulary and scientific conventions.
 - `research` investigates literature, theory, and data.
-- `construct` formulates substantive work and publishes its GitHub issue.
+- `construct` formulates substantive work and publishes a GitHub issue when the repository uses GitHub issues.
 - `build` implements models and numerical methods.
 - `analyze` runs numerical studies and interprets results.
 - `summarize` records a complete analysis slice.
