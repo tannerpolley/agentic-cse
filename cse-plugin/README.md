@@ -15,7 +15,7 @@ The default agent path is:
 - `construct` formulates substantive work and publishes its GitHub issue.
 - `build` implements models and numerical methods.
 - `analyze` runs numerical studies and interprets results.
-- `summarize` records a complete analysis slice.
+- `summarize` admits an accepted analysis slice to its research journal.
 - `write` develops an evidence-supported manuscript.
 - `review` examines the complete scientific reasoning chain when requested.
 
@@ -32,6 +32,8 @@ LaTeX-producing workflows use the package and document-profile decisions in
 [`references/latex-packages.md`](references/latex-packages.md), with curated
 TikZ and PGF selections in
 [`references/latex-extensions.md`](references/latex-extensions.md).
+The distinct manuscript and research-journal contracts are in
+[`references/latex-article-profiles.md`](references/latex-article-profiles.md).
 Layout and visual acceptance rules are in
 [`references/latex-layout-and-qa.md`](references/latex-layout-and-qa.md), and
 [`references/latex-manuals.md`](references/latex-manuals.md) defines the
