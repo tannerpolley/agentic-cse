@@ -28,6 +28,9 @@ The default agent path is:
 - `tikz` creates document-native LaTeX diagrams, schematics, and geometry.
 - `pgfplots` creates table-driven LaTeX-native quantitative plots.
 
+LaTeX-producing workflows use the package and document-profile decisions in
+[`references/latex-packages.md`](references/latex-packages.md).
+
 Tools support a workflow stage and return their evidence or files to that
 stage; they are not additional steps in the workflow spine. A task may start at
 the stage or tool that matches the user's request.
