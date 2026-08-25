@@ -61,6 +61,45 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(data["interface"]["displayName"], "Mine")
         self.assertEqual([entry["name"] for entry in data["plugins"]], ["existing", "cse"])
 
+    def test_visual_qa_accepts_clean_pdf_and_rejects_seeded_overlap(self):
+        fixture_root = ROOT / "tests/fixtures/latex-visual-qa"
+        with tempfile.TemporaryDirectory() as directory:
+            build = Path(directory)
+            results = {}
+            for name in ("clean", "text-overlap"):
+                compiled = subprocess.run(
+                    [
+                        "lualatex",
+                        "-interaction=nonstopmode",
+                        "-halt-on-error",
+                        f"-output-directory={build}",
+                        str(fixture_root / f"{name}.tex"),
+                    ],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                self.assertEqual(compiled.returncode, 0, compiled.stdout[-2000:])
+                arguments = [
+                    "latex_visual_qa.py",
+                    str(build / f"{name}.pdf"),
+                    "--profile",
+                    "article",
+                    "--output-dir",
+                    str(build / f"qa-{name}"),
+                ]
+                if name == "clean":
+                    arguments.extend(("--baseline", str(build / "clean.pdf")))
+                results[name] = self.run_script(*arguments)
+
+            report = json.loads((build / "qa-text-overlap/report.json").read_text())
+            clean_report = json.loads((build / "qa-clean/report.json").read_text())
+
+        self.assertEqual(results["clean"].returncode, 0, results["clean"].stderr)
+        self.assertEqual(results["text-overlap"].returncode, 1, results["text-overlap"].stderr)
+        self.assertIn("text_overlap", {issue["code"] for issue in report["issues"]})
+        self.assertEqual(clean_report["baseline"]["changed_pages"], [])
+
     def test_live_sync_restores_previous_deployment_when_registration_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -158,6 +158,7 @@ so an agent does not select them accidentally.
 | `appendixnumberbeamer` | Conditional | Exclude backup frames from the main frame count. |
 | `pdfpc` | Conditional | Add PDF Presenter Console notes and metadata. |
 | `animate` | Tested-viewer exception | Embed frame animation only after rehearsal on the exact viewer. |
+| `scripts/latex_visual_qa.py` | Release gate | Render color and grayscale pages, flag conservative text geometry risks, compare an optional baseline, and write a structured review packet. |
 
 ```{=latex}
 \newpage
@@ -255,3 +256,12 @@ zones, connector clearance, bounding-box padding, profile-width checks, log
 inspection, and full-size raster inspection. The searchable local official
 manual cache is built with `scripts/cache-latex-manuals.sh` and indexed at
 `~/.local/share/cse/latex-manuals/INDEX.md`.
+
+The release order is source review, real Quarto build, log review, automated
+visual QA, full-size manual inspection, and a recorded disposition. Automated
+success never certifies path crossings, schematic truth, or scientific claims.
+
+```bash
+python3 scripts/latex_visual_qa.py builds/article.pdf \
+  --profile article --output-dir builds/visual-qa/article --contact-sheet
+```

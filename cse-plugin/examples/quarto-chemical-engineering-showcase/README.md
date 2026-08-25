@@ -18,8 +18,11 @@ quarto render article.qmd
 quarto render deck.qmd
 ```
 
-The project writes intermediate output under `builds/`. The build wrapper also
-copies the two final PDFs to the repository `output/pdf/` directory.
+The project writes intermediate output under `builds/`. The build wrapper runs
+the shared visual QA runner for article and Beamer profiles, writes color and
+grayscale review packets under `builds/visual-qa/`, and copies the two final
+PDFs to the repository `output/pdf/` directory. Inspect every rendered page at
+full size before recording a release disposition.
 
 ## Source map
 
@@ -37,5 +40,9 @@ copies the two final PDFs to the repository `output/pdf/` directory.
 Agent-facing layout QA and local-manual lookup guidance lives in
 `../../references/latex-layout-and-qa.md` and
 `../../references/latex-manuals.md`.
+
+The article demonstrates the author-controlled KOMA-Script profile. The deck
+demonstrates the 16:9 Moloch profile with high-contrast semantic text colors;
+series colors still require marker or line-style encoding in grayscale.
 
 All engineering numbers are illustrative and are not validation data.

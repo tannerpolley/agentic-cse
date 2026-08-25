@@ -1,12 +1,12 @@
 \input{tex/shared-preamble.tex}
-\usepackage[margin=25mm]{geometry}
+\KOMAoptions{parskip=half}
 \usepackage{setspace}
 \setstretch{1.04}
-\usepackage{fancyhdr}
-\pagestyle{fancy}
-\fancyhf{}
-\fancyhead[L]{Quarto + LaTeX chemical-engineering showcase}
-\fancyhead[R]{\thepage}
+\usepackage[automark,headsepline]{scrlayer-scrpage}
+\clearpairofpagestyles
+\ihead{Quarto + LaTeX chemical-engineering showcase}
+\ohead{\pagemark}
+\pagestyle{scrheadings}
 \usepackage{amsthm}
 \usepackage{thmtools}
 \declaretheoremstyle[
@@ -54,4 +54,3 @@
   breaklines=true,
   showstringspaces=false
 }
-

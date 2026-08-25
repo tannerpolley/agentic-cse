@@ -155,7 +155,8 @@ format:
 2. Retain the exact tables used for claims.
 3. Let TikZ or PGFPlots render the smallest useful visual.
 4. Let Quarto produce the article and presentation profiles.
-5. Inspect both PDFs before release.
+5. Run the automated color/grayscale QA packet for both PDFs.
+6. Inspect every page at full size and record `keep`, `simplify`, `split`, or `reject`.
 
 ::: {.alert}
 The bundle is successful when every loaded tool has a visible job and every
@@ -169,6 +170,10 @@ number has a traceable basis.
 - Add source-level clearance below the lowest diagram node.
 - Design shared figures at the smaller article or Beamer placement.
 - Inspect every rendered page at full size; use contact sheets only for flow.
+
+The deck default is 16:9 Moloch with one major claim per frame, no automatic
+shrink, accessible text contrast, and roughly one main frame per speaking
+minute. Detail belongs in notes or backup frames.
 
 `chktex`, `lacheck`, and `texfot` help with source and log defects. Raster
 inspection owns overlap, clipping, and legibility.

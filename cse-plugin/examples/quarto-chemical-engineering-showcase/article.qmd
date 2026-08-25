@@ -12,7 +12,10 @@ format:
     include-in-header:
       - tex/article-preamble.tex
     papersize: a4
-    documentclass: article
+    documentclass: scrartcl
+    classoption:
+      - DIV=11
+      - headings=normal
 ---
 
 ## What this proves
@@ -112,7 +115,32 @@ formats the data without recomputing it:
 
 ```{=latex}
 \begin{center}
-\pgfplotstabletypeset[col sep=comma]{data/reactor-profile.csv}
+\pgfplotstabletypeset[
+  col sep=comma,
+  columns={volume,model,observation,lower,upper},
+  every head row/.style={before row=\toprule,after row=\midrule},
+  every last row/.style={after row=\bottomrule},
+  columns/volume/.style={
+    column name={\multicolumn{1}{c}{Volume / \si{\meter\cubed}}},
+    column type={S[table-format=1.1]},string type
+  },
+  columns/model/.style={
+    column name={\multicolumn{1}{c}{Model}},
+    column type={S[table-format=1.2]},string type
+  },
+  columns/observation/.style={
+    column name={\multicolumn{1}{c}{Observation}},
+    column type={S[table-format=1.2]},string type
+  },
+  columns/lower/.style={
+    column name={\multicolumn{1}{c}{Lower}},
+    column type={S[table-format=1.2]},string type
+  },
+  columns/upper/.style={
+    column name={\multicolumn{1}{c}{Upper}},
+    column type={S[table-format=1.2]},string type
+  }
+]{data/reactor-profile.csv}
 \end{center}
 ```
 
@@ -215,9 +243,10 @@ image. Here the \tikzmarknode{balance-anchor}{mass balance} is a named anchor.
 
 ```{=latex}
 \begin{tikzpicture}[remember picture,overlay]
+  \node[cse note,anchor=north] (balance-note)
+    at ([yshift=-8mm]balance-anchor.south) {named prose anchor};
   \draw[-Latex,cseOrange,thick]
-    ([yshift=1mm]balance-anchor.north) to[out=90,in=0] ++(-18mm,6mm)
-    node[left,cse note] {named prose anchor};
+    (balance-note.north) -- ([yshift=-1mm]balance-anchor.south);
 \end{tikzpicture}
 ```
 
