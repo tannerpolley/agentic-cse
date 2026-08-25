@@ -65,17 +65,22 @@
     {(c) isolated path operations};
 \end{tikzpicture}
 &
-% (d) Version-gated scaling remains a separate API example.
+% (d) Grayscale-safe packing and repeated flow direction.
 \begin{tikzpicture}[
   every node/.append style={font=\scriptsize}
 ]
-  \begin{scope}[local bounding box=scaling-content]
-    \node[cse tool,draw=cseBlue,very thick,minimum width=34mm,minimum height=12mm]
-      (scale) {scaling API};
-    \node[cse note,below=3mm of scale] {scalepicture: version-gated};
+  \begin{scope}[local bounding box=encoding-content]
+    \node[cse tool,minimum width=34mm,minimum height=12mm,
+      pattern={Lines[angle=45,distance=3pt]},pattern color=cseSky] (bed) {};
+    \node[cse note,fill=white,inner sep=1pt] at ([yshift=2.5mm]bed.center)
+      {packed bed};
+    \draw[thick,cseBlue,postaction={decorate},decoration={markings,
+      mark=at position .55 with {\arrow{Latex}}}]
+      ([yshift=-3mm]bed.west) -- ([yshift=-3mm]bed.east);
   \end{scope}
-  \node[fit=(scaling-content),inner sep=0pt,draw=none] (scaling-panel) {};
-  \node[cse panel caption,below=4mm of scaling-panel.south]
-    {(d) independent scaling role};
+  \node[ext/node on layer=background,cse panel frame,fit=(encoding-content)]
+    (encoding-panel) {};
+  \node[cse panel caption,below=4mm of encoding-panel.south]
+    {(d) pattern + path marking};
 \end{tikzpicture}
 \end{tabular}

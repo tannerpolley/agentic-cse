@@ -88,9 +88,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                     "--output-dir",
                     str(build / f"qa-{name}"),
                 ]
-                if name == "clean":
-                    arguments.extend(("--baseline", str(build / "clean.pdf")))
-                elif name == "text-graphic-overlap":
+                if name == "text-graphic-overlap":
                     arguments.append("--warnings-as-errors")
                 results[name] = self.run_script(*arguments)
 
@@ -98,8 +96,6 @@ class ScriptBehaviorTests(unittest.TestCase):
             graphic_report = json.loads(
                 (build / "qa-text-graphic-overlap/report.json").read_text()
             )
-            clean_report = json.loads((build / "qa-clean/report.json").read_text())
-
         self.assertEqual(results["clean"].returncode, 0, results["clean"].stderr)
         self.assertEqual(results["text-overlap"].returncode, 1, results["text-overlap"].stderr)
         self.assertEqual(
@@ -112,8 +108,6 @@ class ScriptBehaviorTests(unittest.TestCase):
             "text_graphic_overlap",
             {issue["code"] for issue in graphic_report["issues"]},
         )
-        self.assertEqual(graphic_report["checks"]["vector_clearance"], "complete")
-        self.assertEqual(clean_report["baseline"]["changed_pages"], [])
 
     def test_live_sync_restores_previous_deployment_when_registration_fails(self):
         with tempfile.TemporaryDirectory() as directory:

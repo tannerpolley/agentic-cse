@@ -55,20 +55,23 @@ The material balance for species $A$ in a constant-volume
 \end{equation}
 ```
 
-`siunitx` owns values, uncertainty, ranges, and numeric alignment:
+`siunitx` owns values, uncertainty, ranges, and numeric alignment. `multirow`
+groups related measurements without repeating labels, while `makecell` keeps a
+multiline numeric heading compact:
 
 ```{=latex}
 \begin{center}
 \begin{threeparttable}
 \caption{Illustrative operating conditions.}
-\begin{tabular}{@{}l S[table-format=3.2] l@{}}
+\begin{tabular}{@{}ll S[table-format=3.2] l@{}}
 \toprule
-Quantity & {Value} & {Unit} \\
+Location & Quantity & {\makecell{Value\\(illustrative)}} & {Unit} \\
 \midrule
-Temperature & 355.20 & \si{\kelvin} \\
-Pressure & 4.70 & \si{\barunit} \\
-Molar flow & 12.20 & \si{\kmol\per\hour} \\
-Heat duty & -48.3 & \si{\kilo\watt} \\
+\multirow{2}{*}{Feed} & Temperature & 355.20 & \si{\kelvin} \\
+ & Pressure & 4.70 & \si{\barunit} \\
+\addlinespace
+\multirow{2}{*}{Reactor} & Molar flow & 12.20 & \si{\kmol\per\hour} \\
+ & Heat duty & -48.3 & \si{\kilo\watt} \\
 \bottomrule
 \end{tabular}
 \begin{tablenotes}[flushleft]\footnotesize
@@ -144,10 +147,9 @@ formats the data without recomputing it:
 \end{center}
 ```
 
-Use `longtable`, `multirow`, `makecell`, `csvsimple`, and `pdflscape` when the
-content truly needs continued pages, row groups, multiline headers, CSV row
-selection, or landscape orientation. They are not reasons to make every table
-complicated.
+Use `longtable`, `csvsimple`, and `pdflscape` when the content truly needs
+continued pages, CSV row selection, or landscape orientation. They are not
+reasons to make every table complicated.
 
 ```{=latex}
 \newpage
@@ -228,10 +230,11 @@ point, and controlled whole-picture sizing when those gaps are real.
 Four independent subfigures keep unrelated demonstrations in separate
 coordinate systems: (a) relative positioning and shared node dimensions,
 (b) orthogonal signal routing and layers, (c) path operations, and (d) the
-scaling role.
+grayscale-safe packing and repeated flow direction.
 `ext.topaths.arcthrough` and
-`ext.scalepicture` remain conditional APIs: the installed files load, but their
-advertised path/key syntax does not execute under this 2026 toolchain.
+`ext.scalepicture` remain documented, version-gated APIs; this build does not
+load them because their advertised path/key syntax does not execute under the
+installed 2026 toolchain.
 :::
 
 ```{=latex}
@@ -274,8 +277,9 @@ observations remain points.
 ```
 
 `ternary` displays normalized composition data; `polar` displays a cyclic
-response. The selected `colorbrewer` and `colormaps` libraries provide palette
-sources, while `patchplots` is reserved for small reviewed meshes.
+response. The selected `colormaps` library provides the continuous palette;
+`colorbrewer` remains conditional for categorical or multi-series work, while
+`patchplots` is reserved for small reviewed meshes.
 :::
 
 ```{=latex}
