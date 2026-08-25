@@ -29,7 +29,9 @@ The default agent path is:
 - `pgfplots` creates table-driven LaTeX-native quantitative plots.
 
 LaTeX-producing workflows use the package and document-profile decisions in
-[`references/latex-packages.md`](references/latex-packages.md).
+[`references/latex-packages.md`](references/latex-packages.md), with curated
+TikZ and PGF selections in
+[`references/latex-extensions.md`](references/latex-extensions.md).
 
 Tools support a workflow stage and return their evidence or files to that
 stage; they are not additional steps in the workflow spine. A task may start at
