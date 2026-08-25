@@ -18,14 +18,14 @@ format:
       - headings=normal
 ---
 
-## What this proves
+## Bundle scope
 
 This document is rendered by Quarto, transformed by Pandoc, and compiled by
 LuaLaTeX. It demonstrates how a chemical engineer can combine consistent
 units, reaction notation, equations, tables, process diagrams, control
 schematics, molecular structures, reusable terminology, algorithms, and
 table-driven scientific plots in one reproducible source system. The values
-are deliberately illustrative; they are not experimental or validation data.
+are illustrative and do not represent experimental or validation data.
 
 ::: {#fig-pieces-fit}
 ```{=latex}
@@ -288,8 +288,8 @@ sources, while `patchplots` is reserved for small reviewed meshes.
 \input{figures/patch-field.tex}
 ```
 
-`patchplots` and a perceptually ordered colormap render a deliberately small,
-reviewed triangular field. Larger fields belong in analysis code.
+`patchplots` and a perceptually ordered colormap render a small reviewed
+triangular field. Larger fields belong in analysis code.
 :::
 
 ```{=latex}
@@ -328,31 +328,24 @@ def conversion(c_in, c_out):
 `enumitem` is appropriate when an author-controlled article needs deliberate
 list spacing. Beamer keeps ownership of slide lists.
 
-## What the layout defects taught us
-
-The first PFD version anchored prose near equipment, so a long note crossed a
-vertical product stream. The first TikZ gallery also let its lowest node reach
-the caption boundary. Both sources compiled without error because TeX does not
-know whether those visual relationships are intended.
-
-The corrected sources reserve annotation zones away from streams and add
-explicit bounding-box clearance below the lowest node. The reusable rule is:
+## Layout and visual QA defaults
 
 1. design shared figures at the smallest article or Beamer placement;
 2. anchor labels so they grow away from paths and page edges;
-3. route connectors separately from nodes and prose, and isolate unrelated path demonstrations;
-4. render every final page and inspect it at full size;
-5. keep figures inside semantic sections with `\FloatBarrier` where needed;
-6. use contact sheets for flow, not as the only overlap check.
+3. place panel captions below a named bounding box with an explicit gutter;
+4. route connectors separately from nodes and prose, and isolate unrelated path demonstrations;
+5. render every final page and inspect it at full size;
+6. keep figures inside semantic sections with `\FloatBarrier` where needed;
+7. use contact sheets for flow, not as the only overlap check.
 
 `chktex`, `lacheck`, and `texfot` are useful source and log checks, but raster
 inspection remains the acceptance test for overlap, clipping, and legibility.
-The durable agent procedure is in `references/latex-layout-and-qa.md`.
+See `references/latex-layout-and-qa.md` for the release sequence.
 
-## Which packages belong in which profile
+## Package profiles
 
-The bundle is deliberately larger than any one preamble. The working examples
-above exercise the compatible winners. The remaining tools have narrow jobs:
+Load only the packages required by the selected output profile. The table names
+the default owner for each role and incompatible alternatives:
 
 | Role | Use here or add when triggered | Do not combine by default |
 |---|---|---|

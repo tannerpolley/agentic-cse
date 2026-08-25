@@ -54,8 +54,9 @@
 
   \node[ext/node on layer=background,
     fit=(arrow-label)(arc-label)(control-label)(arrow-start)(arrow-end)(arc-start)(arc-end)(control-start)(control-end),
-    fill=cseSky!7,draw=cseSky,rounded corners,inner sep=2mm] {};
-  \node[cse note] at (.55,-2.05) {(c) isolated path operations};
+    fill=cseSky!7,draw=cseSky,rounded corners,inner sep=3mm] (path-panel) {};
+  \node[cse note,below=4mm of path-panel.south]
+    {(c) isolated path operations};
 \end{tikzpicture}
 &
 % (d) Version-gated scaling remains a separate API example.

@@ -149,7 +149,7 @@ format:
     include-in-header: tex/beamer-preamble.tex
 ```
 
-## The working rule is simple
+## Authoring and release defaults
 
 1. Keep calculations and fitted values in analysis code.
 2. Retain the exact tables used for claims.
@@ -159,8 +159,8 @@ format:
 6. Inspect every page at full size and record `keep`, `simplify`, `split`, or `reject`.
 
 ::: {.alert}
-The bundle is successful when every loaded tool has a visible job and every
-number has a traceable basis.
+Load each tool for a visible output requirement. Retain a source for each
+reported number.
 :::
 
 ## Compilation is not a visual acceptance test
