@@ -1,0 +1,40 @@
+\begin{tikzpicture}[
+  node distance=7mm and 11mm,
+  every node/.append style={font=\scriptsize}
+]
+  % positioning-plus and node-families
+  \node[cse tool,ext/node family={width=operations,height=operations}] (feed) {Feed};
+  \node[cse tool,ext/node family={width=operations,height=operations},right=of feed] (react) {Long reactor label};
+  \node[cse tool,ext/node family={width=operations,height=operations},right=of react] (product) {Product};
+  \draw[cse flow] (feed) -- (react);
+  \draw[cse flow] (react) -- (product);
+  \node[cse note,draw=cseSky,rounded corners,above=2mm of react,
+    ext/span horizontal={(feed)(product)}] {positioning-plus span + node-families};
+
+  % paths.ortho and layers
+  \node[cse tool,below=17mm of feed] (sensor) {sensor};
+  \node[cse tool,right=28mm of sensor] (controller) {controller};
+  \draw[cse signal] (sensor) r-rl (controller);
+  \node[cse note,below=2mm of sensor] {orthogonal routing};
+  \node[ext/node on layer=background,fit=(sensor)(controller),
+    fill=cseSky!12,draw=cseSky,rounded corners,inner sep=3mm] {};
+
+  % arrows-plus, arc-to, and arc-through
+  \coordinate (a) at (6.7,-1.7);
+  \coordinate (b) at (8.2,-0.7);
+  \coordinate (m) at (7.45,-0.35);
+  \draw[thick,csePurple] (a) .. controls +(0,1) and +(0,-1) .. (b)
+    pic[pos=.55]{ext/arrow={Latex}};
+  \draw[thick,cseOrange] (6.5,-2.2) arc to[radius=.8] (8.0,-2.2);
+  \coordinate (arcpoint) at (7.25,-2.35);
+  \draw[thick,cseGreen] (6.5,-2.8) .. controls (arcpoint) .. (8.0,-2.8);
+  \fill[cseGreen] (arcpoint) circle (1.4pt);
+  \node[cse note] at (7.35,-3.3) {path arrow + arc-to + control point};
+
+  % This ordinary mini-picture marks the version-gated scalepicture role.
+  \begin{scope}[xshift=9.0cm,yshift=-1.4cm]
+    \draw[very thick,cseBlue] (0,0) -- (2.8,0) -- (2.8,1) -- (0,1) -- cycle;
+    \node at (1.4,.5) {scaling API};
+    \node[cse note] at (1.4,-.45) {scalepicture: version-gated};
+  \end{scope}
+\end{tikzpicture}

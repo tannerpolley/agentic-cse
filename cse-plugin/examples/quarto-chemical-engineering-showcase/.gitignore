@@ -1,0 +1,7 @@
+/.quarto/
+**/*.quarto_ipynb
+/builds/
+/tmp/
+/article.tex
+/deck.tex
+/*.log

@@ -1,0 +1,13 @@
+project:
+  type: default
+  output-dir: builds
+  render:
+    - article.qmd
+    - deck.qmd
+
+execute:
+  freeze: auto
+
+metadata-files:
+  - metadata.yml
+

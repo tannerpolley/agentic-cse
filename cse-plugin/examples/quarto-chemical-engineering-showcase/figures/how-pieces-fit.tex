@@ -1,0 +1,23 @@
+\begin{tikzpicture}[node distance=10mm and 13mm]
+  \node[cse source] (qmd) {Quarto source\\\texttt{.qmd}};
+  \node[cse engine,right=of qmd] (pandoc) {Pandoc\\document model};
+  \node[cse engine,right=of pandoc] (latex) {LuaLaTeX\\engine};
+  \node[cse output,above right=7mm and 11.5mm of latex] (article) {Article PDF\\deep reference};
+  \node[cse output,below right=7mm and 11.5mm of latex] (beamer) {Beamer PDF\\visual tour};
+
+  \node[cse source,below=15mm of qmd] (data) {Retained CSV\\values + units};
+  \node[cse source,below=15mm of pandoc] (figures) {TikZ / PGFPlots\\figure sources};
+  \node[cse source,below=15mm of latex] (headers) {Profile headers\\packages + styles};
+
+  \draw[cse flow] (qmd) -- (pandoc);
+  \draw[cse flow] (pandoc) -- (latex);
+  \draw[cse flow] (latex) -- (article);
+  \draw[cse flow] (latex) -- (beamer);
+  \draw[cse flow] (data) -- (figures);
+  \draw[cse flow] (figures) -- (headers);
+  \draw[cse flow] (headers) -- (latex);
+
+  \node[cse note,below=3mm of data] {scientific result layer};
+  \node[cse note,below=3mm of figures] {visual encoding layer};
+  \node[cse note,below=3mm of headers] {document profile layer};
+\end{tikzpicture}

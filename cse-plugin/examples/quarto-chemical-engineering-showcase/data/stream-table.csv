@@ -1,0 +1,6 @@
+stream,temperature,pressure,flow,phase
+Feed,298.15,5.0,12.50,Liquid
+Reactor outlet,355.20,4.7,12.20,Two-phase
+Separator vapor,342.80,4.5,3.85,Vapor
+Separator liquid,342.80,4.5,8.35,Liquid
+

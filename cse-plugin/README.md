@@ -33,6 +33,10 @@ LaTeX-producing workflows use the package and document-profile decisions in
 TikZ and PGF selections in
 [`references/latex-extensions.md`](references/latex-extensions.md).
 
+A runnable Quarto-managed chemical-engineering article and Moloch Beamer deck
+live in
+[`examples/quarto-chemical-engineering-showcase/`](examples/quarto-chemical-engineering-showcase/README.md).
+
 Tools support a workflow stage and return their evidence or files to that
 stage; they are not additional steps in the workflow spine. A task may start at
 the stage or tool that matches the user's request.

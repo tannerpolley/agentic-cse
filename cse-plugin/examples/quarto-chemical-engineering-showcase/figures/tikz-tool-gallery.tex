@@ -1,0 +1,28 @@
+\begin{tikzpicture}[node distance=9mm and 12mm]
+  \matrix (stages) [matrix of nodes,
+    nodes={cse tool,minimum width=15mm,minimum height=7mm,font=\scriptsize},
+    column sep=4mm] {
+    Mix & Heat & React & Separate \\
+  };
+  \foreach \a/\b in {1/2,2/3,3/4}
+    \draw[cse flow] (stages-1-\a) -- (stages-1-\b);
+
+  \node[cse tool] (cold) at (-3,-1.5) {cold utility};
+  \node[cse tool] (hot) at (3,-1.5) {hot utility};
+  \path[name path=coldpath] (cold.north east) -- (hot.south west);
+  \path[name path=hotpath] (cold.south east) -- (hot.north west);
+  \path[name intersections={of=coldpath and hotpath,by=pinch}];
+  \fill[cseOrange] (pinch) circle (2.2pt);
+  \node[cse note,below=1mm of pinch] {intersection / pinch};
+
+  \node[draw,diamond,aspect=2,fill=cseGold!20,below=26mm of stages] (decision) {feasible?};
+  \node[cse tool,left=of decision] (recycle) {recycle};
+  \node[cse tool,right=of decision] (product) {product};
+  \draw[cse flow] (decision) -- node[above,font=\scriptsize] {no} (recycle);
+  \draw[cse flow] (decision) -- node[above,font=\scriptsize] {yes} (product);
+
+  \begin{pgfonlayer}{background}
+    \node[fit=(stages)(cold)(hot),fill=cseSky!10,draw=cseSky,
+      rounded corners,inner sep=4mm] {};
+  \end{pgfonlayer}
+\end{tikzpicture}

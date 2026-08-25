@@ -1,0 +1,117 @@
+% Shared notation and figure layer. Quarto remains responsible for document
+% structure, citations, cross-references, and code-block highlighting.
+\usepackage{fontspec}
+\usepackage{mathtools}
+\usepackage{unicode-math}
+\usepackage{derivative}
+\usepackage{microtype}
+\usepackage{siunitx}
+\usepackage[version=4]{mhchem}
+\usepackage{chemfig}
+\usepackage{chemnum}
+\usepackage{booktabs}
+\usepackage{threeparttable}
+\usepackage{longtable}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{nicematrix}
+\usepackage{cancel}
+\usepackage{pgfplotstable}
+\usepackage{csvsimple}
+\usepackage{adjustbox}
+\usepackage{tikz}
+\usetikzlibrary{
+  arrows.meta,
+  positioning,
+  calc,
+  fit,
+  backgrounds,
+  matrix,
+  chains,
+  intersections,
+  decorations.markings,
+  decorations.pathmorphing,
+  patterns.meta,
+  shapes.geometric,
+  graphs,
+  graphdrawing,
+  ext.positioning-plus,
+  ext.paths.ortho,
+  ext.node-families,
+  ext.layers,
+  ext.arrows-plus,
+  ext.paths.arcto,
+  ext.topaths.arcthrough,
+  ext.scalepicture,
+  tikzmark
+}
+\usegdlibrary{layered,trees}
+\tikzextset{layers/patch=node}
+\usepackage{circuitikz}
+\usepackage{forest}
+\usepackage{chemplants}
+\usepackage{chempid}
+\usepackage{pgfplots}
+\pgfplotsset{compat=1.18}
+\usepgfplotslibrary{
+  groupplots,
+  fillbetween,
+  ternary,
+  statistics,
+  colorbrewer,
+  colormaps,
+  polar,
+  patchplots
+}
+
+\sisetup{
+  detect-all,
+  separate-uncertainty=true,
+  range-phrase=--,
+  range-units=single
+}
+\DeclareSIUnit\barunit{bar}
+\DeclareSIUnit\kmol{kmol}
+
+\definecolor{cseBlue}{HTML}{0072B2}
+\definecolor{cseOrange}{HTML}{D55E00}
+\definecolor{cseGreen}{HTML}{009E73}
+\definecolor{csePurple}{HTML}{CC79A7}
+\definecolor{cseGold}{HTML}{E69F00}
+\definecolor{cseSky}{HTML}{56B4E9}
+\definecolor{cseInk}{HTML}{1F2933}
+\definecolor{csePaper}{HTML}{F6F8FA}
+
+\tikzset{
+  cse tool/.style={
+    draw=cseInk,
+    rounded corners=2pt,
+    fill=white,
+    align=center,
+    minimum height=9mm,
+    minimum width=25mm,
+    inner sep=3pt
+  },
+  cse source/.style={cse tool,fill=cseSky!18},
+  cse engine/.style={cse tool,fill=cseGold!22},
+  cse output/.style={cse tool,fill=cseGreen!18},
+  cse flow/.style={-{Latex[length=2.2mm]},thick,cseInk},
+  cse stream/.style={-{Latex[length=2mm]},very thick,cseBlue},
+  cse signal/.style={-{Latex[length=1.8mm]},densely dashed,cseOrange},
+  cse note/.style={font=\scriptsize,align=center,text=cseInk}
+}
+
+\pgfplotsset{
+  cse axis/.style={
+    width=0.46\linewidth,
+    height=0.31\linewidth,
+    grid=major,
+    tick align=outside,
+    legend style={draw=none,fill=none,font=\scriptsize},
+    label style={font=\small},
+    tick label style={font=\scriptsize}
+  },
+  cse model/.style={very thick,cseBlue,no marks},
+  cse data/.style={only marks,mark=o,mark size=2.2pt,cseOrange},
+  cse uncertainty/.style={draw=none,fill=cseSky,fill opacity=0.28}
+}
