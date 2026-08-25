@@ -61,12 +61,12 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(data["interface"]["displayName"], "Mine")
         self.assertEqual([entry["name"] for entry in data["plugins"]], ["existing", "cse"])
 
-    def test_visual_qa_accepts_clean_pdf_and_rejects_seeded_overlap(self):
+    def test_visual_qa_classifies_text_and_graphic_collisions(self):
         fixture_root = ROOT / "tests/fixtures/latex-visual-qa"
         with tempfile.TemporaryDirectory() as directory:
             build = Path(directory)
             results = {}
-            for name in ("clean", "text-overlap"):
+            for name in ("clean", "text-overlap", "text-graphic-overlap"):
                 compiled = subprocess.run(
                     [
                         "lualatex",
@@ -90,14 +90,29 @@ class ScriptBehaviorTests(unittest.TestCase):
                 ]
                 if name == "clean":
                     arguments.extend(("--baseline", str(build / "clean.pdf")))
+                elif name == "text-graphic-overlap":
+                    arguments.append("--warnings-as-errors")
                 results[name] = self.run_script(*arguments)
 
             report = json.loads((build / "qa-text-overlap/report.json").read_text())
+            graphic_report = json.loads(
+                (build / "qa-text-graphic-overlap/report.json").read_text()
+            )
             clean_report = json.loads((build / "qa-clean/report.json").read_text())
 
         self.assertEqual(results["clean"].returncode, 0, results["clean"].stderr)
         self.assertEqual(results["text-overlap"].returncode, 1, results["text-overlap"].stderr)
+        self.assertEqual(
+            results["text-graphic-overlap"].returncode,
+            1,
+            results["text-graphic-overlap"].stderr,
+        )
         self.assertIn("text_overlap", {issue["code"] for issue in report["issues"]})
+        self.assertIn(
+            "text_graphic_overlap",
+            {issue["code"] for issue in graphic_report["issues"]},
+        )
+        self.assertEqual(graphic_report["checks"]["vector_clearance"], "complete")
         self.assertEqual(clean_report["baseline"]["changed_pages"], [])
 
     def test_live_sync_restores_previous_deployment_when_registration_fails(self):

@@ -158,7 +158,10 @@ so an agent does not select them accidentally.
 | `appendixnumberbeamer` | Conditional | Exclude backup frames from the main frame count. |
 | `pdfpc` | Conditional | Add PDF Presenter Console notes and metadata. |
 | `animate` | Tested-viewer exception | Embed frame animation only after rehearsal on the exact viewer. |
-| `scripts/latex_visual_qa.py` | Release gate | Render color and grayscale pages, flag conservative text geometry risks, compare an optional baseline, and write a structured review packet. |
+| Poppler `pdftotext` and `pdftoppm` | QA dependency | Extract text geometry and render final PDF pages. |
+| MuPDF `mutool` | QA dependency | Trace stroked vector paths for text-to-drawing clearance checks. |
+| ImageMagick `montage` | QA conditional | Build document-flow contact sheets when requested. |
+| `latex_visual_qa.py` | Release gate | Check text-to-text and text-to-vector clearance, render color and grayscale pages, compare an optional baseline, and write a structured review packet. |
 
 ```{=latex}
 \newpage

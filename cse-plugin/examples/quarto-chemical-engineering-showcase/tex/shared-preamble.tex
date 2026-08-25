@@ -99,7 +99,14 @@
   cse flow/.style={-{Latex[length=2.2mm]},thick,cseInk},
   cse stream/.style={-{Latex[length=2mm]},very thick,cseBlue},
   cse signal/.style={-{Latex[length=1.8mm]},densely dashed,cseOrange},
-  cse note/.style={font=\scriptsize,align=center,text=cseInk}
+  cse note/.style={font=\scriptsize,align=center,text=cseInk},
+  cse panel frame/.style={
+    draw=cseSky,
+    fill=cseSky!7,
+    rounded corners=2pt,
+    inner sep=3mm
+  },
+  cse panel caption/.style={cse note}
 }
 
 \pgfplotsset{
