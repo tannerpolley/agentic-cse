@@ -25,4 +25,7 @@
     \node[fit=(stages)(cold)(hot),fill=cseSky!10,draw=cseSky,
       rounded corners,inner sep=4mm] {};
   \end{pgfonlayer}
+
+  % Keep the caption outside the diagram's bounding box at every profile width.
+  \path ([yshift=-4mm]current bounding box.south) node[inner sep=0] {};
 \end{tikzpicture}

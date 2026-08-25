@@ -31,6 +31,11 @@ copies the two final PDFs to the repository `output/pdf/` directory.
 - `figures/`: shared document-native TikZ and PGFPlots sources.
 - `data/`: small illustrative retained tables read by PGFPlots and table tools.
 - `software-references.bib`: software/manual references not owned by Zotero.
+- `appendices/supported-tools.qmd`: complete curated bundle inventory and
+  quick examples.
+
+Agent-facing layout QA and local-manual lookup guidance lives in
+`../../references/latex-layout-and-qa.md` and
+`../../references/latex-manuals.md`.
 
 All engineering numbers are illustrative and are not validation data.
-

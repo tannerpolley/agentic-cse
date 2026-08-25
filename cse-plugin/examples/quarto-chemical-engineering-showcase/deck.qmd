@@ -76,7 +76,7 @@ $\dot n=\SI{12.2}{\kmol\per\hour}$
 \resizebox{0.94\textwidth}{!}{\input{figures/process-flow.tex}}
 ```
 
-## `chempid` and `circuitikz` cover instrumentation at two scales
+## P\&ID symbols and circuit analogues
 
 ```{=latex}
 \centering
@@ -161,6 +161,17 @@ format:
 The bundle is successful when every loaded tool has a visible job and every
 number has a traceable basis.
 :::
+
+## Compilation is not a visual acceptance test
+
+- Reserve label zones away from pipes, arrows, and page edges.
+- Use one semantic demonstration per panel and one coordinate system per panel.
+- Add source-level clearance below the lowest diagram node.
+- Design shared figures at the smaller article or Beamer placement.
+- Inspect every rendered page at full size; use contact sheets only for flow.
+
+`chktex`, `lacheck`, and `texfot` help with source and log defects. Raster
+inspection owns overlap, clipping, and legibility.
 
 ## Backup: narrow tools remain available
 

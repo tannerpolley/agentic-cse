@@ -1,40 +1,70 @@
+\begin{tabular}{@{}c@{\hspace{4mm}}c@{}}
+% (a) Relative placement and shared node dimensions.
 \begin{tikzpicture}[
-  node distance=7mm and 11mm,
+  node distance=6mm,
   every node/.append style={font=\scriptsize}
 ]
-  % positioning-plus and node-families
   \node[cse tool,ext/node family={width=operations,height=operations}] (feed) {Feed};
   \node[cse tool,ext/node family={width=operations,height=operations},right=of feed] (react) {Long reactor label};
   \node[cse tool,ext/node family={width=operations,height=operations},right=of react] (product) {Product};
   \draw[cse flow] (feed) -- (react);
   \draw[cse flow] (react) -- (product);
   \node[cse note,draw=cseSky,rounded corners,above=2mm of react,
-    ext/span horizontal={(feed)(product)}] {positioning-plus span + node-families};
-
-  % paths.ortho and layers
-  \node[cse tool,below=17mm of feed] (sensor) {sensor};
-  \node[cse tool,right=28mm of sensor] (controller) {controller};
-  \draw[cse signal] (sensor) r-rl (controller);
-  \node[cse note,below=2mm of sensor] {orthogonal routing};
+    ext/span horizontal={(feed)(product)}] (span) {positioning-plus};
+  \node[ext/node on layer=background,fit=(feed)(react)(product)(span),
+    fill=cseSky!7,draw=cseSky,rounded corners,inner sep=2mm] {};
+  \node[cse note,below=4mm of react] {(a) positioning + node families};
+\end{tikzpicture}
+&
+% (b) Orthogonal routing and layer separation.
+\begin{tikzpicture}[
+  every node/.append style={font=\scriptsize}
+]
+  \node[cse tool] (sensor) {sensor};
+  \node[cse tool,right=18mm of sensor] (controller) {controller};
+  \draw[cse signal] (sensor.east) r-rl (controller.west);
   \node[ext/node on layer=background,fit=(sensor)(controller),
     fill=cseSky!12,draw=cseSky,rounded corners,inner sep=3mm] {};
-
-  % arrows-plus, arc-to, and arc-through
-  \coordinate (a) at (6.7,-1.7);
-  \coordinate (b) at (8.2,-0.7);
-  \coordinate (m) at (7.45,-0.35);
-  \draw[thick,csePurple] (a) .. controls +(0,1) and +(0,-1) .. (b)
-    pic[pos=.55]{ext/arrow={Latex}};
-  \draw[thick,cseOrange] (6.5,-2.2) arc to[radius=.8] (8.0,-2.2);
-  \coordinate (arcpoint) at (7.25,-2.35);
-  \draw[thick,cseGreen] (6.5,-2.8) .. controls (arcpoint) .. (8.0,-2.8);
-  \fill[cseGreen] (arcpoint) circle (1.4pt);
-  \node[cse note] at (7.35,-3.3) {path arrow + arc-to + control point};
-
-  % This ordinary mini-picture marks the version-gated scalepicture role.
-  \begin{scope}[xshift=9.0cm,yshift=-1.4cm]
-    \draw[very thick,cseBlue] (0,0) -- (2.8,0) -- (2.8,1) -- (0,1) -- cycle;
-    \node at (1.4,.5) {scaling API};
-    \node[cse note] at (1.4,-.45) {scalepicture: version-gated};
-  \end{scope}
+  \node[cse note,below=5mm of $(sensor.south)!0.5!(controller.south)$]
+    {(b) orthogonal routing + layers};
 \end{tikzpicture}
+\\[5mm]
+% (c) Each path operation owns a separate row and coordinate system.
+\begin{tikzpicture}[
+  every node/.append style={font=\scriptsize}
+]
+  \node[cse note,anchor=east] (arrow-label) at (0,0) {arrow};
+  \coordinate (arrow-start) at ([xshift=3mm]arrow-label.east);
+  \coordinate (arrow-end) at ([xshift=13mm]arrow-start);
+  \draw[thick,csePurple]
+    (arrow-start) .. controls ([xshift=6.5mm,yshift=3mm]arrow-start) .. (arrow-end)
+    pic[pos=.55]{ext/arrow={Latex}};
+
+  \node[cse note,anchor=east] (arc-label) at (0,-.75) {arc-to};
+  \coordinate (arc-start) at ([xshift=3mm]arc-label.east);
+  \coordinate (arc-end) at ([xshift=13mm]arc-start);
+  \draw[thick,cseOrange] (arc-start) arc to[radius=.65] (arc-end);
+
+  \node[cse note,anchor=east] (control-label) at (0,-1.5) {control};
+  \coordinate (control-start) at ([xshift=3mm]control-label.east);
+  \coordinate (control-end) at ([xshift=13mm]control-start);
+  \coordinate (control-point) at ([xshift=6.5mm,yshift=2mm]control-start);
+  \draw[thick,cseGreen] (control-start) .. controls (control-point) .. (control-end);
+  \fill[cseGreen] (control-point) circle (1.4pt);
+
+  \node[ext/node on layer=background,
+    fit=(arrow-label)(arc-label)(control-label)(arrow-start)(arrow-end)(arc-start)(arc-end)(control-start)(control-end),
+    fill=cseSky!7,draw=cseSky,rounded corners,inner sep=2mm] {};
+  \node[cse note] at (.55,-2.05) {(c) isolated path operations};
+\end{tikzpicture}
+&
+% (d) Version-gated scaling remains a separate API example.
+\begin{tikzpicture}[
+  every node/.append style={font=\scriptsize}
+]
+  \node[cse tool,draw=cseBlue,very thick,minimum width=34mm,minimum height=12mm]
+    (scale) {scaling API};
+  \node[cse note,below=3mm of scale] {scalepicture: version-gated};
+  \node[cse note,below=8mm of scale] {(d) independent scaling role};
+\end{tikzpicture}
+\end{tabular}

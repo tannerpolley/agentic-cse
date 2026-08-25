@@ -32,6 +32,10 @@ LaTeX-producing workflows use the package and document-profile decisions in
 [`references/latex-packages.md`](references/latex-packages.md), with curated
 TikZ and PGF selections in
 [`references/latex-extensions.md`](references/latex-extensions.md).
+Layout and visual acceptance rules are in
+[`references/latex-layout-and-qa.md`](references/latex-layout-and-qa.md), and
+[`references/latex-manuals.md`](references/latex-manuals.md) defines the
+searchable user-level official-manual cache.
 
 A runnable Quarto-managed chemical-engineering article and Moloch Beamer deck
 live in

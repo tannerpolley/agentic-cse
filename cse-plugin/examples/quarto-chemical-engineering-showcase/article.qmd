@@ -121,6 +121,10 @@ content truly needs continued pages, row groups, multiline headers, CSV row
 selection, or landscape orientation. They are not reasons to make every table
 complicated.
 
+```{=latex}
+\newpage
+```
+
 ## Process and instrumentation diagrams
 
 ::: {#fig-pfd}
@@ -133,6 +137,10 @@ A simplified PFD using `chemplants`, TikZ paths, semantic stream arrows, and
 source-sized geometry.
 :::
 
+```{=latex}
+\FloatBarrier
+```
+
 ::: {#fig-pid}
 ```{=latex}
 \centering
@@ -142,6 +150,11 @@ source-sized geometry.
 `chempid` supplies P&ID symbols, while `circuitikz` expresses an electrical
 sensor analogue. Project conventions still decide tag and symbol meaning.
 :::
+
+```{=latex}
+\FloatBarrier
+\newpage
+```
 
 ## Molecules, reactions, and model hierarchy
 
@@ -154,6 +167,10 @@ sensor analogue. Project conventions still decide tag and symbol meaning.
 `chemfig`, `mhchem`, and `forest` cover three different abstractions:
 structure, reaction notation, and hierarchy.
 :::
+
+```{=latex}
+\FloatBarrier
+```
 
 ## TikZ as the semantic diagram layer
 
@@ -170,19 +187,28 @@ sizing, convenient layers, path arrows, true arc-to operations, arcs through a
 point, and controlled whole-picture sizing when those gaps are real.
 :::
 
+```{=latex}
+\FloatBarrier
+```
+
 ::: {#fig-tikz-ext-gallery}
 ```{=latex}
 \centering
 \adjustbox{max width=\linewidth}{\input{figures/tikz-ext-gallery.tex}}
 ```
 
-The selected `tikz-ext` capabilities execute here: factored relative
-positioning, shared node dimensions, orthogonal signal routing, layer
-placement, an arrow along a curved path, and an arc-to path.
+Four independent subfigures keep unrelated demonstrations in separate
+coordinate systems: (a) relative positioning and shared node dimensions,
+(b) orthogonal signal routing and layers, (c) path operations, and (d) the
+scaling role.
 `ext.topaths.arcthrough` and
 `ext.scalepicture` remain conditional APIs: the installed files load, but their
 advertised path/key syntax does not execute under this 2026 toolchain.
 :::
+
+```{=latex}
+\FloatBarrier
+```
 
 `tikzmark` connects prose to a diagram without converting the sentence to an
 image. Here the \tikzmarknode{balance-anchor}{mass balance} is a named anchor.
@@ -208,6 +234,10 @@ and `statistics` draws a prepared box plot. Models remain lines and illustrative
 observations remain points.
 :::
 
+```{=latex}
+\FloatBarrier
+```
+
 ::: {#fig-coordinate-systems}
 ```{=latex}
 \centering
@@ -219,6 +249,10 @@ response. The selected `colorbrewer` and `colormaps` libraries provide palette
 sources, while `patchplots` is reserved for small reviewed meshes.
 :::
 
+```{=latex}
+\FloatBarrier
+```
+
 ::: {#fig-patch-field}
 ```{=latex}
 \centering
@@ -228,6 +262,10 @@ sources, while `patchplots` is reserved for small reviewed meshes.
 `patchplots` and a perceptually ordered colormap render a deliberately small,
 reviewed triangular field. Larger fields belong in analysis code.
 :::
+
+```{=latex}
+\FloatBarrier
+```
 
 ## Algorithms, code, callouts, and lists
 
@@ -260,6 +298,27 @@ def conversion(c_in, c_out):
 
 `enumitem` is appropriate when an author-controlled article needs deliberate
 list spacing. Beamer keeps ownership of slide lists.
+
+## What the layout defects taught us
+
+The first PFD version anchored prose near equipment, so a long note crossed a
+vertical product stream. The first TikZ gallery also let its lowest node reach
+the caption boundary. Both sources compiled without error because TeX does not
+know whether those visual relationships are intended.
+
+The corrected sources reserve annotation zones away from streams and add
+explicit bounding-box clearance below the lowest node. The reusable rule is:
+
+1. design shared figures at the smallest article or Beamer placement;
+2. anchor labels so they grow away from paths and page edges;
+3. route connectors separately from nodes and prose, and isolate unrelated path demonstrations;
+4. render every final page and inspect it at full size;
+5. keep figures inside semantic sections with `\FloatBarrier` where needed;
+6. use contact sheets for flow, not as the only overlap check.
+
+`chktex`, `lacheck`, and `texfot` are useful source and log checks, but raster
+inspection remains the acceptance test for overlap, clipping, and legibility.
+The durable agent procedure is in `references/latex-layout-and-qa.md`.
 
 ## Which packages belong in which profile
 
@@ -326,6 +385,12 @@ The sample used \gls{conversion}, \gls{residence-time}, \gls{pfd}, \gls{pid},
 \printnoidxglossary[type=\acronymtype,title={Acronyms}]
 \printnoidxglossary[title={Terms}]
 ```
+
+```{=latex}
+\appendix
+```
+
+{{< include appendices/supported-tools.qmd >}}
 
 ## References
 
