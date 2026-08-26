@@ -61,6 +61,76 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(data["interface"]["displayName"], "Mine")
         self.assertEqual([entry["name"] for entry in data["plugins"]], ["existing", "cse"])
 
+    def test_visual_qa_classifies_text_and_graphic_collisions(self):
+        fixture_root = ROOT / "tests/fixtures/latex-visual-qa"
+        with tempfile.TemporaryDirectory() as directory:
+            build = Path(directory)
+            results = {}
+            for name in ("clean", "text-overlap", "text-graphic-overlap"):
+                compiled = subprocess.run(
+                    [
+                        "lualatex",
+                        "-interaction=nonstopmode",
+                        "-halt-on-error",
+                        f"-output-directory={build}",
+                        str(fixture_root / f"{name}.tex"),
+                    ],
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                self.assertEqual(compiled.returncode, 0, compiled.stdout[-2000:])
+                arguments = [
+                    "latex_visual_qa.py",
+                    str(build / f"{name}.pdf"),
+                    "--profile",
+                    "article",
+                    "--output-dir",
+                    str(build / f"qa-{name}"),
+                ]
+                if name == "text-graphic-overlap":
+                    arguments.append("--warnings-as-errors")
+                results[name] = self.run_script(*arguments)
+
+            report = json.loads((build / "qa-text-overlap/report.json").read_text())
+            graphic_report = json.loads(
+                (build / "qa-text-graphic-overlap/report.json").read_text()
+            )
+        self.assertEqual(results["clean"].returncode, 0, results["clean"].stderr)
+        self.assertEqual(results["text-overlap"].returncode, 1, results["text-overlap"].stderr)
+        self.assertEqual(
+            results["text-graphic-overlap"].returncode,
+            1,
+            results["text-graphic-overlap"].stderr,
+        )
+        self.assertIn("text_overlap", {issue["code"] for issue in report["issues"]})
+        self.assertIn(
+            "text_graphic_overlap",
+            {issue["code"] for issue in graphic_report["issues"]},
+        )
+
+    def test_quarto_release_entrypoint_does_not_execute_document_python(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            shutil.copy2(ROOT / "assets/project/quarto/_quarto.yml", project)
+            shutil.copy2(ROOT / "assets/project/quarto/render.sh", project)
+            (project / "document.qmd").write_text(
+                "---\nformat: html\n---\n\n"
+                "```{python}\nfrom pathlib import Path\n"
+                "Path('model-ran').write_text('unsafe')\n```\n"
+            )
+            rendered = subprocess.run(
+                ["bash", "render.sh", "document.qmd"],
+                cwd=project,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(rendered.returncode, 0, rendered.stderr)
+            self.assertTrue((project / "builds/document.html").is_file())
+            self.assertFalse((project / "model-ran").exists())
+
     def test_live_sync_restores_previous_deployment_when_registration_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

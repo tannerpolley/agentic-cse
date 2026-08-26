@@ -30,5 +30,6 @@ if rg -n '\[TODO|TODO:' "$plugin_root/.codex-plugin" "$plugin_root/skills" "$plu
   exit 1
 fi
 
-bash -n "$plugin_root/scripts/validate.sh" "$plugin_root/scripts/sync-live.sh"
+bash -n "$plugin_root/scripts/validate.sh" "$plugin_root/scripts/sync-live.sh" \
+  "$plugin_root/scripts/cache-latex-manuals.sh"
 echo "CSE validation passed."

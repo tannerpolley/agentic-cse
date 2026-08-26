@@ -1,0 +1,14 @@
+project:
+  type: default
+  output-dir: builds
+  render:
+    - article.qmd
+    - deck.qmd
+    - interactive-deck.qmd
+    - research-journal.qmd
+
+execute:
+  enabled: false
+
+metadata-files:
+  - metadata.yml

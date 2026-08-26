@@ -1,0 +1,19 @@
+\begin{tikzpicture}[x=1cm,y=1cm]
+  \pic (pump) at (0,0) {centrifugal pump};
+  \pic (heater) at (3.0,0) {heat exchanger};
+  \pic (reactor) at (6.2,0) {stirred reactor};
+  \pic (separator) at (9.6,0) {gas-liquid separator};
+
+  \draw[main stream] (-1.7,0) -- (pump-left) node[midway,above] {Feed};
+  \draw[main stream] (pump-right) -- (heater-pipes left);
+  \draw[main stream] (heater-pipes right) -- (reactor-left);
+  \draw[main stream] (reactor-right) -- (separator-inlet left);
+  \draw[main stream] (separator-gas outlet) -- ++(0,1.3) node[above] {Vapor};
+  \draw[main stream] (separator-liquid outlet) -- ++(0,-1.3) node[below] {Liquid};
+
+  % Reserve the left margin for annotations so neither note crosses a stream.
+  \node[cse note,anchor=west] at (-1.6,1.55)
+    {\texttt{chemplants}: unit-operation vocabulary};
+  \node[cse note,anchor=west] at (-1.6,-1.45)
+    {Streams are semantic paths; values stay in retained tables.};
+\end{tikzpicture}

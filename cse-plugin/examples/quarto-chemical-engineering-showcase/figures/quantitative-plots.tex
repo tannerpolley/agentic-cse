@@ -1,0 +1,32 @@
+\begin{tikzpicture}
+\begin{groupplot}[
+  group style={group size=2 by 1,horizontal sep=1.65cm},
+  cse axis,
+  width=0.41\linewidth,
+  height=0.31\linewidth
+]
+\nextgroupplot[
+  xlabel={Volume (\si{\meter\cubed})},
+  ylabel={Conversion, $X$},
+  legend pos=south east
+]
+  \addplot[name path=upper,draw=none] table[x=volume,y=upper,col sep=comma] {data/reactor-profile.csv};
+  \addplot[name path=lower,draw=none] table[x=volume,y=lower,col sep=comma] {data/reactor-profile.csv};
+  \addplot[cse uncertainty] fill between[of=upper and lower];
+  \addplot[cse model] table[x=volume,y=model,col sep=comma] {data/reactor-profile.csv};
+  \addlegendentry{Model}
+  \addplot[cse data] table[x=volume,y=observation,col sep=comma] {data/reactor-profile.csv};
+  \addlegendentry{Illustrative observations}
+
+\nextgroupplot[
+  xlabel={Tracer-test group},
+  ylabel={Residence time (\si{\minute})},
+  xtick={1},xticklabels={},
+  ymin=3.4,ymax=6.2
+]
+  \addplot+[
+    boxplot={draw direction=y,draw position=1},
+    fill=cseSky!35,draw=cseBlue
+  ] table[y=sample,col sep=comma] {data/residence-samples.csv};
+\end{groupplot}
+\end{tikzpicture}

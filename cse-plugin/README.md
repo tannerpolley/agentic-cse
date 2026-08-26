@@ -15,7 +15,7 @@ The default agent path is:
 - `construct` formulates substantive work and publishes a GitHub issue when the repository uses GitHub issues.
 - `build` implements models and numerical methods.
 - `analyze` runs numerical studies and interprets results.
-- `summarize` records a complete analysis slice.
+- `summarize` admits an accepted analysis slice to its research journal.
 - `write` develops an evidence-supported manuscript.
 - `review` examines the complete scientific reasoning chain when requested.
 
@@ -27,6 +27,24 @@ The default agent path is:
 - `digitize` extracts calibrated values from source figures with QA evidence.
 - `tikz` creates document-native LaTeX diagrams, schematics, and geometry.
 - `pgfplots` creates table-driven LaTeX-native quantitative plots.
+
+Document-producing workflows use the package and output-profile decisions in
+[`references/latex-packages.md`](references/latex-packages.md), with curated
+TikZ and PGF selections in
+[`references/latex-extensions.md`](references/latex-extensions.md).
+The distinct manuscript and research-journal contracts are in
+[`references/latex-article-profiles.md`](references/latex-article-profiles.md).
+[`references/revealjs.md`](references/revealjs.md) defines the interactive
+research-journal view that shares retained results and figure sources with the
+LuaLaTeX PDF.
+Layout and visual acceptance rules are in
+[`references/latex-layout-and-qa.md`](references/latex-layout-and-qa.md), and
+[`references/latex-manuals.md`](references/latex-manuals.md) defines the
+searchable user-level official-manual cache.
+
+A runnable Quarto-managed chemical-engineering article, Moloch Beamer deck,
+RevealJS example, and dual-output research journal live in
+[`examples/quarto-chemical-engineering-showcase/`](examples/quarto-chemical-engineering-showcase/README.md).
 
 Tools support a workflow stage and return their evidence or files to that
 stage; they are not additional steps in the workflow spine. A task may start at
