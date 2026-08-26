@@ -61,7 +61,7 @@ Assess the following dimensions against the repository evidence:
    select independent oracles and quantity-specific tolerances? Does it
    distinguish code verification, solution verification, model validation,
    numerical uncertainty, and physical uncertainty without overpromising?
-4. **Skill routing and continuity.** Do setup, research, construct, build,
+4. **Skill routing and continuity.** Do setup, research, design, build,
    analyze, summarize, write, and review form a coherent workflow spine? Do
    plot, digitize, zotero, mathpix, tikz, and pgfplots return useful evidence or files to those
    stages? Are the continuation rules useful, or do entrypoint overlap and

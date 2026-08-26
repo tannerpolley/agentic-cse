@@ -67,8 +67,8 @@ The eight workflow entrypoints are:
 | Entry point | Main endpoint | Next route when work continues |
 | --- | --- | --- |
 | [`setup`](../../skills/setup/SKILL.md) | Repository vocabulary, scientific records, bibliography, plotting, writing, and integration defaults | The skill that owns the selected scientific endpoint |
-| [`research`](../../skills/research/SKILL.md) | Literature, theory, data, equations, and method evidence | `construct` for substantive repository work |
-| [`construct`](../../skills/construct/SKILL.md) | A complete question and native GitHub issue | `build`, `analyze`, or `write` |
+| [`research`](../../skills/research/SKILL.md) | Literature, theory, data, equations, and method evidence | `design` for substantive repository work |
+| [`design`](../../skills/design/SKILL.md) | A complete question and native GitHub issue | `build`, `analyze`, or `write` |
 | [`build`](../../skills/build/SKILL.md) | Equations, models, numerical methods, solvers, or data transformations | `analyze`, then `summarize` or `review` |
 | [`analyze`](../../skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `summarize`, `write`, or `review` |
 | [`summarize`](../../skills/summarize/SKILL.md) | A durable research-notebook slice | `write` or `review` |

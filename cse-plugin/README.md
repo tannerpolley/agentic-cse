@@ -8,11 +8,11 @@ The plugin has eight workflow stages and eleven supporting tools.
 
 The default agent path is:
 
-`setup → research → construct → build → analyze → summarize → write → review`
+`setup → research → design → build → analyze → summarize → write → review`
 
 - `setup` establishes repository vocabulary and scientific conventions.
 - `research` investigates literature, theory, and data.
-- `construct` formulates substantive work and publishes a GitHub issue when the repository uses GitHub issues.
+- `design` lays out the scientific work and publishes a GitHub issue when the repository uses GitHub issues.
 - `build` implements models and numerical methods.
 - `analyze` runs numerical studies and interprets results.
 - `summarize` admits an accepted analysis slice to its research journal.

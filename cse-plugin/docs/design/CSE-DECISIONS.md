@@ -80,7 +80,7 @@ The eight workflow entrypoints form the default agent path:
    scientific documents, bibliography, writing rules, and integration paths.
 2. [`research`](../../skills/research/SKILL.md) investigates literature, theory,
    data, equations, and numerical methods.
-3. [`construct`](../../skills/construct/SKILL.md) formulates substantive work and
+3. [`design`](../../skills/design/SKILL.md) lays out substantive work and
    publishes its native GitHub issue.
 4. [`build`](../../skills/build/SKILL.md) implements equations, models,
    numerical methods, solvers, and data transformations.
