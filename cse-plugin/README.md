@@ -39,6 +39,14 @@ terms belong in the user's `docs/scientific/CONTEXT.md`.
 
 The starting workflow stage inspects current state, asks a material question round, confirms its interpretation, and then continues to the requested endpoint or a precise blocker. Internal continuations inherit confirmed decisions and ask only delta questions. CSE does not require Project Truss, Matt Pocock skills, Superpowers, generic Zotero or Mathpix skills, GitHub Actions, issue hierarchy, or coverage targets.
 
+## Workbench research
+
+Exploratory research into a standalone CSE application lives under
+[`docs/workbench-research/`](docs/workbench-research/README.md). These documents
+compare agent harnesses and examine Pi as a possible future runtime. That work
+is paused while the Codex plugin matures through use on real CSE projects. It
+does not change the accepted plugin behavior or select an implementation.
+
 ## Validate
 
 ```bash
