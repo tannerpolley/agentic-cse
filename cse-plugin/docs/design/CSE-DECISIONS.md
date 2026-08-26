@@ -2,7 +2,7 @@
 
 This document is the durable decision record for the CSE product.
 It summarizes the originating Project Truss grilling and the later setup of the
-[heat-equation example repository](https://github.com/tannerpolley/scientific-codex-example).
+embedded [heat-equation example](../../examples/heat-equation/README.md).
 It is a decision summary, not a transcript. Statements below are separated into
 plugin-wide decisions and choices made only for that example.
 
@@ -265,23 +265,22 @@ review benchmark best detects unsupported claims without turning into a
 coverage target. The privacy and permission boundary for future connected
 research services also needs continued testing.
 
-The example repository has separate unresolved work: implement FTCS and
-Crank–Nicolson, run the planned stability, refinement, convergence, and
-uncertainty studies, retain the exact tables and figures, and decide whether a
-neutral tutorial manuscript is warranted. Those tasks are not plugin-wide
-claims. The example currently demonstrates setup doctrine and bibliography
-synchronization, not a completed solver or physical validation study.
+The embedded heat-equation example now includes executable FTCS and
+Crank–Nicolson methods, retained stability, refinement, convergence, and
+uncertainty evidence, and a tutorial manuscript. Those results are not
+plugin-wide claims: the example remains limited to code and solution
+verification and does not establish physical model validation.
 
 ## Heat-equation example boundary
 
-The [scientific-codex-example repository](https://github.com/tannerpolley/scientific-codex-example)
+The embedded [heat-equation example](../../examples/heat-equation/README.md)
 is the behavioral evidence for the setup route. Its
-[PROFILE.md](https://github.com/tannerpolley/scientific-codex-example/blob/main/PROFILE.md)
-and [scientific context](https://github.com/tannerpolley/scientific-codex-example/blob/main/docs/scientific/CONTEXT.md)
+[PROFILE.md](../../examples/heat-equation/PROFILE.md)
+and [scientific context](../../examples/heat-equation/docs/scientific/CONTEXT.md)
 define a one-dimensional dimensionless transient heat equation with a single
-Fourier-mode reference case. Its [formulation](https://github.com/tannerpolley/scientific-codex-example/blob/main/docs/scientific/formulation.tex),
-[methods](https://github.com/tannerpolley/scientific-codex-example/blob/main/docs/scientific/methods.tex),
-and [evidence plan](https://github.com/tannerpolley/scientific-codex-example/blob/main/docs/scientific/evidence.tex)
+Fourier-mode reference case. Its [formulation](../../examples/heat-equation/docs/scientific/formulation.tex),
+[methods](../../examples/heat-equation/docs/scientific/methods.tex),
+and [evidence plan](../../examples/heat-equation/docs/scientific/evidence.tex)
 specify:
 
 - \(\partial\theta/\partial Fo=\partial^2\theta/\partial\xi^2\) on
@@ -298,6 +297,6 @@ specify:
 The example deliberately excludes material properties, experimental data,
 dimensional prediction, physical uncertainty, and model validation. Its
 Crank–Nicolson source is now in the generated
-[repository bibliography snapshot](https://github.com/tannerpolley/scientific-codex-example/blob/main/docs/latex/references.bib),
+[repository bibliography snapshot](../../examples/heat-equation/docs/latex/references.bib),
 which is synchronized from the user's Better BibTeX export by the example's
-[one-way helper](https://github.com/tannerpolley/scientific-codex-example/blob/main/scripts/sync_bibliography.sh).
+[one-way helper](../../examples/heat-equation/scripts/sync_bibliography.sh).

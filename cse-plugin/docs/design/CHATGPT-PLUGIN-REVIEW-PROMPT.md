@@ -1,26 +1,27 @@
 # ChatGPT prompt for an external CSE review
 
 Copy and paste the prompt below after granting ChatGPT's GitHub app access to
-both private repositories.
+the private CSE repository.
 
 ~~~text
 You are conducting an independent, review-only product and scientific-workflow
 review of the private Codex plugin CSE. You have GitHub app access
-for both repositories below:
+for the repository below:
 
 1. First inspect the plugin source: https://github.com/tannerpolley/cse
-2. Then inspect the behavioral example: https://github.com/tannerpolley/scientific-codex-example
+2. Then inspect the embedded behavioral example at `examples/heat-equation/`
 
-Do not modify either repository. Do not create issues, branches, pull requests,
+Do not modify the repository. Do not create issues, branches, pull requests,
 comments, commits, releases, labels, Projects, or generated files. Do not
-install anything. If either repository is inaccessible, report that as the
+install anything. If the repository is inaccessible, report that as the
 first finding and do not infer its contents.
 
 ## Review method
 
 Start with the plugin repository. Read its manifest, README, AGENTS.md, all
 twelve public skill files, all shared references, validation scripts, and tests. Then
-read the design documents under docs/design/. After that, inspect the example's
+read the design documents under docs/design/. After that, inspect the embedded
+example's
 PROFILE.md, README.md, docs/scientific/CONTEXT.md, formulation.tex, methods.tex,
 evidence.tex, writing rules, setup validator, bibliography helper, and the
 committed bibliography snapshot. Follow links when they are part of the
@@ -88,7 +89,7 @@ Assess the following dimensions against the repository evidence:
 10. **Ambiguity and duplication.** Identify instructions that could lead to
     different behavior, repeated doctrine that could drift, unresolved product
     boundaries, or terminology that a new user would interpret differently.
-11. **Example fidelity.** Does the scientific-codex-example repository genuinely
+11. **Example fidelity.** Does the embedded heat-equation example genuinely
     demonstrate the plugin's promises, or does it only demonstrate setup and
     documentation? Separate what the example has completed from what it plans
     for future FTCS and Crank–Nicolson studies.

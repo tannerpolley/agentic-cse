@@ -206,6 +206,9 @@ class ScriptBehaviorTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertFalse(legacy.exists())
+        deployed = home / ".codex/plugins/cse"
+        self.assertFalse((deployed / "examples").exists())
+        self.assertFalse((deployed / "cse-pi-harness").exists())
 
 
 if __name__ == "__main__":

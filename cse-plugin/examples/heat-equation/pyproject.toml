@@ -1,0 +1,38 @@
+[build-system]
+requires = ["hatchling>=1.27"]
+build-backend = "hatchling.build"
+
+[project]
+name = "cse-heat-equation-example"
+version = "0.1.0"
+description = "Verification tutorial for FTCS and Crank-Nicolson heat-equation solvers"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+  "numpy>=2.0",
+  "scipy>=1.15",
+]
+
+[dependency-groups]
+dev = [
+  "bibtexparser>=1.4,<2",
+  "matplotlib>=3.10",
+  "pandas>=2.2",
+  "pytest>=8.3",
+  "pyyaml>=6.0",
+  "ruff>=0.12",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/heat_verification"]
+
+[tool.pytest.ini_options]
+addopts = "-q"
+testpaths = ["tests"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]

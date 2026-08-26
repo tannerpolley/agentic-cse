@@ -31,6 +31,7 @@ trap cleanup EXIT
 
 rsync -a --delete \
   --exclude .git --exclude .venv --exclude .pytest_cache --exclude tests \
+  --exclude examples --exclude cse-pi-harness \
   "$plugin_root/" "$next_root/"
 python3 "$validator" "$next_root"
 

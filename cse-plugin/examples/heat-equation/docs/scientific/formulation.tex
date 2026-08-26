@@ -1,0 +1,98 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,booktabs,geometry,siunitx}
+\usepackage[hidelinks]{hyperref}
+\geometry{margin=1in}
+\newcommand{\EqID}[1]{\label{eq:#1}}
+\begin{document}
+
+\title{Mathematical formulation}
+\author{cse-heat-equation-example}
+\date{}
+\maketitle
+
+\section{Scope and basis}
+
+This document defines the dimensionless reference case implemented in
+\path{src/heat_verification/model.py}. Every quantity is dimensionless.
+The project addresses code and solution verification only. It introduces no
+material property, experiment, or dimensional conversion.
+
+\section{Continuous problem}
+
+\subsection{EQ-HEAT-001: governing equation}
+
+The project-declared equation is
+\begin{equation}
+  \frac{\partial \theta}{\partial Fo}
+  = \frac{\partial^2 \theta}{\partial \xi^2},
+  \qquad 0<\xi<1,\quad Fo>0.
+  \EqID{heat-pde}
+\end{equation}
+Here \(\theta\) is dimensionless temperature, \(\xi\) is dimensionless
+position, and \(Fo\) is Fourier number. The equation is one-dimensional,
+linear, homogeneous, and applied only to the smooth single-mode case below.
+
+\subsection{BC-HEAT-001: boundary conditions}
+
+The boundaries remain exactly zero:
+\begin{equation}
+  \theta(0,Fo)=\theta(1,Fo)=0,
+  \qquad Fo\geq 0.
+  \EqID{heat-bc}
+\end{equation}
+Both solvers reset the two endpoint values after every time step. The boundary
+contract is protected by \path{tests/test_scientific_contracts.py}.
+
+\subsection{IC-HEAT-001: initial condition}
+
+The initial field is the first boundary-compatible sine mode:
+\begin{equation}
+  \theta(\xi,0)=\sin(\pi\xi),
+  \qquad 0\leq\xi\leq1.
+  \EqID{heat-ic}
+\end{equation}
+Its amplitude is one on the dimensionless temperature basis.
+
+\section{Reference objects}
+
+\subsection{REF-FOURIER-001: continuous reference}
+
+Separation of variables gives the internally derived continuum solution
+\begin{equation}
+  \theta_{\mathrm{ref}}(\xi,Fo)
+  =\exp(-\pi^2 Fo)\sin(\pi\xi).
+  \EqID{heat-exact}
+\end{equation}
+Direct differentiation recovers Eq.~\eqref{eq:heat-pde}; evaluating at the
+boundaries and at \(Fo=0\) recovers Eqs.~\eqref{eq:heat-bc} and
+\eqref{eq:heat-ic}. The public evaluator is
+\path{heat_verification.reference_solution}.
+
+\subsection{REF-SEMIDISCRETE-001: centered-space reference}
+
+For \(N\) uniform intervals, \(\Delta\xi=1/N\), and the first grid sine mode,
+the centered second-difference eigenvalue is
+\begin{equation}
+  \lambda_h
+  =-\frac{4}{(\Delta\xi)^2}
+    \sin^2\!\left(\frac{\pi}{2N}\right).
+  \EqID{semidiscrete-eigenvalue}
+\end{equation}
+The exact-in-time centered-space field is
+\begin{equation}
+  \theta_h(\xi_i,Fo)
+  =\exp(\lambda_h Fo)\sin(\pi\xi_i).
+  \EqID{semidiscrete-reference}
+\end{equation}
+This project derivation isolates temporal error without conflating it with the
+continuous reference. The public evaluator is
+\path{heat_verification.semidiscrete_reference}.
+
+\section{Validity and claim boundary}
+
+The references are valid for the declared uniform grid, first sine mode, zero
+Dirichlet boundaries, and nonnegative \(Fo\). They do not validate a physical
+heat-transfer model. The retained study evaluates \(Fo=0.1\) and records all
+grid and time-step conditions with each result.
+
+\end{document}

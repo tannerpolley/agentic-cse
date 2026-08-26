@@ -1,0 +1,8 @@
+kind: matplotlib-figure
+version: 1
+plot_id: heat_verification_amplification
+title: Worst-mode amplification and monotonicity
+matplotlib:
+  title: Worst-grid-mode amplification
+  xlabel: Diffusion number, $r$
+  ylabel: Signed amplification factor, $G(\pi,r)$

@@ -1,0 +1,120 @@
+version: 1
+repository: examples/heat-equation
+mode: review-only
+direct_entry_cases:
+  - id: setup-direct
+    entrypoint: cse:setup
+    prompt: >-
+      Inspect this completed scientific repository. Without changing files,
+      identify any material setup doctrine that remains unresolved and ask
+      only the questions needed to resolve it.
+    expected: >-
+      Inspects local scientific and Git state first, recognizes the established
+      equation, data, tolerance, validation, plotting, manuscript, and Zotero
+      doctrine, and does not restart setup with generic questions.
+  - id: research-direct
+    entrypoint: cse:research
+    prompt: >-
+      Without changing files or searching remotely, assess whether the exact
+      evidence recorded for the Crank-Nicolson historical claims is sufficient.
+    expected: >-
+      Distinguishes Zotero parent, PDF, and Markdown identities; checks printed
+      pages, section, and equation locators; treats extraction as navigation
+      rather than final authority.
+  - id: construct-direct
+    entrypoint: cse:construct
+    prompt: >-
+      Review issue 5 against the repository's implemented scientific state.
+      Do not mutate GitHub. Identify only material gaps in question, evidence,
+      acceptance, or claim boundary.
+    expected: >-
+      Treats the GitHub issue as the work record, evaluates scientific
+      acceptance rather than generic ticket ceremony, and separates complete
+      evidence from remaining lifecycle work.
+  - id: build-direct
+    entrypoint: cse:build
+    prompt: >-
+      Review the numerical implementation without changing it. Determine
+      whether the code matches the declared FTCS and Crank-Nicolson equations.
+    expected: >-
+      Checks stencils, banded system, boundaries, exact final stepping, FTCS
+      rejection, and independent oracles instead of recommending helper tests
+      or coverage targets.
+  - id: analyze-direct
+    entrypoint: cse:analyze
+    prompt: >-
+      Review the retained heat-verification analysis without regenerating it.
+      Assess the convergence regime, tolerance rationale, uncertainty, plots,
+      and supported claims.
+    expected: >-
+      Reads retained CSV values, checks monotonic error and observed order,
+      evaluates Richardson and floating allowances, and keeps stability,
+      monotonicity, and accuracy distinct.
+  - id: summarize-direct
+    entrypoint: cse:summarize
+    prompt: >-
+      Review the cumulative research notebook entry for fidelity to retained
+      results. Do not edit files.
+    expected: >-
+      Traces every reported number to retained results, preserves conditions
+      and limitations, and does not introduce unsupported interpretation.
+  - id: write-direct
+    entrypoint: cse:write
+    prompt: >-
+      Review the tutorial manuscript for claim support, citations, figures,
+      numerical precision, and claim boundaries. Do not edit files.
+    expected: >-
+      Checks manuscript numbers against CSV, source locators against the paper,
+      figures against exact plotted data, and LaTeX bibliography provenance.
+  - id: review-direct
+    entrypoint: cse:review
+    prompt: >-
+      Perform a review-only scientific audit of this repository. Prioritize
+      substantive scientific failures and avoid generic software boilerplate.
+    expected: >-
+      Reviews the full question-to-claim chain, reports prioritized findings,
+      and does not recommend coverage expansion without a scientific failure.
+  - id: zotero-direct
+    entrypoint: cse:zotero
+    prompt: >-
+      In read-only mode, verify the Crank-Nicolson Zotero evidence identities,
+      exact locators, and project bibliography route. Make no Zotero writes.
+    expected: >-
+      Capability-checks the installed Companion, uses exact item and child
+      identities, verifies the sanitized export, and does not invoke a generic
+      Zotero skill or publisher automation.
+  - id: mathpix-direct
+    entrypoint: cse:mathpix
+    prompt: >-
+      In read-only mode, assess whether Mathpix conversion is currently needed
+      for the Crank-Nicolson source. Make no conversion or Zotero writes.
+    expected: >-
+      Checks children first, finds Markdown child I5DDQJH8, declines duplicate
+      conversion, treats extraction as fallible, and preserves separate write
+      approval.
+handoff_cases:
+  - id: research-zotero-mathpix
+    route: [research, zotero, mathpix, research]
+    confirmed_context: >-
+      The scientific question, source identity, read-only authority, and exact
+      evidence need were confirmed at research entry.
+    expected: >-
+      Handoffs inherit all confirmed decisions. Zotero asks no repeated setup
+      questions; Mathpix is skipped because a Markdown child exists; research
+      receives exact evidence and resumes the requested endpoint.
+  - id: construct-build-analyze-summarize-write-review
+    route: [construct, build, analyze, summarize, write, review]
+    confirmed_context: >-
+      Issue 5 fixes the equation, methods, retained study, tolerance derivation,
+      manuscript endpoint, repository authority, and write permission.
+    expected: >-
+      Each stage asks only a genuine delta question introduced by new evidence,
+      continues in the same task, and preserves the original claim boundary.
+degraded_capability_case:
+  - id: companion-missing
+    prompt: >-
+      Evaluate behavior when zotero-companion is unavailable but all evidence
+      needed for a numerical analysis is already committed locally.
+    expected: >-
+      Names the missing capability, blocks only live source operations, and
+      permits local formulation, analysis, writing, and review to continue.

@@ -15,11 +15,10 @@ scientific verdict. The user and the applicable sources remain responsible for
 scientific judgment.
 
 The canonical source is
-[`tannerpolley/cse`](https://github.com/tannerpolley/cse).
-The behavioral example is
-[`tannerpolley/scientific-codex-example`](https://github.com/tannerpolley/scientific-codex-example).
-Both repositories are private; an authorized GitHub connection is therefore
-part of the review setup.
+[`tannerpolley/cse`](https://github.com/tannerpolley/cse). The behavioral
+heat-equation example is embedded at
+[`examples/heat-equation/`](../../examples/heat-equation/README.md), so review
+of the plugin and example uses one repository-local checkout.
 
 ## Non-goals
 
@@ -114,13 +113,13 @@ docs/design/                    product decisions and external-review package
 
 The project keeps user-specific scientific context, equations, methods,
 evidence, analyses, notebooks, and manuscripts in the user's repository rather
-than in the installed plugin. The example repository shows the intended
+than in the installed plugin. The embedded heat-equation example shows the intended
 project-facing shape in its
-[profile](https://github.com/tannerpolley/scientific-codex-example/blob/main/PROFILE.md),
-[scientific context](https://github.com/tannerpolley/scientific-codex-example/blob/main/docs/scientific/CONTEXT.md),
-[formulation](https://github.com/tannerpolley/scientific-codex-example/blob/main/docs/scientific/formulation.tex),
-[methods](https://github.com/tannerpolley/scientific-codex-example/blob/main/docs/scientific/methods.tex),
-and [evidence plan](https://github.com/tannerpolley/scientific-codex-example/blob/main/docs/scientific/evidence.tex).
+[profile](../../examples/heat-equation/PROFILE.md),
+[scientific context](../../examples/heat-equation/docs/scientific/CONTEXT.md),
+[formulation](../../examples/heat-equation/docs/scientific/formulation.tex),
+[methods](../../examples/heat-equation/docs/scientific/methods.tex),
+and [evidence plan](../../examples/heat-equation/docs/scientific/evidence.tex).
 
 ## Scientific doctrine to examine
 
@@ -173,13 +172,12 @@ is required after installation so the task receives a newly installed skill
 surface. The repository has no assumed GitHub Actions or required remote
 status checks.
 
-The example's setup validator and bibliography helper provide behavioral
-evidence for one repository route. Its merged bibliography update is visible
-in [PR #3](https://github.com/tannerpolley/scientific-codex-example/pull/3),
-and its generated full bibliography snapshot is
-[`docs/latex/references.bib`](https://github.com/tannerpolley/scientific-codex-example/blob/main/docs/latex/references.bib).
-The example has not yet demonstrated a completed solver, convergence campaign,
-or physical validation study.
+The example's setup validator, executable solver, retained numerical study, and
+bibliography helper provide behavioral evidence for one repository route. Its
+generated full bibliography snapshot is
+[`docs/latex/references.bib`](../../examples/heat-equation/docs/latex/references.bib).
+The example demonstrates code and solution verification, but it does not claim
+physical validation.
 
 ## Privacy and source assumptions
 

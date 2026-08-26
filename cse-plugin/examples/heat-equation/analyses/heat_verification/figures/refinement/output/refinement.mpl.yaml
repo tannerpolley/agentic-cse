@@ -1,0 +1,8 @@
+kind: matplotlib-figure
+version: 1
+plot_id: heat_verification_refinement
+title: Spatial-temporal and isolated-time refinement
+matplotlib:
+  title: Heat-equation refinement behavior
+  combined_title: Combined refinement at fixed $r=0.4$
+  temporal_title: Isolated temporal refinement at $N=20$

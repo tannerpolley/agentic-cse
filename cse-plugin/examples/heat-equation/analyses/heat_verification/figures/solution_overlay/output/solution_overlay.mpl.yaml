@@ -1,0 +1,8 @@
+kind: matplotlib-figure
+version: 1
+plot_id: heat_verification_solution_overlay
+title: Numerical and continuous heat-equation fields
+matplotlib:
+  title: Heat-equation solution at $Fo=0.1$
+  xlabel: Dimensionless position, $\xi$
+  ylabel: Dimensionless temperature, $\theta$
