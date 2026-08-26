@@ -2,30 +2,43 @@
 
 Agentic Computational Science and Engineering (`cse`) gives Codex a disciplined working method for computational science and physical-world engineering. It supports mechanical, chemical, electrical, civil, and related work—not generic software engineering—by keeping attention on the scientific question, equations, numerical method, reference cases, uncertainty, interpretation, and supported writing.
 
-The plugin has eight workflow stages and eleven supporting tools.
+The plugin has nine workflow skills across eight normal levels and eleven
+supporting tools.
 
 ## Workflow spine
 
-The default agent path is:
+The normal agent path is:
 
-`setup → research → design → build → analyze → summarize → write → review`
+`setup → research or diagnose → design → build → analyze → review → summarize → write`
 
 - `setup` establishes repository vocabulary and scientific conventions.
 - `research` investigates literature, theory, and data.
+- `diagnose` establishes why observed behavior disagrees with an expectation.
 - `design` lays out the scientific work and publishes a GitHub issue when the repository uses GitHub issues.
 - `build` implements models and numerical methods.
 - `analyze` runs numerical studies and interprets results.
+- `review` checks the Design-Build-Analyze set before accepted results advance.
 - `summarize` admits an accepted analysis slice to its research journal.
 - `write` develops an evidence-supported manuscript.
-- `review` examines the complete scientific reasoning chain when requested.
+
+Research and Diagnose share level 02 and may both apply. Analyze routes an
+unresolved core disagreement to Diagnose; otherwise it routes to Review. A
+blocking review returns to the same Design and active issue before Build and
+Analyze repeat. Review Pass continues to Summarize and is bounded to the stated
+use and domain.
 
 ## Supporting tools
 
+Sources tools:
+
 - `zotero` retrieves and manages source-linked Zotero evidence through Companion.
 - `mathpix` extracts equation-rich Zotero PDFs only when no Markdown child exists.
-- `plot` creates clear model-versus-data figures from retained values.
+- `data` discovers, queries, validates, and traces retained scientific data.
 - `digitize` extracts calibrated values from source figures with QA evidence.
-- `diagnose` establishes why numerical behavior disagrees with an expectation before repair or interpretation.
+
+Visualize tools:
+
+- `plot` selects Matplotlib or PGFPlots for figures from retained values.
 - `tikz` creates document-native LaTeX diagrams, schematics, and geometry.
 - `pgfplots` creates table-driven LaTeX-native quantitative plots.
 - `latex` is the explicit starting tool for a complete scientific document.
