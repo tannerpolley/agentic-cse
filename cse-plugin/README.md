@@ -2,7 +2,7 @@
 
 Agentic Computational Science and Engineering (`cse`) gives Codex a disciplined working method for computational science and physical-world engineering. It supports mechanical, chemical, electrical, civil, and related work—not generic software engineering—by keeping attention on the scientific question, equations, numerical method, reference cases, uncertainty, interpretation, and supported writing.
 
-The plugin has eight workflow stages and ten supporting tools.
+The plugin has eight workflow stages and eleven supporting tools.
 
 ## Workflow spine
 
@@ -25,6 +25,7 @@ The default agent path is:
 - `mathpix` extracts equation-rich Zotero PDFs only when no Markdown child exists.
 - `plot` creates clear model-versus-data figures from retained values.
 - `digitize` extracts calibrated values from source figures with QA evidence.
+- `diagnose` establishes why numerical behavior disagrees with an expectation before repair or interpretation.
 - `tikz` creates document-native LaTeX diagrams, schematics, and geometry.
 - `pgfplots` creates table-driven LaTeX-native quantitative plots.
 - `latex` is the explicit starting tool for a complete scientific document.
