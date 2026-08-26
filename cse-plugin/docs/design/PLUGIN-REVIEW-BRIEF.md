@@ -15,7 +15,7 @@ scientific verdict. The user and the applicable sources remain responsible for
 scientific judgment.
 
 The canonical source is
-[`tannerpolley/scientific-codex`](https://github.com/tannerpolley/scientific-codex).
+[`tannerpolley/cse`](https://github.com/tannerpolley/cse).
 The behavioral example is
 [`tannerpolley/scientific-codex-example`](https://github.com/tannerpolley/scientific-codex-example).
 Both repositories are private; an authorized GitHub connection is therefore

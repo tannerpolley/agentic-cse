@@ -8,7 +8,7 @@ You are conducting an independent, review-only product and scientific-workflow
 review of the private Codex plugin CSE. You have GitHub app access
 for both repositories below:
 
-1. First inspect the plugin source: https://github.com/tannerpolley/scientific-codex
+1. First inspect the plugin source: https://github.com/tannerpolley/cse
 2. Then inspect the behavioral example: https://github.com/tannerpolley/scientific-codex-example
 
 Do not modify either repository. Do not create issues, branches, pull requests,
