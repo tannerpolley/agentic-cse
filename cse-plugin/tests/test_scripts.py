@@ -169,6 +169,44 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertEqual(preserved, "preserve\n")
 
+    def test_live_sync_removes_identified_legacy_deployment(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            home = root / "home"
+            shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", ".venv"))
+            (source / "scripts/validate.sh").write_text("#!/usr/bin/env bash\nexit 0\n")
+            validator = root / "validator.py"
+            validator.write_text("raise SystemExit(0)\n")
+            subprocess.run(["git", "init", "-q"], cwd=source, check=True)
+            subprocess.run(["git", "add", "-A"], cwd=source, check=True)
+            subprocess.run(
+                ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "fixture"],
+                cwd=source,
+                check=True,
+            )
+            legacy = home / ".codex/plugins/scientific-codex"
+            (legacy / ".codex-plugin").mkdir(parents=True)
+            (legacy / ".codex-plugin/plugin.json").write_text(
+                json.dumps({"name": "scientific-codex"})
+            )
+            environment = os.environ | {
+                "HOME": str(home),
+                "CSE_DEPLOY_ROOT": str(home / ".codex/plugins/cse"),
+                "CSE_PLUGIN_VALIDATOR": str(validator),
+            }
+            result = subprocess.run(
+                ["bash", str(source / "scripts/sync-live.sh"), "--validate"],
+                cwd=source,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertFalse(legacy.exists())
+
 
 if __name__ == "__main__":
     unittest.main()

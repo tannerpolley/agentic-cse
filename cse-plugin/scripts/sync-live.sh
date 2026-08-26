@@ -4,6 +4,7 @@ set -euo pipefail
 plugin_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 deploy_root="${CSE_DEPLOY_ROOT:-$HOME/.codex/plugins/cse}"
 expected_root="$HOME/.codex/plugins/cse"
+legacy_root="$HOME/.codex/plugins/scientific-codex"
 validator="${CSE_PLUGIN_VALIDATOR:-$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py}"
 
 if [[ "${1:-}" != "--validate" || $# -ne 1 ]]; then
@@ -49,4 +50,14 @@ if ! python3 "$plugin_root/scripts/register_marketplace.py"; then
   exit 1
 fi
 [[ ! -e "$previous_root" ]] || rm -rf -- "$previous_root"
+if [[ -d "$legacy_root" ]]; then
+  legacy_name="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["name"])' \
+    "$legacy_root/.codex-plugin/plugin.json" 2>/dev/null || true)"
+  if [[ "$legacy_name" == "scientific-codex" ]]; then
+    rm -rf -- "$legacy_root"
+    echo "Removed retired Scientific Codex deployment from $legacy_root"
+  else
+    echo "Preserving unexpected directory at $legacy_root" >&2
+  fi
+fi
 echo "Deployed CSE to $deploy_root"
