@@ -5,7 +5,7 @@ project:
     - article.qmd
     - deck.qmd
     - interactive-deck.qmd
-    - research-journal.qmd
+    - analyses/artificial-absorber/notebook.qmd
 
 execute:
   enabled: false

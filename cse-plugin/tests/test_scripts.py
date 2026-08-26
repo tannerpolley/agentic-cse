@@ -112,6 +112,111 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 1)
         self.assertIn("forbidden word", result.stdout)
 
+    def test_prose_check_applies_scoped_rules_and_exceptions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            context = root / "docs/scientific/CONTEXT.md"
+            context.parent.mkdir(parents=True)
+            context.write_text(
+                "| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |\n"
+                "|---|---|---|---|---|---|\n"
+                "| frozen parameter set | parameters held fixed | Preserve validation meaning. "
+                "| docs/latex/sections/*.tex | frozen composition | task:608 |\n"
+            )
+            config = root / "config.toml"
+            config.write_text(
+                "[[terminology]]\n"
+                'Avoid = "contact"\n'
+                'Prefer = "stages"\n'
+                'Meaning = "Name the extraction sequence."\n'
+                'Scope = ["analyses/*/notebook.qmd"]\n'
+                'Exceptions = ["MSContactor", "contact mechanics"]\n'
+                'Evidence = "confirmed user correction"\n'
+            )
+            notebook = root / "analyses/case/notebook.qmd"
+            notebook.parent.mkdir(parents=True)
+            notebook.write_text(
+                "Contact mechanics uses one contact followed by MSContactor.\n"
+            )
+            manuscript = root / "docs/latex/sections/methods.tex"
+            manuscript.parent.mkdir(parents=True)
+            manuscript.write_text(
+                "The frozen parameter set was used; frozen composition was retained.\n"
+            )
+            outside = root / "notes.md"
+            outside.write_text("contact and frozen parameter set\n")
+
+            result = self.run_script(
+                "check_prose.py",
+                str(notebook),
+                str(manuscript),
+                str(outside),
+                "--config",
+                str(config),
+                "--context",
+                str(context),
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("avoid 'contact' → prefer 'stages'", result.stdout)
+        self.assertEqual(result.stdout.count("avoid 'contact'"), 1)
+        self.assertIn(
+            "avoid 'frozen parameter set' → prefer 'parameters held fixed'",
+            result.stdout,
+        )
+        self.assertNotIn("MSContactor", result.stdout)
+        self.assertNotIn("notes.md", result.stdout)
+
+    def test_prose_check_rejects_overlapping_authorities(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            context = root / "docs/scientific/CONTEXT.md"
+            context.parent.mkdir(parents=True)
+            context.write_text(
+                "| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |\n"
+                "|---|---|---|---|---|---|\n"
+                "| contact | stages | Repository meaning. | analyses/*/notebook.qmd |  | repo |\n"
+            )
+            config = root / "config.toml"
+            config.write_text(
+                "[[terminology]]\n"
+                'Avoid = "contact"\n'
+                'Prefer = "stages"\n'
+                'Meaning = "Personal meaning."\n'
+                'Scope = ["analyses/*/notebook.qmd"]\n'
+                'Exceptions = []\n'
+                'Evidence = "user"\n'
+            )
+            draft = root / "analyses/case/notebook.qmd"
+            draft.parent.mkdir(parents=True)
+            draft.write_text("contact\n")
+            result = self.run_script(
+                "check_prose.py",
+                str(draft),
+                "--config",
+                str(config),
+                "--context",
+                str(context),
+            )
+            context.write_text(
+                "| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |\n"
+                "|---|---|---|---|---|---|\n"
+                "| contact | stages | Repository meaning. | docs/latex/*.tex |  | repo |\n"
+            )
+            draft.write_text("stages\n")
+            resolved = self.run_script(
+                "check_prose.py",
+                str(draft),
+                "--config",
+                str(config),
+                "--context",
+                str(context),
+            )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("terminology conflict", result.stdout)
+        self.assertEqual(resolved.returncode, 0, resolved.stdout)
+
     def test_bibliography_sync_and_check(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

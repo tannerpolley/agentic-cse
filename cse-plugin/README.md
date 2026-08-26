@@ -18,7 +18,8 @@ The normal agent path is:
 - `build` implements models and numerical methods.
 - `analyze` runs numerical studies and interprets results.
 - `review` checks the Design-Build-Analyze set before accepted results advance.
-- `summarize` admits an accepted analysis slice to its research journal.
+- `summarize` replaces one analysis research notebook with the current reviewed
+  scientific view.
 - `write` develops an evidence-supported manuscript.
 
 Research and Diagnose share level 02 and may both apply. Analyze routes an
@@ -56,10 +57,10 @@ Document-producing workflows use the package and output-profile decisions in
 [`references/latex-packages.md`](references/latex-packages.md), with curated
 TikZ and PGF selections in
 [`references/latex-extensions.md`](references/latex-extensions.md).
-The distinct manuscript and research-journal contracts are in
+The distinct manuscript and analysis-notebook contracts are in
 [`references/latex-article-profiles.md`](references/latex-article-profiles.md).
 [`references/revealjs.md`](references/revealjs.md) defines the interactive
-research-journal view that shares retained results and figure sources with the
+analysis-notebook view that shares retained results and figure sources with the
 LuaLaTeX PDF.
 Layout and visual acceptance rules are in
 [`references/latex-layout-and-qa.md`](references/latex-layout-and-qa.md), and
@@ -67,7 +68,7 @@ Layout and visual acceptance rules are in
 searchable user-level official-manual cache.
 
 A runnable Quarto-managed chemical-engineering article, Moloch Beamer deck,
-RevealJS example, and dual-output research journal live in
+RevealJS example, and dual-output analysis research notebook live in
 [`examples/quarto-chemical-engineering-showcase/`](examples/quarto-chemical-engineering-showcase/README.md).
 
 The embedded [`heat-equation example`](examples/heat-equation/README.md) and
@@ -82,7 +83,8 @@ the stage or tool that matches the user's request.
 The plugin-wide language contract is in
 [`references/terminology.md`](references/terminology.md), and vague agent
 language to replace is collected in [`BANNED.md`](BANNED.md). Project-specific
-terms belong in the user's `docs/scientific/CONTEXT.md`.
+terms belong in the user's `docs/scientific/CONTEXT.md`; confirmed personal
+preferences belong in `~/.config/cse/config.toml`.
 
 The starting workflow stage inspects current state, asks a material question round, confirms its interpretation, and then continues to the requested endpoint or a precise blocker. Internal continuations inherit confirmed decisions and ask only delta questions. CSE does not require Project Truss, Matt Pocock skills, Superpowers, generic Zotero or Mathpix skills, GitHub Actions, issue hierarchy, or coverage targets.
 

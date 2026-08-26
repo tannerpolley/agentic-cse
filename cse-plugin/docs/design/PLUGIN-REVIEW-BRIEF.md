@@ -62,16 +62,17 @@ skills stay intentionally thin and route through shared references:
 - [`terminology.md`](../../references/terminology.md) defines canonical
   workflow, tool, source, extraction, figure, and claim language.
 
-The eight workflow entrypoints are:
+The nine workflow stages are:
 
 | Entry point | Main endpoint | Next route when work continues |
 | --- | --- | --- |
 | [`setup`](../../skills/setup/SKILL.md) | Repository vocabulary, scientific records, bibliography, plotting, writing, and integration defaults | The skill that owns the selected scientific endpoint |
 | [`research`](../../skills/research/SKILL.md) | Literature, theory, data, equations, and method evidence | `design` for substantive repository work |
+| [`diagnose`](../../skills/diagnose/SKILL.md) | Cause of numerical or scientific disagreement | `design` with the correction boundary |
 | [`design`](../../skills/design/SKILL.md) | A complete question and native GitHub issue | `build`, `analyze`, or `write` |
-| [`build`](../../skills/build/SKILL.md) | Equations, models, numerical methods, solvers, or data transformations | `analyze`, then `summarize` or `review` |
-| [`analyze`](../../skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `summarize`, `write`, or `review` |
-| [`summarize`](../../skills/summarize/SKILL.md) | A durable research-notebook slice | `write` or `review` |
+| [`build`](../../skills/build/SKILL.md) | Equations, models, numerical methods, solvers, or data transformations | `analyze` |
+| [`analyze`](../../skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `review` or `diagnose` |
+| [`summarize`](../../skills/summarize/SKILL.md) | The current reviewed analysis research notebook | `write` or `review` |
 | [`write`](../../skills/write/SKILL.md) | Evidence-supported papers, reports, captions, and LaTeX | `review` |
 | [`review`](../../skills/review/SKILL.md) | Whole-chain scientific and repository review | Route material corrections to the owning skill |
 
@@ -101,7 +102,7 @@ hidden plugin dependencies.
 
 ```text
 .codex-plugin/plugin.json       installable manifest and interface metadata
-skills/<stage-or-tool>/SKILL.md eight workflow routes plus six supporting tools
+skills/<stage-or-tool>/SKILL.md nine workflow stages plus supporting tools
 references/*.md                 shared scientific, numerical, Git, and source doctrine
 scripts/validate.sh             source validation and contract checks
 scripts/sync-live.sh             guarded source-to-marketplace deployment
@@ -140,7 +141,7 @@ percentage as scientific evidence.
 The plotting and writing doctrine retains exact plotted values and publication
 formats, labels quantities and units, distinguishes models, observations,
 literature, and uncertainty semantically, and treats the notebook as the
-cumulative research record and the manuscript as a selected story.
+current reviewed analysis record and the manuscript as a selected story.
 
 ## Validation and evaluation evidence
 
@@ -210,7 +211,7 @@ An external review would be most valuable on these questions:
 - Do the numerical and uncertainty rules distinguish code correctness,
   discretization error, physical validation, and scientific acceptance in
   practice?
-- Do the eight workflow stages form a coherent route with useful continuity,
+- Do the nine workflow stages form a coherent route with useful continuity,
   and do the six supporting tools avoid becoming competing stages?
 - Is the grilling quality material and adaptive without blocking ordinary work?
 - Is the Zotero and Companion boundary safe, understandable, and useful for
