@@ -1,0 +1,41 @@
+\definecolor{cseBlue}{HTML}{0072B2}
+\definecolor{cseOrange}{HTML}{D55E00}
+\definecolor{cseGreen}{HTML}{009E73}
+\definecolor{cseSky}{HTML}{56B4E9}
+\definecolor{cseInk}{HTML}{1F2933}
+
+\pgfplotsset{
+  compat=1.18,
+  cse research axis/.style={
+    grid=major,
+    tick align=outside,
+    axis line style={cseInk},
+    tick label style={font=\small},
+    label style={font=\small},
+    legend style={draw=none,fill=none,font=\small},
+  },
+  cse research model/.style={very thick,cseBlue,no marks},
+  cse research observation/.style={
+    only marks,
+    mark=o,
+    mark options={fill=white,draw=cseOrange,very thick},
+    mark size=2.6pt,
+    cseOrange,
+  },
+}
+
+\tikzset{
+  cse research node/.style={
+    draw=cseInk,
+    rounded corners=2pt,
+    align=center,
+    minimum width=29mm,
+    minimum height=11mm,
+    inner sep=3pt,
+    fill=white,
+  },
+  cse research data/.style={cse research node,fill=cseSky!18},
+  cse research source/.style={cse research node,fill=cseOrange!14},
+  cse research output/.style={cse research node,fill=cseGreen!16},
+  cse research flow/.style={-{Latex[length=2.2mm]},thick,cseInk},
+}

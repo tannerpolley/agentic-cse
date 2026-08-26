@@ -28,19 +28,22 @@ The default agent path is:
 - `tikz` creates document-native LaTeX diagrams, schematics, and geometry.
 - `pgfplots` creates table-driven LaTeX-native quantitative plots.
 
-LaTeX-producing workflows use the package and document-profile decisions in
+Document-producing workflows use the package and output-profile decisions in
 [`references/latex-packages.md`](references/latex-packages.md), with curated
 TikZ and PGF selections in
 [`references/latex-extensions.md`](references/latex-extensions.md).
 The distinct manuscript and research-journal contracts are in
 [`references/latex-article-profiles.md`](references/latex-article-profiles.md).
+[`references/revealjs.md`](references/revealjs.md) defines the interactive
+research-journal view that shares retained results and figure sources with the
+LuaLaTeX PDF.
 Layout and visual acceptance rules are in
 [`references/latex-layout-and-qa.md`](references/latex-layout-and-qa.md), and
 [`references/latex-manuals.md`](references/latex-manuals.md) defines the
 searchable user-level official-manual cache.
 
-A runnable Quarto-managed chemical-engineering article and Moloch Beamer deck
-live in
+A runnable Quarto-managed chemical-engineering article, Moloch Beamer deck,
+RevealJS example, and dual-output research journal live in
 [`examples/quarto-chemical-engineering-showcase/`](examples/quarto-chemical-engineering-showcase/README.md).
 
 Tools support a workflow stage and return their evidence or files to that

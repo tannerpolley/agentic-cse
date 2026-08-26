@@ -4,10 +4,11 @@ project:
   render:
     - article.qmd
     - deck.qmd
+    - interactive-deck.qmd
+    - research-journal.qmd
 
 execute:
-  freeze: auto
+  enabled: false
 
 metadata-files:
   - metadata.yml
-

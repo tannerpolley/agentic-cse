@@ -109,6 +109,28 @@ class ScriptBehaviorTests(unittest.TestCase):
             {issue["code"] for issue in graphic_report["issues"]},
         )
 
+    def test_quarto_release_entrypoint_does_not_execute_document_python(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            shutil.copy2(ROOT / "assets/project/quarto/_quarto.yml", project)
+            shutil.copy2(ROOT / "assets/project/quarto/render.sh", project)
+            (project / "document.qmd").write_text(
+                "---\nformat: html\n---\n\n"
+                "```{python}\nfrom pathlib import Path\n"
+                "Path('model-ran').write_text('unsafe')\n```\n"
+            )
+            rendered = subprocess.run(
+                ["bash", "render.sh", "document.qmd"],
+                cwd=project,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+
+            self.assertEqual(rendered.returncode, 0, rendered.stderr)
+            self.assertTrue((project / "builds/document.html").is_file())
+            self.assertFalse((project / "model-ran").exists())
+
     def test_live_sync_restores_previous_deployment_when_registration_fails(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
