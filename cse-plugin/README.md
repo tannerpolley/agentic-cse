@@ -2,7 +2,7 @@
 
 Agentic Computational Science and Engineering (`cse`) gives Codex a disciplined working method for computational science and physical-world engineering. It supports mechanical, chemical, electrical, civil, and related work—not generic software engineering—by keeping attention on the scientific question, equations, numerical method, reference cases, uncertainty, interpretation, and supported writing.
 
-The plugin has eight workflow stages and six supporting tools.
+The plugin has eight workflow stages and ten supporting tools.
 
 ## Workflow spine
 
@@ -27,6 +27,16 @@ The default agent path is:
 - `digitize` extracts calibrated values from source figures with QA evidence.
 - `tikz` creates document-native LaTeX diagrams, schematics, and geometry.
 - `pgfplots` creates table-driven LaTeX-native quantitative plots.
+- `latex` is the explicit starting tool for a complete scientific document.
+- `quarto` manages shared `.qmd` source and controlled multi-format rendering.
+- `revealjs` creates interactive, scroll-capable scientific results views.
+- `beamer` creates fixed-layout scientific presentation PDFs.
+
+Invoke `$cse:latex` when you want one guided route through the document bundle.
+It confirms the document type and outputs, uses the needed specialist tools,
+builds every selected output, and completes visual inspection. Run
+`scripts/check-latex-toolchain.sh` to verify the supported user toolchain:
+TinyTeX as the TeX distribution and LuaLaTeX as its default PDF engine.
 
 Document-producing workflows use the package and output-profile decisions in
 [`references/latex-packages.md`](references/latex-packages.md), with curated
