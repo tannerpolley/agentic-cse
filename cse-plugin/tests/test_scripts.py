@@ -22,6 +22,88 @@ class ScriptBehaviorTests(unittest.TestCase):
             check=False,
         )
 
+    def initialize_git_repository(self, root: Path, branch: str = "main"):
+        subprocess.run(["git", "init", "-q", "-b", branch], cwd=root, check=True)
+        subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
+        subprocess.run(
+            ["git", "config", "user.email", "test@example.com"], cwd=root, check=True
+        )
+
+    def commit_all(self, root: Path, message: str):
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+        subprocess.run(["git", "commit", "-qm", message], cwd=root, check=True)
+
+    def test_change_accounting_covers_branch_and_worktree_states(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize_git_repository(root)
+            (root / "src").mkdir()
+            (root / "src/model.py").write_text("value = 1\n")
+            (root / "tests").mkdir()
+            (root / "tests/test_model.py").write_text("assert True\n")
+            (root / "docs").mkdir()
+            (root / "docs/method.md").write_text("baseline\n")
+            (root / ".gitignore").write_text("ignored.bin\n")
+            self.commit_all(root, "baseline")
+            subprocess.run(["git", "switch", "-qc", "feature"], cwd=root, check=True)
+
+            (root / "src/model.py").write_text("value = 2\nextra = 3\n")
+            self.commit_all(root, "committed implementation")
+            (root / "tests/test_model.py").write_text("assert 2 == 2\n")
+            subprocess.run(["git", "add", "tests/test_model.py"], cwd=root, check=True)
+            (root / "docs/method.md").write_text("revised\n")
+            (root / "generated").mkdir()
+            (root / "generated/result.py").write_text("generated = True\n")
+            (root / "figure.bin").write_bytes(b"\x00\x01\x02")
+            (root / "ignored.bin").write_bytes(b"\x00ignored")
+
+            result = self.run_script(
+                "change_accounting.py", "--repo", str(root), "--base", "main", "--json"
+            )
+            report = json.loads(result.stdout)
+            files = {record["path"]: record for record in report["files"]}
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(files["src/model.py"]["category"], "executable")
+        self.assertEqual(files["tests/test_model.py"]["category"], "tests")
+        self.assertEqual(files["docs/method.md"]["category"], "documents")
+        self.assertEqual(files["generated/result.py"]["category"], "generated")
+        self.assertTrue(files["generated/result.py"]["untracked"])
+        self.assertTrue(files["figure.bin"]["binary"])
+        self.assertIsNone(files["figure.bin"]["additions"])
+        self.assertNotIn("ignored.bin", files)
+        self.assertEqual(report["executable_removal_to_addition_ratio"], 0.5)
+
+    def test_change_accounting_detects_default_base_and_renders_text(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize_git_repository(root)
+            (root / "README.md").write_text("baseline\n")
+            self.commit_all(root, "baseline")
+            subprocess.run(["git", "switch", "-qc", "feature"], cwd=root, check=True)
+            (root / "README.md").write_text("revision\n")
+            result = self.run_script("change_accounting.py", "--repo", str(root))
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("requested base: main", result.stdout)
+        self.assertIn("executable removal/addition ratio: not applicable", result.stdout)
+        self.assertIn("documents: +1 -1 README.md", result.stdout)
+
+    def test_change_accounting_rejects_non_repository(self):
+        with tempfile.TemporaryDirectory() as directory:
+            result = self.run_script("change_accounting.py", "--repo", directory)
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("not a Git repository", result.stderr)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize_git_repository(root, "trunk")
+            (root / "input.txt").write_text("value\n")
+            self.commit_all(root, "baseline")
+            result = self.run_script("change_accounting.py", "--repo", str(root))
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("provide --base REF", result.stderr)
+
     def test_prose_check_rejects_default_forbidden_word(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "draft.md"
