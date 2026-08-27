@@ -3,6 +3,7 @@ set -euo pipefail
 
 showcase_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd "$showcase_root/../.." && pwd)"
+render="$repository_root/assets/project/quarto/render.sh"
 
 cd "$showcase_root"
 mkdir -p builds/figures figures/generated
@@ -15,11 +16,11 @@ for figure in artificial-absorber-comparison analysis-notebook-lineage; do
     "builds/figures/${figure}-standalone.dvi" >/dev/null
 done
 
-quarto render article.qmd --no-execute
-quarto render deck.qmd --no-execute
-quarto render interactive-deck.qmd --no-execute
-quarto render analyses/artificial-absorber/notebook.qmd --to pdf --no-execute
-quarto render analyses/artificial-absorber/notebook.qmd --to revealjs --no-execute
+"$render" article.qmd
+"$render" deck.qmd
+"$render" interactive-deck.qmd
+"$render" analyses/artificial-absorber/notebook.qmd --to pdf
+"$render" analyses/artificial-absorber/notebook.qmd --to revealjs
 
 python3 "$repository_root/scripts/latex_visual_qa.py" builds/article.pdf \
   --profile article --output-dir builds/visual-qa/article --contact-sheet
