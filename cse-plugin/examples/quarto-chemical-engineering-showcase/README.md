@@ -2,7 +2,7 @@
 
 Quarto is the source manager. It renders one detailed article and one Moloch
 Beamer deck through LuaLaTeX, plus an interactive RevealJS HTML deck. A shared
-research-journal source also renders to a LuaLaTeX PDF and a RevealJS HTML
+analysis-notebook source also renders to a LuaLaTeX PDF and a RevealJS HTML
 companion from the same artificial retained results and the same TikZ and
 PGFPlots figure sources. Document code is disabled for the default and release
 build.
@@ -20,8 +20,8 @@ be rerendered with:
 quarto render article.qmd --no-execute
 quarto render deck.qmd --no-execute
 quarto render interactive-deck.qmd --no-execute
-quarto render research-journal.qmd --to pdf --no-execute
-quarto render research-journal.qmd --to revealjs --no-execute
+quarto render analyses/artificial-absorber/notebook.qmd --to pdf --no-execute
+quarto render analyses/artificial-absorber/notebook.qmd --to revealjs --no-execute
 ```
 
 The project writes intermediate output under `builds/`. The build wrapper runs
@@ -36,8 +36,8 @@ full size before recording a release disposition.
 - `deck.qmd`: presentation-focused tour of the same system.
 - `interactive-deck.qmd`: browser-native RevealJS navigation, fragments,
   auto-animation, tabsets, and speaker notes without Python execution.
-- `research-journal.qmd`: one curated analysis slice rendered as both a
-  LuaLaTeX research-journal PDF and a scroll-first RevealJS companion.
+- `analyses/artificial-absorber/notebook.qmd`: one reviewed analysis set rendered as both a
+  LuaLaTeX analysis-notebook PDF and a scroll-first RevealJS companion.
 - `tex/`: distinct article and Beamer headers; do not inject the article
   header into Beamer.
 - `theme/`: restrained Moloch customization.

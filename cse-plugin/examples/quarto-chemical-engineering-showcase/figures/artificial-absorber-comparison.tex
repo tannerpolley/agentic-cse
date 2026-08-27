@@ -1,3 +1,4 @@
+\providecommand{\absorberdatatable}{data/artificial-absorber-profile.csv}
 \begin{tikzpicture}
 \begin{axis}[
   cse research axis,
@@ -13,7 +14,7 @@
 ]
   \addplot[cse research model]
     table[x=height_m,y=model_co2_pct,col sep=comma]
-    {data/artificial-absorber-profile.csv};
+    {\absorberdatatable};
   \addlegendentry{Artificial model}
 
   \addplot+[
@@ -26,7 +27,7 @@
     y=observation_co2_pct,
     y error=uncertainty_pct,
     col sep=comma,
-  ] {data/artificial-absorber-profile.csv};
+  ] {\absorberdatatable};
   \addlegendentry{Artificial observations}
 \end{axis}
 \end{tikzpicture}

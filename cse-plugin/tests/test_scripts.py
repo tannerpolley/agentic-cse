@@ -104,6 +104,165 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("provide --base REF", result.stderr)
 
+    def test_cse_review_stop_hook_is_opt_in_and_single_shot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repository = root / "repo"
+            repository.mkdir()
+            self.initialize_git_repository(repository)
+            plugin = root / "plugin"
+            scripts = plugin / "scripts"
+            scripts.mkdir(parents=True)
+            accounting = scripts / "change_accounting.py"
+            hook = ROOT / "scripts/cse-review-stop.py"
+            environment = {**os.environ, "PLUGIN_ROOT": str(plugin)}
+
+            def invoke(*, active=False, cwd=repository):
+                return subprocess.run(
+                    [sys.executable, str(hook)],
+                    input=json.dumps({"cwd": str(cwd), "stop_hook_active": active}),
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+
+            accounting.write_text("raise SystemExit(9)\n")
+            outside = root / "outside"
+            outside.mkdir()
+            self.assertEqual(invoke(cwd=outside).stdout, "")
+            self.assertEqual(invoke().stdout, "")
+
+            (repository / "AGENTS.md").write_text(
+                "Repository Profile: scientific-computing\n"
+            )
+            self.commit_all(repository, "baseline")
+            self.assertEqual(invoke(active=True).stdout, "")
+
+            report = {
+                "categories": {
+                    "executable": {"files": 0},
+                    "tests": {"files": 0},
+                },
+                "files": [{"category": "documents", "path": "README.md"}],
+            }
+            accounting.write_text(
+                "import json\nprint(json.dumps(" + repr(report) + "))\n"
+            )
+            self.assertEqual(invoke().stdout, "")
+
+            report["files"] = [{"category": "other", "path": "solver.yaml"}]
+            accounting.write_text(
+                "import json\nprint(json.dumps(" + repr(report) + "))\n"
+            )
+            config_reminder = json.loads(invoke().stdout)
+            self.assertEqual(config_reminder["decision"], "block")
+
+            report["categories"]["executable"]["files"] = 1
+            report["files"] = [{"category": "executable", "path": "src/model.py"}]
+            accounting.write_text(
+                "import json\nprint(json.dumps(" + repr(report) + "))\n"
+            )
+            reminder = json.loads(invoke().stdout)
+            self.assertEqual(reminder["decision"], "block")
+            self.assertIn("Apply CSE Review", reminder["reason"])
+
+            accounting.write_text("raise SystemExit(9)\n")
+            warning = json.loads(invoke().stdout)
+            self.assertIn("skipped", warning["systemMessage"])
+
+            accounting.write_text(
+                'print(\'{"files":[null],"categories":{"executable":{"files":0},'
+                '"tests":{"files":0}}}\')\n'
+            )
+            malformed = json.loads(invoke().stdout)
+            self.assertIn("invalid data", malformed["systemMessage"])
+
+            (repository / "src").mkdir()
+            (repository / "src/model.py").write_text("result = 1\n")
+            integrated = subprocess.run(
+                [sys.executable, str(hook)],
+                input=json.dumps({"cwd": str(repository), "stop_hook_active": False}),
+                env={**os.environ, "PLUGIN_ROOT": str(ROOT)},
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(json.loads(integrated.stdout)["decision"], "block")
+
+    def test_installed_check_reports_missing_disabled_mismatch_and_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            deployed = root / "deployed"
+            for relative in (
+                ".codex-plugin/plugin.json",
+                "hooks/hooks.json",
+                "scripts/change_accounting.py",
+                "scripts/check-installed.py",
+                "scripts/check_prose.py",
+                "scripts/cse-review-stop.py",
+            ):
+                destination = deployed / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(ROOT / relative, destination)
+            for source in (ROOT / "skills").glob("*/SKILL.md"):
+                destination = deployed / source.relative_to(ROOT)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+
+            command_dir = root / "bin"
+            command_dir.mkdir()
+            codex = command_dir / "codex"
+            codex.write_text(
+                "#!/usr/bin/env python3\n"
+                "import os\n"
+                "print(open(os.environ['FAKE_PLUGIN_LIST']).read())\n"
+            )
+            codex.chmod(0o755)
+            listing = root / "plugins.json"
+            environment = {
+                **os.environ,
+                "PATH": str(command_dir) + os.pathsep + os.environ.get("PATH", ""),
+                "CSE_DEPLOY_ROOT": str(deployed),
+                "FAKE_PLUGIN_LIST": str(listing),
+            }
+            check = ROOT / "scripts/check-installed.py"
+
+            cases = (
+                ({"installed": []}, "not installed"),
+                ({"installed": [{
+                    "pluginId": "cse@personal", "installed": True,
+                    "enabled": False, "version": "1.1.0",
+                    "source": {"path": str(deployed)},
+                }]}, "disabled"),
+                ({"installed": [{
+                    "pluginId": "cse@personal", "installed": True,
+                    "enabled": True, "version": "1.0.0",
+                    "source": {"path": str(deployed)},
+                }]}, "expected '1.1.0'"),
+            )
+            for payload, message in cases:
+                with self.subTest(message=message):
+                    listing.write_text(json.dumps(payload))
+                    result = subprocess.run(
+                        [sys.executable, str(check)], env=environment, text=True,
+                        capture_output=True, check=False,
+                    )
+                    self.assertEqual(result.returncode, 1)
+                    self.assertIn(message, result.stderr)
+
+            listing.write_text(json.dumps({"installed": [{
+                "pluginId": "cse@personal", "installed": True,
+                "enabled": True, "version": "1.1.0",
+                "source": {"path": str(deployed)},
+            }]}))
+            result = subprocess.run(
+                [sys.executable, str(check)], env=environment, text=True,
+                capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("CSE installed check passed", result.stdout)
+
     def test_prose_check_rejects_default_forbidden_word(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "draft.md"
@@ -111,6 +270,111 @@ class ScriptBehaviorTests(unittest.TestCase):
             result = self.run_script("check_prose.py", str(path))
         self.assertEqual(result.returncode, 1)
         self.assertIn("forbidden word", result.stdout)
+
+    def test_prose_check_applies_scoped_rules_and_exceptions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            context = root / "docs/scientific/CONTEXT.md"
+            context.parent.mkdir(parents=True)
+            context.write_text(
+                "| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |\n"
+                "|---|---|---|---|---|---|\n"
+                "| frozen parameter set | parameters held fixed | Preserve validation meaning. "
+                "| docs/latex/sections/*.tex | frozen composition | task:608 |\n"
+            )
+            config = root / "config.toml"
+            config.write_text(
+                "[[terminology]]\n"
+                'Avoid = "contact"\n'
+                'Prefer = "stages"\n'
+                'Meaning = "Name the extraction sequence."\n'
+                'Scope = ["analyses/*/notebook.qmd"]\n'
+                'Exceptions = ["MSContactor", "contact mechanics"]\n'
+                'Evidence = "confirmed user correction"\n'
+            )
+            notebook = root / "analyses/case/notebook.qmd"
+            notebook.parent.mkdir(parents=True)
+            notebook.write_text(
+                "Contact mechanics uses one contact followed by MSContactor.\n"
+            )
+            manuscript = root / "docs/latex/sections/methods.tex"
+            manuscript.parent.mkdir(parents=True)
+            manuscript.write_text(
+                "The frozen parameter set was used; frozen composition was retained.\n"
+            )
+            outside = root / "notes.md"
+            outside.write_text("contact and frozen parameter set\n")
+
+            result = self.run_script(
+                "check_prose.py",
+                str(notebook),
+                str(manuscript),
+                str(outside),
+                "--config",
+                str(config),
+                "--context",
+                str(context),
+            )
+
+        self.assertEqual(result.returncode, 1)
+        self.assertIn("avoid 'contact' → prefer 'stages'", result.stdout)
+        self.assertEqual(result.stdout.count("avoid 'contact'"), 1)
+        self.assertIn(
+            "avoid 'frozen parameter set' → prefer 'parameters held fixed'",
+            result.stdout,
+        )
+        self.assertNotIn("MSContactor", result.stdout)
+        self.assertNotIn("notes.md", result.stdout)
+
+    def test_prose_check_rejects_overlapping_authorities(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            context = root / "docs/scientific/CONTEXT.md"
+            context.parent.mkdir(parents=True)
+            context.write_text(
+                "| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |\n"
+                "|---|---|---|---|---|---|\n"
+                "| contact | stages | Repository meaning. | analyses/*/notebook.qmd |  | repo |\n"
+            )
+            config = root / "config.toml"
+            config.write_text(
+                "[[terminology]]\n"
+                'Avoid = "contact"\n'
+                'Prefer = "stages"\n'
+                'Meaning = "Personal meaning."\n'
+                'Scope = ["analyses/*/notebook.qmd"]\n'
+                'Exceptions = []\n'
+                'Evidence = "user"\n'
+            )
+            draft = root / "analyses/case/notebook.qmd"
+            draft.parent.mkdir(parents=True)
+            draft.write_text("contact\n")
+            result = self.run_script(
+                "check_prose.py",
+                str(draft),
+                "--config",
+                str(config),
+                "--context",
+                str(context),
+            )
+            context.write_text(
+                "| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |\n"
+                "|---|---|---|---|---|---|\n"
+                "| contact | stages | Repository meaning. | docs/latex/*.tex |  | repo |\n"
+            )
+            draft.write_text("stages\n")
+            resolved = self.run_script(
+                "check_prose.py",
+                str(draft),
+                "--config",
+                str(config),
+                "--context",
+                str(context),
+            )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("terminology conflict", result.stdout)
+        self.assertEqual(resolved.returncode, 0, resolved.stdout)
 
     def test_bibliography_sync_and_check(self):
         with tempfile.TemporaryDirectory() as directory:

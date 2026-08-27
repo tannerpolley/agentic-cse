@@ -74,23 +74,25 @@ The [terminology reference](../../references/terminology.md) is the canonical
 language contract for workflow stages, supporting tools, sources, extraction,
 figures, and claims.
 
-The eight workflow entrypoints form the default agent path:
+The nine workflow stages form the default agent path:
 
 1. [`setup`](../../skills/setup/SKILL.md) establishes repository vocabulary,
    scientific documents, bibliography, writing rules, and integration paths.
 2. [`research`](../../skills/research/SKILL.md) investigates literature, theory,
    data, equations, and numerical methods.
-3. [`design`](../../skills/design/SKILL.md) lays out substantive work and
+3. [`diagnose`](../../skills/diagnose/SKILL.md) establishes the cause of a
+   numerical or scientific disagreement.
+4. [`design`](../../skills/design/SKILL.md) lays out substantive work and
    publishes its native GitHub issue.
-4. [`build`](../../skills/build/SKILL.md) implements equations, models,
+5. [`build`](../../skills/build/SKILL.md) implements equations, models,
    numerical methods, solvers, and data transformations.
-5. [`analyze`](../../skills/analyze/SKILL.md) runs studies for convergence,
+6. [`analyze`](../../skills/analyze/SKILL.md) runs studies for convergence,
    sensitivity, uncertainty, comparison, and figures.
-6. [`summarize`](../../skills/summarize/SKILL.md) records a completed analysis
-   slice in the research notebook.
-7. [`write`](../../skills/write/SKILL.md) develops an evidence-supported paper,
+7. [`summarize`](../../skills/summarize/SKILL.md) replaces the analysis
+   research notebook with the current reviewed scientific view.
+8. [`write`](../../skills/write/SKILL.md) develops an evidence-supported paper,
    report, caption, equation, or appendix.
-8. [`review`](../../skills/review/SKILL.md) checks the full scientific chain
+9. [`review`](../../skills/review/SKILL.md) checks the full scientific chain
    before publication or integration.
 
 The supporting tools are public skills but are not workflow stages:
@@ -204,8 +206,9 @@ worktrees are removed. The plugin does not create a parallel lifecycle store.
 
 ## Writing, plotting, and manuscript expectations
 
-The research notebook is the cumulative record of completed analysis slices. A
-manuscript is a selected scientific story, not a replacement for the notebook.
+Each analysis research notebook is the current reviewed view of one coherent
+question. Git and retained results preserve history. A manuscript is a selected
+scientific story, not a replacement for the notebook.
 The [project-record reference](../../references/scientific-projects.md) expects
 questions and conditions, methods and sources, results, interpretation,
 limitations, claim boundaries, and relevant convergence, uncertainty,

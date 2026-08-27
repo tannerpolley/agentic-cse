@@ -123,7 +123,7 @@ If a priority level has no findings, say so explicitly.
 
 ### Scientific workflow coverage
 
-Map the eight workflow stages, six supporting tools, and the example to the
+Map the nine workflow stages, supporting tools, and the example to the
 work they actually support. Identify
 missing workflows and explain which should be added, clarified, delegated to the
 user's repository, or deliberately left out.
