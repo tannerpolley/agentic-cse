@@ -14,14 +14,14 @@ build.
 ```
 
 After `./build.sh` has refreshed the shared SVG views, individual documents can
-be rerendered with:
+be rerendered through the CSE wrapper with:
 
 ```bash
-quarto render article.qmd --no-execute
-quarto render deck.qmd --no-execute
-quarto render interactive-deck.qmd --no-execute
-quarto render analyses/artificial-absorber/notebook.qmd --to pdf --no-execute
-quarto render analyses/artificial-absorber/notebook.qmd --to revealjs --no-execute
+../../assets/project/quarto/render.sh article.qmd
+../../assets/project/quarto/render.sh deck.qmd
+../../assets/project/quarto/render.sh interactive-deck.qmd
+../../assets/project/quarto/render.sh analyses/artificial-absorber/notebook.qmd --to pdf
+../../assets/project/quarto/render.sh analyses/artificial-absorber/notebook.qmd --to revealjs
 ```
 
 The project writes intermediate output under `builds/`. The build wrapper runs

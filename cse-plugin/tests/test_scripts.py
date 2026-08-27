@@ -416,6 +416,12 @@ class ScriptBehaviorTests(unittest.TestCase):
         fixture_root = ROOT / "tests/fixtures/latex-visual-qa"
         with tempfile.TemporaryDirectory() as directory:
             build = Path(directory)
+            tex_cache = build / "tex-cache"
+            tex_cache.mkdir()
+            environment = os.environ | {
+                "TEXMFVAR": str(tex_cache),
+                "TEXMFCACHE": str(tex_cache),
+            }
             results = {}
             for name in ("clean", "text-overlap", "text-graphic-overlap"):
                 compiled = subprocess.run(
@@ -426,6 +432,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                         f"-output-directory={build}",
                         str(fixture_root / f"{name}.tex"),
                     ],
+                    env=environment,
                     text=True,
                     capture_output=True,
                     check=False,
@@ -460,27 +467,125 @@ class ScriptBehaviorTests(unittest.TestCase):
             {issue["code"] for issue in graphic_report["issues"]},
         )
 
-    def test_quarto_release_entrypoint_does_not_execute_document_python(self):
+    def test_quarto_release_entrypoint_isolates_lualatex_runtime(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
+            runtime_parent = project / "runtime"
+            inherited_cache = project / "inherited-cache"
+            texmf_config = project / "texmf-config"
+            proxy_directory = project / "bin"
+            runtime_parent.mkdir()
+            inherited_cache.mkdir()
+            inherited_cache.chmod(0o555)
+            texmf_config.mkdir()
+            proxy_directory.mkdir()
             shutil.copy2(ROOT / "assets/project/quarto/_quarto.yml", project)
             shutil.copy2(ROOT / "assets/project/quarto/render.sh", project)
+            real_quarto = shutil.which("quarto")
+            self.assertIsNotNone(real_quarto)
+            proxy = proxy_directory / "quarto"
+            proxy.write_text(
+                "#!/usr/bin/env bash\n"
+                "printf '%s\\n' \"$TEXMFVAR\" \"$TEXMFCACHE\" "
+                "\"$QUARTO_CACHE_DIR\" \"$DENO_DIR\" \"$XDG_CACHE_HOME\" "
+                "\"$HOME\" \"$TEXMFCONFIG\" "
+                "\"${@: -1}\" > \"$CSE_RENDER_ENV_LOG\"\n"
+                "exec \"$CSE_REAL_QUARTO\" \"$@\"\n"
+            )
+            proxy.chmod(0o755)
             (project / "document.qmd").write_text(
-                "---\nformat: html\n---\n\n"
+                "---\nformat: pdf\n---\n\n"
                 "```{python}\nfrom pathlib import Path\n"
                 "Path('model-ran').write_text('unsafe')\n```\n"
             )
+            environment = os.environ | {
+                "PATH": f"{proxy_directory}{os.pathsep}{os.environ['PATH']}",
+                "TMPDIR": str(runtime_parent),
+                "TEXMFVAR": str(inherited_cache),
+                "TEXMFCACHE": str(inherited_cache),
+                "TEXMFCONFIG": str(texmf_config),
+                "CSE_REAL_QUARTO": real_quarto,
+                "CSE_RENDER_ENV_LOG": str(project / "render-env"),
+            }
+            tinytex_root = Path(
+                subprocess.run(
+                    ["kpsewhich", "-var-value=TEXMFROOT"],
+                    text=True,
+                    capture_output=True,
+                    check=True,
+                ).stdout.strip()
+            )
+            package_database = tinytex_root / "tlpkg/texlive.tlpdb"
+            package_database_before = package_database.read_bytes()
             rendered = subprocess.run(
                 ["bash", "render.sh", "document.qmd"],
                 cwd=project,
+                env=environment,
                 text=True,
                 capture_output=True,
                 check=False,
             )
+            runtime_values = (project / "render-env").read_text().splitlines()
 
             self.assertEqual(rendered.returncode, 0, rendered.stderr)
-            self.assertTrue((project / "builds/document.html").is_file())
+            self.assertTrue((project / "builds/document.pdf").is_file())
             self.assertFalse((project / "model-ran").exists())
+            self.assertEqual(runtime_values[-1], "--no-execute")
+            self.assertEqual(runtime_values[5], environment["HOME"])
+            self.assertEqual(runtime_values[6], str(texmf_config))
+            self.assertEqual(runtime_values[0], runtime_values[1])
+            runtime_root = Path(runtime_values[0]).parent
+            self.assertEqual(runtime_root.parent, runtime_parent)
+            self.assertTrue(
+                all(Path(value).parent == runtime_root for value in runtime_values[:5])
+            )
+            self.assertFalse(runtime_root.exists())
+            self.assertEqual(list(inherited_cache.iterdir()), [])
+
+            (project / "document.qmd").write_text(
+                "---\nformat:\n  pdf:\n    include-in-header:\n"
+                "      text: |\n        \\usepackage{cse-package-does-not-exist}\n"
+                "---\n\nMissing package check.\n"
+            )
+            missing_package = subprocess.run(
+                ["bash", "render.sh", "document.qmd"],
+                cwd=project,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            failed_runtime_root = Path(
+                (project / "render-env").read_text().splitlines()[0]
+            ).parent
+            self.assertNotEqual(missing_package.returncode, 0)
+            self.assertIn(
+                "cse-package-does-not-exist.sty",
+                missing_package.stdout + missing_package.stderr,
+            )
+            self.assertFalse(failed_runtime_root.exists())
+            self.assertEqual(package_database.read_bytes(), package_database_before)
+
+            (project / "document.qmd").write_text(
+                "---\nformat: pdf\n---\n\n\\notacommandfromcse\n"
+            )
+            invalid_source = subprocess.run(
+                ["bash", "render.sh", "document.qmd"],
+                cwd=project,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            failed_runtime_root = Path(
+                (project / "render-env").read_text().splitlines()[0]
+            ).parent
+            self.assertNotEqual(invalid_source.returncode, 0)
+            self.assertIn(
+                "Undefined control sequence",
+                invalid_source.stdout + invalid_source.stderr,
+            )
+            self.assertFalse(failed_runtime_root.exists())
 
     def test_live_sync_restores_previous_deployment_when_registration_fails(self):
         with tempfile.TemporaryDirectory() as directory:
