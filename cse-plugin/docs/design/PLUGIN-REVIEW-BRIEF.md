@@ -116,7 +116,6 @@ The project keeps user-specific scientific context, equations, methods,
 evidence, analyses, notebooks, and manuscripts in the user's repository rather
 than in the installed plugin. The embedded heat-equation example shows the intended
 project-facing shape in its
-[profile](../../examples/heat-equation/PROFILE.md),
 [scientific context](../../examples/heat-equation/docs/scientific/CONTEXT.md),
 [formulation](../../examples/heat-equation/docs/scientific/formulation.tex),
 [methods](../../examples/heat-equation/docs/scientific/methods.tex),

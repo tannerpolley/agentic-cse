@@ -134,8 +134,13 @@ class ScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(invoke().stdout, "")
 
             (repository / "AGENTS.md").write_text(
-                "Repository Profile: scientific-computing\n"
+                "Repository " + "Profile: scientific-computing\n"
             )
+            self.assertEqual(invoke().stdout, "")
+
+            context = repository / "docs/scientific/CONTEXT.md"
+            context.parent.mkdir(parents=True)
+            context.write_text("# Scientific context\n")
             self.commit_all(repository, "baseline")
             self.assertEqual(invoke(active=True).stdout, "")
 
@@ -232,14 +237,14 @@ class ScriptBehaviorTests(unittest.TestCase):
                 ({"installed": []}, "not installed"),
                 ({"installed": [{
                     "pluginId": "cse@personal", "installed": True,
-                    "enabled": False, "version": "1.1.0",
+                    "enabled": False, "version": "1.1.1",
                     "source": {"path": str(deployed)},
                 }]}, "disabled"),
                 ({"installed": [{
                     "pluginId": "cse@personal", "installed": True,
                     "enabled": True, "version": "1.0.0",
                     "source": {"path": str(deployed)},
-                }]}, "expected '1.1.0'"),
+                }]}, "expected '1.1.1'"),
             )
             for payload, message in cases:
                 with self.subTest(message=message):
@@ -253,7 +258,7 @@ class ScriptBehaviorTests(unittest.TestCase):
 
             listing.write_text(json.dumps({"installed": [{
                 "pluginId": "cse@personal", "installed": True,
-                "enabled": True, "version": "1.1.0",
+                "enabled": True, "version": "1.1.1",
                 "source": {"path": str(deployed)},
             }]}))
             result = subprocess.run(

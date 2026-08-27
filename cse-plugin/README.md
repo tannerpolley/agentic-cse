@@ -110,14 +110,15 @@ codex plugin add cse@personal --json
 python3 scripts/check-installed.py
 ```
 
-Review and trust the bundled Stop hook after installation. Codex records trust
-for the exact hook definition, so repeat that review whenever the hook changes.
+The CSE Stop hook is temporarily disabled because repository-wide change
+accounting can override legitimate user-decision stops. Its implementation is
+retained for a later turn-aware redesign; installation registers no Stop hook.
 Then start a fresh Codex task and record the representative routing results in
 `evaluation/results/<version>.md`.
 
 Release versions follow semantic versioning: patches preserve skill and hook
 behavior, minor versions add a skill, supporting tool, hook behavior, or
 material workflow improvement, and major versions make an incompatible rename,
-removal, or repository opt-in change. Tag `v<version>` only after source
+removal, or CSE repository-detection change. Tag `v<version>` only after source
 validation, synchronization, installation, installed verification, hook trust
 review, and the fresh-task routing pass succeed.

@@ -9,8 +9,14 @@ format:
     number-sections: true
     documentclass: scrartcl
     classoption:
-      - DIV=11
+      - oneside
       - headings=normal
+    fontsize: 10pt
+    geometry:
+      - left=0.62in
+      - right=0.62in
+      - top=0.55in
+      - bottom=0.55in
     fig-pos: H
     include-in-header:
       - ../../tex/analysis-notebook-preamble.tex

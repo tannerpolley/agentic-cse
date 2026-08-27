@@ -26,6 +26,26 @@ tutorial, not a physical prediction.
 | model validation | Comparison with physical reality or experiments, which is out of scope. |
 | numerical uncertainty | Effects of refinement, reference evaluation, linear solves, and floating point. |
 
+## Numerical doctrine
+
+- Require a uniform grid and an integer number of equal time steps ending
+  exactly at the declared final `Fo`.
+- Reject FTCS when `r = Delta Fo/(Delta xi)^2 > 0.5`.
+- Keep the continuous analytic reference and exact-in-time centered-space
+  reference separate from the FTCS and Crank-Nicolson amplification oracles.
+- Report interior `L-infinity` and RMS field error, monotonic error reduction,
+  observed order, and the linear residual where applicable.
+- Use `abs(error) <= atol + rtol*abs(reference)` for direct value checks and
+  explain both terms from scale, truncation, solver behavior, and floating
+  point.
+
+The retained study uses `Fo = 0.1`. Combined refinement holds `r = 0.4` for
+`N = 10, 20, 40, 80, 160`; isolated temporal refinement holds `N = 20` and
+uses 80 through 1280 steps. The finest-grid tolerance is a factor-two
+Richardson estimate with a 1.25 safety factor plus a 64-epsilon floating
+allowance. The order tolerance is twice the change between the two finest
+observed orders plus propagated floating allowance.
+
 ## Scientific map
 
 - [Formulation](formulation.tex)

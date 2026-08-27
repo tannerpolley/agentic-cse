@@ -1,8 +1,6 @@
 # CSE project guidance
 
-Repository Profile: scientific-computing
-
-Read [PROFILE.md](PROFILE.md) before changing equations, numerical methods,
+Read [the scientific context](docs/scientific/CONTEXT.md) before changing equations, numerical methods,
 tests, retained analyses, figures, or manuscript claims. This repository is an
 executable scientific argument about FTCS and Crank-Nicolson for one
 dimensionless heat-equation reference case.
