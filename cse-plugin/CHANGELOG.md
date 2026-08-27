@@ -8,6 +8,9 @@
   `docs/scientific/CONTEXT.md` instead of an `AGENTS.md` profile line.
 - Temporarily disable the Stop hook after repository-wide change accounting
   overrode legitimate user-decision stops; retain its script for redesign.
+- Make the sole analysis-notebook template use the reviewed compact 10 pt,
+  explicit-margin, and table-spacing defaults without changing manuscripts or
+  presentations.
 
 ## 1.1.0
 
