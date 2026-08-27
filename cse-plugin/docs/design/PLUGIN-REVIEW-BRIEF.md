@@ -175,7 +175,7 @@ status checks.
 The example's setup validator, executable solver, retained numerical study, and
 bibliography helper provide behavioral evidence for one repository route. Its
 generated full bibliography snapshot is
-[`docs/latex/references.bib`](../../examples/heat-equation/docs/latex/references.bib).
+[`docs/scientific/latex/references.bib`](../../examples/heat-equation/docs/scientific/latex/references.bib).
 The example demonstrates code and solution verification, but it does not claim
 physical validation.
 

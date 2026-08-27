@@ -13,7 +13,9 @@ heat equation:
 
 All inputs and outputs are dimensionless. The generated CSV tables are the
 retained numerical record. Rendering reads those tables and does not rerun the
-solvers. Figures are emitted as SVG, PNG, and PDF.
+solvers. Figures are emitted as SVG, PNG, and PDF. `inputs/case.json` retains
+the reviewed calculation conditions, source identifiers, commands, and result
+paths with provenance.
 
 Run from the repository root:
 

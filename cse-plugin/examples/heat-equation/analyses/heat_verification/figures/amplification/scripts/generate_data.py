@@ -9,7 +9,8 @@ from heat_verification import amplification_factor
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output"
 OUTPUT.mkdir(parents=True, exist_ok=True)
-r = np.linspace(0.0, 4.0, 161)
+domain = globals()["CASE"]["conditions"]["amplification_diffusion_number"]
+r = np.linspace(domain["minimum"], domain["maximum"], domain["count"])
 pd.DataFrame(
     {
         "diffusion_number": r,

@@ -1,0 +1,38 @@
+{
+  "id": "heat_verification",
+  "title": "FTCS and Crank-Nicolson heat-equation verification",
+  "provenance": "Reviewed calculation conditions; source identifiers resolve through the project bibliography snapshot.",
+  "source": {
+    "zotero_parent": "NPC9836V",
+    "pdf_attachment": "R4GC8HTF",
+    "markdown_attachment": "I5DDQJH8",
+    "doi": "10.1017/S0305004100023197"
+  },
+  "conditions": {
+    "final_fo": 0.1,
+    "combined_diffusion_number": 0.4,
+    "combined_intervals": [10, 20, 40, 80, 160],
+    "overlay_intervals": 40,
+    "temporal_intervals": 20,
+    "temporal_steps": [80, 160, 320, 640, 1280],
+    "amplification_diffusion_number": {
+      "minimum": 0.0,
+      "maximum": 4.0,
+      "count": 161
+    }
+  },
+  "commands": {
+    "generate": "uv run python analyses/heat_verification/scripts/generate_all.py",
+    "render": "uv run python analyses/heat_verification/scripts/render_all.py",
+    "validate": "uv run python analyses/heat_verification/scripts/validate_results.py"
+  },
+  "measured_full_seconds": 15,
+  "tracked_results": [
+    "figures/solution_overlay/output/solution_overlay.csv",
+    "figures/refinement/output/refinement.csv",
+    "figures/amplification/output/amplification.csv",
+    "figures/solution_overlay/output/solution_overlay.svg",
+    "figures/refinement/output/refinement.svg",
+    "figures/amplification/output/amplification.svg"
+  ]
+}

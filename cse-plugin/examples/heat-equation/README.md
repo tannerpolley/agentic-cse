@@ -42,8 +42,8 @@ uv run python scripts/validate_project.py quick
 - [Numerical methods](docs/scientific/methods.tex)
 - [Verification and uncertainty](docs/scientific/evidence.tex)
 - [Retained analysis](analyses/heat_verification/README.md)
-- [Research notebook](docs/scientific/notebook/research-notebook.tex)
-- [Tutorial manuscript](docs/latex/main.tex)
+- [Research notebook](analyses/heat_verification/notebook.qmd)
+- [Tutorial manuscript](docs/scientific/latex/main.tex)
 - [Ten-skill evaluation](evaluation/README.md)
 
 ## Retained findings
@@ -69,7 +69,7 @@ equation (16), printed pages 54-55; the error-damping discussion is in Section
 7(b), printed page 59.
 
 `scripts/sync_bibliography.sh` generates the one-record, path-sanitized
-`docs/latex/references.bib` snapshot from the canonical Zotero Better BibTeX
+`docs/scientific/latex/references.bib` snapshot from the canonical Zotero Better BibTeX
 export. The snapshot is never edited by hand.
 
 ## Claim boundary

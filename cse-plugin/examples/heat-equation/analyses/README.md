@@ -1,8 +1,9 @@
 # Analysis layout
 
 Each durable study owns a locally understandable folder under `analyses/` with
-an `README.md`, `analysis.yaml`, separate data-generation and rendering
-scripts, exact plotted-data tables, and retained final figures.
+an `README.md`, retained `inputs/` with provenance, separate data-generation
+and rendering scripts, exact plotted-data tables, retained final figures, and
+a reviewed `notebook.qmd` created only after Review Pass.
 
 The current study is [heat_verification](heat_verification/README.md). Its
 figure-owned directories contain source scripts, editable plotting metadata,

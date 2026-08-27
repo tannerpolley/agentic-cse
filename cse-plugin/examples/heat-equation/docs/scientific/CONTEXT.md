@@ -51,9 +51,10 @@ observed orders plus propagated floating allowance.
 - [Formulation](formulation.tex)
 - [Methods](methods.tex)
 - [Verification and uncertainty](evidence.tex)
+- [Scientific decision records](adr/README.md)
 - [Retained analysis](../../analyses/heat_verification/README.md)
-- [Research notebook](notebook/research-notebook.tex)
-- [Tutorial manuscript](../latex/main.tex)
+- [Research notebook](../../analyses/heat_verification/notebook.qmd)
+- [Tutorial manuscript](latex/main.tex)
 - [Writing style](writing/STYLE.md) and [rules](writing/RULES.md)
 
 ## Evidence authority

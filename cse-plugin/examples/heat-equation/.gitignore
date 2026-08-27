@@ -19,9 +19,12 @@
 *.snm
 *.vrb
 
-# Generated documents. Retained analysis figures are intentionally not
-# ignored; only document builds under docs/scientific are disposable.
-docs/scientific/**/*.pdf
+# Generated documents. Retained analysis and shared manuscript figures are not
+# ignored; only document builds and rendered notebook views are disposable.
+docs/scientific/latex/builds/
+analyses/**/notebook.pdf
+analyses/**/notebook.html
+analyses/**/notebook_files/
 
 # Python and tool caches
 __pycache__/
@@ -42,14 +45,11 @@ analyses/**/results/runs/
 analyses/**/results/*.tmp
 analyses/**/figures/*.tmp
 
-# Local LaTeX builds
-docs/latex/builds/
-
 # Local editor and operating-system files
 .DS_Store
 *.swp
 *.swo
 
-# Do not ignore docs/latex/references.bib, small retained CSV tables, or
+# Do not ignore docs/scientific/latex/references.bib, small retained CSV tables, or
 # retained PDF, PNG, and SVG analysis figures. They become versioned evidence
 # when a future study actually produces them.

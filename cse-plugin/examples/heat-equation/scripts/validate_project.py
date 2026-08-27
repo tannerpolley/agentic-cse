@@ -37,12 +37,11 @@ def confidence() -> None:
 
 
 def docs() -> None:
-    run("bash", "docs/latex/scripts/build_main.sh")
+    run("bash", "docs/scientific/latex/scripts/build_main.sh")
     scientific_documents = (
         "docs/scientific/formulation.tex",
         "docs/scientific/methods.tex",
         "docs/scientific/evidence.tex",
-        "docs/scientific/notebook/research-notebook.tex",
     )
     with tempfile.TemporaryDirectory(prefix="cse-heat-equation-example-") as temporary:
         for document in scientific_documents:
@@ -55,6 +54,18 @@ def docs() -> None:
                 f"-outdir={temporary}",
                 document,
             )
+        run(
+            "quarto",
+            "render",
+            "analyses/heat_verification/notebook.qmd",
+            "--to",
+            "pdf",
+            "--no-execute",
+            "--output-dir",
+            temporary,
+        )
+        if not (Path(temporary) / "notebook.pdf").is_file():
+            raise SystemExit("analysis notebook render did not produce notebook.pdf")
 
 
 def full() -> None:

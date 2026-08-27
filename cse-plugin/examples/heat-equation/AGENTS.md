@@ -10,11 +10,11 @@ Keep the chain explicit:
 - `src/heat_verification/` owns the declared numerical methods and public
   scientific API;
 - `tests/` protects distinct scientific failure meanings, not helper coverage;
-- `analyses/heat_verification/` owns retained tables, exact plotted data, and
-  SVG, PNG, and PDF figures;
-- `docs/scientific/` owns formulation, method, evidence, uncertainty, and the
-  cumulative notebook;
-- `docs/latex/` owns the self-contained tutorial manuscript;
+- `analyses/heat_verification/` owns the retained input snapshot, tables, exact
+  plotted data, SVG, PNG, and PDF figures, and reviewed notebook;
+- `docs/scientific/` owns shared formulation, method, evidence, uncertainty,
+  decision records, and writing rules;
+- `docs/scientific/latex/` owns the self-contained tutorial manuscript;
 - `evaluation/` owns sanitized ten-skill behavioral evidence, never private
   transcripts.
 
@@ -24,7 +24,8 @@ Do not promote code or solution verification into physical model validation.
 
 Zotero owns bibliographic metadata and attachments. Generate the project-only
 snapshot from `/home/user/Zotero/exports/references.bib` with
-`scripts/sync_bibliography.sh`. Never hand-edit `docs/latex/references.bib`,
+`scripts/sync_bibliography.sh`. Never hand-edit
+`docs/scientific/latex/references.bib`,
 and never add local attachment paths to it.
 
 Use the validation ladder:

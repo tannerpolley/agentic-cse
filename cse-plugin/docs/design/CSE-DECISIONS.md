@@ -204,6 +204,25 @@ commit, push, pull request, merge, remote-head deletion, and local cleanup.
 After a merge, only clean, outcome-owned, confirmed-merged branches and
 worktrees are removed. The plugin does not create a parallel lifecycle store.
 
+## Science-first decision records and project ownership
+
+CSE-created shared scientific records have one owner: `docs/scientific/`.
+Formulation, methods, evidence, writing rules, optional shared LaTeX and Quarto
+sources, bibliography, manuscript, and one numbered decision-record sequence
+stay there. Each bounded analysis instead owns its retained input snapshot with
+provenance, scripts, results, figures, and reviewed notebook at root
+`analyses/<short-id>/`. Setup never creates an empty analysis root or initial
+notebook; Summarize creates or replaces the notebook only after Review Pass.
+
+Decision records are shared doctrine, not a public workflow stage, external
+skill dependency, or lifecycle store; the system is not a lifecycle database.
+Their four-part threshold and five
+science-first kinds preserve only consequential, non-obvious trade-offs. CSE
+requires the setting and evidence but leaves acceptance to the repository's
+authorized scientific owner. Dependent scientific changes likewise use GitHub
+issues, pull requests, Git state, executable checks, and retained results
+rather than a controller service or lifecycle database.
+
 ## Writing, plotting, and manuscript expectations
 
 Each analysis research notebook is the current reviewed view of one coherent
@@ -299,6 +318,6 @@ specify:
 The example deliberately excludes material properties, experimental data,
 dimensional prediction, physical uncertainty, and model validation. Its
 Crank–Nicolson source is now in the generated
-[repository bibliography snapshot](../../examples/heat-equation/docs/latex/references.bib),
+[repository bibliography snapshot](../../examples/heat-equation/docs/scientific/latex/references.bib),
 which is synchronized from the user's Better BibTeX export by the example's
 [one-way helper](../../examples/heat-equation/scripts/sync_bibliography.sh).
