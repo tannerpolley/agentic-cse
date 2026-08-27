@@ -110,10 +110,9 @@ codex plugin add cse@personal --json
 python3 scripts/check-installed.py
 ```
 
-Review and trust the bundled Stop hook after installation. Codex records trust
-for the exact hook definition, so repeat that review whenever the hook changes.
-The hook activates only in a Git repository containing the canonical
-`docs/scientific/CONTEXT.md` created by CSE Setup.
+The CSE Stop hook is temporarily disabled because repository-wide change
+accounting can override legitimate user-decision stops. Its implementation is
+retained for a later turn-aware redesign; installation registers no Stop hook.
 Then start a fresh Codex task and record the representative routing results in
 `evaluation/results/<version>.md`.
 

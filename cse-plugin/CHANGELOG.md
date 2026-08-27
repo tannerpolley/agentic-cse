@@ -6,6 +6,8 @@
   now own scientific-repository setup.
 - Keep the CSE Review reminder and activate it from
   `docs/scientific/CONTEXT.md` instead of an `AGENTS.md` profile line.
+- Temporarily disable the Stop hook after repository-wide change accounting
+  overrode legitimate user-decision stops; retain its script for redesign.
 
 ## 1.1.0
 
