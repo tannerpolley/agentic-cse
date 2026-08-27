@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import numpy as np
@@ -11,12 +12,31 @@ ROOT = Path(__file__).resolve().parents[3]
 REFINEMENT = ROOT / "analyses/heat_verification/figures/refinement/output/refinement.csv"
 AMPLIFICATION = ROOT / "analyses/heat_verification/figures/amplification/output/amplification.csv"
 SOLUTION = ROOT / "analyses/heat_verification/figures/solution_overlay/output/solution_overlay.csv"
+CASE = json.loads(
+    (ROOT / "analyses/heat_verification/inputs/case.json").read_text(encoding="utf-8")
+)
+NOTEBOOK = ROOT / "analyses/heat_verification/notebook.qmd"
 
 refinement = pd.read_csv(REFINEMENT, float_precision="round_trip")
 solution = pd.read_csv(SOLUTION, float_precision="round_trip")
 amplification = pd.read_csv(AMPLIFICATION, float_precision="round_trip")
 
 failures: list[str] = []
+conditions = CASE["conditions"]
+if not np.allclose(refinement.final_fo, conditions["final_fo"]):
+    failures.append("refinement results disagree with retained final_fo")
+if sorted(refinement.loc[refinement.study == "combined", "intervals"].unique()) != sorted(
+    conditions["combined_intervals"]
+):
+    failures.append("combined refinement intervals disagree with retained inputs")
+if sorted(refinement.loc[refinement.study == "temporal", "steps"].unique()) != sorted(
+    conditions["temporal_steps"]
+):
+    failures.append("temporal steps disagree with retained inputs")
+if not np.allclose(solution.final_fo, conditions["final_fo"]):
+    failures.append("solution overlay disagrees with retained final_fo")
+if not np.all(solution.intervals == conditions["overlay_intervals"]):
+    failures.append("solution overlay intervals disagree with retained inputs")
 for study in ("combined", "temporal"):
     for method in ("ftcs", "crank-nicolson"):
         rows = refinement[(refinement.study == study) & (refinement.method == method)]
@@ -74,6 +94,28 @@ if not np.all(np.abs(amplification.crank_nicolson_factor) <= 1.0 + 8.0e-15):
 negative_cn = amplification.loc[amplification.diffusion_number > 0.5, "crank_nicolson_factor"]
 if not np.all(negative_cn < 0.0):
     failures.append("Crank-Nicolson worst-mode factor did not become negative above r=0.5")
+
+notebook = NOTEBOOK.read_text(encoding="utf-8")
+
+
+def notebook_scientific(value: float) -> str:
+    mantissa, exponent = f"{value:.6e}".split("e")
+    return f"${mantissa}\\times10^{{{int(exponent)}}}$"
+
+
+for study, method, label in (
+    ("combined", "ftcs", "Combined | FTCS"),
+    ("combined", "crank-nicolson", "Combined | Crank--Nicolson"),
+    ("temporal", "ftcs", "Temporal | FTCS"),
+    ("temporal", "crank-nicolson", "Temporal | Crank--Nicolson"),
+):
+    finest = refinement[(refinement.study == study) & (refinement.method == method)].iloc[-1]
+    expected = (
+        f"| {label} | {notebook_scientific(finest.linf_error)} | "
+        f"{finest.observed_order_linf:.6f} |"
+    )
+    if expected not in notebook:
+        failures.append(f"notebook retained-value row is stale: {study}/{method}")
 
 if failures:
     raise SystemExit("\n".join(failures))

@@ -13,8 +13,8 @@ from bibtexparser.bwriter import BibTexWriter
 
 ROOT = Path(__file__).resolve().parents[1]
 SOURCE = Path.home() / "Zotero/exports/references.bib"
-TARGET = ROOT / "docs/latex/references.bib"
-KEYS_FILE = ROOT / "docs/latex/cited_keys.txt"
+TARGET = ROOT / "docs/scientific/latex/references.bib"
+KEYS_FILE = ROOT / "docs/scientific/latex/cited_keys.txt"
 
 
 def cited_keys() -> list[str]:

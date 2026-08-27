@@ -9,9 +9,10 @@ from heat_verification import reference_solution, solve_crank_nicolson, solve_ft
 OUTPUT = Path(__file__).resolve().parents[1] / "output"
 OUTPUT.mkdir(parents=True, exist_ok=True)
 
-intervals = 40
-final_fo = 0.1
-steps = intervals**2 // 4
+conditions = globals()["CASE"]["conditions"]
+intervals = conditions["overlay_intervals"]
+final_fo = conditions["final_fo"]
+steps = round(final_fo * intervals**2 / conditions["combined_diffusion_number"])
 ftcs = solve_ftcs(intervals, final_fo, steps)
 cn = solve_crank_nicolson(intervals, final_fo, steps)
 

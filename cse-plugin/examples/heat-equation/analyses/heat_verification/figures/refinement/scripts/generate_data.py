@@ -17,7 +17,8 @@ from heat_verification import (
 
 OUTPUT = Path(__file__).resolve().parents[1] / "output"
 OUTPUT.mkdir(parents=True, exist_ok=True)
-FINAL_FO = 0.1
+CONDITIONS = globals()["CASE"]["conditions"]
+FINAL_FO = CONDITIONS["final_fo"]
 SOLVERS = {"ftcs": solve_ftcs, "crank-nicolson": solve_crank_nicolson}
 
 
@@ -72,16 +73,20 @@ def make_rows(study, method, results, references, resolutions, target_order):
 
 
 rows = []
-combined_intervals = (10, 20, 40, 80, 160)
+combined_intervals = CONDITIONS["combined_intervals"]
 for method, solver in SOLVERS.items():
-    results = [solver(n, FINAL_FO, n**2 // 4) for n in combined_intervals]
+    results = [
+        solver(n, FINAL_FO, round(FINAL_FO * n**2 / CONDITIONS["combined_diffusion_number"]))
+        for n in combined_intervals
+    ]
     references = [reference_solution(result.xi, FINAL_FO) for result in results]
     rows.extend(make_rows("combined", method, results, references, combined_intervals, 2.0))
 
-temporal_steps = (80, 160, 320, 640, 1280)
+temporal_steps = CONDITIONS["temporal_steps"]
+temporal_intervals = CONDITIONS["temporal_intervals"]
 for method, solver in SOLVERS.items():
-    results = [solver(20, FINAL_FO, steps) for steps in temporal_steps]
-    references = [semidiscrete_reference(20, FINAL_FO) for _ in results]
+    results = [solver(temporal_intervals, FINAL_FO, steps) for steps in temporal_steps]
+    references = [semidiscrete_reference(temporal_intervals, FINAL_FO) for _ in results]
     target_order = 1.0 if method == "ftcs" else 2.0
     rows.extend(make_rows("temporal", method, results, references, temporal_steps, target_order))
 

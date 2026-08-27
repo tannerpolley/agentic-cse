@@ -59,6 +59,11 @@ TikZ and PGF selections in
 [`references/latex-extensions.md`](references/latex-extensions.md).
 The distinct manuscript and analysis-notebook contracts are in
 [`references/latex-article-profiles.md`](references/latex-article-profiles.md).
+Shared scientific records and science-first decisions are defined in
+[`references/scientific-projects.md`](references/scientific-projects.md) and
+[`references/decision-records.md`](references/decision-records.md). Real
+dependent leaves use the bounded sequence in
+[`references/dependent-scientific-changes.md`](references/dependent-scientific-changes.md).
 [`references/revealjs.md`](references/revealjs.md) defines the interactive
 analysis-notebook view that shares retained results and figure sources with the
 LuaLaTeX PDF.
