@@ -22,7 +22,7 @@ Start with the plugin repository. Read its manifest, README, AGENTS.md, all
 twelve public skill files, all shared references, validation scripts, and tests. Then
 read the design documents under docs/design/. After that, inspect the embedded
 example's
-PROFILE.md, README.md, docs/scientific/CONTEXT.md, formulation.tex, methods.tex,
+README.md, docs/scientific/CONTEXT.md, formulation.tex, methods.tex,
 evidence.tex, writing rules, setup validator, bibliography helper, and the
 committed bibliography snapshot. Follow links when they are part of the
 plugin's stated contract.

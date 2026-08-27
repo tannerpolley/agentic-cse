@@ -278,8 +278,7 @@ verification and does not establish physical model validation.
 
 The embedded [heat-equation example](../../examples/heat-equation/README.md)
 is the behavioral evidence for the setup route. Its
-[PROFILE.md](../../examples/heat-equation/PROFILE.md)
-and [scientific context](../../examples/heat-equation/docs/scientific/CONTEXT.md)
+[scientific context](../../examples/heat-equation/docs/scientific/CONTEXT.md)
 define a one-dimensional dimensionless transient heat equation with a single
 Fourier-mode reference case. Its [formulation](../../examples/heat-equation/docs/scientific/formulation.tex),
 [methods](../../examples/heat-equation/docs/scientific/methods.tex),

@@ -1,7 +1,5 @@
 # Agentic Computational Science and Engineering plugin repository
 
-Repository Profile: application-development
-
 This repository is the canonical source for the `cse` plugin, whose official
 name is Agentic Computational Science and Engineering.
 
