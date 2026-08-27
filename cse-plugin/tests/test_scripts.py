@@ -104,6 +104,165 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("provide --base REF", result.stderr)
 
+    def test_cse_review_stop_hook_is_opt_in_and_single_shot(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            repository = root / "repo"
+            repository.mkdir()
+            self.initialize_git_repository(repository)
+            plugin = root / "plugin"
+            scripts = plugin / "scripts"
+            scripts.mkdir(parents=True)
+            accounting = scripts / "change_accounting.py"
+            hook = ROOT / "scripts/cse-review-stop.py"
+            environment = {**os.environ, "PLUGIN_ROOT": str(plugin)}
+
+            def invoke(*, active=False, cwd=repository):
+                return subprocess.run(
+                    [sys.executable, str(hook)],
+                    input=json.dumps({"cwd": str(cwd), "stop_hook_active": active}),
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+
+            accounting.write_text("raise SystemExit(9)\n")
+            outside = root / "outside"
+            outside.mkdir()
+            self.assertEqual(invoke(cwd=outside).stdout, "")
+            self.assertEqual(invoke().stdout, "")
+
+            (repository / "AGENTS.md").write_text(
+                "Repository Profile: scientific-computing\n"
+            )
+            self.commit_all(repository, "baseline")
+            self.assertEqual(invoke(active=True).stdout, "")
+
+            report = {
+                "categories": {
+                    "executable": {"files": 0},
+                    "tests": {"files": 0},
+                },
+                "files": [{"category": "documents", "path": "README.md"}],
+            }
+            accounting.write_text(
+                "import json\nprint(json.dumps(" + repr(report) + "))\n"
+            )
+            self.assertEqual(invoke().stdout, "")
+
+            report["files"] = [{"category": "other", "path": "solver.yaml"}]
+            accounting.write_text(
+                "import json\nprint(json.dumps(" + repr(report) + "))\n"
+            )
+            config_reminder = json.loads(invoke().stdout)
+            self.assertEqual(config_reminder["decision"], "block")
+
+            report["categories"]["executable"]["files"] = 1
+            report["files"] = [{"category": "executable", "path": "src/model.py"}]
+            accounting.write_text(
+                "import json\nprint(json.dumps(" + repr(report) + "))\n"
+            )
+            reminder = json.loads(invoke().stdout)
+            self.assertEqual(reminder["decision"], "block")
+            self.assertIn("Apply CSE Review", reminder["reason"])
+
+            accounting.write_text("raise SystemExit(9)\n")
+            warning = json.loads(invoke().stdout)
+            self.assertIn("skipped", warning["systemMessage"])
+
+            accounting.write_text(
+                'print(\'{"files":[null],"categories":{"executable":{"files":0},'
+                '"tests":{"files":0}}}\')\n'
+            )
+            malformed = json.loads(invoke().stdout)
+            self.assertIn("invalid data", malformed["systemMessage"])
+
+            (repository / "src").mkdir()
+            (repository / "src/model.py").write_text("result = 1\n")
+            integrated = subprocess.run(
+                [sys.executable, str(hook)],
+                input=json.dumps({"cwd": str(repository), "stop_hook_active": False}),
+                env={**os.environ, "PLUGIN_ROOT": str(ROOT)},
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(json.loads(integrated.stdout)["decision"], "block")
+
+    def test_installed_check_reports_missing_disabled_mismatch_and_pass(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            deployed = root / "deployed"
+            for relative in (
+                ".codex-plugin/plugin.json",
+                "hooks/hooks.json",
+                "scripts/change_accounting.py",
+                "scripts/check-installed.py",
+                "scripts/check_prose.py",
+                "scripts/cse-review-stop.py",
+            ):
+                destination = deployed / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(ROOT / relative, destination)
+            for source in (ROOT / "skills").glob("*/SKILL.md"):
+                destination = deployed / source.relative_to(ROOT)
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
+
+            command_dir = root / "bin"
+            command_dir.mkdir()
+            codex = command_dir / "codex"
+            codex.write_text(
+                "#!/usr/bin/env python3\n"
+                "import os\n"
+                "print(open(os.environ['FAKE_PLUGIN_LIST']).read())\n"
+            )
+            codex.chmod(0o755)
+            listing = root / "plugins.json"
+            environment = {
+                **os.environ,
+                "PATH": str(command_dir) + os.pathsep + os.environ.get("PATH", ""),
+                "CSE_DEPLOY_ROOT": str(deployed),
+                "FAKE_PLUGIN_LIST": str(listing),
+            }
+            check = ROOT / "scripts/check-installed.py"
+
+            cases = (
+                ({"installed": []}, "not installed"),
+                ({"installed": [{
+                    "pluginId": "cse@personal", "installed": True,
+                    "enabled": False, "version": "1.1.0",
+                    "source": {"path": str(deployed)},
+                }]}, "disabled"),
+                ({"installed": [{
+                    "pluginId": "cse@personal", "installed": True,
+                    "enabled": True, "version": "1.0.0",
+                    "source": {"path": str(deployed)},
+                }]}, "expected '1.1.0'"),
+            )
+            for payload, message in cases:
+                with self.subTest(message=message):
+                    listing.write_text(json.dumps(payload))
+                    result = subprocess.run(
+                        [sys.executable, str(check)], env=environment, text=True,
+                        capture_output=True, check=False,
+                    )
+                    self.assertEqual(result.returncode, 1)
+                    self.assertIn(message, result.stderr)
+
+            listing.write_text(json.dumps({"installed": [{
+                "pluginId": "cse@personal", "installed": True,
+                "enabled": True, "version": "1.1.0",
+                "source": {"path": str(deployed)},
+            }]}))
+            result = subprocess.run(
+                [sys.executable, str(check)], env=environment, text=True,
+                capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertIn("CSE installed check passed", result.stdout)
+
     def test_prose_check_rejects_default_forbidden_word(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "draft.md"

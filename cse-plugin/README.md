@@ -107,6 +107,17 @@ does not change the accepted plugin behavior or select an implementation.
 ```bash
 ./scripts/sync-live.sh --validate
 codex plugin add cse@personal --json
+python3 scripts/check-installed.py
 ```
 
-Start a fresh Codex task after installation so the task receives the new skills.
+Review and trust the bundled Stop hook after installation. Codex records trust
+for the exact hook definition, so repeat that review whenever the hook changes.
+Then start a fresh Codex task and record the representative routing results in
+`evaluation/results/<version>.md`.
+
+Release versions follow semantic versioning: patches preserve skill and hook
+behavior, minor versions add a skill, supporting tool, hook behavior, or
+material workflow improvement, and major versions make an incompatible rename,
+removal, or repository opt-in change. Tag `v<version>` only after source
+validation, synchronization, installation, installed verification, hook trust
+review, and the fresh-task routing pass succeed.
