@@ -31,7 +31,12 @@ trap cleanup EXIT
 
 rsync -a --delete \
   --exclude .git --exclude .venv --exclude .pytest_cache --exclude tests \
-  --exclude examples --exclude cse-pi-harness \
+  --exclude examples --exclude cse-pi-harness --exclude docs --exclude evaluation \
+  --exclude scripts/check-installed.py \
+  --exclude scripts/cooling_fit_benchmark.py \
+  --exclude scripts/delete_disposable_repo.py \
+  --exclude scripts/register_marketplace.py \
+  --exclude scripts/sync-live.sh --exclude scripts/validate.sh \
   "$plugin_root/" "$next_root/"
 python3 "$validator" "$next_root"
 

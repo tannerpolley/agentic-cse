@@ -16,13 +16,9 @@ REQUIRED_PATHS = (
     ".codex-plugin/plugin.json",
     "hooks/hooks.json",
     "scripts/change_accounting.py",
-    "scripts/check-installed.py",
     "scripts/check_prose.py",
-    "scripts/cooling_fit_benchmark.py",
     "scripts/cse-review-stop.py",
-    "scripts/delete_disposable_repo.py",
     "scripts/setup_scientific_project.py",
-    "evaluation/cooling-fit/benchmark.json",
     "assets/project/AGENTS.md",
     "assets/project/README.md",
     "assets/project/CONTEXT.md",
@@ -37,6 +33,17 @@ REQUIRED_PATHS = (
     "assets/project/adr/templates/scientific-formulation.md",
     "assets/project/writing/STYLE.md",
     "assets/project/writing/RULES.md",
+)
+
+PROHIBITED_PATHS = (
+    "docs",
+    "evaluation",
+    "scripts/check-installed.py",
+    "scripts/cooling_fit_benchmark.py",
+    "scripts/delete_disposable_repo.py",
+    "scripts/register_marketplace.py",
+    "scripts/sync-live.sh",
+    "scripts/validate.sh",
 )
 
 
@@ -102,6 +109,9 @@ def main() -> int:
     missing = [path for path in required if not (expected_deploy / path).is_file()]
     if missing:
         return fail("deployed source is missing: " + ", ".join(missing))
+    leaked = [path for path in PROHIBITED_PATHS if (expected_deploy / path).exists()]
+    if leaked:
+        return fail("deployed source exposes source-only material: " + ", ".join(leaked))
 
     print(f"CSE installed check passed: {PLUGIN_ID} {expected_version}")
     return 0

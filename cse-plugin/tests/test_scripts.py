@@ -203,13 +203,9 @@ class ScriptBehaviorTests(unittest.TestCase):
                 ".codex-plugin/plugin.json",
                 "hooks/hooks.json",
                 "scripts/change_accounting.py",
-                "scripts/check-installed.py",
                 "scripts/check_prose.py",
-                "scripts/cooling_fit_benchmark.py",
                 "scripts/cse-review-stop.py",
-                "scripts/delete_disposable_repo.py",
                 "scripts/setup_scientific_project.py",
-                "evaluation/cooling-fit/benchmark.json",
                 "assets/project/AGENTS.md",
                 "assets/project/README.md",
                 "assets/project/CONTEXT.md",
@@ -279,6 +275,15 @@ class ScriptBehaviorTests(unittest.TestCase):
                 "enabled": True, "version": "1.1.1",
                 "source": {"path": str(deployed)},
             }]}))
+            leaked = deployed / "scripts/cooling_fit_benchmark.py"
+            leaked.write_text("raise SystemExit('must not deploy')\n")
+            result = subprocess.run(
+                [sys.executable, str(check)], env=environment, text=True,
+                capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("source-only material", result.stderr)
+            leaked.unlink()
             result = subprocess.run(
                 [sys.executable, str(check)], env=environment, text=True,
                 capture_output=True, check=False,
@@ -683,6 +688,9 @@ class ScriptBehaviorTests(unittest.TestCase):
         deployed = home / ".codex/plugins/cse"
         self.assertFalse((deployed / "examples").exists())
         self.assertFalse((deployed / "cse-pi-harness").exists())
+        self.assertFalse((deployed / "docs").exists())
+        self.assertFalse((deployed / "evaluation").exists())
+        self.assertFalse((deployed / "scripts/cooling_fit_benchmark.py").exists())
 
 
 if __name__ == "__main__":
