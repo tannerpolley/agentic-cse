@@ -203,9 +203,23 @@ class ScriptBehaviorTests(unittest.TestCase):
                 ".codex-plugin/plugin.json",
                 "hooks/hooks.json",
                 "scripts/change_accounting.py",
-                "scripts/check-installed.py",
                 "scripts/check_prose.py",
                 "scripts/cse-review-stop.py",
+                "scripts/setup_scientific_project.py",
+                "assets/project/AGENTS.md",
+                "assets/project/README.md",
+                "assets/project/CONTEXT.md",
+                "assets/project/formulation.tex",
+                "assets/project/methods.tex",
+                "assets/project/evidence.tex",
+                "assets/project/adr/README.md",
+                "assets/project/adr/templates/computational-architecture.md",
+                "assets/project/adr/templates/evidence-admission.md",
+                "assets/project/adr/templates/numerical-method.md",
+                "assets/project/adr/templates/reproducibility-tooling.md",
+                "assets/project/adr/templates/scientific-formulation.md",
+                "assets/project/writing/STYLE.md",
+                "assets/project/writing/RULES.md",
             ):
                 destination = deployed / relative
                 destination.parent.mkdir(parents=True, exist_ok=True)
@@ -261,6 +275,15 @@ class ScriptBehaviorTests(unittest.TestCase):
                 "enabled": True, "version": "1.1.1",
                 "source": {"path": str(deployed)},
             }]}))
+            leaked = deployed / "scripts/cooling_fit_benchmark.py"
+            leaked.write_text("raise SystemExit('must not deploy')\n")
+            result = subprocess.run(
+                [sys.executable, str(check)], env=environment, text=True,
+                capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("source-only material", result.stderr)
+            leaked.unlink()
             result = subprocess.run(
                 [sys.executable, str(check)], env=environment, text=True,
                 capture_output=True, check=False,
@@ -665,6 +688,9 @@ class ScriptBehaviorTests(unittest.TestCase):
         deployed = home / ".codex/plugins/cse"
         self.assertFalse((deployed / "examples").exists())
         self.assertFalse((deployed / "cse-pi-harness").exists())
+        self.assertFalse((deployed / "docs").exists())
+        self.assertFalse((deployed / "evaluation").exists())
+        self.assertFalse((deployed / "scripts/cooling_fit_benchmark.py").exists())
 
 
 if __name__ == "__main__":
