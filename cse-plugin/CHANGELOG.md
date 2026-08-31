@@ -1,5 +1,14 @@
 # Changelog
 
+## 2.0.0
+
+- Split optional companion skills into `cse-sources` and `cse-visualize`; core
+  `cse` keeps its nine workflow skills.
+- **Breaking:** `cse:{zotero,mathpix,data,digitize}` moved to
+  `cse-sources:*` and `cse:{plot,tikz,pgfplots,latex,quarto,revealjs,beamer}`
+  moved to `cse-visualize:*`. The old `cse:*` names have no compatibility
+  aliases.
+
 ## 1.1.1
 
 - Remove repository profile labels; the CSE plugin and its canonical context
