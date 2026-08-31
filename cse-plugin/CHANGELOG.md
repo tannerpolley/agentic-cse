@@ -8,6 +8,8 @@
   `cse-sources:*` and `cse:{plot,tikz,pgfplots,latex,quarto,revealjs,beamer}`
   moved to `cse-visualize:*`. The old `cse:*` names have no compatibility
   aliases.
+- Allow Setup to adopt a clear repository-owned analysis path and meaningful
+  child names while keeping `analyses/<short-id>/` as the creation default.
 
 ## 1.1.1
 

@@ -234,9 +234,11 @@ CSE-created shared scientific records have one owner: `docs/scientific/`.
 Formulation, methods, evidence, writing rules, optional shared LaTeX and Quarto
 sources, bibliography, manuscript, and one numbered decision-record sequence
 stay there. Each bounded analysis instead owns its retained input snapshot with
-provenance, scripts, results, figures, and reviewed notebook at root
-`analyses/<short-id>/`. Setup never creates an empty analysis root or initial
-notebook; Summarize creates or replaces the notebook only after Review Pass.
+provenance, scripts, results, figures, and reviewed notebook. New CSE-created
+sets default to root `analyses/<short-id>/`; established repositories may keep
+a clear repository-owned analysis path and meaningful populated child names.
+Setup never creates an empty analysis root or initial notebook; Summarize
+creates or replaces the notebook only after Review Pass.
 
 Decision records are shared doctrine, not a public workflow stage, external
 skill dependency, or lifecycle store; the system is not a lifecycle database.
