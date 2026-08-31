@@ -30,7 +30,8 @@ cleanup() {
 trap cleanup EXIT
 
 rsync -a --delete \
-  --exclude .git --exclude .venv --exclude .pytest_cache --exclude tests \
+  --exclude .git --exclude .venv --exclude .pytest_cache --exclude .runs \
+  --exclude __pycache__ --exclude '*.pyc' --exclude tests \
   --exclude examples --exclude cse-pi-harness --exclude docs --exclude evaluation \
   --exclude scripts/check-installed.py \
   --exclude scripts/cooling_fit_benchmark.py \

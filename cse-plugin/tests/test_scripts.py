@@ -199,6 +199,26 @@ class ScriptBehaviorTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             deployed = root / "deployed"
+            runtime_ignored = {
+                ".git", ".venv", ".pytest_cache", ".runs", "tests", "examples",
+                "cse-pi-harness", "docs", "evaluation", "__pycache__",
+            }
+            runtime_source_only = {
+                "scripts/check-installed.py", "scripts/cooling_fit_benchmark.py",
+                "scripts/delete_disposable_repo.py", "scripts/register_marketplace.py",
+                "scripts/sync-live.sh", "scripts/validate.sh",
+            }
+            for source in ROOT.rglob("*"):
+                if not source.is_file():
+                    continue
+                relative = source.relative_to(ROOT)
+                if runtime_ignored.intersection(relative.parts):
+                    continue
+                if relative.as_posix() in runtime_source_only or source.suffix == ".pyc":
+                    continue
+                destination = deployed / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(source, destination)
             for relative in (
                 ".codex-plugin/plugin.json",
                 "hooks/hooks.json",
@@ -284,12 +304,32 @@ class ScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn("source-only material", result.stderr)
             leaked.unlink()
+            leaked_runs = deployed / ".runs/cooling-fit/run-1/events.jsonl"
+            leaked_runs.parent.mkdir(parents=True)
+            leaked_runs.write_text("must not deploy\n")
+            result = subprocess.run(
+                [sys.executable, str(check)], env=environment, text=True,
+                capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("source-only material", result.stderr)
+            shutil.rmtree(deployed / ".runs")
             result = subprocess.run(
                 [sys.executable, str(check)], env=environment, text=True,
                 capture_output=True, check=False,
             )
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertIn("CSE installed check passed", result.stdout)
+            parity_file = deployed / "README.md"
+            parity_text = parity_file.read_text()
+            parity_file.write_text(parity_text + "changed\n")
+            result = subprocess.run(
+                [sys.executable, str(check)], env=environment, text=True,
+                capture_output=True, check=False,
+            )
+            self.assertEqual(result.returncode, 1)
+            self.assertIn("runtime payload does not match", result.stderr)
+            parity_file.write_text(parity_text)
 
     def test_prose_check_rejects_default_forbidden_word(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -657,6 +697,8 @@ class ScriptBehaviorTests(unittest.TestCase):
             (source / "scripts/validate.sh").write_text("#!/usr/bin/env bash\nexit 0\n")
             validator = root / "validator.py"
             validator.write_text("raise SystemExit(0)\n")
+            (source / ".runs/cooling-fit/run-1").mkdir(parents=True)
+            (source / ".runs/cooling-fit/run-1/events.jsonl").write_text("source-only\n")
             subprocess.run(["git", "init", "-q"], cwd=source, check=True)
             subprocess.run(["git", "add", "-A"], cwd=source, check=True)
             subprocess.run(
@@ -690,6 +732,7 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertFalse((deployed / "cse-pi-harness").exists())
         self.assertFalse((deployed / "docs").exists())
         self.assertFalse((deployed / "evaluation").exists())
+        self.assertFalse((deployed / ".runs").exists())
         self.assertFalse((deployed / "scripts/cooling_fit_benchmark.py").exists())
 
 
