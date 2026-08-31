@@ -6,6 +6,21 @@ embedded [heat-equation example](../../examples/heat-equation/README.md).
 It is a decision summary, not a transcript. Statements below are separated into
 plugin-wide decisions and choices made only for that example.
 
+## Companion package decision
+
+Core `cse` remains the workflow spine: it owns scientific questions, retained
+records, evidence admission, Review, interpretation, and claim boundaries.
+`cse-sources` owns Zotero, Mathpix, data-lineage, and digitization operations;
+`cse-visualize` owns Plot, TikZ, PGFPlots, LaTeX, Quarto, RevealJS, and Beamer
+rendering. Both companions require core CSE, are independently installable
+from this repository, and do not depend on one another.
+
+Rejected alternatives are a Sources or Visualize mega skill, separate source
+repositories, compatibility aliases under `cse:*`, and duplicated scientific
+doctrine. Sources returns provenance and QA, not admitted claims. Visualize
+consumes reviewed retained values or accepted claims, never runs the scientific
+model, and treats successful rendering as distinct from Review Pass.
+
 ## Product vision
 
 Agentic Computational Science and Engineering is a self-contained Codex plugin for scientific and

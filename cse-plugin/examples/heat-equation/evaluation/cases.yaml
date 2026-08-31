@@ -75,7 +75,7 @@ direct_entry_cases:
       Reviews the full question-to-claim chain, reports prioritized findings,
       and does not recommend coverage expansion without a scientific failure.
   - id: zotero-direct
-    entrypoint: cse:zotero
+    entrypoint: cse-sources:zotero
     prompt: >-
       In read-only mode, verify the Crank-Nicolson Zotero evidence identities,
       exact locators, and project bibliography route. Make no Zotero writes.
@@ -84,7 +84,7 @@ direct_entry_cases:
       identities, verifies the sanitized export, and does not invoke a generic
       Zotero skill or publisher automation.
   - id: mathpix-direct
-    entrypoint: cse:mathpix
+    entrypoint: cse-sources:mathpix
     prompt: >-
       In read-only mode, assess whether Mathpix conversion is currently needed
       for the Crank-Nicolson source. Make no conversion or Zotero writes.
