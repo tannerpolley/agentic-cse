@@ -2,8 +2,9 @@
 
 Agentic Computational Science and Engineering (`cse`) gives Codex a disciplined working method for computational science and physical-world engineering. It supports mechanical, chemical, electrical, civil, and related work—not generic software engineering—by keeping attention on the scientific question, equations, numerical method, reference cases, uncertainty, interpretation, and supported writing.
 
-The plugin has nine workflow skills across eight normal levels and eleven
-supporting tools.
+Core CSE has nine workflow skills across eight normal levels. Optional
+companions add Sources or Visualize capabilities when a project explicitly
+needs them; core remains usable when neither is installed.
 
 ## Workflow spine
 
@@ -28,16 +29,17 @@ blocking review returns to the same Design and active issue before Build and
 Analyze repeat. Review Pass continues to Summarize and is bounded to the stated
 use and domain.
 
-## Supporting tools
+## Optional companion plugins
 
-Sources tools:
+Install `cse-sources` with core `cse` for source evidence and retained-data
+operations:
 
 - `zotero` retrieves and manages source-linked Zotero evidence through Companion.
 - `mathpix` extracts equation-rich Zotero PDFs only when no Markdown child exists.
 - `data` discovers, queries, validates, and traces retained scientific data.
 - `digitize` extracts calibrated values from source figures with QA evidence.
 
-Visualize tools:
+Install `cse-visualize` with core `cse` for figure and document rendering:
 
 - `plot` selects Matplotlib or PGFPlots for figures from retained values.
 - `tikz` creates document-native LaTeX diagrams, schematics, and geometry.
@@ -47,30 +49,21 @@ Visualize tools:
 - `revealjs` creates interactive, scroll-capable scientific results views.
 - `beamer` creates fixed-layout scientific presentation PDFs.
 
-Invoke `$cse:latex` when you want one guided route through the document bundle.
+Invoke `$cse-visualize:latex` when you want one guided route through the document bundle.
 It confirms the document type and outputs, uses the needed specialist tools,
 builds every selected output, and completes visual inspection. Run
-`scripts/check-latex-toolchain.sh` to verify the supported user toolchain:
+`extensions/cse-visualize/scripts/check-latex-toolchain.sh` to verify the supported user toolchain:
 TinyTeX as the TeX distribution and LuaLaTeX as its default PDF engine.
 
-Document-producing workflows use the package and output-profile decisions in
-[`references/latex-packages.md`](references/latex-packages.md), with curated
-TikZ and PGF selections in
-[`references/latex-extensions.md`](references/latex-extensions.md).
-The distinct manuscript and analysis-notebook contracts are in
-[`references/latex-article-profiles.md`](references/latex-article-profiles.md).
+Document-producing workflows use the Visualize package's rendering references.
 Shared scientific records and science-first decisions are defined in
 [`references/scientific-projects.md`](references/scientific-projects.md) and
 [`references/decision-records.md`](references/decision-records.md). Real
 dependent leaves use the bounded sequence in
 [`references/dependent-scientific-changes.md`](references/dependent-scientific-changes.md).
-[`references/revealjs.md`](references/revealjs.md) defines the interactive
-analysis-notebook view that shares retained results and figure sources with the
-LuaLaTeX PDF.
-Layout and visual acceptance rules are in
-[`references/latex-layout-and-qa.md`](references/latex-layout-and-qa.md), and
-[`references/latex-manuals.md`](references/latex-manuals.md) defines the
-searchable user-level official-manual cache.
+Visualize owns interactive analysis views, layout checks, and the official
+LaTeX-manual cache. Core retains the authoritative notebook source and claim
+order; rendering is conditional on the selected companion.
 
 A runnable Quarto-managed chemical-engineering article, Moloch Beamer deck,
 RevealJS example, and dual-output analysis research notebook live in
@@ -78,8 +71,8 @@ RevealJS example, and dual-output analysis research notebook live in
 
 The embedded [`heat-equation example`](examples/heat-equation/README.md) and
 [`CSE Pi harness`](cse-pi-harness/README.md) are repository evidence and
-project work, not installed plugin content. `scripts/sync-live.sh` excludes
-both directories from deployment.
+project work, not installed plugin content. The deployment inventory omits both
+directories.
 
 Tools support a workflow stage and return their evidence or files to that
 stage; they are not additional steps in the workflow spine. A task may start at
@@ -112,7 +105,9 @@ does not change the accepted plugin behavior or select an implementation.
 ```bash
 ./scripts/sync-live.sh --validate
 codex plugin add cse@personal --json
-python3 scripts/check-installed.py
+codex plugin add cse-sources@personal --json
+codex plugin add cse-visualize@personal --json
+python3 scripts/check-installed.py --all
 ```
 
 The CSE Stop hook is temporarily disabled because repository-wide change

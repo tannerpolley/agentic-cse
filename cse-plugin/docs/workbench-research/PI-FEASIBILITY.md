@@ -85,8 +85,8 @@ Pi extensions can:
 
 Those capabilities are sufficient for a CSE Pi package containing:
 
-- the eight workflow-stage instructions;
-- Zotero, Mathpix, plot, digitize, TikZ, and PGFPlots tool definitions;
+- the current three-package instructions: nine core workflow skills, four
+  optional Sources skills, and seven optional Visualize skills;
 - a project-profile reader;
 - scientific terminology guidance and prose checks;
 - figure-description and result-table schemas;

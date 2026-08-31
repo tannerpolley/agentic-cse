@@ -56,7 +56,7 @@ skills stay intentionally thin and route through shared references:
   and manuscript conventions.
 - [`github-and-git.md`](../../references/github-and-git.md) defines the
   authoritative GitHub lifecycle and guarded synchronization and cleanup.
-- [`zotero-companion.md`](../../references/zotero-companion.md) defines the
+- [`zotero-companion.md`](../../extensions/cse-sources/references/zotero-companion.md) defines the
   Zotero authority, Companion capability contract, exact source lineage,
   bibliography, and on-demand extraction boundaries.
 - [`terminology.md`](../../references/terminology.md) defines canonical
@@ -76,16 +76,11 @@ The nine workflow stages are:
 | [`write`](../../skills/write/SKILL.md) | Evidence-supported papers, reports, captions, and LaTeX | `review` |
 | [`review`](../../skills/review/SKILL.md) | Whole-chain scientific and repository review | Route material corrections to the owning skill |
 
-Supporting tools are public skills, but they are not workflow stages:
-
-| Tool | Role | Returns to |
-| --- | --- | --- |
-| [`zotero`](../../skills/zotero/SKILL.md) | Retrieve, inspect, and cite source evidence | Invoking workflow stage |
-| [`mathpix`](../../skills/mathpix/SKILL.md) | Create a source-linked Markdown companion from a confirmed Zotero PDF when no usable child exists | Invoking workflow stage |
-| [`plot`](../../skills/plot/SKILL.md) | Render or review figures from retained values with explicit visual semantics | `analyze`, `summarize`, `write`, or `review` |
-| [`digitize`](../../skills/digitize/SKILL.md) | Recover calibrated values from source figures with independent QA | `analyze` or `review` |
-| [`tikz`](../../skills/tikz/SKILL.md) | Create document-native LaTeX diagrams, schematics, geometry, and annotations | `write` or `review` |
-| [`pgfplots`](../../skills/pgfplots/SKILL.md) | Create table-driven LaTeX-native quantitative plots | `analyze`, `summarize`, `write`, or `review` |
+The installable family has three packages: core `cse` provides these nine
+workflow skills; optional `cse-sources` provides four source and data skills;
+optional `cse-visualize` provides seven rendering and document skills. Companion
+skills return evidence or files to their invoking core workflow stage rather
+than becoming workflow stages themselves.
 
 The initial workflow entrypoint inspects the repository and asks a material question
 round. After confirmation, internal handoffs inherit decisions and ask only
@@ -101,13 +96,15 @@ hidden plugin dependencies.
 ## Repository layout
 
 ```text
-.codex-plugin/plugin.json       installable manifest and interface metadata
-skills/<stage-or-tool>/SKILL.md nine workflow stages plus supporting tools
-references/*.md                 shared scientific, numerical, Git, and source doctrine
+.codex-plugin/plugin.json       core manifest and interface metadata
+skills/<stage>/SKILL.md         nine core workflow stages
+extensions/cse-sources/         four optional source and data skills
+extensions/cse-visualize/       seven optional rendering and document skills
+references/*.md                 shared core scientific, numerical, and Git doctrine
 scripts/validate.sh             source validation and contract checks
 scripts/sync-live.sh             guarded source-to-marketplace deployment
 scripts/check_prose.py          forbidden-language check
-scripts/sync_bibliography.py    one-way bibliography snapshot helper
+extensions/cse-sources/scripts/sync_bibliography.py  one-way bibliography snapshot helper
 tests/                          front-door and destructive-operation safeguards
 docs/design/                    product decisions and external-review package
 ```
@@ -155,8 +152,9 @@ currently:
 
 The contract tests in
 [`tests/test_contract.py`](../../tests/test_contract.py) protect the manifest,
-the exact eight-workflow/six-tool skill surface, thin skills, shared-reference
-links, opening alignment anchors, numerical doctrine, optional GitHub features,
+the exact three-package, 9-core/4-Sources/7-Visualize skill surface, thin
+skills, shared-reference links, opening alignment anchors, numerical doctrine,
+optional GitHub features,
 forbidden runtime workflow names, and the absence of generic coverage
 assumptions.
 [`tests/test_scripts.py`](../../tests/test_scripts.py) exercises bibliography
@@ -211,7 +209,7 @@ An external review would be most valuable on these questions:
   discretization error, physical validation, and scientific acceptance in
   practice?
 - Do the nine workflow stages form a coherent route with useful continuity,
-  and do the six supporting tools avoid becoming competing stages?
+  and do the eleven optional companion skills avoid becoming competing stages?
 - Is the grilling quality material and adaptive without blocking ordinary work?
 - Is the Zotero and Companion boundary safe, understandable, and useful for
   source-linked research?

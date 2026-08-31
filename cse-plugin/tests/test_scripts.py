@@ -15,8 +15,9 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class ScriptBehaviorTests(unittest.TestCase):
     def run_script(self, script: str, *arguments: str):
+        path = ROOT / script if "/" in script else ROOT / "scripts" / script
         return subprocess.run(
-            [sys.executable, str(ROOT / "scripts" / script), *arguments],
+            [sys.executable, str(path), *arguments],
             text=True,
             capture_output=True,
             check=False,
@@ -198,56 +199,24 @@ class ScriptBehaviorTests(unittest.TestCase):
     def test_installed_check_reports_missing_disabled_mismatch_and_pass(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            deployed = root / "deployed"
-            runtime_ignored = {
-                ".git", ".venv", ".pytest_cache", ".runs", "tests", "examples",
-                "cse-pi-harness", "docs", "evaluation", "__pycache__",
-            }
-            runtime_source_only = {
-                "scripts/check-installed.py", "scripts/cooling_fit_benchmark.py",
-                "scripts/delete_disposable_repo.py", "scripts/register_marketplace.py",
-                "scripts/sync-live.sh", "scripts/validate.sh",
-            }
-            for source in ROOT.rglob("*"):
-                if not source.is_file():
-                    continue
-                relative = source.relative_to(ROOT)
-                if runtime_ignored.intersection(relative.parts):
-                    continue
-                if relative.as_posix() in runtime_source_only or source.suffix == ".pyc":
-                    continue
-                destination = deployed / relative
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source, destination)
-            for relative in (
-                ".codex-plugin/plugin.json",
-                "hooks/hooks.json",
-                "scripts/change_accounting.py",
-                "scripts/check_prose.py",
-                "scripts/cse-review-stop.py",
-                "scripts/setup_scientific_project.py",
-                "assets/project/AGENTS.md",
-                "assets/project/README.md",
-                "assets/project/CONTEXT.md",
-                "assets/project/formulation.tex",
-                "assets/project/methods.tex",
-                "assets/project/evidence.tex",
-                "assets/project/adr/README.md",
-                "assets/project/adr/templates/computational-architecture.md",
-                "assets/project/adr/templates/evidence-admission.md",
-                "assets/project/adr/templates/numerical-method.md",
-                "assets/project/adr/templates/reproducibility-tooling.md",
-                "assets/project/adr/templates/scientific-formulation.md",
-                "assets/project/writing/STYLE.md",
-                "assets/project/writing/RULES.md",
-            ):
-                destination = deployed / relative
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(ROOT / relative, destination)
-            for source in (ROOT / "skills").glob("*/SKILL.md"):
-                destination = deployed / source.relative_to(ROOT)
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(source, destination)
+            home = root / "home"
+            commit = subprocess.run(
+                ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
+                capture_output=True, check=True,
+            ).stdout.strip()
+            names = ("cse", "cse-sources", "cse-visualize")
+            versions = {"cse": "2.0.0", "cse-sources": "1.0.0", "cse-visualize": "1.0.0"}
+            for name in names:
+                result = subprocess.run(
+                    [
+                        sys.executable, str(ROOT / "scripts/package_inventory.py"),
+                        "stage", name, str(home / f".codex/plugins/{name}"),
+                        "--commit", commit, "--home", str(home),
+                    ],
+                    text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                self.assertTrue(json.loads(result.stdout)["enabled"])
 
             command_dir = root / "bin"
             command_dir.mkdir()
@@ -262,74 +231,91 @@ class ScriptBehaviorTests(unittest.TestCase):
             environment = {
                 **os.environ,
                 "PATH": str(command_dir) + os.pathsep + os.environ.get("PATH", ""),
-                "CSE_DEPLOY_ROOT": str(deployed),
                 "FAKE_PLUGIN_LIST": str(listing),
             }
             check = ROOT / "scripts/check-installed.py"
 
+            def record(name: str, *, enabled: bool = True, version: str | None = None):
+                return {
+                    "pluginId": f"{name}@personal", "installed": True, "enabled": enabled,
+                    "version": version or versions[name],
+                    "source": {"path": str(home / f".codex/plugins/{name}")},
+                }
+
             cases = (
-                ({"installed": []}, "not installed"),
-                ({"installed": [{
-                    "pluginId": "cse@personal", "installed": True,
-                    "enabled": False, "version": "1.1.1",
-                    "source": {"path": str(deployed)},
-                }]}, "disabled"),
-                ({"installed": [{
-                    "pluginId": "cse@personal", "installed": True,
-                    "enabled": True, "version": "1.0.0",
-                    "source": {"path": str(deployed)},
-                }]}, "expected '1.1.1'"),
+                ({"installed": []}, "do not match the selected configuration"),
+                ({"installed": [record("cse"), record("cse-sources", enabled=False), record("cse-visualize")]}, "not enabled"),
+                ({"installed": [record("cse"), record("cse-sources"), record("cse-visualize", version="9.0.0")]}, "version does not match"),
+                ({"installed": [record("cse"), record("cse-sources"), record("cse-visualize"), record("cse")]}, "missing or duplicated"),
+                ({"installed": [record("cse"), record("cse-sources"), record("cse-visualize"), {**record("cse"), "pluginId": "cse@other"}]}, "do not match the selected configuration"),
+                ({"installed": [record("cse"), record("cse-sources"), record("cse-visualize"), {"pluginId": "cse-experimental@personal"}]}, "unexpected CSE-family packages"),
             )
             for payload, message in cases:
                 with self.subTest(message=message):
                     listing.write_text(json.dumps(payload))
                     result = subprocess.run(
-                        [sys.executable, str(check)], env=environment, text=True,
-                        capture_output=True, check=False,
+                        [sys.executable, str(check), "--all", "--home", str(home)],
+                        env=environment, text=True, capture_output=True, check=False,
                     )
                     self.assertEqual(result.returncode, 1)
                     self.assertIn(message, result.stderr)
 
-            listing.write_text(json.dumps({"installed": [{
-                "pluginId": "cse@personal", "installed": True,
-                "enabled": True, "version": "1.1.1",
-                "source": {"path": str(deployed)},
-            }]}))
-            leaked = deployed / "scripts/cooling_fit_benchmark.py"
-            leaked.write_text("raise SystemExit('must not deploy')\n")
+            missing_source = record("cse")
+            missing_source.pop("source")
+            listing.write_text(json.dumps({"installed": [missing_source, record("cse-sources"), record("cse-visualize")]}))
             result = subprocess.run(
-                [sys.executable, str(check)], env=environment, text=True,
-                capture_output=True, check=False,
+                [sys.executable, str(check), "--all", "--home", str(home)],
+                env=environment, text=True, capture_output=True, check=False,
             )
             self.assertEqual(result.returncode, 1)
-            self.assertIn("source-only material", result.stderr)
-            leaked.unlink()
-            leaked_runs = deployed / ".runs/cooling-fit/run-1/events.jsonl"
-            leaked_runs.parent.mkdir(parents=True)
-            leaked_runs.write_text("must not deploy\n")
-            result = subprocess.run(
-                [sys.executable, str(check)], env=environment, text=True,
-                capture_output=True, check=False,
+            self.assertIn("unexpected deployment root", result.stderr)
+
+            listing.write_text(json.dumps({"installed": [record(name) for name in names]}))
+            passed = subprocess.run(
+                [sys.executable, str(check), "--all", "--home", str(home)],
+                env=environment, text=True, capture_output=True, check=False,
             )
-            self.assertEqual(result.returncode, 1)
-            self.assertIn("source-only material", result.stderr)
-            shutil.rmtree(deployed / ".runs")
-            result = subprocess.run(
-                [sys.executable, str(check)], env=environment, text=True,
-                capture_output=True, check=False,
+            self.assertEqual(passed.returncode, 0, passed.stderr)
+            for selected in (("cse",), ("cse", "cse-sources"), ("cse", "cse-visualize")):
+                listing.write_text(json.dumps({"installed": [record(name) for name in selected]}))
+                configured = subprocess.run(
+                    [
+                        sys.executable, str(check), "--packages", ",".join(selected),
+                        "--home", str(home),
+                    ],
+                    env=environment, text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(configured.returncode, 0, configured.stderr)
+            missing_core = subprocess.run(
+                [sys.executable, str(check), "--packages", "cse-sources", "--home", str(home)],
+                env=environment, text=True, capture_output=True, check=False,
             )
-            self.assertEqual(result.returncode, 0, result.stderr)
-            self.assertIn("CSE installed check passed", result.stdout)
-            parity_file = deployed / "README.md"
-            parity_text = parity_file.read_text()
-            parity_file.write_text(parity_text + "changed\n")
-            result = subprocess.run(
-                [sys.executable, str(check)], env=environment, text=True,
-                capture_output=True, check=False,
+            self.assertEqual(missing_core.returncode, 2)
+            self.assertIn("requires the core cse plugin", missing_core.stderr)
+
+            listing.write_text(json.dumps({"installed": [record(name) for name in names]}))
+            altered = home / ".codex/plugins/cse-sources/README.md"
+            altered.write_text(altered.read_text() + "changed\n")
+            rejected = subprocess.run(
+                [sys.executable, str(check), "--all", "--home", str(home)],
+                env=environment, text=True, capture_output=True, check=False,
             )
-            self.assertEqual(result.returncode, 1)
-            self.assertIn("runtime payload does not match", result.stderr)
-            parity_file.write_text(parity_text)
+            self.assertEqual(rejected.returncode, 1)
+            self.assertIn("stale, altered, or incompatible", rejected.stderr)
+            identity_path = home / ".codex/plugins/cse-sources/.codex-plugin/installed.json"
+            identity = json.loads(identity_path.read_text())
+            inventory = subprocess.run(
+                [sys.executable, "-c", "from package_inventory import runtime_tree_hash; from pathlib import Path; import sys; print(runtime_tree_hash(Path(sys.argv[1])))", str(altered.parents[0])],
+                cwd=ROOT / "scripts", text=True, capture_output=True, check=True,
+            ).stdout.strip()
+            identity["runtimeTreeSha256"] = inventory
+            identity_path.write_text(json.dumps(identity, indent=2, sort_keys=True) + "\n")
+            source_mismatch = subprocess.run(
+                [sys.executable, str(check), "--all", "--home", str(home)],
+                env=environment, text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(source_mismatch.returncode, 1)
+            self.assertIn("does not match the committed source", source_mismatch.stderr)
 
     def test_prose_check_rejects_default_forbidden_word(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -450,9 +436,9 @@ class ScriptBehaviorTests(unittest.TestCase):
             source = root / "export.bib"
             destination = root / "docs" / "references.bib"
             source.write_text("@article{case, title={Reference}}\n")
-            copied = self.run_script("sync_bibliography.py", str(source), str(destination))
+            copied = self.run_script("extensions/cse-sources/scripts/sync_bibliography.py", str(source), str(destination))
             checked = self.run_script(
-                "sync_bibliography.py", str(source), str(destination), "--check"
+                "extensions/cse-sources/scripts/sync_bibliography.py", str(source), str(destination), "--check"
             )
         self.assertEqual(copied.returncode, 0, copied.stderr)
         self.assertEqual(checked.returncode, 0, checked.stderr)
@@ -473,7 +459,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             data = json.loads(path.read_text())
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(data["interface"]["displayName"], "Mine")
-        self.assertEqual([entry["name"] for entry in data["plugins"]], ["existing", "cse"])
+        self.assertEqual([entry["name"] for entry in data["plugins"]], ["existing", "cse", "cse-sources", "cse-visualize"])
 
     def test_visual_qa_classifies_text_and_graphic_collisions(self):
         fixture_root = ROOT / "tests/fixtures/latex-visual-qa"
@@ -502,7 +488,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                 )
                 self.assertEqual(compiled.returncode, 0, compiled.stdout[-2000:])
                 arguments = [
-                    "latex_visual_qa.py",
+                    "extensions/cse-visualize/scripts/latex_visual_qa.py",
                     str(build / f"{name}.pdf"),
                     "--profile",
                     "article",
@@ -542,8 +528,8 @@ class ScriptBehaviorTests(unittest.TestCase):
             inherited_cache.chmod(0o555)
             texmf_config.mkdir()
             proxy_directory.mkdir()
-            shutil.copy2(ROOT / "assets/project/quarto/_quarto.yml", project)
-            shutil.copy2(ROOT / "assets/project/quarto/render.sh", project)
+            shutil.copy2(ROOT / "extensions/cse-visualize/assets/project/quarto/_quarto.yml", project)
+            shutil.copy2(ROOT / "extensions/cse-visualize/assets/project/quarto/render.sh", project)
             real_quarto = shutil.which("quarto")
             self.assertIsNotNone(real_quarto)
             proxy = proxy_directory / "quarto"
@@ -672,7 +658,6 @@ class ScriptBehaviorTests(unittest.TestCase):
             (deployed / "previous.txt").write_text("preserve\n")
             environment = os.environ | {
                 "HOME": str(home),
-                "CSE_DEPLOY_ROOT": str(deployed),
                 "CSE_PLUGIN_VALIDATOR": str(validator),
             }
             result = subprocess.run(
@@ -713,7 +698,6 @@ class ScriptBehaviorTests(unittest.TestCase):
             )
             environment = os.environ | {
                 "HOME": str(home),
-                "CSE_DEPLOY_ROOT": str(home / ".codex/plugins/cse"),
                 "CSE_PLUGIN_VALIDATOR": str(validator),
             }
             result = subprocess.run(
@@ -724,9 +708,24 @@ class ScriptBehaviorTests(unittest.TestCase):
                 capture_output=True,
                 check=False,
             )
+            identified_removed = not legacy.exists()
+            unexpected = home / ".codex/plugins/scientific-codex"
+            unexpected.mkdir()
+            (unexpected / "keep.txt").write_text("user directory\n")
+            preserved_result = subprocess.run(
+                ["bash", str(source / "scripts/sync-live.sh"), "--validate"],
+                cwd=source,
+                env=environment,
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            preserved = (unexpected / "keep.txt").read_text()
 
         self.assertEqual(result.returncode, 0, result.stderr)
-        self.assertFalse(legacy.exists())
+        self.assertTrue(identified_removed)
+        self.assertEqual(preserved_result.returncode, 0, preserved_result.stderr)
+        self.assertEqual(preserved, "user directory\n")
         deployed = home / ".codex/plugins/cse"
         self.assertFalse((deployed / "examples").exists())
         self.assertFalse((deployed / "cse-pi-harness").exists())
@@ -734,6 +733,107 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertFalse((deployed / "evaluation").exists())
         self.assertFalse((deployed / ".runs").exists())
         self.assertFalse((deployed / "scripts/cooling_fit_benchmark.py").exists())
+
+    def test_every_family_failure_checkpoint_is_atomic_for_first_install_and_upgrade(self):
+        packages = ("cse", "cse-sources", "cse-visualize")
+        checkpoints = tuple(
+            f"{phase}:{side}:{name}"
+            for phase in ("validate", "stage", "deploy", "register")
+            for side in ("before", "after")
+            for name in packages
+        ) + ("register-final:before", "register-final:after")
+
+        def tree(path: Path):
+            return {
+                item.relative_to(path).as_posix(): item.read_bytes()
+                for item in path.rglob("*") if item.is_file()
+            } if path.is_dir() else None
+
+        def state(home: Path):
+            return {
+                **{name: tree(home / f".codex/plugins/{name}") for name in packages},
+                "legacy": tree(home / ".codex/plugins/scientific-codex"),
+                "marketplace": (
+                    home / ".agents/plugins/marketplace.json"
+                ).read_bytes() if (home / ".agents/plugins/marketplace.json").is_file() else None,
+            }
+
+        def seed_verified_legacy(home: Path):
+            legacy = home / ".codex/plugins/scientific-codex/.codex-plugin"
+            legacy.mkdir(parents=True)
+            (legacy / "plugin.json").write_text(json.dumps({"name": "scientific-codex"}))
+            marketplace = home / ".agents/plugins/marketplace.json"
+            marketplace.parent.mkdir(parents=True, exist_ok=True)
+            data = json.loads(marketplace.read_text()) if marketplace.is_file() else {
+                "name": "personal", "plugins": []
+            }
+            data["plugins"] = [
+                *data["plugins"], {"name": "scientific-codex"}
+            ]
+            marketplace.write_text(json.dumps(data))
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            shutil.copytree(
+                ROOT, source,
+                ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__", ".pytest_cache", ".runs"),
+            )
+            (source / "scripts/validate.sh").write_text(
+                "#!/usr/bin/env bash\n"
+                "case \"${CSE_FAIL_AT:-}\" in validate:*) exit 9;; esac\n"
+                "exit 0\n"
+            )
+            (source / "scripts/validate.sh").chmod(0o755)
+            validator = root / "validator.py"
+            validator.write_text("raise SystemExit(0)\n")
+            subprocess.run(["git", "init", "-q", "-b", "main"], cwd=source, check=True)
+            subprocess.run(["git", "add", "-A"], cwd=source, check=True)
+            subprocess.run(
+                ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "fixture"],
+                cwd=source, check=True,
+            )
+
+            def invoke(home: Path, checkpoint: str | None = None):
+                environment = os.environ | {
+                    "HOME": str(home), "CSE_PLUGIN_VALIDATOR": str(validator),
+                }
+                if checkpoint:
+                    environment["CSE_FAIL_AT"] = checkpoint
+                return subprocess.run(
+                    ["bash", "scripts/sync-live.sh", "--validate"], cwd=source,
+                    env=environment, text=True, capture_output=True, check=False,
+                )
+
+            prior = root / "prior"
+            installed = invoke(prior)
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            seed_verified_legacy(prior)
+            prior_state = state(prior)
+            self.assertIsNotNone(prior_state["legacy"])
+            self.assertIn(b'"scientific-codex"', prior_state["marketplace"])
+
+            for checkpoint in checkpoints:
+                with self.subTest(mode="first", checkpoint=checkpoint):
+                    home = root / "first" / checkpoint.replace(":", "-")
+                    seed_verified_legacy(home)
+                    marketplace = home / ".agents/plugins/marketplace.json"
+                    data = json.loads(marketplace.read_text())
+                    data["plugins"].insert(0, {"name": "other"})
+                    marketplace.write_text(json.dumps(data))
+                    before = state(home)
+                    self.assertIsNotNone(before["legacy"])
+                    self.assertIn(b'"scientific-codex"', before["marketplace"])
+                    result = invoke(home, checkpoint)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(state(home), before)
+
+                with self.subTest(mode="upgrade", checkpoint=checkpoint):
+                    home = root / "upgrade" / checkpoint.replace(":", "-")
+                    shutil.copytree(prior, home)
+                    result = invoke(home, checkpoint)
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertEqual(state(home), prior_state)
 
 
 if __name__ == "__main__":
