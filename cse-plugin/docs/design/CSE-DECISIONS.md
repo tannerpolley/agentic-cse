@@ -180,6 +180,14 @@ relative error away from zero, weighted or uncertainty-normalized residuals for
 heterogeneous data, and norms or conservation measures for fields and
 balances.
 
+Explore permits disposable calculations but no persistent test or accepted
+claim. Retaining a new or expanded test promotes it to durable scientific work:
+the agent presents the complete scientific-risk, oracle, metric, tolerance,
+failure, replacement, and runtime proposal and obtains explicit user approval.
+The installed lifecycle hooks compare the final test inventory with the exact
+session-start contents and block completion for an unapproved content
+fingerprint. They do not judge whether the proposal or science is correct.
+
 Durable equations and correlations receive stable identifiers, exact source
 locators, symbols, units or basis, assumptions, validity domain, and links to
 implementation and tests. Alternate conventions stay named and distinct.
@@ -285,9 +293,10 @@ files govern forbidden language and completeness checks.
 
 ## Known limitations
 
-- The plugin is advisory. It can frame a task, ask questions, and route work,
-  but it cannot guarantee scientific correctness or prevent a user from
-  accepting an unsupported interpretation.
+- The plugin remains advisory about scientific correctness and interpretation.
+  Its test gate blocks ordinary hook-aware task completion, but it is not an
+  OS sandbox, cannot prevent transient writes, and can be disabled with the
+  plugin or superseded by host-managed hook policy.
 - The domain expert must supply or approve the question, equations, sources,
   conventions, tolerances, intended use, and claims. Missing context can stop
   a route.

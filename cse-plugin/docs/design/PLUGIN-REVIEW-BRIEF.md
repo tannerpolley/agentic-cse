@@ -194,8 +194,10 @@ contain only cited records and are never hand-edited.
 ## Limitations and high-value review questions
 
 The plugin is advisory and depends on the user's scientific context, sources,
-toolchain, and judgment. It cannot guarantee that a model is physically valid,
-that an oracle is independent, or that a user will preserve claim boundaries.
+toolchain, and judgment. Its lifecycle gate can block hook-aware task completion
+for unapproved persistent test growth, but cannot guarantee that a model is
+physically valid, that an oracle is independent, or that a user will preserve
+claim boundaries.
 The current package has no cross-domain benchmark for question quality,
 uncertainty interpretation, or reviewer agreement. Companion integration,
 domain packs, registry adapters, private-source permissions, and the right

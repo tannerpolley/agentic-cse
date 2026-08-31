@@ -1,5 +1,12 @@
 # Changelog
 
+## 2.1.0
+
+- Replace the disabled broad Review Stop hook with a session-baselined gate
+  that blocks completion only for unapproved persistent test growth.
+- Add an Explore-to-Promote boundary, generated-repository fallback doctrine,
+  and proportional named CSE reviewer protocols.
+
 ## 2.0.0
 
 - Split optional companion skills into `cse-sources` and `cse-visualize`; core

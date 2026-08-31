@@ -110,11 +110,13 @@ codex plugin add cse-visualize@personal --json
 python3 scripts/check-installed.py --all
 ```
 
-The CSE Stop hook is temporarily disabled because repository-wide change
-accounting can override legitimate user-decision stops. Its implementation is
-retained for a later turn-aware redesign; installation registers no Stop hook.
-Then start a fresh Codex task and record the representative routing results in
-`evaluation/results/<version>.md`.
+For repositories containing `docs/scientific/CONTEXT.md`, the CSE hooks inject
+the persistent-test policy, seal the session-start test inventory outside the
+repository, report test growth after write-capable tools, and block Stop or
+SubagentStop until the exact current test fingerprint has explicit approval or
+is removed. The gate does not claim OS-level write prevention or scientific
+validity. Start a fresh Codex task after installation, verify the hook behavior,
+and record representative routing results in `evaluation/results/<version>.md`.
 
 Release versions follow semantic versioning: patches preserve skill and hook
 behavior, minor versions add a skill, supporting tool, hook behavior, or
