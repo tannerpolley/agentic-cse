@@ -11,7 +11,7 @@ The normal agent path is:
 
 `setup → research or diagnose → design → build → analyze → review → summarize → write`
 
-- `setup` establishes repository vocabulary and scientific conventions.
+- `setup` establishes or revises repository vocabulary and scientific conventions.
 - `research` investigates literature, theory, and data.
 - `diagnose` establishes why observed behavior disagrees with an expectation.
 - `design` lays out the scientific work and publishes a GitHub issue when the repository uses GitHub issues.
