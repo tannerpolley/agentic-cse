@@ -116,10 +116,11 @@ flowchart TB
     CSE --> REPO
 ```
 
-The CSE package should initially contain only:
+The CSE family should initially contain only:
 
-- the existing workflow-stage and supporting-tool instructions from one shared
-  authoritative source;
+- the existing three-package instructions from one shared authoritative source:
+  nine core workflow skills, four optional Sources skills, and seven optional
+  Visualize skills;
 - one typed scientific-figure result description;
 - one typed numerical-check result description;
 - the terminology and banned-language checks;
@@ -137,8 +138,9 @@ files.
 
 No existing package reviewed here supplies:
 
-- the eight CSE workflow stages and their continuation rules;
-- the six supporting scientific tools as a coherent family;
+- the nine core CSE workflow skills and their continuation rules;
+- the four Sources and seven Visualize companion skills as an optional,
+  coherent family;
 - distinction among code verification, solution verification, model
   validation, and uncertainty analysis;
 - quantity, unit, basis, assumption, and validity-bound records;
