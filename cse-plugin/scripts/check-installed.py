@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import json
+import hashlib
 import os
 from pathlib import Path
 import subprocess
@@ -38,6 +39,7 @@ REQUIRED_PATHS = (
 PROHIBITED_PATHS = (
     "docs",
     "evaluation",
+    ".runs",
     "scripts/check-installed.py",
     "scripts/cooling_fit_benchmark.py",
     "scripts/delete_disposable_repo.py",
@@ -45,11 +47,34 @@ PROHIBITED_PATHS = (
     "scripts/sync-live.sh",
     "scripts/validate.sh",
 )
+RUNTIME_EXCLUDED_PARTS = {
+    ".git", ".venv", ".pytest_cache", ".runs", "tests", "examples",
+    "cse-pi-harness", "docs", "evaluation", "__pycache__",
+}
+RUNTIME_SOURCE_ONLY = {
+    "scripts/check-installed.py", "scripts/cooling_fit_benchmark.py",
+    "scripts/delete_disposable_repo.py", "scripts/register_marketplace.py",
+    "scripts/sync-live.sh", "scripts/validate.sh",
+}
 
 
 def fail(message: str) -> int:
     print(f"CSE installed check failed: {message}", file=sys.stderr)
     return 1
+
+
+def runtime_payload(root: Path) -> dict[str, str]:
+    payload = {}
+    for path in root.rglob("*"):
+        if not path.is_file():
+            continue
+        relative = path.relative_to(root)
+        if RUNTIME_EXCLUDED_PARTS.intersection(relative.parts):
+            continue
+        if relative.as_posix() in RUNTIME_SOURCE_ONLY or path.suffix == ".pyc":
+            continue
+        payload[relative.as_posix()] = hashlib.sha256(path.read_bytes()).hexdigest()
+    return payload
 
 
 def main() -> int:
@@ -91,6 +116,9 @@ def main() -> int:
         return fail(f"{PLUGIN_ID} source is {source_path!r}; expected {str(expected_deploy)!r}")
     if not expected_deploy.is_dir():
         return fail(f"deployed source is unavailable at {expected_deploy}")
+
+    if runtime_payload(ROOT) != runtime_payload(expected_deploy):
+        return fail("installed runtime payload does not match the source payload")
 
     try:
         deployed_manifest = json.loads(
