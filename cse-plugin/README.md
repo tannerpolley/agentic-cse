@@ -52,7 +52,7 @@ Install `cse-visualize` with core `cse` for figure and document rendering:
 Invoke `$cse-visualize:latex` when you want one guided route through the document bundle.
 It confirms the document type and outputs, uses the needed specialist tools,
 builds every selected output, and completes visual inspection. Run
-`scripts/check-latex-toolchain.sh` to verify the supported user toolchain:
+`extensions/cse-visualize/scripts/check-latex-toolchain.sh` to verify the supported user toolchain:
 TinyTeX as the TeX distribution and LuaLaTeX as its default PDF engine.
 
 Document-producing workflows use the Visualize package's rendering references.
@@ -71,8 +71,8 @@ RevealJS example, and dual-output analysis research notebook live in
 
 The embedded [`heat-equation example`](examples/heat-equation/README.md) and
 [`CSE Pi harness`](cse-pi-harness/README.md) are repository evidence and
-project work, not installed plugin content. `scripts/sync-live.sh` excludes
-both directories from deployment.
+project work, not installed plugin content. The deployment inventory omits both
+directories.
 
 Tools support a workflow stage and return their evidence or files to that
 stage; they are not additional steps in the workflow spine. A task may start at

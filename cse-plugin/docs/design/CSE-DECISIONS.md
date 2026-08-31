@@ -15,6 +15,12 @@ records, evidence admission, Review, interpretation, and claim boundaries.
 rendering. Both companions require core CSE, are independently installable
 from this repository, and do not depend on one another.
 
+The allowed dependency graph is one-way: each companion may route back to core
+Review, while core never requires a companion for its workflow spine and the
+companions never invoke one another. The three package roots remain in this
+repository so one issue, compatibility tuple, and atomic deployment govern a
+release without creating a meta-plugin.
+
 Rejected alternatives are a Sources or Visualize mega skill, separate source
 repositories, compatibility aliases under `cse:*`, and duplicated scientific
 doctrine. Sources returns provenance and QA, not admitted claims. Visualize
@@ -75,15 +81,17 @@ physical model.
 
 ## Self-contained architecture
 
-The plugin keeps public skills thin and puts shared behavior in versioned
-references. The [operating model](../../references/operating-model.md),
+Core keeps public skills thin and puts shared scientific behavior in versioned
+root references. The [operating model](../../references/operating-model.md),
 [scientific method](../../references/scientific-method.md),
 [numerical testing](../../references/numerical-testing.md),
 [scientific project records](../../references/scientific-projects.md),
-[GitHub and Git](../../references/github-and-git.md), and
-[Zotero Companion](../../references/zotero-companion.md) references are the
-shared doctrine. Repository-specific equations, methods, evidence, notebooks,
-analyses, and writing rules remain in the user repository.
+[GitHub and Git](../../references/github-and-git.md) references are the shared
+doctrine. Sources owns its operational
+[Zotero Companion](../../extensions/cse-sources/references/zotero-companion.md)
+contract, and Visualize owns its rendering references. Repository-specific
+equations, methods, evidence, notebooks, analyses, and writing rules remain in
+the user repository.
 
 The [terminology reference](../../references/terminology.md) is the canonical
 language contract for workflow stages, supporting tools, sources, extraction,
@@ -112,17 +120,17 @@ The nine workflow stages form the default agent path:
 
 The supporting tools are public skills but are not workflow stages:
 
-- [`zotero`](../../skills/zotero/SKILL.md) retrieves, verifies, and cites
+- [`zotero`](../../extensions/cse-sources/skills/zotero/SKILL.md) retrieves, verifies, and cites
   Zotero evidence through the Companion capability contract.
-- [`mathpix`](../../skills/mathpix/SKILL.md) creates a source-linked Markdown
+- [`mathpix`](../../extensions/cse-sources/skills/mathpix/SKILL.md) creates a source-linked Markdown
   companion only when a confirmed Zotero PDF has no usable Markdown child.
-- [`plot`](../../skills/plot/SKILL.md) renders or reviews figures from retained
+- [`plot`](../../extensions/cse-visualize/skills/plot/SKILL.md) renders or reviews figures from retained
   values with explicit visual semantics.
-- [`digitize`](../../skills/digitize/SKILL.md) extracts calibrated values from
+- [`digitize`](../../extensions/cse-sources/skills/digitize/SKILL.md) extracts calibrated values from
   source figures and preserves QA evidence.
-- [`tikz`](../../skills/tikz/SKILL.md) creates document-native LaTeX diagrams,
+- [`tikz`](../../extensions/cse-visualize/skills/tikz/SKILL.md) creates document-native LaTeX diagrams,
   schematics, geometry, and annotations.
-- [`pgfplots`](../../skills/pgfplots/SKILL.md) creates table-driven quantitative
+- [`pgfplots`](../../extensions/cse-visualize/skills/pgfplots/SKILL.md) creates table-driven quantitative
   plots that compile natively with the manuscript.
 
 The workflow stages are connected routes rather than isolated commands. Tools
@@ -188,7 +196,7 @@ interpretation record exact page, section, equation, table, figure, or row
 locators. Metadata or a paper alone is not treated as a validated project
 conclusion without an applicability check.
 
-[Zotero Companion](../../references/zotero-companion.md) is the separately
+[Zotero Companion](../../extensions/cse-sources/references/zotero-companion.md) is the separately
 installed capability-gated evidence and lineage layer. Zotero remains authoritative for
 bibliographic metadata, collections, and attachments. Companion can hold
 source-linked briefs, claims, equations, limitations, and structured data; it

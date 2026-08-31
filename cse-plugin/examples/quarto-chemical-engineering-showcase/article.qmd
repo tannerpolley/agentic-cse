@@ -344,7 +344,7 @@ list spacing. Beamer keeps ownership of slide lists.
 
 `chktex`, `lacheck`, and `texfot` are useful source and log checks, but raster
 inspection remains the acceptance test for overlap, clipping, and legibility.
-See `references/latex-layout-and-qa.md` for the release sequence.
+See `extensions/cse-visualize/references/latex-layout-and-qa.md` for the release sequence.
 
 ## Package profiles
 

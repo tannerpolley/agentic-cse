@@ -3,7 +3,8 @@ set -euo pipefail
 
 showcase_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd "$showcase_root/../.." && pwd)"
-render="$repository_root/assets/project/quarto/render.sh"
+render="$repository_root/extensions/cse-visualize/assets/project/quarto/render.sh"
+visual_qa="$repository_root/extensions/cse-visualize/scripts/latex_visual_qa.py"
 
 cd "$showcase_root"
 mkdir -p builds/figures figures/generated
@@ -22,11 +23,11 @@ done
 "$render" analyses/artificial-absorber/notebook.qmd --to pdf
 "$render" analyses/artificial-absorber/notebook.qmd --to revealjs
 
-python3 "$repository_root/scripts/latex_visual_qa.py" builds/article.pdf \
+python3 "$visual_qa" builds/article.pdf \
   --profile article --output-dir builds/visual-qa/article --contact-sheet
-python3 "$repository_root/scripts/latex_visual_qa.py" builds/deck.pdf \
+python3 "$visual_qa" builds/deck.pdf \
   --profile beamer --output-dir builds/visual-qa/deck --contact-sheet
-python3 "$repository_root/scripts/latex_visual_qa.py" builds/analyses/artificial-absorber/notebook.pdf \
+python3 "$visual_qa" builds/analyses/artificial-absorber/notebook.pdf \
   --profile article --output-dir builds/visual-qa/analysis-notebook --contact-sheet
 
 mkdir -p "$repository_root/output/pdf"

@@ -56,7 +56,7 @@ skills stay intentionally thin and route through shared references:
   and manuscript conventions.
 - [`github-and-git.md`](../../references/github-and-git.md) defines the
   authoritative GitHub lifecycle and guarded synchronization and cleanup.
-- [`zotero-companion.md`](../../references/zotero-companion.md) defines the
+- [`zotero-companion.md`](../../extensions/cse-sources/references/zotero-companion.md) defines the
   Zotero authority, Companion capability contract, exact source lineage,
   bibliography, and on-demand extraction boundaries.
 - [`terminology.md`](../../references/terminology.md) defines canonical
@@ -80,12 +80,12 @@ Supporting tools are public skills, but they are not workflow stages:
 
 | Tool | Role | Returns to |
 | --- | --- | --- |
-| [`zotero`](../../skills/zotero/SKILL.md) | Retrieve, inspect, and cite source evidence | Invoking workflow stage |
-| [`mathpix`](../../skills/mathpix/SKILL.md) | Create a source-linked Markdown companion from a confirmed Zotero PDF when no usable child exists | Invoking workflow stage |
-| [`plot`](../../skills/plot/SKILL.md) | Render or review figures from retained values with explicit visual semantics | `analyze`, `summarize`, `write`, or `review` |
-| [`digitize`](../../skills/digitize/SKILL.md) | Recover calibrated values from source figures with independent QA | `analyze` or `review` |
-| [`tikz`](../../skills/tikz/SKILL.md) | Create document-native LaTeX diagrams, schematics, geometry, and annotations | `write` or `review` |
-| [`pgfplots`](../../skills/pgfplots/SKILL.md) | Create table-driven LaTeX-native quantitative plots | `analyze`, `summarize`, `write`, or `review` |
+| [`zotero`](../../extensions/cse-sources/skills/zotero/SKILL.md) | Retrieve, inspect, and cite source evidence | Invoking workflow stage |
+| [`mathpix`](../../extensions/cse-sources/skills/mathpix/SKILL.md) | Create a source-linked Markdown companion from a confirmed Zotero PDF when no usable child exists | Invoking workflow stage |
+| [`plot`](../../extensions/cse-visualize/skills/plot/SKILL.md) | Render or review figures from retained values with explicit visual semantics | `analyze`, `summarize`, `write`, or `review` |
+| [`digitize`](../../extensions/cse-sources/skills/digitize/SKILL.md) | Recover calibrated values from source figures with independent QA | `analyze` or `review` |
+| [`tikz`](../../extensions/cse-visualize/skills/tikz/SKILL.md) | Create document-native LaTeX diagrams, schematics, geometry, and annotations | `write` or `review` |
+| [`pgfplots`](../../extensions/cse-visualize/skills/pgfplots/SKILL.md) | Create table-driven LaTeX-native quantitative plots | `analyze`, `summarize`, `write`, or `review` |
 
 The initial workflow entrypoint inspects the repository and asks a material question
 round. After confirmation, internal handoffs inherit decisions and ask only
@@ -107,7 +107,7 @@ references/*.md                 shared scientific, numerical, Git, and source do
 scripts/validate.sh             source validation and contract checks
 scripts/sync-live.sh             guarded source-to-marketplace deployment
 scripts/check_prose.py          forbidden-language check
-scripts/sync_bibliography.py    one-way bibliography snapshot helper
+extensions/cse-sources/scripts/sync_bibliography.py  one-way bibliography snapshot helper
 tests/                          front-door and destructive-operation safeguards
 docs/design/                    product decisions and external-review package
 ```

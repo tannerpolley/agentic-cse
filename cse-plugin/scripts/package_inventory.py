@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -115,6 +116,7 @@ def stage(item: dict, destination: Path, commit: str, home: Path | None = None) 
         "version": manifest["version"],
         "sourceCommit": commit,
         "deploymentRoot": str(deploy_root(item, home)),
+        "enabled": True,
         "runtimeTreeSha256": runtime_tree_hash(destination),
         "payloadSkills": list(item["skills"]),
         "compatibility": COMPATIBILITY,
@@ -141,6 +143,7 @@ def verify(item: dict, root: Path, commit: str, home: Path | None = None) -> dic
         "version": COMPATIBILITY[item["name"]],
         "sourceCommit": commit,
         "deploymentRoot": str(deploy_root(item, home)),
+        "enabled": True,
         "runtimeTreeSha256": runtime_tree_hash(root),
         "payloadSkills": list(item["skills"]),
         "compatibility": COMPATIBILITY,
@@ -148,7 +151,15 @@ def verify(item: dict, root: Path, commit: str, home: Path | None = None) -> dic
     if manifest.get("name") != expected["pluginId"] or manifest.get("version") != expected["version"]:
         raise RuntimeError(f"{item['name']} manifest disagrees with its inventory")
     if identity != expected:
-        raise RuntimeError(f"{item['name']} installed identity is stale, altered, or incompatible")
+        fields = sorted(key for key in set(identity) | set(expected) if identity.get(key) != expected.get(key))
+        raise RuntimeError(
+            f"{item['name']} installed identity is stale, altered, or incompatible: {', '.join(fields)}"
+        )
+    with tempfile.TemporaryDirectory() as directory:
+        staged = Path(directory) / item["name"]
+        stage(item, staged, commit, home)
+        if runtime_payload(root) != runtime_payload(staged):
+            raise RuntimeError(f"{item['name']} runtime payload does not match the committed source")
     skills = sorted(path.name for path in (root / "skills").iterdir() if path.is_dir())
     if skills != sorted(item["skills"]):
         raise RuntimeError(f"{item['name']} runtime skills are {skills}; expected {sorted(item['skills'])}")
@@ -185,7 +196,7 @@ def main() -> int:
         else:
             identity = verify(item, args.root.resolve(), args.commit or source_commit(), args.home)
     except (OSError, ValueError, RuntimeError, json.JSONDecodeError) as exc:
-        print(f"CSE package staging failed: {exc}", file=sys.stderr)
+        print(f"CSE package operation failed: {exc}", file=sys.stderr)
         return 1
     print(json.dumps(identity, sort_keys=True))
     return 0

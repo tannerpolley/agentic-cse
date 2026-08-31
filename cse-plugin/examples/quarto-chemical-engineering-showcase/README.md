@@ -17,11 +17,11 @@ After `./build.sh` has refreshed the shared SVG views, individual documents can
 be rerendered through the CSE wrapper with:
 
 ```bash
-../../assets/project/quarto/render.sh article.qmd
-../../assets/project/quarto/render.sh deck.qmd
-../../assets/project/quarto/render.sh interactive-deck.qmd
-../../assets/project/quarto/render.sh analyses/artificial-absorber/notebook.qmd --to pdf
-../../assets/project/quarto/render.sh analyses/artificial-absorber/notebook.qmd --to revealjs
+../../extensions/cse-visualize/assets/project/quarto/render.sh article.qmd
+../../extensions/cse-visualize/assets/project/quarto/render.sh deck.qmd
+../../extensions/cse-visualize/assets/project/quarto/render.sh interactive-deck.qmd
+../../extensions/cse-visualize/assets/project/quarto/render.sh analyses/artificial-absorber/notebook.qmd --to pdf
+../../extensions/cse-visualize/assets/project/quarto/render.sh analyses/artificial-absorber/notebook.qmd --to revealjs
 ```
 
 The project writes intermediate output under `builds/`. The build wrapper runs
@@ -50,8 +50,8 @@ full size before recording a release disposition.
   quick examples.
 
 Agent-facing layout QA and local-manual lookup guidance lives in
-`../../references/latex-layout-and-qa.md` and
-`../../references/latex-manuals.md`.
+`../../extensions/cse-visualize/references/latex-layout-and-qa.md` and
+`../../extensions/cse-visualize/references/latex-manuals.md`.
 
 The article demonstrates the author-controlled KOMA-Script profile. The deck
 demonstrates the 16:9 Moloch profile with high-contrast semantic text colors;
@@ -59,4 +59,4 @@ series colors still require marker or line-style encoding in grayscale.
 
 All engineering numbers are illustrative and are not validation data.
 
-Read `../../references/quarto-execution.md` before adding executable Python.
+Read `../../extensions/cse-visualize/references/quarto-execution.md` before adding executable Python.
