@@ -110,7 +110,15 @@ if [[ -d "$legacy_root" ]]; then
     echo "Preserving unexpected directory at $legacy_root" >&2
   fi
 fi
+if [[ "${CSE_FAIL_AT:-}" == "register-final:before" ]]; then
+  echo "Injected failure at register-final:before" >&2
+  exit 1
+fi
 python3 "$repository_root/scripts/register_marketplace.py"
+if [[ "${CSE_FAIL_AT:-}" == "register-final:after" ]]; then
+  echo "Injected failure at register-final:after" >&2
+  exit 1
+fi
 
 committed=1
 echo "Deployed CSE family to $deploy_parent"

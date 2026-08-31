@@ -118,20 +118,21 @@ The nine workflow stages form the default agent path:
 9. [`review`](../../skills/review/SKILL.md) checks the full scientific chain
    before publication or integration.
 
-The supporting tools are public skills but are not workflow stages:
+The eleven companion skills are public skills but are not workflow stages:
 
-- [`zotero`](../../extensions/cse-sources/skills/zotero/SKILL.md) retrieves, verifies, and cites
-  Zotero evidence through the Companion capability contract.
-- [`mathpix`](../../extensions/cse-sources/skills/mathpix/SKILL.md) creates a source-linked Markdown
-  companion only when a confirmed Zotero PDF has no usable Markdown child.
-- [`plot`](../../extensions/cse-visualize/skills/plot/SKILL.md) renders or reviews figures from retained
-  values with explicit visual semantics.
-- [`digitize`](../../extensions/cse-sources/skills/digitize/SKILL.md) extracts calibrated values from
-  source figures and preserves QA evidence.
-- [`tikz`](../../extensions/cse-visualize/skills/tikz/SKILL.md) creates document-native LaTeX diagrams,
-  schematics, geometry, and annotations.
-- [`pgfplots`](../../extensions/cse-visualize/skills/pgfplots/SKILL.md) creates table-driven quantitative
-  plots that compile natively with the manuscript.
+- Sources: [`zotero`](../../extensions/cse-sources/skills/zotero/SKILL.md),
+  [`mathpix`](../../extensions/cse-sources/skills/mathpix/SKILL.md),
+  [`data`](../../extensions/cse-sources/skills/data/SKILL.md), and
+  [`digitize`](../../extensions/cse-sources/skills/digitize/SKILL.md) own source
+  evidence, extraction, data lineage, and digitization QA.
+- Visualize: [`plot`](../../extensions/cse-visualize/skills/plot/SKILL.md),
+  [`tikz`](../../extensions/cse-visualize/skills/tikz/SKILL.md),
+  [`pgfplots`](../../extensions/cse-visualize/skills/pgfplots/SKILL.md),
+  [`latex`](../../extensions/cse-visualize/skills/latex/SKILL.md),
+  [`quarto`](../../extensions/cse-visualize/skills/quarto/SKILL.md),
+  [`revealjs`](../../extensions/cse-visualize/skills/revealjs/SKILL.md), and
+  [`beamer`](../../extensions/cse-visualize/skills/beamer/SKILL.md) own figures,
+  LaTeX, and non-executing document rendering.
 
 The workflow stages are connected routes rather than isolated commands. Tools
 are invoked by a stage and normally return their evidence or files to that

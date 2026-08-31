@@ -741,7 +741,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             for phase in ("validate", "stage", "deploy", "register")
             for side in ("before", "after")
             for name in packages
-        )
+        ) + ("register-final:before", "register-final:after")
 
         def tree(path: Path):
             return {
@@ -757,6 +757,20 @@ class ScriptBehaviorTests(unittest.TestCase):
                     home / ".agents/plugins/marketplace.json"
                 ).read_bytes() if (home / ".agents/plugins/marketplace.json").is_file() else None,
             }
+
+        def seed_verified_legacy(home: Path):
+            legacy = home / ".codex/plugins/scientific-codex/.codex-plugin"
+            legacy.mkdir(parents=True)
+            (legacy / "plugin.json").write_text(json.dumps({"name": "scientific-codex"}))
+            marketplace = home / ".agents/plugins/marketplace.json"
+            marketplace.parent.mkdir(parents=True, exist_ok=True)
+            data = json.loads(marketplace.read_text()) if marketplace.is_file() else {
+                "name": "personal", "plugins": []
+            }
+            data["plugins"] = [
+                *data["plugins"], {"name": "scientific-codex"}
+            ]
+            marketplace.write_text(json.dumps(data))
 
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -794,18 +808,22 @@ class ScriptBehaviorTests(unittest.TestCase):
             prior = root / "prior"
             installed = invoke(prior)
             self.assertEqual(installed.returncode, 0, installed.stderr)
+            seed_verified_legacy(prior)
             prior_state = state(prior)
+            self.assertIsNotNone(prior_state["legacy"])
+            self.assertIn(b'"scientific-codex"', prior_state["marketplace"])
 
             for checkpoint in checkpoints:
                 with self.subTest(mode="first", checkpoint=checkpoint):
                     home = root / "first" / checkpoint.replace(":", "-")
-                    legacy = home / ".codex/plugins/scientific-codex/.codex-plugin"
-                    legacy.mkdir(parents=True)
-                    (legacy / "plugin.json").write_text(json.dumps({"name": "scientific-codex"}))
+                    seed_verified_legacy(home)
                     marketplace = home / ".agents/plugins/marketplace.json"
-                    marketplace.parent.mkdir(parents=True)
-                    marketplace.write_text(json.dumps({"name": "personal", "plugins": [{"name": "other"}, {"name": "scientific-codex"}]}))
+                    data = json.loads(marketplace.read_text())
+                    data["plugins"].insert(0, {"name": "other"})
+                    marketplace.write_text(json.dumps(data))
                     before = state(home)
+                    self.assertIsNotNone(before["legacy"])
+                    self.assertIn(b'"scientific-codex"', before["marketplace"])
                     result = invoke(home, checkpoint)
                     self.assertNotEqual(result.returncode, 0)
                     self.assertEqual(state(home), before)
