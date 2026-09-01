@@ -18,7 +18,7 @@ WORKFLOW = {"setup", "research", "diagnose", "design", "build", "analyze", "revi
 SUPPORTING = {"audit"}
 CORE = WORKFLOW | SUPPORTING
 SOURCES = {"zotero", "mathpix", "data", "digitize"}
-VISUALIZE = {"plot", "tikz", "pgfplots", "latex", "quarto", "revealjs", "beamer"}
+VISUALIZE = {"plot", "tikz", "pgfplots", "latex", "quarto", "beamer"}
 SKILLS = CORE | SOURCES | VISUALIZE
 SOURCES_ROOT = ROOT / "extensions/cse-sources"
 VISUALIZE_ROOT = ROOT / "extensions/cse-visualize"
@@ -148,7 +148,7 @@ class PluginBehaviorTests(unittest.TestCase):
     def test_manifest_and_public_skills(self):
         manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text())
         self.assertEqual(manifest["name"], "cse")
-        self.assertEqual(manifest["version"], "2.2.1")
+        self.assertEqual(manifest["version"], "2.3.0")
         self.assertEqual(
             manifest["interface"]["displayName"],
             "Agentic Computational Science and Engineering",
@@ -157,12 +157,12 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertEqual({path.name for path in (SOURCES_ROOT / "skills").iterdir()}, SOURCES)
         self.assertEqual({path.name for path in (VISUALIZE_ROOT / "skills").iterdir()}, VISUALIZE)
         self.assertEqual(json.loads((SOURCES_ROOT / ".codex-plugin/plugin.json").read_text())["version"], "1.0.0")
-        self.assertEqual(json.loads((VISUALIZE_ROOT / ".codex-plugin/plugin.json").read_text())["version"], "1.0.0")
+        self.assertEqual(json.loads((VISUALIZE_ROOT / ".codex-plugin/plugin.json").read_text())["version"], "2.0.0")
         self.assertTrue((ROOT / "BANNED.md").is_file())
 
     def test_release_assurance_stays_bounded_and_pinned(self):
         manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text())
-        self.assertEqual(manifest["version"], "2.2.1")
+        self.assertEqual(manifest["version"], "2.3.0")
         routing = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())
         cases = routing["cases"]
         self.assertGreaterEqual(len(cases), 15)
@@ -363,9 +363,21 @@ class PluginBehaviorTests(unittest.TestCase):
         quarto = skill_text("quarto")
         self.assertIn("execute.enabled: false", quarto)
         self.assertIn("--no-execute", quarto)
-        reveal = skill_text("revealjs")
-        self.assertIn("one retained data authority", reveal)
-        self.assertRegex(reveal, r"must not become model\s+execution")
+        self.assertIn("Ordinary Quarto HTML", quarto)
+        self.assertIn("scaffold.sh", quarto)
+        self.assertIn("promoted-pdf", quarto)
+
+    def test_visualize_active_surface_is_html_first_without_retired_companion(self):
+        retired = "reveal" + "js"
+        self.assertFalse((VISUALIZE_ROOT / "skills" / retired).exists())
+        self.assertFalse((VISUALIZE_ROOT / "references" / f"{retired}.md").exists())
+        active = "\n".join(
+            path.read_text(errors="replace")
+            for path in VISUALIZE_ROOT.rglob("*") if path.is_file()
+        ).casefold()
+        self.assertNotIn(retired, active)
+        self.assertIn("ordinary quarto html", active)
+        self.assertIn("promoted-pdf-header.tex", active)
 
     def test_scientific_doctrine_and_approval_boundaries_remain_reachable(self):
         numerical = (ROOT / "references/numerical-testing.md").read_text()
@@ -407,7 +419,7 @@ class PluginBehaviorTests(unittest.TestCase):
         plotting = (VISUALIZE_ROOT / "references/plotting.md").read_text()
         for text, patterns in (
             (latex, (r"one\s+retained data authority", r"never authorizes.*model execution", r"visual")),
-            (quarto, (r"execute\.enabled: false", r"--no-execute", r"material.*return to `cse:review`")),
+            (quarto, (r"execute\.enabled: false", r"--no-execute", r"scaffold\.sh", r"material.*return to `cse:review`")),
             (plot, (r"retained continuous relationship", r"`o`/`x`", r"project.*intended use")),
             (summarize, (r"useful method-specific result", r"must\s+not\s+rerun", r"before Review")),
             (profile, (r"Manuscript", r"Analysis research notebook", r"one continuous story", r"selected render")),
@@ -505,7 +517,7 @@ class PluginBehaviorTests(unittest.TestCase):
         for relative in (
             "inputs/observations.csv", "results/fit_summary.json", "results/fit_curve.csv",
             "results/plot_manifest.json", "figures/cooling_fit.png", "notebook.qmd",
-            "notebook.html", "notebook.pdf",
+            "notebook.html",
         ):
             self.assertIn(Path(relative).name, source)
 
@@ -583,9 +595,9 @@ class PluginBehaviorTests(unittest.TestCase):
 
     def test_companion_package_ownership_namespaces_and_handoffs(self):
         packages = {
-            "cse": (ROOT, CORE, "2.2.1"),
+            "cse": (ROOT, CORE, "2.3.0"),
             "cse-sources": (SOURCES_ROOT, SOURCES, "1.0.0"),
-            "cse-visualize": (VISUALIZE_ROOT, VISUALIZE, "1.0.0"),
+            "cse-visualize": (VISUALIZE_ROOT, VISUALIZE, "2.0.0"),
         }
         for name, (root, expected, version) in packages.items():
             package_manifest = json.loads((root / ".codex-plugin/plugin.json").read_text())
@@ -642,9 +654,9 @@ class PluginBehaviorTests(unittest.TestCase):
             text = " ".join(path.read_text().casefold().split())
             self.assertIn("nine core", text)
             self.assertIn("four optional sources", text)
-            self.assertIn("seven optional visualize", text)
+            self.assertIn("six optional visualize", text)
             self.assertNotIn("eight workflow", text)
-            self.assertNotIn("six supporting", text)
+            self.assertNotIn("seven optional visualize", text)
 
 
 if __name__ == "__main__":

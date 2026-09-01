@@ -231,7 +231,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                 capture_output=True, check=True,
             ).stdout.strip()
             names = ("cse", "cse-sources", "cse-visualize")
-            versions = {"cse": "2.2.1", "cse-sources": "1.0.0", "cse-visualize": "1.0.0"}
+            versions = {"cse": "2.3.0", "cse-sources": "1.0.0", "cse-visualize": "2.0.0"}
             for name in names:
                 result = subprocess.run(
                     [
@@ -541,6 +541,74 @@ class ScriptBehaviorTests(unittest.TestCase):
             "text_graphic_overlap",
             {issue["code"] for issue in graphic_report["issues"]},
         )
+
+    def test_quarto_scaffold_is_additive_and_refuses_collisions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize_git_repository(root)
+            script = ROOT / "extensions/cse-visualize/assets/project/quarto/scaffold.sh"
+            analysis = root / "analyses" / "case"
+            analysis.mkdir(parents=True)
+            marker = analysis / "results.csv"
+            marker.write_bytes(b"retained\n")
+            retained = marker.read_bytes()
+            created = subprocess.run(
+                ["bash", str(script), str(analysis)],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(created.returncode, 0, created.stderr)
+            for relative in (
+                ".gitignore", "_quarto.yml", "_quarto-promoted-pdf.yml",
+                "promoted-pdf-header.tex", "render.sh", "notebook.qmd",
+            ):
+                self.assertTrue((analysis / relative).is_file(), relative)
+            self.assertIn("enabled: false", (analysis / "notebook.qmd").read_text())
+            self.assertIn("html:", (analysis / "_quarto.yml").read_text())
+            self.assertIn("pdf-engine: lualatex", (analysis / "_quarto-promoted-pdf.yml").read_text())
+            self.assertIn("include-in-header", (analysis / "_quarto-promoted-pdf.yml").read_text())
+            self.assertEqual(retained, marker.read_bytes())
+
+            header_check = subprocess.run(
+                ["git", "check-ignore", "--no-index", "promoted-pdf-header.tex"],
+                cwd=analysis, text=True, capture_output=True, check=False,
+            )
+            generated_check = subprocess.run(
+                ["git", "check-ignore", "--no-index", "notebook.tex"],
+                cwd=analysis, text=True, capture_output=True, check=False,
+            )
+            self.assertNotEqual(header_check.returncode, 0, header_check.stdout)
+            self.assertEqual(generated_check.returncode, 0, generated_check.stdout)
+
+            scaffold_files = (
+                ".gitignore", "_quarto.yml", "_quarto-promoted-pdf.yml",
+                "promoted-pdf-header.tex", "render.sh", "notebook.qmd",
+            )
+            before_refusal = {
+                relative: (analysis / relative).read_bytes()
+                for relative in (*scaffold_files, "results.csv")
+            }
+            refused = subprocess.run(
+                ["bash", str(script), str(analysis)],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(refused.returncode, 1)
+            self.assertIn("scaffold-owned", refused.stderr)
+            after_refusal = {
+                relative: (analysis / relative).read_bytes()
+                for relative in (*scaffold_files, "results.csv")
+            }
+            self.assertEqual(before_refusal, after_refusal)
+
+            notebook_collision = root / "analyses" / "notebook-collision"
+            notebook_collision.mkdir()
+            (notebook_collision / "notebook.qmd").write_text("existing\n")
+            refused_notebook = subprocess.run(
+                ["bash", str(script), str(notebook_collision)],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(refused_notebook.returncode, 1)
+            self.assertIn("notebook.qmd", refused_notebook.stderr)
+            self.assertFalse((notebook_collision / ".gitignore").exists())
 
     def test_quarto_release_entrypoint_isolates_lualatex_runtime(self):
         with tempfile.TemporaryDirectory() as directory:

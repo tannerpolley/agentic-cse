@@ -15,7 +15,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPATIBILITY = {"cse": "2.2.1", "cse-sources": "1.0.0", "cse-visualize": "1.0.0"}
+COMPATIBILITY = {"cse": "2.3.0", "cse-sources": "1.0.0", "cse-visualize": "2.0.0"}
 PACKAGES = (
     {
         "name": "cse",
@@ -40,7 +40,7 @@ PACKAGES = (
     {
         "name": "cse-visualize",
         "root": "extensions/cse-visualize",
-        "skills": ("plot", "tikz", "pgfplots", "latex", "quarto", "revealjs", "beamer"),
+        "skills": ("plot", "tikz", "pgfplots", "latex", "quarto", "beamer"),
         "include": (".codex-plugin", "README.md", "assets", "references", "scripts", "skills"),
     },
 )

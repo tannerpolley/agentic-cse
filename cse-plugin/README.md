@@ -46,8 +46,8 @@ Install `cse-visualize` with core `cse` for figure and document rendering:
 - `tikz` creates document-native LaTeX diagrams, schematics, and geometry.
 - `pgfplots` creates table-driven LaTeX-native quantitative plots.
 - `latex` is the explicit starting tool for a complete scientific document.
-- `quarto` manages shared `.qmd` source and controlled multi-format rendering.
-- `revealjs` creates interactive, scroll-capable scientific results views.
+- `quarto` manages shared `.qmd` source, ordinary HTML notebooks, and selected
+  promoted PDF renders.
 - `beamer` creates fixed-layout scientific presentation PDFs.
 
 Invoke `$cse-visualize:latex` when you want one guided route through the document bundle.
@@ -67,7 +67,7 @@ LaTeX-manual cache. Core retains the authoritative notebook source and claim
 order; rendering is conditional on the selected companion.
 
 A runnable Quarto-managed chemical-engineering article, Moloch Beamer deck,
-RevealJS example, and dual-output analysis research notebook live in
+and HTML/PDF analysis research notebook live in
 [`examples/quarto-chemical-engineering-showcase/`](examples/quarto-chemical-engineering-showcase/README.md).
 
 The embedded [`heat-equation example`](examples/heat-equation/README.md) and

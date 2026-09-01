@@ -119,7 +119,7 @@ flowchart TB
 The CSE family should initially contain only:
 
 - the existing three-package instructions from one shared authoritative source:
-  nine core workflow skills, four optional Sources skills, and seven optional
+  nine core workflow skills, four optional Sources skills, and six optional
   Visualize skills;
 - one typed scientific-figure result description;
 - one typed numerical-check result description;
@@ -139,7 +139,7 @@ files.
 No existing package reviewed here supplies:
 
 - the nine core CSE workflow skills and their continuation rules;
-- the four Sources and seven Visualize companion skills as an optional,
+- the four Sources and six Visualize companion skills as an optional,
   coherent family;
 - distinction among code verification, solution verification, model
   validation, and uncertainty analysis;

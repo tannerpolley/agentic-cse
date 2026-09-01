@@ -1,45 +1,6 @@
 ---
 title: "Artificial absorber-profile comparison"
-subtitle: "One working analysis notebook, two output forms for Review"
-format:
-  pdf:
-    pdf-engine: lualatex
-    latex-auto-install: false
-    toc: true
-    number-sections: true
-    documentclass: scrartcl
-    classoption:
-      - oneside
-      - headings=normal
-    fontsize: 10pt
-    geometry:
-      - left=0.62in
-      - right=0.62in
-      - top=0.55in
-      - bottom=0.55in
-    fig-pos: H
-    include-in-header:
-      - ../../tex/analysis-notebook-preamble.tex
-  revealjs:
-    theme:
-      - simple
-      - ../../theme/analysis-notebook.scss
-    slide-level: 2
-    navigation-mode: vertical
-    scroll-view:
-      activate: true
-      layout: compact
-      snap: proximity
-      progress: true
-    menu: true
-    search: true
-    hash: true
-    overview: true
-    slide-number: h.v
-    controls: true
-    progress: true
-    transition: fade
-    embed-resources: true
+subtitle: "One working analysis notebook for Review"
 execute:
   enabled: false
 resources:
@@ -98,7 +59,7 @@ view and does not validate a physical absorber model.
 ```
 ::::
 
-:::: {.content-visible when-format="revealjs"}
+:::: {.content-visible when-format="html"}
 ```{=html}
 <img
   src="../../figures/generated/artificial-absorber-comparison.svg"
@@ -170,11 +131,11 @@ and visual checks.
 ```
 ::::
 
-:::: {.content-visible when-format="revealjs"}
+:::: {.content-visible when-format="html"}
 ```{=html}
 <img
   src="../../figures/generated/analysis-notebook-lineage.svg"
-  alt="Retained CSV feeds shared TikZ and PGFPlots source, which branches to a LuaLaTeX PDF and an SVG used in RevealJS HTML."
+  alt="Retained CSV feeds shared TikZ and PGFPlots source, which branches to a LuaLaTeX PDF and ordinary HTML."
   loading="eager"
   style="width:92%;height:auto"
 >
@@ -182,7 +143,7 @@ and visual checks.
 ::::
 
 Both outputs read the same retained table and the same TikZ or PGFPlots source.
-LuaLaTeX compiles that source directly; the RevealJS build uses an SVG compiled
+LuaLaTeX compiles that source directly; the HTML build uses an SVG compiled
 from the same source.
 :::
 

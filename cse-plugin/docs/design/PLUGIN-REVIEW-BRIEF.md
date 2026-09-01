@@ -78,7 +78,7 @@ The nine workflow stages are:
 
 The installable family has three packages: core `cse` provides these nine
 workflow skills; optional `cse-sources` provides four source and data skills;
-optional `cse-visualize` provides seven rendering and document skills. Companion
+optional `cse-visualize` provides six rendering and document skills. Companion
 skills return evidence or files to their invoking core workflow stage rather
 than becoming workflow stages themselves.
 
@@ -99,7 +99,7 @@ hidden plugin dependencies.
 .codex-plugin/plugin.json       core manifest and interface metadata
 skills/<stage>/SKILL.md         nine core workflow stages
 extensions/cse-sources/         four optional source and data skills
-extensions/cse-visualize/       seven optional rendering and document skills
+extensions/cse-visualize/       six optional rendering and document skills
 references/*.md                 shared core scientific, numerical, and Git doctrine
 scripts/validate.sh             source validation and plugin checks
 scripts/sync-live.sh             guarded source-to-marketplace deployment

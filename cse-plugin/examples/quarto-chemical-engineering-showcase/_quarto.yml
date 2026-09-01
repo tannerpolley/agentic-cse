@@ -4,7 +4,6 @@ project:
   render:
     - article.qmd
     - deck.qmd
-    - interactive-deck.qmd
     - analyses/artificial-absorber/notebook.qmd
 
 execute:

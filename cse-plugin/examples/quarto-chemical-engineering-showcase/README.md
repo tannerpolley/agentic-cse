@@ -1,11 +1,10 @@
 # Quarto chemical-engineering LaTeX showcase
 
 Quarto is the source manager. It renders one detailed article and one Moloch
-Beamer deck through LuaLaTeX, plus an interactive RevealJS HTML deck. A shared
-analysis-notebook source also renders to a LuaLaTeX PDF and a RevealJS HTML
-companion from the same artificial retained results and the same TikZ and
-PGFPlots figure sources. Document code is disabled for the default and release
-build.
+Beamer deck through LuaLaTeX. A shared analysis-notebook source renders to
+ordinary HTML and an optional promoted LuaLaTeX PDF from the same artificial
+retained results and the same TikZ and PGFPlots figure sources. Document code
+is disabled for the default and release build.
 
 ## Build
 
@@ -19,9 +18,8 @@ be rerendered through the CSE wrapper with:
 ```bash
 ../../extensions/cse-visualize/assets/project/quarto/render.sh article.qmd
 ../../extensions/cse-visualize/assets/project/quarto/render.sh deck.qmd
-../../extensions/cse-visualize/assets/project/quarto/render.sh interactive-deck.qmd
-../../extensions/cse-visualize/assets/project/quarto/render.sh analyses/artificial-absorber/notebook.qmd --to pdf
-../../extensions/cse-visualize/assets/project/quarto/render.sh analyses/artificial-absorber/notebook.qmd --to revealjs
+../../extensions/cse-visualize/assets/project/quarto/render.sh analyses/artificial-absorber/notebook.qmd
+../../extensions/cse-visualize/assets/project/quarto/render.sh analyses/artificial-absorber/notebook.qmd --profile promoted-pdf
 ```
 
 The project writes intermediate output under `builds/`. The build wrapper runs
@@ -34,16 +32,14 @@ full size before recording a release disposition.
 
 - `article.qmd`: detailed package guide and reusable examples.
 - `deck.qmd`: presentation-focused tour of the same system.
-- `interactive-deck.qmd`: browser-native RevealJS navigation, fragments,
-  auto-animation, tabsets, and speaker notes without Python execution.
-- `analyses/artificial-absorber/notebook.qmd`: one reviewed analysis set rendered as both a
-  LuaLaTeX analysis-notebook PDF and a scroll-first RevealJS companion.
+- `analyses/artificial-absorber/notebook.qmd`: one reviewed analysis set rendered as ordinary
+  HTML and an optional promoted LuaLaTeX analysis-notebook PDF.
 - `tex/`: distinct article and Beamer headers; do not inject the article
   header into Beamer.
 - `theme/`: restrained Moloch customization.
 - `figures/`: shared document-native TikZ and PGFPlots sources.
 - `figures/generated/`: SVG views compiled from the shared figure sources for
-  RevealJS; the PDF includes the `.tex` sources directly.
+  the HTML notebook; the PDF includes the `.tex` sources directly.
 - `data/`: small illustrative retained tables read by PGFPlots and table tools.
 - `software-references.bib`: software/manual references not owned by Zotero.
 - `appendices/supported-tools.qmd`: complete curated bundle inventory and

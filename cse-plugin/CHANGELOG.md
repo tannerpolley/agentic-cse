@@ -1,5 +1,11 @@
 # Changelog
 
+## 2.3.0
+
+- Make ordinary Quarto HTML the living analysis-notebook view.
+- Add a guarded no-execute notebook scaffold and an opt-in LuaLaTeX PDF profile.
+- Remove the retired interactive companion from the active Visualize package.
+
 ## 2.2.1
 
 - Require one claim-led figure for each central retained numerical relationship

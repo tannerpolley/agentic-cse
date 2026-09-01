@@ -11,7 +11,7 @@ plugin-wide decisions and choices made only for that example.
 Core `cse` remains the workflow spine: it owns scientific questions, retained
 records, Review, interpretation, and claim boundaries.
 `cse-sources` owns Zotero, Mathpix, data-lineage, and digitization operations;
-`cse-visualize` owns Plot, TikZ, PGFPlots, LaTeX, Quarto, RevealJS, and Beamer
+`cse-visualize` owns Plot, TikZ, PGFPlots, LaTeX, Quarto, and Beamer
 rendering. Both companions require core CSE, are independently installable
 from this repository, and do not depend on one another.
 
@@ -130,7 +130,6 @@ The eleven companion skills are public skills but are not workflow stages:
   [`pgfplots`](../../extensions/cse-visualize/skills/pgfplots/SKILL.md),
   [`latex`](../../extensions/cse-visualize/skills/latex/SKILL.md),
   [`quarto`](../../extensions/cse-visualize/skills/quarto/SKILL.md),
-  [`revealjs`](../../extensions/cse-visualize/skills/revealjs/SKILL.md), and
   [`beamer`](../../extensions/cse-visualize/skills/beamer/SKILL.md) own figures,
   LaTeX, and non-executing document rendering.
 

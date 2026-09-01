@@ -13,7 +13,6 @@ so an agent does not select them accidentally.
 |---|---|---|
 | Quarto | Core | Own `.qmd` profiles, citations, code blocks, cross-references, and multi-format rendering. |
 | Pandoc | Core through Quarto | Transform the document model into article or Beamer LaTeX. |
-| RevealJS | Core for interactive HTML slides | Provide browser navigation, fragments, tabsets, speaker view, and client-side widgets without a live Python process. |
 | LuaLaTeX | Core | Compile Unicode text and OpenType mathematics; required for graph drawing. |
 | `latexmk` | Conditional | Drive repeated raw-LaTeX compilation outside Quarto. |
 | `fontspec` | Core with LuaLaTeX | Select OpenType or TrueType text fonts. |

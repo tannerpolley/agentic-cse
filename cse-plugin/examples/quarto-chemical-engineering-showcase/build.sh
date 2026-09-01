@@ -19,9 +19,8 @@ done
 
 "$render" article.qmd
 "$render" deck.qmd
-"$render" interactive-deck.qmd
-"$render" analyses/artificial-absorber/notebook.qmd --to pdf
-"$render" analyses/artificial-absorber/notebook.qmd --to revealjs
+"$render" analyses/artificial-absorber/notebook.qmd
+"$render" analyses/artificial-absorber/notebook.qmd --profile promoted-pdf
 
 python3 "$visual_qa" builds/article.pdf \
   --profile article --output-dir builds/visual-qa/article --contact-sheet
@@ -38,7 +37,6 @@ cp builds/analyses/artificial-absorber/notebook.pdf \
 
 printf 'Created %s\n' "$repository_root/output/pdf/chemical-engineering-quarto-article.pdf"
 printf 'Created %s\n' "$repository_root/output/pdf/chemical-engineering-quarto-beamer.pdf"
-printf 'Created %s\n' "$showcase_root/builds/interactive-deck.html"
 printf 'Created %s\n' "$repository_root/output/pdf/chemical-engineering-analysis-notebook.pdf"
 printf 'Created %s\n' "$showcase_root/builds/analyses/artificial-absorber/notebook.html"
 printf 'Review visual QA packets under %s\n' "$showcase_root/builds/visual-qa"
