@@ -89,12 +89,12 @@ root references. The [operating model](../../references/operating-model.md),
 [GitHub and Git](../../references/github-and-git.md) references are the shared
 doctrine. Sources owns its operational
 [Zotero Companion](../../extensions/cse-sources/references/zotero-companion.md)
-contract, and Visualize owns its rendering references. Repository-specific
+behavior, and Visualize owns its rendering references. Repository-specific
 equations, methods, evidence, notebooks, analyses, and writing rules remain in
 the user repository.
 
 The [terminology reference](../../references/terminology.md) is the canonical
-language contract for workflow stages, supporting tools, sources, extraction,
+glossary for workflow stages, supporting tools, sources, extraction,
 figures, and claims.
 
 The nine workflow stages form the default agent path:
@@ -279,7 +279,7 @@ files govern forbidden language and completeness checks.
 
 | Alternative | Decision and reason |
 | --- | --- |
-| Keep Project Truss as the runtime foundation | Rejected. The product needs a clean scientific identity and must not inherit a generic lifecycle or vocabulary contract. |
+| Keep Project Truss as the runtime foundation | Rejected. The product needs a clean scientific identity and must not inherit generic lifecycle machinery or vocabulary. |
 | Invoke Matt Pocock skills or Superpowers at runtime | Rejected. Their useful ideas can inform design history, but CSE must be installable and understandable without those families. |
 | Merge Zotero-Wiki into the plugin | Rejected. A replaceable plugin cache must not contain a user's private library or evidence corpus. The capability belongs in an optional, user-owned Zotero Companion boundary. |
 | Put the thermophysical data registry inside the plugin | Rejected. A registry is an independent scientific resource. CSE may teach provenance and adapters without owning its data, schema, or migration. |
@@ -315,7 +315,7 @@ files govern forbidden language and completeness checks.
 ## Unresolved questions
 
 Plugin-wide questions remain about how to evaluate scientific usefulness across
-domains, how the Companion contract should evolve without duplicating Zotero,
+domains, how Companion behavior should evolve without duplicating Zotero,
 which domain packs or registry adapters are worth
 maintaining, how much questioning is optimal for different users, and which
 review benchmark best detects unsupported claims without turning into a

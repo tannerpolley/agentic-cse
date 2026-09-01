@@ -39,4 +39,4 @@ for that case.
   provenance, precision, and claim limits.
 
 Generic software-engineering advice is relevant only when it identifies a
-specific failure in the scientific argument or installable plugin contract.
+specific failure in the scientific argument or installed plugin behavior.

@@ -5,7 +5,7 @@
 The source and installed plugin expose all ten expected entrypoints: setup,
 research, construct, build, analyze, summarize, write, review, zotero, and
 mathpix. Each skill is thin and routes through shared operating, scientific,
-numerical, GitHub, and Companion doctrine. Contract validation passed for all
+numerical, GitHub, and Companion doctrine. Plugin validation passed for all
 ten skills.
 
 ## End-to-end evidence from this project

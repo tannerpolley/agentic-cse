@@ -2,7 +2,8 @@
 
 Agentic Computational Science and Engineering (`cse`) gives Codex a disciplined working method for computational science and physical-world engineering. It supports mechanical, chemical, electrical, civil, and related work—not generic software engineering—by keeping attention on the scientific question, equations, numerical method, reference cases, uncertainty, interpretation, and supported writing.
 
-Core CSE has nine workflow skills across eight normal levels. Optional
+Core CSE has nine workflow skills across eight normal levels and one read-only
+supporting `audit` skill. Optional
 companions add Sources or Visualize capabilities when a project explicitly
 needs them; core remains usable when neither is installed.
 
@@ -78,7 +79,7 @@ Tools support a workflow stage and return their evidence or files to that
 stage; they are not additional steps in the workflow spine. A task may start at
 the stage or tool that matches the user's request.
 
-The plugin-wide language contract is in
+The plugin-wide glossary is in
 [`references/terminology.md`](references/terminology.md), and vague agent
 language to replace is collected in [`BANNED.md`](BANNED.md). Project-specific
 terms belong in the user's `docs/scientific/CONTEXT.md`; confirmed personal
