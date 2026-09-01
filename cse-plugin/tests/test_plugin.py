@@ -373,7 +373,9 @@ class PluginBehaviorTests(unittest.TestCase):
         dependent = (ROOT / "references/dependent-scientific-changes.md").read_text()
         for text, terms in (
             (numerical, ("result-first", "reference case", "tolerance rationale", "test-content fingerprint", "Coverage may reveal")),
-            (failure, ("attempted:", "stopped_by:", "outcome:", "not established under", "bounded direct")),
+            (failure, ("method that actually ran", "no useful numerical result",
+                       "key/value failure record", "input-readiness question",
+                       "bounded direct")),
             (projects, ("defaults to the root-level", "repository-relative path",
                         "meaningful populated child names", "same responsibilities",
                         "Only after Review Pass", "must not rerun")),
