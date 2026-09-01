@@ -9,6 +9,8 @@
   not clarify the claim.
 - Route plottable Analyze and Summarize results through CSE Plot when installed,
   and return table-only central comparisons from Review as Revise.
+- Move the six CSE lifecycle hooks out of the versioned plugin runtime into one
+  stable user-owned executable selected only by repository-local CSE hook files.
 
 ## 2.2.0
 

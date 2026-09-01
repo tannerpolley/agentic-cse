@@ -122,7 +122,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             existing.write_text("assert True\n# pre-existing user work\n")
 
             hook = ROOT / "scripts/cse-test-gate.py"
-            environment = {**os.environ, "PLUGIN_DATA": str(root / "plugin-data")}
+            environment = {**os.environ}
             base_event = {"cwd": str(repository), "session_id": "session-1"}
 
             def invoke(event: str, **values):
@@ -161,6 +161,66 @@ class ScriptBehaviorTests(unittest.TestCase):
             self.assertNotIn(proposal, changed["reason"])
             added.unlink()
             self.assertEqual(invoke("Stop"), {})
+
+    def test_repo_hooks_survive_plugin_removal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            plugin = root / "plugin"
+            home = root / "home"
+            repository = root / "repo"
+            shutil.copytree(ROOT / "scripts", plugin / "scripts")
+            shutil.copytree(ROOT / "assets", plugin / "assets")
+            repository.mkdir()
+            self.initialize_git_repository(repository)
+            context = repository / "docs/scientific/CONTEXT.md"
+            context.parent.mkdir(parents=True)
+            context.write_text("# Scientific context\n")
+            self.commit_all(repository, "baseline")
+
+            installed = subprocess.run(
+                [
+                    sys.executable,
+                    str(plugin / "scripts/install_cse_hooks.py"),
+                    "--home",
+                    str(home),
+                    "--replace-runtime",
+                    "--repo",
+                    str(repository),
+                ],
+                text=True,
+                capture_output=True,
+                check=False,
+            )
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            shutil.rmtree(plugin)
+
+            config = json.loads((repository / ".codex/hooks.json").read_text())
+            environment = {**os.environ, "HOME": str(home)}
+            base_event = {"cwd": str(repository), "session_id": "survives-upgrade"}
+            for event in (
+                "SessionStart", "SubagentStart", "UserPromptSubmit",
+                "PostToolUse", "SubagentStop", "Stop",
+            ):
+                command = config["hooks"][event][0]["hooks"][0]["command"]
+                values = {**base_event}
+                if event == "SessionStart":
+                    values["source"] = "startup"
+                result = subprocess.run(
+                    command,
+                    shell=True,
+                    input=json.dumps(values),
+                    env=environment,
+                    text=True,
+                    capture_output=True,
+                    check=False,
+                )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                if result.stdout:
+                    json.loads(result.stdout)
+
+            self.assertNotIn("plugins/cache", json.dumps(config))
+            self.assertNotIn("PLUGIN_ROOT", json.dumps(config))
+            self.assertNotIn("CLAUDE_PLUGIN_ROOT", json.dumps(config))
 
     def test_installed_check_reports_missing_disabled_mismatch_and_pass(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -687,18 +747,22 @@ class ScriptBehaviorTests(unittest.TestCase):
                 check=False,
             )
             preserved = (unexpected / "keep.txt").read_text()
+            deployed = home / ".codex/plugins/cse"
+            excluded = tuple(
+                (deployed / relative).exists()
+                for relative in (
+                    "examples", "cse-pi-harness", "docs", "evaluation", ".runs",
+                    "scripts/cooling_fit_benchmark.py", "hooks/hooks.json",
+                )
+            )
+            project_hooks_installed = (deployed / "assets/codex/hooks.json").is_file()
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertTrue(identified_removed)
         self.assertEqual(preserved_result.returncode, 0, preserved_result.stderr)
         self.assertEqual(preserved, "user directory\n")
-        deployed = home / ".codex/plugins/cse"
-        self.assertFalse((deployed / "examples").exists())
-        self.assertFalse((deployed / "cse-pi-harness").exists())
-        self.assertFalse((deployed / "docs").exists())
-        self.assertFalse((deployed / "evaluation").exists())
-        self.assertFalse((deployed / ".runs").exists())
-        self.assertFalse((deployed / "scripts/cooling_fit_benchmark.py").exists())
+        self.assertFalse(any(excluded))
+        self.assertTrue(project_hooks_installed)
 
     def test_every_family_failure_checkpoint_is_atomic_for_first_install_and_upgrade(self):
         packages = ("cse", "cse-sources", "cse-visualize")

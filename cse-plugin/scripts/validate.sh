@@ -30,6 +30,7 @@ while IFS=$'\t' read -r package_name package_root _; do
 done < <(python3 "$repository_root/scripts/package_inventory.py" list)
 
 python3 -m unittest discover -s "$repository_root/tests" -v
+python3 "$repository_root/scripts/install_cse_hooks.py" --check
 for package_root in "${package_roots[@]}"; do
   prose_paths=("$package_root/.codex-plugin" "$package_root/skills")
   for optional in references assets README.md AGENTS.md; do
