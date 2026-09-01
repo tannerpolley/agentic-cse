@@ -105,96 +105,62 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("provide --base REF", result.stderr)
 
-    def test_cse_review_stop_hook_is_opt_in_and_single_shot(self):
+    def test_cse_test_gate_requires_exact_approval_for_new_test_content(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repository = root / "repo"
             repository.mkdir()
             self.initialize_git_repository(repository)
-            plugin = root / "plugin"
-            scripts = plugin / "scripts"
-            scripts.mkdir(parents=True)
-            accounting = scripts / "change_accounting.py"
-            hook = ROOT / "scripts/cse-review-stop.py"
-            environment = {**os.environ, "PLUGIN_ROOT": str(plugin)}
+            context = repository / "docs/scientific/CONTEXT.md"
+            context.parent.mkdir(parents=True)
+            context.write_text("# Scientific context\n")
+            tests = repository / "tests"
+            tests.mkdir()
+            existing = tests / "test_model.py"
+            existing.write_text("assert True\n")
+            self.commit_all(repository, "baseline")
+            existing.write_text("assert True\n# pre-existing user work\n")
 
-            def invoke(*, active=False, cwd=repository):
-                return subprocess.run(
-                    [sys.executable, str(hook)],
-                    input=json.dumps({"cwd": str(cwd), "stop_hook_active": active}),
+            hook = ROOT / "scripts/cse-test-gate.py"
+            environment = {**os.environ, "PLUGIN_DATA": str(root / "plugin-data")}
+            base_event = {"cwd": str(repository), "session_id": "session-1"}
+
+            def invoke(event: str, **values):
+                result = subprocess.run(
+                    [sys.executable, str(hook), event],
+                    input=json.dumps({**base_event, **values}),
                     env=environment,
                     text=True,
                     capture_output=True,
                     check=False,
                 )
+                self.assertEqual(result.returncode, 0, result.stderr)
+                return json.loads(result.stdout) if result.stdout else {}
 
-            accounting.write_text("raise SystemExit(9)\n")
-            outside = root / "outside"
-            outside.mkdir()
-            self.assertEqual(invoke(cwd=outside).stdout, "")
-            self.assertEqual(invoke().stdout, "")
+            started = invoke("SessionStart", source="startup")
+            self.assertIn("persistent-test gate", started["hookSpecificOutput"]["additionalContext"])
+            self.assertEqual(invoke("Stop"), {})
 
-            (repository / "AGENTS.md").write_text(
-                "Repository " + "Profile: scientific-computing\n"
+            added = tests / "test_new_model.py"
+            added.write_text("assert 2 == 2\n")
+            observed = invoke("PostToolUse")
+            proposal = observed["systemMessage"].rsplit(": ", 1)[1]
+            blocked = invoke("Stop")
+            self.assertEqual(blocked["decision"], "block")
+            self.assertIn(proposal, blocked["reason"])
+
+            approved = invoke(
+                "UserPromptSubmit", prompt="Approve exact test (Recommended)"
             )
-            self.assertEqual(invoke().stdout, "")
+            self.assertIn("approved", approved["systemMessage"])
+            self.assertEqual(invoke("Stop"), {})
 
-            context = repository / "docs/scientific/CONTEXT.md"
-            context.parent.mkdir(parents=True)
-            context.write_text("# Scientific context\n")
-            self.commit_all(repository, "baseline")
-            self.assertEqual(invoke(active=True).stdout, "")
-
-            report = {
-                "categories": {
-                    "executable": {"files": 0},
-                    "tests": {"files": 0},
-                },
-                "files": [{"category": "documents", "path": "README.md"}],
-            }
-            accounting.write_text(
-                "import json\nprint(json.dumps(" + repr(report) + "))\n"
-            )
-            self.assertEqual(invoke().stdout, "")
-
-            report["files"] = [{"category": "other", "path": "solver.yaml"}]
-            accounting.write_text(
-                "import json\nprint(json.dumps(" + repr(report) + "))\n"
-            )
-            config_reminder = json.loads(invoke().stdout)
-            self.assertEqual(config_reminder["decision"], "block")
-
-            report["categories"]["executable"]["files"] = 1
-            report["files"] = [{"category": "executable", "path": "src/model.py"}]
-            accounting.write_text(
-                "import json\nprint(json.dumps(" + repr(report) + "))\n"
-            )
-            reminder = json.loads(invoke().stdout)
-            self.assertEqual(reminder["decision"], "block")
-            self.assertIn("Apply CSE Review", reminder["reason"])
-
-            accounting.write_text("raise SystemExit(9)\n")
-            warning = json.loads(invoke().stdout)
-            self.assertIn("skipped", warning["systemMessage"])
-
-            accounting.write_text(
-                'print(\'{"files":[null],"categories":{"executable":{"files":0},'
-                '"tests":{"files":0}}}\')\n'
-            )
-            malformed = json.loads(invoke().stdout)
-            self.assertIn("invalid data", malformed["systemMessage"])
-
-            (repository / "src").mkdir()
-            (repository / "src/model.py").write_text("result = 1\n")
-            integrated = subprocess.run(
-                [sys.executable, str(hook)],
-                input=json.dumps({"cwd": str(repository), "stop_hook_active": False}),
-                env={**os.environ, "PLUGIN_ROOT": str(ROOT)},
-                text=True,
-                capture_output=True,
-                check=False,
-            )
-            self.assertEqual(json.loads(integrated.stdout)["decision"], "block")
+            added.write_text("assert 2 == 2\nassert 3 == 3\n")
+            changed = invoke("Stop")
+            self.assertEqual(changed["decision"], "block")
+            self.assertNotIn(proposal, changed["reason"])
+            added.unlink()
+            self.assertEqual(invoke("Stop"), {})
 
     def test_installed_check_reports_missing_disabled_mismatch_and_pass(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -205,7 +171,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                 capture_output=True, check=True,
             ).stdout.strip()
             names = ("cse", "cse-sources", "cse-visualize")
-            versions = {"cse": "2.0.0", "cse-sources": "1.0.0", "cse-visualize": "1.0.0"}
+            versions = {"cse": "2.2.0", "cse-sources": "1.0.0", "cse-visualize": "1.0.0"}
             for name in names:
                 result = subprocess.run(
                     [

@@ -57,7 +57,7 @@ skills stay intentionally thin and route through shared references:
 - [`github-and-git.md`](../../references/github-and-git.md) defines the
   authoritative GitHub lifecycle and guarded synchronization and cleanup.
 - [`zotero-companion.md`](../../extensions/cse-sources/references/zotero-companion.md) defines the
-  Zotero authority, Companion capability contract, exact source lineage,
+  Zotero authority, Companion capability boundary, exact source lineage,
   bibliography, and on-demand extraction boundaries.
 - [`terminology.md`](../../references/terminology.md) defines canonical
   workflow, tool, source, extraction, figure, and claim language.
@@ -71,10 +71,10 @@ The nine workflow stages are:
 | [`diagnose`](../../skills/diagnose/SKILL.md) | Cause of numerical or scientific disagreement | `design` with the correction boundary |
 | [`design`](../../skills/design/SKILL.md) | A complete question and native GitHub issue | `build`, `analyze`, or `write` |
 | [`build`](../../skills/build/SKILL.md) | Equations, models, numerical methods, solvers, or data transformations | `analyze` |
-| [`analyze`](../../skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `review` or `diagnose` |
-| [`summarize`](../../skills/summarize/SKILL.md) | The current reviewed analysis research notebook | `write` or `review` |
+| [`analyze`](../../skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `summarize` or `diagnose` |
+| [`summarize`](../../skills/summarize/SKILL.md) | The working analysis research notebook and selected render | `review` |
+| [`review`](../../skills/review/SKILL.md) | Whole-chain scientific and repository review, including the notebook and render | Route material corrections to the owning skill or advise Pass for the stated use |
 | [`write`](../../skills/write/SKILL.md) | Evidence-supported papers, reports, captions, and LaTeX | `review` |
-| [`review`](../../skills/review/SKILL.md) | Whole-chain scientific and repository review | Route material corrections to the owning skill |
 
 The installable family has three packages: core `cse` provides these nine
 workflow skills; optional `cse-sources` provides four source and data skills;
@@ -101,7 +101,7 @@ skills/<stage>/SKILL.md         nine core workflow stages
 extensions/cse-sources/         four optional source and data skills
 extensions/cse-visualize/       seven optional rendering and document skills
 references/*.md                 shared core scientific, numerical, and Git doctrine
-scripts/validate.sh             source validation and contract checks
+scripts/validate.sh             source validation and plugin checks
 scripts/sync-live.sh             guarded source-to-marketplace deployment
 scripts/check_prose.py          forbidden-language check
 extensions/cse-sources/scripts/sync_bibliography.py  one-way bibliography snapshot helper
@@ -145,13 +145,13 @@ The source validator is [`scripts/validate.sh`](../../scripts/validate.sh). It
 currently:
 
 1. runs the Codex plugin and skill validators;
-2. runs the repository's Python contract and script tests;
+2. runs the repository's Python plugin and script tests;
 3. checks prose under the installable surface for forbidden language and
    unresolved placeholders; and
 4. checks Bash syntax for the lifecycle scripts.
 
-The contract tests in
-[`tests/test_contract.py`](../../tests/test_contract.py) protect the manifest,
+The plugin checks in
+[`tests/test_plugin.py`](../../tests/test_plugin.py) protect the manifest,
 the exact three-package, 9-core/4-Sources/7-Visualize skill surface, thin
 skills, shared-reference links, opening alignment anchors, numerical doctrine,
 optional GitHub features,
@@ -194,8 +194,10 @@ contain only cited records and are never hand-edited.
 ## Limitations and high-value review questions
 
 The plugin is advisory and depends on the user's scientific context, sources,
-toolchain, and judgment. It cannot guarantee that a model is physically valid,
-that an oracle is independent, or that a user will preserve claim boundaries.
+toolchain, and judgment. Its lifecycle gate can block hook-aware task completion
+for unapproved persistent test growth, but cannot guarantee that a model is
+physically valid, that an oracle is independent, or that a user will preserve
+claim boundaries.
 The current package has no cross-domain benchmark for question quality,
 uncertainty interpretation, or reviewer agreement. Companion integration,
 domain packs, registry adapters, private-source permissions, and the right

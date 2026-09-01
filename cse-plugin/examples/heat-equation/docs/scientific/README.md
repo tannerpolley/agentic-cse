@@ -4,7 +4,7 @@ This tree owns the example's shared context, formulation, numerical methods,
 verification evidence, decision-record sequence, writing rules, bibliography,
 and tutorial manuscript. The populated root
 `analyses/heat_verification/` set owns retained calculation values, scripts,
-figures, and its reviewed notebook. `src/heat_verification/` owns reusable model
+figures, and its analysis notebook. `src/heat_verification/` owns reusable model
 and method code.
 
 - `CONTEXT.md` maps the question, terminology, and repository paths.

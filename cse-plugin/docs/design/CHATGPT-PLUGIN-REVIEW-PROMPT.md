@@ -25,7 +25,7 @@ example's
 README.md, docs/scientific/CONTEXT.md, formulation.tex, methods.tex,
 evidence.tex, writing rules, setup validator, bibliography helper, and the
 committed bibliography snapshot. Follow links when they are part of the
-plugin's stated contract.
+plugin's stated behavior.
 
 For every material finding:
 
@@ -43,7 +43,7 @@ Do not use generic software-engineering boilerplate. Do not recommend coverage
 targets, a test pyramid, helper-by-helper tests, or conventional architecture
 work unless you can tie the recommendation to a concrete scientific risk,
 source-integrity risk, numerical failure, privacy boundary, or Codex plugin
-contract.
+behavior.
 
 ## Questions to answer
 
@@ -62,7 +62,7 @@ Assess the following dimensions against the repository evidence:
    distinguish code verification, solution verification, model validation,
    numerical uncertainty, and physical uncertainty without overpromising?
 4. **Skill routing and continuity.** Do setup, research, design, build,
-   analyze, summarize, write, and review form a coherent workflow spine? Do
+   analyze, summarize, review, and write form a coherent workflow spine? Do
    plot, digitize, zotero, mathpix, tikz, and pgfplots return useful evidence or files to those
    stages? Are the continuation rules useful, or do entrypoint overlap and
    repeated alignment questions create friction?

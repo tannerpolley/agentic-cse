@@ -26,7 +26,7 @@ def run(*command: str) -> None:
 def quick() -> None:
     run("uv", "run", "ruff", "check", "src", "tests", "scripts", "analyses/heat_verification")
     run("uv", "run", "pytest")
-    run("uv", "run", "python", "scripts/check_repository_contract.py")
+    run("uv", "run", "python", "scripts/check_repository.py")
     run("bash", "scripts/sync_bibliography.sh", "--check")
 
 

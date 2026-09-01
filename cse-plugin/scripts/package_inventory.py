@@ -15,16 +15,19 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPATIBILITY = {"cse": "2.0.0", "cse-sources": "1.0.0", "cse-visualize": "1.0.0"}
+COMPATIBILITY = {"cse": "2.2.0", "cse-sources": "1.0.0", "cse-visualize": "1.0.0"}
 PACKAGES = (
     {
         "name": "cse",
         "root": ".",
-        "skills": ("setup", "research", "diagnose", "design", "build", "analyze", "review", "summarize", "write"),
+        "skills": (
+            "audit", "setup", "research", "diagnose", "design", "build",
+            "analyze", "summarize", "review", "write",
+        ),
         "include": (
             ".codex-plugin", "AGENTS.md", "BANNED.md", "CHANGELOG.md", "LICENSE", "README.md",
             "assets", "hooks", "references", "skills", "scripts/change_accounting.py",
-            "scripts/check_prose.py", "scripts/cse-review-stop.py", "scripts/setup_scientific_project.py",
+            "scripts/check_prose.py", "scripts/cse-test-gate.py", "scripts/setup_scientific_project.py",
         ),
     },
     {

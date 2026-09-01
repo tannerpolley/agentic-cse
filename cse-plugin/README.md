@@ -2,7 +2,8 @@
 
 Agentic Computational Science and Engineering (`cse`) gives Codex a disciplined working method for computational science and physical-world engineering. It supports mechanical, chemical, electrical, civil, and related work—not generic software engineering—by keeping attention on the scientific question, equations, numerical method, reference cases, uncertainty, interpretation, and supported writing.
 
-Core CSE has nine workflow skills across eight normal levels. Optional
+Core CSE has nine workflow skills across eight normal levels and one read-only
+supporting `audit` skill. Optional
 companions add Sources or Visualize capabilities when a project explicitly
 needs them; core remains usable when neither is installed.
 
@@ -10,7 +11,7 @@ needs them; core remains usable when neither is installed.
 
 The normal agent path is:
 
-`setup → research or diagnose → design → build → analyze → review → summarize → write`
+`setup → research or diagnose → design → build → analyze → summarize → review → write`
 
 - `setup` establishes or revises repository vocabulary and scientific conventions.
 - `research` investigates literature, theory, and data.
@@ -18,16 +19,16 @@ The normal agent path is:
 - `design` lays out the scientific work and publishes a GitHub issue when the repository uses GitHub issues.
 - `build` implements models and numerical methods.
 - `analyze` runs numerical studies and interprets results.
-- `review` checks the Design-Build-Analyze set before accepted results advance.
-- `summarize` replaces one analysis research notebook with the current reviewed
-  scientific view.
+- `summarize` replaces one analysis research notebook with the current retained
+  results and selected nonexecuting render.
+- `review` checks the complete analysis, including that notebook and render.
 - `write` develops an evidence-supported manuscript.
 
 Research and Diagnose share level 02 and may both apply. Analyze routes an
-unresolved core disagreement to Diagnose; otherwise it routes to Review. A
+unresolved core disagreement to Diagnose; otherwise it routes to Summarize. A
 blocking review returns to the same Design and active issue before Build and
-Analyze repeat. Review Pass continues to Summarize and is bounded to the stated
-use and domain.
+Analyze repeat. Review Pass is bounded to the stated use and domain. Only the
+investigator may promote the reviewed notebook for manuscript use.
 
 ## Optional companion plugins
 
@@ -78,7 +79,7 @@ Tools support a workflow stage and return their evidence or files to that
 stage; they are not additional steps in the workflow spine. A task may start at
 the stage or tool that matches the user's request.
 
-The plugin-wide language contract is in
+The plugin-wide glossary is in
 [`references/terminology.md`](references/terminology.md), and vague agent
 language to replace is collected in [`BANNED.md`](BANNED.md). Project-specific
 terms belong in the user's `docs/scientific/CONTEXT.md`; confirmed personal
@@ -110,11 +111,13 @@ codex plugin add cse-visualize@personal --json
 python3 scripts/check-installed.py --all
 ```
 
-The CSE Stop hook is temporarily disabled because repository-wide change
-accounting can override legitimate user-decision stops. Its implementation is
-retained for a later turn-aware redesign; installation registers no Stop hook.
-Then start a fresh Codex task and record the representative routing results in
-`evaluation/results/<version>.md`.
+For repositories containing `docs/scientific/CONTEXT.md`, the CSE hooks inject
+the persistent-test policy, seal the session-start test inventory outside the
+repository, report test growth after write-capable tools, and block Stop or
+SubagentStop until the exact current test fingerprint has explicit approval or
+is removed. The gate does not claim OS-level write prevention or scientific
+validity. Start a fresh Codex task after installation, verify the hook behavior,
+and record representative routing results in `evaluation/results/<version>.md`.
 
 Release versions follow semantic versioning: patches preserve skill and hook
 behavior, minor versions add a skill, supporting tool, hook behavior, or

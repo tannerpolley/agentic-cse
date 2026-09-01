@@ -1,5 +1,23 @@
 # Changelog
 
+## 2.2.0
+
+- Reconcile existing repository routing during Setup without overwriting custom
+  guidance, and stop copying generic decision-record starters.
+- Add the read-only `cse:audit` supporting skill and replace software ceremony
+  with direct scientific questions, values, diagnostics, and checks.
+- Require useful method-specific numerical results before completion or
+  notebook creation; retain failed cases only when they bound real results.
+- Create and render the working analysis notebook before Review, keep Review
+  advisory, and reserve manuscript promotion to the investigator.
+
+## 2.1.0
+
+- Replace the disabled broad Review Stop hook with a session-baselined gate
+  that blocks completion only for unapproved persistent test growth.
+- Add an Explore-to-Promote boundary, generated-repository fallback doctrine,
+  and proportional named CSE reviewer protocols.
+
 ## 2.0.0
 
 - Split optional companion skills into `cse-sources` and `cse-visualize`; core

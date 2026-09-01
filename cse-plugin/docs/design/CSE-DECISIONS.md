@@ -9,7 +9,7 @@ plugin-wide decisions and choices made only for that example.
 ## Companion package decision
 
 Core `cse` remains the workflow spine: it owns scientific questions, retained
-records, evidence admission, Review, interpretation, and claim boundaries.
+records, Review, interpretation, and claim boundaries.
 `cse-sources` owns Zotero, Mathpix, data-lineage, and digitization operations;
 `cse-visualize` owns Plot, TikZ, PGFPlots, LaTeX, Quarto, RevealJS, and Beamer
 rendering. Both companions require core CSE, are independently installable
@@ -23,9 +23,9 @@ release without creating a meta-plugin.
 
 Rejected alternatives are a Sources or Visualize mega skill, separate source
 repositories, compatibility aliases under `cse:*`, and duplicated scientific
-doctrine. Sources returns provenance and QA, not admitted claims. Visualize
-consumes reviewed retained values or accepted claims, never runs the scientific
-model, and treats successful rendering as distinct from Review Pass.
+doctrine. Sources returns provenance and QA without judging claims. Visualize
+consumes retained values or supported claims, never runs the scientific model,
+and treats successful rendering as distinct from Review Pass.
 
 ## Product vision
 
@@ -89,12 +89,12 @@ root references. The [operating model](../../references/operating-model.md),
 [GitHub and Git](../../references/github-and-git.md) references are the shared
 doctrine. Sources owns its operational
 [Zotero Companion](../../extensions/cse-sources/references/zotero-companion.md)
-contract, and Visualize owns its rendering references. Repository-specific
+behavior, and Visualize owns its rendering references. Repository-specific
 equations, methods, evidence, notebooks, analyses, and writing rules remain in
 the user repository.
 
 The [terminology reference](../../references/terminology.md) is the canonical
-language contract for workflow stages, supporting tools, sources, extraction,
+glossary for workflow stages, supporting tools, sources, extraction,
 figures, and claims.
 
 The nine workflow stages form the default agent path:
@@ -112,11 +112,11 @@ The nine workflow stages form the default agent path:
 6. [`analyze`](../../skills/analyze/SKILL.md) runs studies for convergence,
    sensitivity, uncertainty, comparison, and figures.
 7. [`summarize`](../../skills/summarize/SKILL.md) replaces the analysis
-   research notebook with the current reviewed scientific view.
-8. [`write`](../../skills/write/SKILL.md) develops an evidence-supported paper,
-   report, caption, equation, or appendix.
-9. [`review`](../../skills/review/SKILL.md) checks the full scientific chain
-   before publication or integration.
+   research notebook with the current retained results and selected render.
+8. [`review`](../../skills/review/SKILL.md) checks the full scientific chain,
+   including the notebook and selected render.
+9. [`write`](../../skills/write/SKILL.md) uses only reviewed notebook results
+   the investigator promotes for the named manuscript use.
 
 The eleven companion skills are public skills but are not workflow stages:
 
@@ -168,7 +168,7 @@ Useful test families include literature or experiment reproduction, analytic or
 manufactured solutions, conservation and dimensional invariants, symmetry and
 limiting behavior, monotonicity, grid or solver convergence, cross-method or
 independent-implementation comparison, sensitivity and uncertainty
-propagation, and regressions for demonstrated numerical failures.
+propagation, and previous-failure checks for demonstrated numerical failures.
 
 The plugin rejects a test pyramid, helper-by-helper coverage expansion, private
 implementation mirroring, and one unexplained epsilon across unrelated
@@ -179,6 +179,14 @@ criterion. The metric should match the quantity: absolute error near zero,
 relative error away from zero, weighted or uncertainty-normalized residuals for
 heterogeneous data, and norms or conservation measures for fields and
 balances.
+
+Explore permits disposable calculations but no persistent test or accepted
+claim. Retaining a new or expanded test promotes it to durable scientific work:
+the agent presents the complete scientific-risk, oracle, metric, tolerance,
+failure, replacement, and runtime proposal and obtains explicit user approval.
+The installed lifecycle hooks compare the final test inventory with the exact
+session-start contents and block completion for an unapproved content
+fingerprint. They do not judge whether the proposal or science is correct.
 
 Durable equations and correlations receive stable identifiers, exact source
 locators, symbols, units or basis, assumptions, validity domain, and links to
@@ -218,7 +226,7 @@ milestones, Projects, relationships, issue types, and Actions are optional
 context and are used only when the science or user chooses them. Substantive
 construction records the question, equations or model, assumptions, inputs,
 references, reference cases, metrics and tolerances, analyses, outputs, claim
-limits, limitations, unresolved questions, and acceptance checks. A supported
+limits, limitations, unresolved questions, and required result checks. A supported
 negative result is a valid outcome.
 
 Before mutation, the route discovers the default branch and remotes, fetches and
@@ -234,11 +242,11 @@ CSE-created shared scientific records have one owner: `docs/scientific/`.
 Formulation, methods, evidence, writing rules, optional shared LaTeX and Quarto
 sources, bibliography, manuscript, and one numbered decision-record sequence
 stay there. Each bounded analysis instead owns its retained input snapshot with
-provenance, scripts, results, figures, and reviewed notebook. New CSE-created
+provenance, scripts, results, figures, and notebook. New CSE-created
 sets default to root `analyses/<short-id>/`; established repositories may keep
 a clear repository-owned analysis path and meaningful populated child names.
 Setup never creates an empty analysis root or initial notebook; Summarize
-creates or replaces the notebook only after Review Pass.
+creates or replaces the notebook after useful results and before Review.
 
 Decision records are shared doctrine, not a public workflow stage, external
 skill dependency, or lifecycle store; the system is not a lifecycle database.
@@ -251,9 +259,11 @@ rather than a controller service or lifecycle database.
 
 ## Writing, plotting, and manuscript expectations
 
-Each analysis research notebook is the current reviewed view of one coherent
-question. Git and retained results preserve history. A manuscript is a selected
-scientific story, not a replacement for the notebook.
+Each analysis research notebook is the current view of one coherent question.
+Review checks that complete view; the investigator decides whether to promote
+its reviewed commit for manuscript use. Git and retained results preserve
+history. A manuscript is a selected scientific story, not a replacement for
+the notebook.
 The [project-record reference](../../references/scientific-projects.md) expects
 questions and conditions, methods and sources, results, interpretation,
 limitations, claim boundaries, and relevant convergence, uncertainty,
@@ -271,7 +281,7 @@ files govern forbidden language and completeness checks.
 
 | Alternative | Decision and reason |
 | --- | --- |
-| Keep Project Truss as the runtime foundation | Rejected. The product needs a clean scientific identity and must not inherit a generic lifecycle or vocabulary contract. |
+| Keep Project Truss as the runtime foundation | Rejected. The product needs a clean scientific identity and must not inherit generic lifecycle machinery or vocabulary. |
 | Invoke Matt Pocock skills or Superpowers at runtime | Rejected. Their useful ideas can inform design history, but CSE must be installable and understandable without those families. |
 | Merge Zotero-Wiki into the plugin | Rejected. A replaceable plugin cache must not contain a user's private library or evidence corpus. The capability belongs in an optional, user-owned Zotero Companion boundary. |
 | Put the thermophysical data registry inside the plugin | Rejected. A registry is an independent scientific resource. CSE may teach provenance and adapters without owning its data, schema, or migration. |
@@ -285,9 +295,10 @@ files govern forbidden language and completeness checks.
 
 ## Known limitations
 
-- The plugin is advisory. It can frame a task, ask questions, and route work,
-  but it cannot guarantee scientific correctness or prevent a user from
-  accepting an unsupported interpretation.
+- The plugin remains advisory about scientific correctness and interpretation.
+  Its test gate blocks ordinary hook-aware task completion, but it is not an
+  OS sandbox, cannot prevent transient writes, and can be disabled with the
+  plugin or superseded by host-managed hook policy.
 - The domain expert must supply or approve the question, equations, sources,
   conventions, tolerances, intended use, and claims. Missing context can stop
   a route.
@@ -306,7 +317,7 @@ files govern forbidden language and completeness checks.
 ## Unresolved questions
 
 Plugin-wide questions remain about how to evaluate scientific usefulness across
-domains, how the Companion contract should evolve without duplicating Zotero,
+domains, how Companion behavior should evolve without duplicating Zotero,
 which domain packs or registry adapters are worth
 maintaining, how much questioning is optimal for different users, and which
 review benchmark best detects unsupported claims without turning into a
