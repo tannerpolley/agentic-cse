@@ -1,6 +1,6 @@
 ---
 title: "Artificial absorber-profile comparison"
-subtitle: "One analysis notebook, two reviewed output forms"
+subtitle: "One working analysis notebook, two output forms for Review"
 format:
   pdf:
     pdf-engine: lualatex
@@ -47,6 +47,9 @@ resources:
   - ../../figures/artificial-absorber-comparison.tex
   - ../../figures/analysis-notebook-lineage.tex
 ---
+
+This working analysis notebook has not been independently reviewed or promoted
+for manuscript use.
 
 ::: {.content-visible when-format="pdf"}
 ```{=latex}

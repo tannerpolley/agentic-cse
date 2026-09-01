@@ -22,7 +22,7 @@ PACKAGES = (
         "root": ".",
         "skills": (
             "audit", "setup", "research", "diagnose", "design", "build",
-            "analyze", "review", "summarize", "write",
+            "analyze", "summarize", "review", "write",
         ),
         "include": (
             ".codex-plugin", "AGENTS.md", "BANNED.md", "CHANGELOG.md", "LICENSE", "README.md",

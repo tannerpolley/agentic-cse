@@ -62,7 +62,7 @@ Assess the following dimensions against the repository evidence:
    distinguish code verification, solution verification, model validation,
    numerical uncertainty, and physical uncertainty without overpromising?
 4. **Skill routing and continuity.** Do setup, research, design, build,
-   analyze, summarize, write, and review form a coherent workflow spine? Do
+   analyze, summarize, review, and write form a coherent workflow spine? Do
    plot, digitize, zotero, mathpix, tikz, and pgfplots return useful evidence or files to those
    stages? Are the continuation rules useful, or do entrypoint overlap and
    repeated alignment questions create friction?

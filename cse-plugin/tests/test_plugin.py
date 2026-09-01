@@ -103,8 +103,8 @@ def routing_analysis() -> dict:
             exact_assertions.append({"line": line_number, "text": line.strip()})
 
     routes = {
-        "research": ["research", "design", "build", "analyze", "review", "summarize"],
-        "diagnose": ["diagnose", "research", "design", "build", "analyze", "review", "summarize"],
+        "research": ["research", "design", "build", "analyze", "summarize", "review"],
+        "diagnose": ["diagnose", "research", "design", "build", "analyze", "summarize", "review"],
     }
     projected = {}
     for route_name, route in routes.items():
@@ -553,7 +553,7 @@ class PluginBehaviorTests(unittest.TestCase):
                 identity["payloadSkills"],
                 [
                     "audit", "setup", "research", "diagnose", "design",
-                    "build", "analyze", "review", "summarize", "write",
+                    "build", "analyze", "summarize", "review", "write",
                 ],
             )
             self.assertFalse((staged / ".runs").exists())
@@ -605,8 +605,7 @@ class PluginBehaviorTests(unittest.TestCase):
             (visualize, "CSE Visualize requires the core cse plugin"),
         ):
             self.assertIn(diagnostic, text)
-            self.assertIn("outcome: not_attempted", text)
-            self.assertIn("claim_strength: not_established", text)
+            self.assertIn("was not", text)
             self.assertIn("cache, deployment,", " ".join(text.split()))
         self.assertIn("does not require or invoke CSE Visualize", sources)
         self.assertIn("does not require or invoke CSE Sources", visualize)
@@ -614,12 +613,9 @@ class PluginBehaviorTests(unittest.TestCase):
             family = "Sources" if name in SOURCES else "Visualize"
             text = skill_text(name)
             self.assertIn("Before any other action", text)
-            self.assertIn("outcome: not_attempted", text)
-            self.assertIn("claim_strength: not_established", text)
-            self.assertIn(
-                f"diagnostic: CSE {family} requires the core cse plugin",
-                text,
-            )
+            self.assertIn(f"CSE {family} requires the core cse plugin", text)
+            self.assertIn("was not", text)
+            self.assertNotIn("claim_strength", text)
         self.assertNotIn(
             "plotting",
             skill_frontmatter("digitize")["metadata"]["cse-routing"]["direct"],

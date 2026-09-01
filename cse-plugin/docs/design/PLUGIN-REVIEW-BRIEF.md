@@ -71,10 +71,10 @@ The nine workflow stages are:
 | [`diagnose`](../../skills/diagnose/SKILL.md) | Cause of numerical or scientific disagreement | `design` with the correction boundary |
 | [`design`](../../skills/design/SKILL.md) | A complete question and native GitHub issue | `build`, `analyze`, or `write` |
 | [`build`](../../skills/build/SKILL.md) | Equations, models, numerical methods, solvers, or data transformations | `analyze` |
-| [`analyze`](../../skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `review` or `diagnose` |
-| [`summarize`](../../skills/summarize/SKILL.md) | The current reviewed analysis research notebook | `write` or `review` |
+| [`analyze`](../../skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `summarize` or `diagnose` |
+| [`summarize`](../../skills/summarize/SKILL.md) | The working analysis research notebook and selected render | `review` |
+| [`review`](../../skills/review/SKILL.md) | Whole-chain scientific and repository review, including the notebook and render | Route material corrections to the owning skill or advise Pass for the stated use |
 | [`write`](../../skills/write/SKILL.md) | Evidence-supported papers, reports, captions, and LaTeX | `review` |
-| [`review`](../../skills/review/SKILL.md) | Whole-chain scientific and repository review | Route material corrections to the owning skill |
 
 The installable family has three packages: core `cse` provides these nine
 workflow skills; optional `cse-sources` provides four source and data skills;

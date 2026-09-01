@@ -24,7 +24,7 @@ release without creating a meta-plugin.
 Rejected alternatives are a Sources or Visualize mega skill, separate source
 repositories, compatibility aliases under `cse:*`, and duplicated scientific
 doctrine. Sources returns provenance and QA without judging claims. Visualize
-consumes retained values or accepted claims, never runs the scientific model,
+consumes retained values or supported claims, never runs the scientific model,
 and treats successful rendering as distinct from Review Pass.
 
 ## Product vision
