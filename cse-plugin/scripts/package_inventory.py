@@ -15,7 +15,7 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPATIBILITY = {"cse": "2.2.0", "cse-sources": "1.0.0", "cse-visualize": "1.0.0"}
+COMPATIBILITY = {"cse": "2.2.1", "cse-sources": "1.0.0", "cse-visualize": "1.0.0"}
 PACKAGES = (
     {
         "name": "cse",

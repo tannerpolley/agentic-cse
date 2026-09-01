@@ -1,5 +1,15 @@
 # Changelog
 
+## 2.2.1
+
+- Require one claim-led figure for each central retained numerical relationship
+  or comparison; a table, summary statistic, or CSV link cannot replace it.
+- Keep table-only results for a few scalar or categorical values, exact lookups,
+  and diagnosed negative results when the notebook explains why plotting would
+  not clarify the claim.
+- Route plottable Analyze and Summarize results through CSE Plot when installed,
+  and return table-only central comparisons from Review as Revise.
+
 ## 2.2.0
 
 - Reconcile existing repository routing during Setup without overwriting custom
@@ -50,11 +60,3 @@
   completion.
 - Add representative routing checks, installed-plugin verification, and an
   opt-in CSE Review reminder for scientific-computing repositories.
-
-## Version policy
-
-- Patch releases correct behavior without changing skill or hook behavior.
-- Minor releases add a skill, supporting tool, hook behavior, or material
-  workflow improvement.
-- Major releases make an incompatible rename, removal, or CSE detection
-  change.

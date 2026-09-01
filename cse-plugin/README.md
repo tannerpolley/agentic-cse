@@ -119,9 +119,6 @@ is removed. The gate does not claim OS-level write prevention or scientific
 validity. Start a fresh Codex task after installation, verify the hook behavior,
 and record representative routing results in `evaluation/results/<version>.md`.
 
-Release versions follow semantic versioning: patches preserve skill and hook
-behavior, minor versions add a skill, supporting tool, hook behavior, or
-material workflow improvement, and major versions make an incompatible rename,
-removal, or CSE repository-detection change. Tag `v<version>` only after source
+Tag `v<version>` only after source
 validation, synchronization, installation, installed verification, hook trust
 review, and the fresh-task routing pass succeed.

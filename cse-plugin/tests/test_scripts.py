@@ -171,7 +171,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                 capture_output=True, check=True,
             ).stdout.strip()
             names = ("cse", "cse-sources", "cse-visualize")
-            versions = {"cse": "2.2.0", "cse-sources": "1.0.0", "cse-visualize": "1.0.0"}
+            versions = {"cse": "2.2.1", "cse-sources": "1.0.0", "cse-visualize": "1.0.0"}
             for name in names:
                 result = subprocess.run(
                     [

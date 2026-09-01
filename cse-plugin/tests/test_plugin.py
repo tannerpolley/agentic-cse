@@ -148,7 +148,7 @@ class PluginBehaviorTests(unittest.TestCase):
     def test_manifest_and_public_skills(self):
         manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text())
         self.assertEqual(manifest["name"], "cse")
-        self.assertEqual(manifest["version"], "2.2.0")
+        self.assertEqual(manifest["version"], "2.2.1")
         self.assertEqual(
             manifest["interface"]["displayName"],
             "Agentic Computational Science and Engineering",
@@ -162,7 +162,7 @@ class PluginBehaviorTests(unittest.TestCase):
 
     def test_release_assurance_stays_bounded_and_pinned(self):
         manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text())
-        self.assertEqual(manifest["version"], "2.2.0")
+        self.assertEqual(manifest["version"], "2.2.1")
         routing = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())
         cases = routing["cases"]
         self.assertGreaterEqual(len(cases), 15)
@@ -340,11 +340,14 @@ class PluginBehaviorTests(unittest.TestCase):
         analyze = skill_text("analyze")
         self.assertIn("an authoritative retained input\nneeds no Data probe", analyze)
         self.assertIn("Project-selected output formats", analyze)
+        self.assertIn("A CSV or summary statistic does not replace the figure", analyze)
         review = skill_text("review")
         self.assertIn("once against the final tree", review)
+        self.assertIn("central plottable comparison appears only", review)
         summarize = skill_text("summarize")
         self.assertIn("useful method-specific result", summarize)
         self.assertIn("before Review", summarize)
+        self.assertIn("neither a CSV link nor a table replaces it", summarize)
 
     def test_scientific_safety_and_retained_evidence_boundaries_remain(self):
         data = skill_text("data")
@@ -378,7 +381,8 @@ class PluginBehaviorTests(unittest.TestCase):
                        "bounded direct")),
             (projects, ("defaults to the root-level", "repository-relative path",
                         "meaningful populated child names", "same responsibilities",
-                        "exist before Review", "must not rerun")),
+                        "exist before Review", "must not rerun", "one claim-led figure",
+                        "The retained CSV owns")),
             (github, ("Standalone issues are normal", "git merge --ff-only", "optional context")),
             (decisions, ("one numbered sequence", "reversible library choice", "independent reference case")),
             (dependent, ("Observed state", "Proposed correction", "CSE Scientific Basis Reviewer", "CSE Numerical Experiment and Execution Reviewer", "Only **Ready** permits Build")),
@@ -579,7 +583,7 @@ class PluginBehaviorTests(unittest.TestCase):
 
     def test_companion_package_ownership_namespaces_and_handoffs(self):
         packages = {
-            "cse": (ROOT, CORE, "2.2.0"),
+            "cse": (ROOT, CORE, "2.2.1"),
             "cse-sources": (SOURCES_ROOT, SOURCES, "1.0.0"),
             "cse-visualize": (VISUALIZE_ROOT, VISUALIZE, "1.0.0"),
         }
