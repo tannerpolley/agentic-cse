@@ -24,7 +24,7 @@ SOURCES_ROOT = ROOT / "extensions/cse-sources"
 VISUALIZE_ROOT = ROOT / "extensions/cse-visualize"
 WORKFLOW_ORDERS = {
     "setup": "01", "research": "02A", "diagnose": "02B", "design": "03",
-    "build": "04", "analyze": "05", "review": "06", "summarize": "07",
+    "build": "04", "analyze": "05", "summarize": "06", "review": "07",
     "write": "08",
 }
 ROUTE_PATHS = {
@@ -300,15 +300,15 @@ class PluginBehaviorTests(unittest.TestCase):
             "Must — invariant", "Should — default", "May — option",
             "At an initial workflow entrypoint", "Ask only\nquestions",
             "internal CSE handoff inherits", "must not reread an unchanged",
-            "fresh reviewer independently loads", "expected analysis notebook",
-            "does not itself require another Review", "materially changed",
+            "fresh reviewer independently loads", "working notebook",
+            "Review inspects that complete notebook", "material changes",
             "durable CSE-authored scientific prose", "Routine inspection",
         ):
             self.assertIn(phrase, text)
         self.assertNotIn("terminology.md` and `../BANNED.md` completely", text)
 
     def test_declared_projection_preserves_reads_and_effective_handoffs_reuse(self):
-        research = ["research", "design", "build", "analyze", "review", "summarize"]
+        research = ["research", "design", "build", "analyze", "summarize", "review"]
         diagnose = ["diagnose", *research]
         diagnose_documents = projected_documents(diagnose)
         diagnose_counts = Counter(diagnose_documents)
@@ -343,8 +343,8 @@ class PluginBehaviorTests(unittest.TestCase):
         review = skill_text("review")
         self.assertIn("once against the final tree", review)
         summarize = skill_text("summarize")
-        self.assertIn("Expected notebook creation", summarize)
-        self.assertIn("does not itself require another Review", summarize)
+        self.assertIn("useful method-specific result", summarize)
+        self.assertIn("before Review", summarize)
 
     def test_scientific_safety_and_retained_evidence_boundaries_remain(self):
         data = skill_text("data")
@@ -378,7 +378,7 @@ class PluginBehaviorTests(unittest.TestCase):
                        "bounded direct")),
             (projects, ("defaults to the root-level", "repository-relative path",
                         "meaningful populated child names", "same responsibilities",
-                        "Only after Review Pass", "must not rerun")),
+                        "exist before Review", "must not rerun")),
             (github, ("Standalone issues are normal", "git merge --ff-only", "optional context")),
             (decisions, ("one numbered sequence", "reversible library choice", "independent reference case")),
             (dependent, ("Observed state", "Proposed correction", "CSE Scientific Basis Reviewer", "CSE Numerical Experiment and Execution Reviewer", "Only **Ready** permits Build")),
@@ -405,8 +405,8 @@ class PluginBehaviorTests(unittest.TestCase):
             (latex, (r"one\s+retained data authority", r"never authorizes.*model execution", r"visual")),
             (quarto, (r"execute\.enabled: false", r"--no-execute", r"material.*return to `cse:review`")),
             (plot, (r"retained continuous relationship", r"`o`/`x`", r"project.*intended use")),
-            (summarize, (r"Only a satisfactory result", r"must\s+not\s+rerun", r"does not itself require another Review")),
-            (profile, (r"Manuscript", r"Analysis research notebook", r"one continuous story", r"Review Pass")),
+            (summarize, (r"useful method-specific result", r"must\s+not\s+rerun", r"before Review")),
+            (profile, (r"Manuscript", r"Analysis research notebook", r"one continuous story", r"selected render")),
             (plotting, (r"primary figure directly answers", r"Predictions available only", r"color-vision-safe")),
         ):
             for pattern in patterns:
@@ -468,8 +468,8 @@ class PluginBehaviorTests(unittest.TestCase):
         }, oracle["tolerance_rationale"])
         self.assertEqual(
             {
-                "research": ["cse:research", "cse:design", "cse:build", "cse:analyze", "cse:review", "cse:summarize"],
-                "diagnose": ["cse:diagnose", "cse:research", "cse:design", "cse:build", "cse:analyze", "cse:review", "cse:summarize"],
+                "research": ["cse:research", "cse:design", "cse:build", "cse:analyze", "cse:summarize", "cse:review"],
+                "diagnose": ["cse:diagnose", "cse:research", "cse:design", "cse:build", "cse:analyze", "cse:summarize", "cse:review"],
             }, {key: config["cases"][key]["expected_route"] for key in ("research", "diagnose")})
         tree = ast.parse((ROOT / "scripts/cooling_fit_benchmark.py").read_text())
         gate_dicts = [
@@ -480,7 +480,7 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertEqual(1, len(gate_dicts))
         self.assertEqual(
             {"remote_safety", "retained_numerical_evidence", "research_source_support",
-             "review_before_admission", "nonexecuting_supported_notebook"},
+             "notebook_before_review", "nonexecuting_supported_notebook"},
             {key.value for key in gate_dicts[0].keys},
         )
         category_weights = Counter()
@@ -488,7 +488,7 @@ class PluginBehaviorTests(unittest.TestCase):
             category_weights[item["category"]] += item["max_points"]
         self.assertEqual({
             "evidence_justified_entry": 15, "design_build_analyze": 30,
-            "review_and_admission": 20, "notebook_and_response": 20,
+            "review_of_notebook": 20, "notebook_and_response": 20,
             "restraint": 10, "efficiency": 5,
         }, dict(category_weights))
         self.assertEqual(100, sum(category_weights.values()))
@@ -516,32 +516,14 @@ class PluginBehaviorTests(unittest.TestCase):
 
     def test_scientific_project_and_review_owners_remain_explicit(self):
         projects = (ROOT / "references/scientific-projects.md").read_text()
-        self.assertIn("Only after Review Pass", projects)
-        self.assertIn("does not itself require another Review", projects)
+        self.assertIn("exist before Review", projects)
+        self.assertIn("still requires investigator", projects)
         dependent = (ROOT / "references/dependent-scientific-changes.md").read_text()
         self.assertIn("bounded supported design", dependent)
         self.assertIn("two fresh read-only reviewers", dependent)
         surface = (ROOT / "references/code-surface-review.md").read_text()
         self.assertIn("Review owns the one change-accounting run", surface)
         self.assertIn("Build reports its changed surface", surface)
-
-    def test_issue_15_oracle_routes_hard_gates_and_rubric_are_unchanged(self):
-        config = json.loads((ROOT / "evaluation/cooling-fit/benchmark.json").read_text())
-        oracle = config["oracle"]
-        self.assertEqual(1, oracle["version"])
-        self.assertEqual(0.00499692115269, oracle["k_per_s"])
-        self.assertEqual(200.123229774, oracle["time_constant_s"])
-        self.assertEqual(0.162902517152, oracle["rmse_degC"])
-        self.assertEqual(80, config["pass_score"])
-        self.assertEqual(100, sum(item["max_points"] for item in config["rubric"]))
-        self.assertEqual(
-            ["cse:research", "cse:design", "cse:build", "cse:analyze", "cse:review", "cse:summarize"],
-            config["cases"]["research"]["expected_route"],
-        )
-        self.assertEqual(
-            ["cse:diagnose", "cse:research", "cse:design", "cse:build", "cse:analyze", "cse:review", "cse:summarize"],
-            config["cases"]["diagnose"]["expected_route"],
-        )
 
     def test_source_only_boundary_excludes_runs_from_sync_and_installation(self):
         benchmark = (ROOT / "scripts/cooling_fit_benchmark.py").read_text()

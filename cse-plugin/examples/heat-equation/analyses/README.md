@@ -3,7 +3,8 @@
 Each durable study owns a locally understandable folder under `analyses/` with
 an `README.md`, retained `inputs/` with provenance, separate data-generation
 and rendering scripts, exact plotted-data tables, retained final figures, and
-a reviewed `notebook.qmd` created only after Review Pass.
+a `notebook.qmd` created after useful results and inspected with its renders by
+Review.
 
 The current study is [heat_verification](heat_verification/README.md). Its
 figure-owned directories contain source scripts, editable plotting metadata,

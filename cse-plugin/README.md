@@ -11,7 +11,7 @@ needs them; core remains usable when neither is installed.
 
 The normal agent path is:
 
-`setup → research or diagnose → design → build → analyze → review → summarize → write`
+`setup → research or diagnose → design → build → analyze → summarize → review → write`
 
 - `setup` establishes or revises repository vocabulary and scientific conventions.
 - `research` investigates literature, theory, and data.
@@ -19,16 +19,16 @@ The normal agent path is:
 - `design` lays out the scientific work and publishes a GitHub issue when the repository uses GitHub issues.
 - `build` implements models and numerical methods.
 - `analyze` runs numerical studies and interprets results.
-- `review` checks the Design-Build-Analyze set before accepted results advance.
-- `summarize` replaces one analysis research notebook with the current reviewed
-  scientific view.
+- `summarize` replaces one analysis research notebook with the current retained
+  results and selected nonexecuting render.
+- `review` checks the complete analysis, including that notebook and render.
 - `write` develops an evidence-supported manuscript.
 
 Research and Diagnose share level 02 and may both apply. Analyze routes an
-unresolved core disagreement to Diagnose; otherwise it routes to Review. A
+unresolved core disagreement to Diagnose; otherwise it routes to Summarize. A
 blocking review returns to the same Design and active issue before Build and
-Analyze repeat. Review Pass continues to Summarize and is bounded to the stated
-use and domain.
+Analyze repeat. Review Pass is bounded to the stated use and domain. Only the
+investigator may promote the reviewed notebook for manuscript use.
 
 ## Optional companion plugins
 

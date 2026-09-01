@@ -9,7 +9,7 @@ plugin-wide decisions and choices made only for that example.
 ## Companion package decision
 
 Core `cse` remains the workflow spine: it owns scientific questions, retained
-records, evidence admission, Review, interpretation, and claim boundaries.
+records, Review, interpretation, and claim boundaries.
 `cse-sources` owns Zotero, Mathpix, data-lineage, and digitization operations;
 `cse-visualize` owns Plot, TikZ, PGFPlots, LaTeX, Quarto, RevealJS, and Beamer
 rendering. Both companions require core CSE, are independently installable
@@ -23,9 +23,9 @@ release without creating a meta-plugin.
 
 Rejected alternatives are a Sources or Visualize mega skill, separate source
 repositories, compatibility aliases under `cse:*`, and duplicated scientific
-doctrine. Sources returns provenance and QA, not admitted claims. Visualize
-consumes reviewed retained values or accepted claims, never runs the scientific
-model, and treats successful rendering as distinct from Review Pass.
+doctrine. Sources returns provenance and QA without judging claims. Visualize
+consumes retained values or accepted claims, never runs the scientific model,
+and treats successful rendering as distinct from Review Pass.
 
 ## Product vision
 
@@ -112,11 +112,11 @@ The nine workflow stages form the default agent path:
 6. [`analyze`](../../skills/analyze/SKILL.md) runs studies for convergence,
    sensitivity, uncertainty, comparison, and figures.
 7. [`summarize`](../../skills/summarize/SKILL.md) replaces the analysis
-   research notebook with the current reviewed scientific view.
-8. [`write`](../../skills/write/SKILL.md) develops an evidence-supported paper,
-   report, caption, equation, or appendix.
-9. [`review`](../../skills/review/SKILL.md) checks the full scientific chain
-   before publication or integration.
+   research notebook with the current retained results and selected render.
+8. [`review`](../../skills/review/SKILL.md) checks the full scientific chain,
+   including the notebook and selected render.
+9. [`write`](../../skills/write/SKILL.md) uses only reviewed notebook results
+   the investigator promotes for the named manuscript use.
 
 The eleven companion skills are public skills but are not workflow stages:
 
@@ -168,7 +168,7 @@ Useful test families include literature or experiment reproduction, analytic or
 manufactured solutions, conservation and dimensional invariants, symmetry and
 limiting behavior, monotonicity, grid or solver convergence, cross-method or
 independent-implementation comparison, sensitivity and uncertainty
-propagation, and regressions for demonstrated numerical failures.
+propagation, and previous-failure checks for demonstrated numerical failures.
 
 The plugin rejects a test pyramid, helper-by-helper coverage expansion, private
 implementation mirroring, and one unexplained epsilon across unrelated
@@ -226,7 +226,7 @@ milestones, Projects, relationships, issue types, and Actions are optional
 context and are used only when the science or user chooses them. Substantive
 construction records the question, equations or model, assumptions, inputs,
 references, reference cases, metrics and tolerances, analyses, outputs, claim
-limits, limitations, unresolved questions, and acceptance checks. A supported
+limits, limitations, unresolved questions, and required result checks. A supported
 negative result is a valid outcome.
 
 Before mutation, the route discovers the default branch and remotes, fetches and
@@ -242,11 +242,11 @@ CSE-created shared scientific records have one owner: `docs/scientific/`.
 Formulation, methods, evidence, writing rules, optional shared LaTeX and Quarto
 sources, bibliography, manuscript, and one numbered decision-record sequence
 stay there. Each bounded analysis instead owns its retained input snapshot with
-provenance, scripts, results, figures, and reviewed notebook. New CSE-created
+provenance, scripts, results, figures, and notebook. New CSE-created
 sets default to root `analyses/<short-id>/`; established repositories may keep
 a clear repository-owned analysis path and meaningful populated child names.
 Setup never creates an empty analysis root or initial notebook; Summarize
-creates or replaces the notebook only after Review Pass.
+creates or replaces the notebook after useful results and before Review.
 
 Decision records are shared doctrine, not a public workflow stage, external
 skill dependency, or lifecycle store; the system is not a lifecycle database.
@@ -259,9 +259,11 @@ rather than a controller service or lifecycle database.
 
 ## Writing, plotting, and manuscript expectations
 
-Each analysis research notebook is the current reviewed view of one coherent
-question. Git and retained results preserve history. A manuscript is a selected
-scientific story, not a replacement for the notebook.
+Each analysis research notebook is the current view of one coherent question.
+Review checks that complete view; the investigator decides whether to promote
+its reviewed commit for manuscript use. Git and retained results preserve
+history. A manuscript is a selected scientific story, not a replacement for
+the notebook.
 The [project-record reference](../../references/scientific-projects.md) expects
 questions and conditions, methods and sources, results, interpretation,
 limitations, claim boundaries, and relevant convergence, uncertainty,
