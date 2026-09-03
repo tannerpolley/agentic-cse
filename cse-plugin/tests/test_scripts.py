@@ -105,31 +105,36 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("provide --base REF", result.stderr)
 
-    def test_cse_test_gate_requires_exact_approval_for_new_test_content(self):
+    def test_cse_hook_injects_stance_and_reports_test_changes_without_blocking(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repository = root / "repo"
             repository.mkdir()
             self.initialize_git_repository(repository)
-            context = repository / "docs/scientific/CONTEXT.md"
+            project = repository / "engine"
+            context = project / "docs/scientific/CONTEXT.md"
             context.parent.mkdir(parents=True)
             context.write_text("# Scientific context\n")
-            tests = repository / "tests"
+            tests = project / "tests"
             tests.mkdir()
             existing = tests / "test_model.py"
-            existing.write_text("assert True\n")
+            original = "assert True\nassert 2 == 2\n"
+            existing.write_text(original)
+            removed = tests / "test_removed.py"
+            removed.write_text("assert True\n")
+            target = tests / "target.py"
+            target.write_text("assert True\n")
+            (tests / "test_link.py").symlink_to(target.name)
             self.commit_all(repository, "baseline")
-            existing.write_text("assert True\n# pre-existing user work\n")
 
             hook = ROOT / "scripts/cse-test-gate.py"
-            environment = {**os.environ}
-            base_event = {"cwd": str(repository), "session_id": "session-1"}
+            stance_template = (ROOT / "assets/codex/scientific-stance.txt").read_text().strip()
+            serial = 0
 
             def invoke(event: str, **values):
                 result = subprocess.run(
                     [sys.executable, str(hook), event],
-                    input=json.dumps({**base_event, **values}),
-                    env=environment,
+                    input=json.dumps({"cwd": str(project), **values}),
                     text=True,
                     capture_output=True,
                     check=False,
@@ -137,30 +142,53 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 return json.loads(result.stdout) if result.stdout else {}
 
-            started = invoke("SessionStart", source="startup")
-            self.assertIn("persistent-test gate", started["hookSpecificOutput"]["additionalContext"])
-            self.assertEqual(invoke("Stop"), {})
+            def start():
+                nonlocal serial
+                serial += 1
+                return invoke("SessionStart", source="startup", session_id=f"session-{serial}")
 
-            added = tests / "test_new_model.py"
-            added.write_text("assert 2 == 2\n")
-            observed = invoke("PostToolUse")
-            proposal = observed["systemMessage"].rsplit(": ", 1)[1]
-            blocked = invoke("Stop")
-            self.assertEqual(blocked["decision"], "block")
-            self.assertIn(proposal, blocked["reason"])
+            def expected_stance(deliverable=None):
+                start_index = stance_template.index("[[")
+                end_index = stance_template.index("]]", start_index)
+                optional = stance_template[start_index + 2:end_index]
+                clause = optional.replace("{deliverable}", deliverable) if deliverable else ""
+                return stance_template[:start_index] + clause + stance_template[end_index + 2:]
 
-            approved = invoke(
-                "UserPromptSubmit", prompt="Approve exact test (Recommended)"
+            for context_text, deliverable, opening in (
+                ("# Scientific context\ndefault deliverable: result\n", "result",
+                 "This is a CSE scientific repository, default deliverable: result."),
+                ("# Scientific context\ndefault deliverable: capability\n", "capability",
+                 "This is a CSE scientific repository, default deliverable: capability."),
+                ("# Scientific context\n", None, "This is a CSE scientific repository."),
+                ("# Scientific context\ndefault deliverable: report\n", None,
+                 "This is a CSE scientific repository."),
+            ):
+                context.write_text(context_text)
+                rendered = start()["hookSpecificOutput"]["additionalContext"]
+                self.assertEqual(expected_stance(deliverable), rendered)
+                self.assertTrue(rendered.startswith(opening))
+                self.assertLessEqual(len(rendered.split()), 180)
+            context.write_text("# Scientific context\n")
+
+            for event in ("SubagentStart", "UserPromptSubmit"):
+                output = invoke(event, session_id=f"session-{serial}")
+                self.assertEqual(expected_stance(), output["hookSpecificOutput"]["additionalContext"])
+
+            probes = (
+                (lambda: existing.write_text("assert True\n"), "expanded test: engine/tests/test_model.py"),
+                (removed.unlink, "deleted test: engine/tests/test_removed.py"),
+                (lambda: existing.write_text(original + "# comment\n"), "expanded test: engine/tests/test_model.py"),
+                (lambda: (tests / "test_new.py").write_text("assert True\n"), "new test: engine/tests/test_new.py"),
             )
-            self.assertIn("approved", approved["systemMessage"])
-            self.assertEqual(invoke("Stop"), {})
-
-            added.write_text("assert 2 == 2\nassert 3 == 3\n")
-            changed = invoke("Stop")
-            self.assertEqual(changed["decision"], "block")
-            self.assertNotIn(proposal, changed["reason"])
-            added.unlink()
-            self.assertEqual(invoke("Stop"), {})
+            for mutate, expected in probes:
+                existing.write_text(original)
+                removed.write_text("assert True\n")
+                (tests / "test_new.py").unlink(missing_ok=True)
+                start()
+                mutate()
+                advisory = invoke("Stop", session_id=f"session-{serial}")
+                self.assertNotIn("decision", advisory)
+                self.assertIn(expected, advisory["hookSpecificOutput"]["additionalContext"])
 
     def test_repo_hooks_survive_plugin_removal(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -172,9 +200,23 @@ class ScriptBehaviorTests(unittest.TestCase):
             shutil.copytree(ROOT / "assets", plugin / "assets")
             repository.mkdir()
             self.initialize_git_repository(repository)
-            context = repository / "docs/scientific/CONTEXT.md"
+            project = repository / "engine"
+            context = project / "docs/scientific/CONTEXT.md"
             context.parent.mkdir(parents=True)
             context.write_text("# Scientific context\n")
+            old_events = (
+                "SessionStart", "SubagentStart", "UserPromptSubmit",
+                "PostToolUse", "SubagentStop", "Stop",
+            )
+            old_config = project / ".codex/hooks.json"
+            old_config.parent.mkdir(parents=True)
+            old_config.write_text(json.dumps({"hooks": {
+                event: [{"hooks": [{
+                    "type": "command",
+                    "command": f'/usr/bin/python3 "$HOME/.codex/hooks/cse-test-gate.py" {event}',
+                }]}]
+                for event in old_events
+            }}))
             self.commit_all(repository, "baseline")
 
             installed = subprocess.run(
@@ -185,22 +227,37 @@ class ScriptBehaviorTests(unittest.TestCase):
                     str(home),
                     "--replace-runtime",
                     "--repo",
-                    str(repository),
+                    str(project),
                 ],
                 text=True,
                 capture_output=True,
                 check=False,
             )
             self.assertEqual(installed.returncode, 0, installed.stderr)
+
+            unrelated = root / "unrelated"
+            unrelated.mkdir()
+            self.initialize_git_repository(unrelated)
+            unrelated_context = unrelated / "docs/scientific/CONTEXT.md"
+            unrelated_context.parent.mkdir(parents=True)
+            unrelated_context.write_text("# Scientific context\n")
+            unrelated_hooks = unrelated / ".codex/hooks.json"
+            unrelated_hooks.parent.mkdir()
+            unrelated_hooks.write_text('{"hooks":{"Stop":[{"hooks":[{"command":"other"}]}]}}')
+            refused = subprocess.run(
+                [sys.executable, str(plugin / "scripts/install_cse_hooks.py"),
+                 "--home", str(home), "--repo", str(unrelated)],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(refused.returncode, 1)
+            self.assertEqual(unrelated_hooks.read_text(), '{"hooks":{"Stop":[{"hooks":[{"command":"other"}]}]}}')
             shutil.rmtree(plugin)
 
-            config = json.loads((repository / ".codex/hooks.json").read_text())
+            config = json.loads((project / ".codex/hooks.json").read_text())
+            self.assertEqual(set(config["hooks"]), {"SessionStart", "SubagentStart", "UserPromptSubmit", "Stop"})
             environment = {**os.environ, "HOME": str(home)}
-            base_event = {"cwd": str(repository), "session_id": "survives-upgrade"}
-            for event in (
-                "SessionStart", "SubagentStart", "UserPromptSubmit",
-                "PostToolUse", "SubagentStop", "Stop",
-            ):
+            base_event = {"cwd": str(project), "session_id": "survives-upgrade"}
+            for event in ("SessionStart", "SubagentStart", "UserPromptSubmit", "Stop"):
                 command = config["hooks"][event][0]["hooks"][0]["command"]
                 values = {**base_event}
                 if event == "SessionStart":
@@ -217,6 +274,9 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, result.stderr)
                 if result.stdout:
                     json.loads(result.stdout)
+
+            self.assertTrue((home / ".codex/hooks/cse_hook_common.py").is_file())
+            self.assertTrue((home / ".codex/hooks/cse-scientific-stance.txt").is_file())
 
             self.assertNotIn("plugins/cache", json.dumps(config))
             self.assertNotIn("PLUGIN_ROOT", json.dumps(config))

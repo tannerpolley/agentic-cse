@@ -120,15 +120,13 @@ python3 scripts/install_cse_hooks.py --replace-runtime --repo /path/to/cse-repos
 
 Plugin synchronization never replaces this runtime. Setup adds the same
 repository-local `.codex/hooks.json` to newly prepared CSE repositories and
-refuses to overwrite an unrelated hook configuration. For repositories
-containing `docs/scientific/CONTEXT.md`, the CSE hooks inject
-the persistent-test policy, seal the session-start test inventory outside the
-working tree in Git metadata, report test growth after write-capable tools, and block Stop or
-SubagentStop until the exact current test fingerprint has explicit approval or
-is removed. The gate does not claim OS-level write prevention or scientific
-validity. Review and trust the repository hooks, start a fresh Codex task after
-installation, verify the hook behavior,
-and record representative routing results in `evaluation/results/<version>.md`.
+refuses to overwrite an unrelated hook configuration. The hook activates from
+the nearest `docs/scientific/CONTEXT.md` at or above the working directory. It
+injects the compact scientific stance at session, subagent, and prompt entry,
+then reports new, changed, and deleted test files as advisory context at Stop.
+Review and trust the repository hooks, start a fresh Codex task after
+installation, verify the hook behavior, and record representative routing
+results in `evaluation/results/<version>.md`.
 
 Tag `v<version>` only after source
 validation, synchronization, installation, installed verification, hook trust

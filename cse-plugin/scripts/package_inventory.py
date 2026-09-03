@@ -27,7 +27,8 @@ PACKAGES = (
         "include": (
             ".codex-plugin", "AGENTS.md", "BANNED.md", "CHANGELOG.md", "LICENSE", "README.md",
             "assets", "references", "skills", "scripts/change_accounting.py",
-            "scripts/check_prose.py", "scripts/cse-test-gate.py", "scripts/install_cse_hooks.py",
+            "scripts/check_prose.py", "scripts/cse-test-gate.py", "scripts/cse_hook_common.py",
+            "scripts/install_cse_hooks.py",
             "scripts/setup_scientific_project.py",
         ),
     },

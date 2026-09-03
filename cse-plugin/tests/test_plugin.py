@@ -410,7 +410,7 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertIn("ordinary quarto html", active)
         self.assertIn("promoted-pdf-header.tex", active)
 
-    def test_scientific_doctrine_and_approval_boundaries_remain_reachable(self):
+    def test_scientific_doctrine_and_test_boundaries_remain_reachable(self):
         numerical = (ROOT / "references/numerical-testing.md").read_text()
         failure = (ROOT / "references/failure-triage.md").read_text()
         projects = (ROOT / "references/scientific-projects.md").read_text()
@@ -418,7 +418,7 @@ class PluginBehaviorTests(unittest.TestCase):
         decisions = (ROOT / "references/decision-records.md").read_text()
         dependent = (ROOT / "references/dependent-scientific-changes.md").read_text()
         for text, terms in (
-            (numerical, ("result-first", "reference case", "tolerance rationale", "test-content fingerprint", "Coverage may reveal")),
+            (numerical, ("result-first", "reference case", "tolerance rationale", "Coverage may reveal", "never by weakening a tolerance")),
             (failure, ("method that actually ran", "no useful numerical result",
                        "key/value failure record", "input-readiness question",
                        "bounded direct")),
