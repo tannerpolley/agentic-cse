@@ -470,7 +470,8 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertEqual("cse:design", by_id["design-experiment-result-shape"]["expected_skill"])
         self.assertEqual("cse:design", by_id["design-capability-tool-shape"]["expected_skill"])
         self.assertEqual("cse:diagnose", by_id["build-failing-case-diagnose-boundary"]["expected_skill"])
-        self.assertFalse(any((ROOT / "assets/project/adr/templates").iterdir()))
+        templates = ROOT / "assets/project/adr/templates"
+        self.assertFalse(templates.exists() and any(templates.iterdir()))
 
     def test_document_and_figure_routes_preserve_render_and_disposition_rules(self):
         latex = skill_text("latex")
