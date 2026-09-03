@@ -166,7 +166,7 @@ class PluginBehaviorTests(unittest.TestCase):
         routing = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())
         cases = routing["cases"]
         self.assertGreaterEqual(len(cases), 15)
-        self.assertLessEqual(len(cases), 25)
+        self.assertEqual(28, len(cases))
         self.assertEqual(len(cases), len({case["id"] for case in cases}))
         self.assertEqual(
             {"direct", "indirect", "incomplete", "negative", "unsupported"},
@@ -417,8 +417,9 @@ class PluginBehaviorTests(unittest.TestCase):
         github = (ROOT / "references/github-and-git.md").read_text()
         decisions = (ROOT / "references/decision-records.md").read_text()
         dependent = (ROOT / "references/dependent-scientific-changes.md").read_text()
+        design = skill_text("design")
         for text, terms in (
-            (numerical, ("result-first", "reference case", "tolerance rationale", "Coverage may reveal", "never by weakening a tolerance")),
+            (numerical, ("result-first", "reference case", "tolerance rationale", "Coverage may reveal", "never by weakening a tolerance", "failing case, proposed")),
             (failure, ("method that actually ran", "no useful numerical result",
                        "key/value failure record", "input-readiness question",
                        "bounded direct")),
@@ -428,7 +429,8 @@ class PluginBehaviorTests(unittest.TestCase):
                         "The retained CSV owns")),
             (github, ("Standalone issues are normal", "git merge --ff-only", "optional context")),
             (decisions, ("one numbered sequence", "reversible library choice", "independent reference case")),
-            (dependent, ("Observed state", "Proposed correction", "CSE Scientific Basis Reviewer", "CSE Numerical Experiment and Execution Reviewer", "Only **Ready** permits Build")),
+            (dependent, ("Observed state", "Proposed correction")),
+            (design, ("Result lens", "Capability lens", "Only a **Ready** disposition permits `cse:build`")),
         ):
             for term in terms:
                 self.assertIn(term, text)
@@ -440,6 +442,35 @@ class PluginBehaviorTests(unittest.TestCase):
         design = skill_text("design")
         self.assertRegex(design, r"(?is)publish.*one issue.*before.*Build")
         self.assertRegex(design, r"(?is)only a \*\*Ready\*\*.*permits")
+
+    def test_issue_54_moves_design_review_and_binds_failing_cases(self):
+        design = skill_text("design")
+        build = skill_text("build")
+        dependent = (ROOT / "references/dependent-scientific-changes.md").read_text()
+        decisions = (ROOT / "references/decision-records.md").read_text()
+        numerical = (ROOT / "references/numerical-testing.md").read_text()
+        routing = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())["cases"]
+        by_id = {case["id"]: case for case in routing}
+
+        self.assertLess(len(design.split()), 520)
+        self.assertLess(len(dependent.split()), 600)
+        self.assertNotIn("## Independent pre-Build review", dependent)
+        self.assertNotIn("## Pre-Build disposition", dependent)
+        self.assertIn("result or a capability", design)
+        self.assertIn("Experiment issue (result)", design)
+        self.assertIn("Tool issue (capability)", design)
+        self.assertIn("no code, registries, generators, or prescribed implementation", design)
+        self.assertIn("no new numerical method, tolerance", build)
+        self.assertIn("cse:diagnose` classifies the", build)
+        self.assertIn("same approval as the fix", numerical)
+        self.assertIn("records five facts", decisions)
+        self.assertNotIn("Four focused kinds", decisions)
+        self.assertNotIn("scientific-formulation`:", decisions)
+        self.assertNotIn("numerical-method`:", decisions)
+        self.assertEqual("cse:design", by_id["design-experiment-result-shape"]["expected_skill"])
+        self.assertEqual("cse:design", by_id["design-capability-tool-shape"]["expected_skill"])
+        self.assertEqual("cse:diagnose", by_id["build-failing-case-diagnose-boundary"]["expected_skill"])
+        self.assertFalse(any((ROOT / "assets/project/adr/templates").iterdir()))
 
     def test_document_and_figure_routes_preserve_render_and_disposition_rules(self):
         latex = skill_text("latex")
@@ -466,17 +497,16 @@ class PluginBehaviorTests(unittest.TestCase):
             for case in routing["cases"] if case.get("source_issue") == 24
         }
         self.assertEqual({"Ready", "Revise", "Block"}, set(cases))
-        guide = (ROOT / "references/dependent-scientific-changes.md").read_text()
+        guide = skill_text("design")
         design = skill_text("design")
         for disposition, case in cases.items():
             self.assertEqual("cse:design", case["expected_skill"])
             self.assertIn("Build", case["prohibited_action"])
             self.assertIn(f"**{disposition}**", guide)
         for term in (
-            "live repository", "real callers and owners", "retained evidence",
-            "public input -> formulation or data owner -> numerical owner",
-            "all five science-first lenses", "two fresh read-only reviewers",
-            "reviewer/implementer identity collision", "normal GitHub issue record",
+            "live project", "callers, owners", "evidence",
+            "public input", "Result lens", "Capability lens", "two fresh reviewers",
+            "normal GitHub issue record",
         ):
             self.assertIn(term, guide)
         self.assertRegex(design, r"(?is)only a \*\*Ready\*\*.*permits `cse:build`")
@@ -566,8 +596,10 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertIn("exist before Review", projects)
         self.assertIn("still requires investigator", projects)
         dependent = (ROOT / "references/dependent-scientific-changes.md").read_text()
-        self.assertIn("bounded supported design", dependent)
-        self.assertIn("two fresh read-only reviewers", dependent)
+        design = skill_text("design")
+        self.assertNotIn("bounded supported design", dependent)
+        self.assertIn("bounded supported design", design)
+        self.assertIn("two fresh reviewers", design)
         surface = (ROOT / "references/code-surface-review.md").read_text()
         self.assertIn("Build owns the one change-accounting run", surface)
         self.assertIn("Build reports its changed surface", surface)
