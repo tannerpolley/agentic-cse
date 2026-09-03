@@ -335,15 +335,17 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertIn("publish and verify one issue", design)
         self.assertIn("Only a **Ready**", design)
         build = skill_text("build")
-        self.assertIn("does not run change accounting", build)
-        self.assertNotIn("change accounting and focused validation", build)
+        self.assertIn("one change-accounting run against the final tree", build)
+        self.assertIn("stage performing a Git or GitHub action owns its authority", build)
         analyze = skill_text("analyze")
         self.assertIn("an authoritative retained input\nneeds no Data probe", analyze)
         self.assertIn("Project-selected output formats", analyze)
         self.assertIn("A CSV or summary statistic does not replace the figure", analyze)
         review = skill_text("review")
-        self.assertIn("once against the final tree", review)
-        self.assertIn("central plottable comparison appears only", review)
+        self.assertIn("Result lens", review)
+        self.assertIn("Capability lens", review)
+        self.assertIn("explicit merge base", review)
+        self.assertIn("complete changed functions", review)
         summarize = skill_text("summarize")
         self.assertIn("useful method-specific result", summarize)
         self.assertIn("before Review", summarize)
@@ -366,6 +368,35 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertIn("Ordinary Quarto HTML", quarto)
         self.assertIn("scaffold.sh", quarto)
         self.assertIn("promoted-pdf", quarto)
+
+    def test_three_sections_and_review_lenses_keep_ownership_boundaries(self):
+        operating = (ROOT / "references/operating-model.md").read_text()
+        for term in ("Think", "Do", "Publish", "Setup runs once", "Audit stands outside"):
+            self.assertIn(term, operating)
+        review = skill_text("review")
+        summarize = skill_text("summarize")
+        self.assertLess(len(review.split()), 340)
+        self.assertLess(len(summarize.split()), 330)
+        self.assertEqual(skill_frontmatter("review")["metadata"]["cse-routing"]["direct"], ["operating-model"])
+        for phrase in (
+            "calculations stay with the accepted numerical owner",
+            "distinct fields do not reuse one value without identity evidence",
+            "missing inputs and silent exits preserve causes",
+            "repeated constants,\nlimits, defaults, and tolerances use their existing scientific owner",
+        ):
+            self.assertIn(phrase, review)
+        self.assertIn("chat summary of the main points", summarize)
+        surface = (ROOT / "references/code-surface-review.md").read_text()
+        self.assertIn("Any implementation correction\ninvalidates the", surface)
+        audit = skill_text("audit")
+        for phrase in (
+            "scientific calculations or transformations outside the designated owner",
+            "result mapping that duplicates, fabricates, drops, or changes the meaning",
+            "silent exits that erase failure or unavailability causes",
+            "duplicated equations, physical limits, constants, defaults, or tolerances",
+            "semantically distinct fields populated from one source without identity evidence",
+        ):
+            self.assertIn(phrase, audit)
 
     def test_visualize_active_surface_is_html_first_without_retired_companion(self):
         retired = "reveal" + "js"
@@ -538,7 +569,7 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertIn("bounded supported design", dependent)
         self.assertIn("two fresh read-only reviewers", dependent)
         surface = (ROOT / "references/code-surface-review.md").read_text()
-        self.assertIn("Review owns the one change-accounting run", surface)
+        self.assertIn("Build owns the one change-accounting run", surface)
         self.assertIn("Build reports its changed surface", surface)
 
     def test_source_only_boundary_excludes_runs_from_sync_and_installation(self):
