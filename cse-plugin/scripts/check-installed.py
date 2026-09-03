@@ -10,7 +10,6 @@ import subprocess
 import sys
 
 from package_inventory import (
-    COMPATIBILITY,
     LEGACY_NAME,
     PACKAGES,
     deploy_root,
@@ -43,13 +42,13 @@ def main() -> int:
         listed = [] if args.deployed_only else json.loads(subprocess.run(["codex", "plugin", "list", "--json"], text=True, capture_output=True, check=True).stdout).get("installed", [])
         family = [
             entry for entry in listed
-            if str(entry.get("pluginId", "")).split("@", 1)[0] in COMPATIBILITY
+            if str(entry.get("pluginId", "")).split("@", 1)[0] in {item["name"] for item in PACKAGES}
         ]
         unexpected = [
             str(entry.get("pluginId", "")) for entry in listed
             if (name := str(entry.get("pluginId", "")).split("@", 1)[0])
             and (name.startswith("cse-") or name == LEGACY_NAME)
-            and name not in COMPATIBILITY
+            and name not in {item["name"] for item in PACKAGES}
         ]
         if unexpected:
             raise RuntimeError(f"unexpected CSE-family packages: {', '.join(unexpected)}")
@@ -70,8 +69,6 @@ def main() -> int:
                 entry = matches[0]
                 if not entry.get("installed") or not entry.get("enabled"):
                     raise RuntimeError(f"{item['name']} is not enabled")
-                if str(entry.get("version")) != COMPATIBILITY[item["name"]]:
-                    raise RuntimeError(f"{item['name']} version does not match {COMPATIBILITY[item['name']]}")
                 source = (entry.get("source") or {}).get("path")
                 if not isinstance(source, str) or Path(source).resolve() != root:
                     raise RuntimeError(f"{item['name']} has an unexpected deployment root")

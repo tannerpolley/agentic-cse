@@ -2,10 +2,9 @@
 set -euo pipefail
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-plugin_validator="${CSE_PLUGIN_VALIDATOR:-$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py}"
 skill_validator="${CSE_SKILL_VALIDATOR:-$HOME/.codex/skills/.system/skill-creator/scripts/quick_validate.py}"
 
-for validator in "$plugin_validator" "$skill_validator"; do
+for validator in "$skill_validator"; do
   if [[ ! -f "$validator" ]]; then
     echo "Required Codex validator is unavailable: $validator" >&2
     exit 1
@@ -19,7 +18,7 @@ while IFS=$'\t' read -r package_name package_root _; do
     echo "Injected failure at validate:before:$package_name" >&2
     exit 1
   fi
-  python3 "$plugin_validator" "$package_root"
+  python3 "$repository_root/scripts/package_inventory.py" check "$package_name"
   for skill in "$package_root"/skills/*; do
     python3 "$skill_validator" "$skill"
   done

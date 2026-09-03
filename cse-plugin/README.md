@@ -123,11 +123,16 @@ repository-local `.codex/hooks.json` to newly prepared CSE repositories and
 refuses to overwrite an unrelated hook configuration. The hook activates from
 the nearest `docs/scientific/CONTEXT.md` at or above the working directory. It
 injects the compact scientific stance at session, subagent, and prompt entry,
-then reports new, changed, and deleted test files as advisory context at Stop.
-Review and trust the repository hooks, start a fresh Codex task after
-installation, verify the hook behavior, and record representative routing
-results in `evaluation/results/<version>.md`.
+then reports new, changed, and deleted test files as advisory messages at Stop.
+Changed Markdown, Quarto, and LaTeX prose is checked against `BANNED.md` at
+Stop; violations block with the offending lines. Test-file growth stays advisory.
+Review and trust repository hooks and start a fresh Codex task after installing.
 
-Tag `v<version>` only after source
-validation, synchronization, installation, installed verification, hook trust
-review, and the fresh-task routing pass succeed.
+## Source identity, not numbered releases
+
+CSE uses Git commits and installed payload hashes to identify changes. The
+plugin manifests omit release numbers; there is no version bump or tag gate.
+Historical tags and result records remain evidence, not a release schedule.
+Model-backed routing measurements and cooling-fit trials are opt-in and never
+run automatically during validation, installation, or merge. Record any
+explicitly requested measurement under `evaluation/results/<commit>-routing.md`.

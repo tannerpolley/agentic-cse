@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import ast
 import json
-from collections import Counter
+from collections import Counter, defaultdict
 from pathlib import Path
 import re
 import shutil
@@ -145,10 +145,43 @@ def routing_analysis() -> dict:
 
 
 class PluginBehaviorTests(unittest.TestCase):
+    def test_manuscript_checkpoint_keeps_routine_writing_available(self):
+        cases = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())["cases"]
+        by_id = {case["id"]: case for case in cases}
+        self.assertEqual("cse:write", by_id["write-routine-manuscript-edit"]["expected_skill"])
+        self.assertEqual("cse:review", by_id["review-final-manuscript-cohesion"]["expected_skill"])
+        writing = skill_text("write")
+        review = skill_text("review")
+        owner = (ROOT / "references/scientific-projects.md").read_text()
+        self.assertIn("rendering does not require an agent cohesion review", writing)
+        self.assertIn("sentence-to-argument checkpoint", review)
+        for required in ("Each sentence", "Each paragraph", "Each section", "argument spine",
+                         "clear, weak, or broken", "source identity", "Return **Revise**",
+                         "must never assign", "second independent review"):
+            self.assertIn(required, owner)
+
+    def test_long_sentences_have_one_core_owner(self):
+        # Add only exact deliberate quotations, with their source and reason.
+        quotation_allowlist = {}
+        seen = defaultdict(set)
+        paths = [*ROOT.glob("skills/*/SKILL.md"), *ROOT.glob("references/*.md")]
+        for path in paths:
+            text = path.read_text()
+            if path.name == "SKILL.md":
+                text = text.split("---", 2)[-1]
+            text = re.sub(r"```.*?```", "", text, flags=re.S)
+            for paragraph in re.split(r"\n\s*\n", text):
+                for sentence in re.split(r"(?<=[.!?])\s+", " ".join(paragraph.split())):
+                    if len(sentence.split()) > 12:
+                        seen[sentence].add(str(path.relative_to(ROOT)))
+        duplicates = {sentence: sorted(paths) for sentence, paths in seen.items()
+                      if len(paths) > 1 and sentence not in quotation_allowlist}
+        self.assertEqual({}, duplicates)
+
     def test_manifest_and_public_skills(self):
         manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text())
         self.assertEqual(manifest["name"], "cse")
-        self.assertEqual(manifest["version"], "2.3.0")
+        self.assertNotIn("version", manifest)
         self.assertEqual(
             manifest["interface"]["displayName"],
             "Agentic Computational Science and Engineering",
@@ -156,17 +189,17 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertEqual({path.name for path in (ROOT / "skills").iterdir()}, CORE)
         self.assertEqual({path.name for path in (SOURCES_ROOT / "skills").iterdir()}, SOURCES)
         self.assertEqual({path.name for path in (VISUALIZE_ROOT / "skills").iterdir()}, VISUALIZE)
-        self.assertEqual(json.loads((SOURCES_ROOT / ".codex-plugin/plugin.json").read_text())["version"], "1.0.0")
-        self.assertEqual(json.loads((VISUALIZE_ROOT / ".codex-plugin/plugin.json").read_text())["version"], "2.0.0")
+        self.assertNotIn("version", json.loads((SOURCES_ROOT / ".codex-plugin/plugin.json").read_text()))
+        self.assertNotIn("version", json.loads((VISUALIZE_ROOT / ".codex-plugin/plugin.json").read_text()))
         self.assertTrue((ROOT / "BANNED.md").is_file())
 
-    def test_release_assurance_stays_bounded_and_pinned(self):
+    def test_source_identity_and_routing_cases_remain_explicit(self):
         manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text())
-        self.assertEqual(manifest["version"], "2.3.0")
+        self.assertNotIn("version", manifest)
         routing = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())
         cases = routing["cases"]
         self.assertGreaterEqual(len(cases), 15)
-        self.assertEqual(28, len(cases))
+        self.assertEqual(30, len(cases))
         self.assertEqual(len(cases), len({case["id"] for case in cases}))
         self.assertEqual(
             {"direct", "indirect", "incomplete", "negative", "unsupported"},
@@ -230,11 +263,12 @@ class PluginBehaviorTests(unittest.TestCase):
             routing = skill_frontmatter(name)["metadata"]["cse-routing"]
             self.assertNotIn("terminology", routing["direct"], name)
             self.assertNotIn("BANNED", routing["direct"], name)
-            self.assertTrue({"terminology", "BANNED"} <= set(routing["conditional"]), name)
-            text = skill_text(name)
-            self.assertRegex(text, r"(?is)activate\s+`terminology`.*`references/terminology\.md`")
-            self.assertRegex(text, r"(?is)activate.*`BANNED`.*`BANNED\.md`")
-            self.assertRegex(text, r"(?is)routine\s+inspection.*questions.*commands.*terse progress")
+            self.assertFalse({"terminology", "BANNED"} & set(routing["conditional"]), name)
+            self.assertIn("operating-model", routing["direct"])
+        text = (ROOT / "references/operating-model.md").read_text()
+        self.assertIn("references/terminology.md", text)
+        self.assertIn("BANNED.md", text)
+        self.assertRegex(text, r"(?is)Routine inspection.*questions.*commands.*terse progress")
 
     def test_terminology_conflict_and_native_approval_safeguards_remain_explicit(self):
         cases = yaml.safe_load((ROOT / "evaluation" / "skill-routing.yaml").read_text())["cases"]
@@ -340,7 +374,7 @@ class PluginBehaviorTests(unittest.TestCase):
         analyze = skill_text("analyze")
         self.assertIn("an authoritative retained input\nneeds no Data probe", analyze)
         self.assertIn("Project-selected output formats", analyze)
-        self.assertIn("A CSV or summary statistic does not replace the figure", analyze)
+        self.assertIn("claim-led figure rule in `scientific-projects`", analyze)
         review = skill_text("review")
         self.assertIn("Result lens", review)
         self.assertIn("Capability lens", review)
@@ -349,7 +383,8 @@ class PluginBehaviorTests(unittest.TestCase):
         summarize = skill_text("summarize")
         self.assertIn("useful method-specific result", summarize)
         self.assertIn("before Review", summarize)
-        self.assertIn("neither a CSV link nor a table replaces it", summarize)
+        self.assertIn("claim-led figure requirement", summarize)
+        self.assertIn("neither a CSV link nor a", (ROOT / "references/scientific-projects.md").read_text())
 
     def test_scientific_safety_and_retained_evidence_boundaries_remain(self):
         data = skill_text("data")
@@ -427,7 +462,7 @@ class PluginBehaviorTests(unittest.TestCase):
                         "meaningful populated child names", "same responsibilities",
                         "exist before Review", "must not rerun", "one claim-led figure",
                         "The retained CSV owns")),
-            (github, ("Standalone issues are normal", "git merge --ff-only", "optional context")),
+            (github, ("Standalone issues are normal", "git merge --ff-only", "optional repository context")),
             (decisions, ("one numbered sequence", "reversible library choice", "independent reference case")),
             (dependent, ("Observed state", "Proposed correction")),
             (design, ("Result lens", "Capability lens", "Only a **Ready** disposition permits `cse:build`")),
@@ -605,6 +640,19 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertIn("Build owns the one change-accounting run", surface)
         self.assertIn("Build reports its changed surface", surface)
 
+    def test_setup_assets_keep_records_markdown_and_latex_manuscript_only(self):
+        project = ROOT / "assets/project"
+        self.assertTrue((project / "README.md").is_file())
+        context = (project / "CONTEXT.md").read_text()
+        for phrase in ("default deliverable: result", "## Owners", "## Glossary", "## Avoid", "Source"):
+            self.assertIn(phrase, context)
+        for name in ("formulation.md", "methods.md", "evidence.md", "decisions/README.md", "writing/STYLE.md", "writing/RULES.md"):
+            self.assertTrue((project / name).is_file(), name)
+        self.assertFalse(any(path.suffix == ".tex" for path in project.rglob("*")))
+        projects = (ROOT / "references/scientific-projects.md").read_text()
+        self.assertIn("Setup always creates", projects)
+        self.assertIn("Optional formulation, methods, evidence", projects)
+
     def test_source_only_boundary_excludes_runs_from_sync_and_installation(self):
         benchmark = (ROOT / "scripts/cooling_fit_benchmark.py").read_text()
         with tempfile.TemporaryDirectory() as directory:
@@ -659,13 +707,13 @@ class PluginBehaviorTests(unittest.TestCase):
 
     def test_companion_package_ownership_namespaces_and_handoffs(self):
         packages = {
-            "cse": (ROOT, CORE, "2.3.0"),
-            "cse-sources": (SOURCES_ROOT, SOURCES, "1.0.0"),
-            "cse-visualize": (VISUALIZE_ROOT, VISUALIZE, "2.0.0"),
+            "cse": (ROOT, CORE, None),
+            "cse-sources": (SOURCES_ROOT, SOURCES, None),
+            "cse-visualize": (VISUALIZE_ROOT, VISUALIZE, None),
         }
         for name, (root, expected, version) in packages.items():
             package_manifest = json.loads((root / ".codex-plugin/plugin.json").read_text())
-            self.assertEqual((package_manifest["name"], package_manifest["version"]), (name, version))
+            self.assertEqual((package_manifest["name"], package_manifest.get("version")), (name, version))
             self.assertEqual({path.name for path in (root / "skills").iterdir()}, expected)
 
         active_roots = [ROOT / "skills", ROOT / "references", ROOT / ".codex-plugin", ROOT / "README.md", ROOT / "docs/design", ROOT / "evaluation", ROOT / "examples", ROOT / "extensions"]

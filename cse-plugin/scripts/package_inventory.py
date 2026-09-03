@@ -15,7 +15,6 @@ import tempfile
 
 
 ROOT = Path(__file__).resolve().parents[1]
-COMPATIBILITY = {"cse": "2.3.0", "cse-sources": "1.0.0", "cse-visualize": "2.0.0"}
 PACKAGES = (
     {
         "name": "cse",
@@ -60,6 +59,20 @@ def source_root(item: dict) -> Path:
     return (ROOT / item["root"]).resolve()
 
 
+def check_source(item: dict) -> None:
+    root = source_root(item)
+    manifest = json.loads((root / ".codex-plugin/plugin.json").read_text())
+    if manifest.get("name") != item["name"] or not manifest.get("description"):
+        raise RuntimeError(f"{item['name']} requires its package name and description")
+    if "version" in manifest:
+        raise RuntimeError("CSE packages use source commits, not release numbers")
+    for relative in item["include"]:
+        if not (root / relative).exists():
+            raise RuntimeError(f"{item['name']} payload is missing: {relative}")
+    if sorted(path.name for path in (root / "skills").iterdir() if path.is_dir()) != sorted(item["skills"]):
+        raise RuntimeError(f"{item['name']} skills disagree with the package inventory")
+
+
 def deploy_root(item: dict, home: Path | None = None) -> Path:
     return ((home or Path.home()) / ".codex" / "plugins" / item["name"]).resolve()
 
@@ -96,6 +109,7 @@ def runtime_tree_hash(root: Path) -> str:
 
 
 def stage(item: dict, destination: Path, commit: str, home: Path | None = None) -> dict:
+    check_source(item)
     source = source_root(item)
     if destination.exists():
         raise RuntimeError(f"staging destination already exists: {destination}")
@@ -111,20 +125,18 @@ def stage(item: dict, destination: Path, commit: str, home: Path | None = None) 
         else:
             shutil.copy2(origin, target)
     manifest = json.loads((destination / ".codex-plugin/plugin.json").read_text())
-    if manifest.get("name") != item["name"] or manifest.get("version") != COMPATIBILITY[item["name"]]:
+    if manifest.get("name") != item["name"]:
         raise RuntimeError(f"{item['name']} manifest disagrees with the package inventory")
     skills = sorted(path.name for path in (destination / "skills").iterdir() if path.is_dir())
     if skills != sorted(item["skills"]):
         raise RuntimeError(f"{item['name']} staged skills are {skills}; expected {sorted(item['skills'])}")
     identity = {
         "pluginId": item["name"],
-        "version": manifest["version"],
         "sourceCommit": commit,
         "deploymentRoot": str(deploy_root(item, home)),
         "enabled": True,
         "runtimeTreeSha256": runtime_tree_hash(destination),
         "payloadSkills": list(item["skills"]),
-        "compatibility": COMPATIBILITY,
     }
     identity_path = destination / IDENTITY_PATH
     identity_path.write_text(json.dumps(identity, indent=2, sort_keys=True) + "\n")
@@ -145,15 +157,13 @@ def verify(item: dict, root: Path, commit: str, home: Path | None = None) -> dic
     identity = json.loads(identity_path.read_text())
     expected = {
         "pluginId": item["name"],
-        "version": COMPATIBILITY[item["name"]],
         "sourceCommit": commit,
         "deploymentRoot": str(deploy_root(item, home)),
         "enabled": True,
         "runtimeTreeSha256": runtime_tree_hash(root),
         "payloadSkills": list(item["skills"]),
-        "compatibility": COMPATIBILITY,
     }
-    if manifest.get("name") != expected["pluginId"] or manifest.get("version") != expected["version"]:
+    if manifest.get("name") != expected["pluginId"]:
         raise RuntimeError(f"{item['name']} manifest disagrees with its inventory")
     if identity != expected:
         fields = sorted(key for key in set(identity) | set(expected) if identity.get(key) != expected.get(key))
@@ -176,6 +186,8 @@ def main() -> int:
     subparsers = parser.add_subparsers(dest="command", required=True)
     subparsers.add_parser("inventory")
     subparsers.add_parser("list")
+    check_parser = subparsers.add_parser("check")
+    check_parser.add_argument("package")
     stage_parser = subparsers.add_parser("stage")
     stage_parser.add_argument("package")
     stage_parser.add_argument("destination", type=Path)
@@ -188,7 +200,7 @@ def main() -> int:
     verify_parser.add_argument("--home", type=Path)
     args = parser.parse_args()
     if args.command == "inventory":
-        print(json.dumps({"compatibility": COMPATIBILITY, "packages": PACKAGES}, indent=2))
+        print(json.dumps({"packages": PACKAGES}, indent=2))
         return 0
     if args.command == "list":
         for item in PACKAGES:
@@ -196,6 +208,10 @@ def main() -> int:
         return 0
     try:
         item = package(args.package)
+        if args.command == "check":
+            check_source(item)
+            print(f"{item['name']} source inventory checked")
+            return 0
         if args.command == "stage":
             identity = stage(item, args.destination.resolve(), args.commit or source_commit(), args.home)
         else:

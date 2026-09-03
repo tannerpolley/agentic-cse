@@ -5,7 +5,6 @@ repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 deploy_parent="$HOME/.codex/plugins"
 marketplace="$HOME/.agents/plugins/marketplace.json"
 legacy_root="$deploy_parent/scientific-codex"
-validator="${CSE_PLUGIN_VALIDATOR:-$HOME/.codex/skills/.system/plugin-creator/scripts/validate_plugin.py}"
 
 if [[ "${1:-}" != "--validate" || $# -ne 1 ]]; then
   echo "Usage: $0 --validate" >&2
@@ -67,7 +66,7 @@ while IFS=$'\t' read -r package_name _ target; do
     exit 1
   fi
   python3 "$repository_root/scripts/package_inventory.py" stage "$package_name" "$staged/$package_name" --commit "$commit"
-  python3 "$validator" "$staged/$package_name"
+  python3 "$repository_root/scripts/package_inventory.py" verify "$package_name" "$staged/$package_name" --commit "$commit"
   if [[ "${CSE_FAIL_AT:-}" == "stage:after:$package_name" ]]; then
     echo "Injected failure at stage:after:$package_name" >&2
     exit 1

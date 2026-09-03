@@ -198,6 +198,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             repository = root / "repo"
             shutil.copytree(ROOT / "scripts", plugin / "scripts")
             shutil.copytree(ROOT / "assets", plugin / "assets")
+            shutil.copy2(ROOT / "BANNED.md", plugin / "BANNED.md")
             repository.mkdir()
             self.initialize_git_repository(repository)
             project = repository / "engine"
@@ -291,7 +292,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                 capture_output=True, check=True,
             ).stdout.strip()
             names = ("cse", "cse-sources", "cse-visualize")
-            versions = {"cse": "2.3.0", "cse-sources": "1.0.0", "cse-visualize": "2.0.0"}
+            versions = {name: "local" for name in names}
             for name in names:
                 result = subprocess.run(
                     [
@@ -331,7 +332,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             cases = (
                 ({"installed": []}, "do not match the selected configuration"),
                 ({"installed": [record("cse"), record("cse-sources", enabled=False), record("cse-visualize")]}, "not enabled"),
-                ({"installed": [record("cse"), record("cse-sources"), record("cse-visualize", version="9.0.0")]}, "version does not match"),
+                ({"installed": [record("cse"), record("cse-sources"), {**record("cse-visualize"), "source": {"path": str(root / "wrong")}}]}, "unexpected deployment root"),
                 ({"installed": [record("cse"), record("cse-sources"), record("cse-visualize"), record("cse")]}, "missing or duplicated"),
                 ({"installed": [record("cse"), record("cse-sources"), record("cse-visualize"), {**record("cse"), "pluginId": "cse@other"}]}, "do not match the selected configuration"),
                 ({"installed": [record("cse"), record("cse-sources"), record("cse-visualize"), {"pluginId": "cse-experimental@personal"}]}, "unexpected CSE-family packages"),
@@ -403,13 +404,45 @@ class ScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(source_mismatch.returncode, 1)
             self.assertIn("does not match the committed source", source_mismatch.stderr)
 
-    def test_prose_check_rejects_default_forbidden_word(self):
+    def test_prose_check_reads_banned_rows(self):
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory) / "draft.md"
             path.write_text("An " + "arti" + "fact" + " remains.\n")
             result = self.run_script("check_prose.py", str(path))
         self.assertEqual(result.returncode, 1)
-        self.assertIn("forbidden word", result.stdout)
+        self.assertIn("avoid", result.stdout)
+
+    def test_stop_checks_changed_prose_and_sourced_exemptions(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.initialize_git_repository(root)
+            context = root / "docs/scientific/CONTEXT.md"
+            context.parent.mkdir(parents=True)
+            context.write_text("# Scientific context\n")
+            notebook = root / "notebook.qmd"
+            notebook.write_text("Existing prose.\n")
+            def invoke(event):
+                result = subprocess.run(
+                    [sys.executable, str(ROOT / "scripts/cse-test-gate.py"), event],
+                    input=json.dumps({"cwd": str(root), "session_id": "prose-check"}),
+                    text=True, capture_output=True, check=True)
+                return json.loads(result.stdout) if result.stdout else {}
+            invoke("SessionStart")
+            notebook.write_text("the pipeline is robust\n")
+            blocked = invoke("Stop")
+            self.assertEqual("block", blocked["decision"])
+            self.assertIn("avoid 'pipeline'", blocked["reason"])
+            self.assertIn("avoid 'robust'", blocked["reason"])
+            notebook.write_text("`pipeline`, `pipeline_run`, and `robust.md`\n")
+            self.assertNotIn("decision", invoke("Stop"))
+            notebook.write_text("the model is robust.md\n")
+            self.assertEqual("block", invoke("Stop")["decision"])
+            context.write_text("# Scientific context\n\n| Term | Meaning | Source | Scope |\n"
+                               "|---|---|---|---|\n"
+                               "| pipeline | domain operation | paper:1 | * |\n"
+                               "| robust | bounded estimator | paper:2 | * |\n")
+            notebook.write_text("the pipeline is robust\n")
+            self.assertNotIn("decision", invoke("Stop"))
 
     def test_prose_check_applies_scoped_rules_and_exceptions(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -457,13 +490,13 @@ class ScriptBehaviorTests(unittest.TestCase):
             )
 
         self.assertEqual(result.returncode, 1)
-        self.assertIn("avoid 'contact' → prefer 'stages'", result.stdout)
+        self.assertIn("avoid 'contact' → stages", result.stdout)
         self.assertEqual(result.stdout.count("avoid 'contact'"), 1)
         self.assertIn(
-            "avoid 'frozen parameter set' → prefer 'parameters held fixed'",
+            "avoid 'frozen parameter set' → parameters held fixed",
             result.stdout,
         )
-        self.assertNotIn("MSContactor", result.stdout)
+        self.assertEqual(result.stdout.count("avoid 'contact'"), 1)
         self.assertNotIn("notes.md", result.stdout)
 
     def test_prose_check_rejects_overlapping_authorities(self):
