@@ -534,18 +534,17 @@ class PluginBehaviorTests(unittest.TestCase):
         }
         self.assertEqual({"Ready", "Revise", "Block"}, set(cases))
         guide = skill_text("design")
-        design = skill_text("design")
         for disposition, case in cases.items():
             self.assertEqual("cse:design", case["expected_skill"])
             self.assertIn("Build", case["prohibited_action"])
             self.assertIn(f"**{disposition}**", guide)
         for term in (
-            "live project", "callers, owners", "evidence",
+            "changed surface and callers", "numerical owner", "sources",
             "public input", "Result lens", "Capability lens", "two fresh reviewers",
             "normal GitHub issue record",
         ):
             self.assertIn(term, guide)
-        self.assertRegex(design, r"(?is)only a \*\*Ready\*\*.*permits `cse:build`")
+        self.assertRegex(guide, r"(?is)only a \*\*Ready\*\*.*permits `cse:build`")
 
     def test_issue_15_protocol_is_fully_pinned(self):
         config = json.loads((ROOT / "evaluation/cooling-fit/benchmark.json").read_text())
@@ -661,7 +660,7 @@ class PluginBehaviorTests(unittest.TestCase):
             shutil.copytree(
                 ROOT,
                 source,
-                ignore=shutil.ignore_patterns(".git", "__pycache__", ".pytest_cache"),
+                ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__", ".pytest_cache", ".runs"),
             )
             (source / ".runs/cooling-fit/run-1").mkdir(parents=True)
             (source / ".runs/cooling-fit/run-1/events.jsonl").write_text("source-only\n")

@@ -76,7 +76,9 @@ def main() -> int:
     except (OSError, RuntimeError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
         print(f"CSE installed check failed: {exc}", file=sys.stderr)
         return 1
-    print(json.dumps({"verified": verified}, sort_keys=True))
+    print(json.dumps({"verified": verified, "sourceCommit": commit,
+                      "activation": "unverified" if args.deployed_only else "installed and enabled in CLI plugin list",
+                      "active_task_loaded_state": "unverified"}, sort_keys=True))
     return 0
 
 

@@ -73,7 +73,9 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertTrue(files["figure.bin"]["binary"])
         self.assertIsNone(files["figure.bin"]["additions"])
         self.assertNotIn("ignored.bin", files)
-        self.assertEqual(report["executable_removal_to_addition_ratio"], 0.5)
+        self.assertEqual(report["categories"]["executable"]["additions"], 2)
+        self.assertEqual(report["categories"]["executable"]["removals"], 1)
+        self.assertNotIn("executable_removal_to_addition_ratio", report)
 
     def test_change_accounting_detects_default_base_and_renders_text(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -87,7 +89,8 @@ class ScriptBehaviorTests(unittest.TestCase):
 
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertIn("requested base: main", result.stdout)
-        self.assertIn("executable removal/addition ratio: not applicable", result.stdout)
+        self.assertIn("executable: 0 files, +0 -0, 0 binary", result.stdout)
+        self.assertNotIn("removal/addition ratio", result.stdout)
         self.assertIn("documents: +1 -1 README.md", result.stdout)
 
     def test_change_accounting_rejects_non_repository(self):
@@ -105,7 +108,7 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(result.returncode, 2)
         self.assertIn("provide --base REF", result.stderr)
 
-    def test_cse_hook_injects_stance_and_reports_test_changes_without_blocking(self):
+    def test_cse_hook_refreshes_stance_and_reports_test_advisory_without_continuation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             repository = root / "repo"
@@ -170,9 +173,27 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertLessEqual(len(rendered.split()), 180)
             context.write_text("# Scientific context\n")
 
-            for event in ("SubagentStart", "UserPromptSubmit"):
-                output = invoke(event, session_id=f"session-{serial}")
-                self.assertEqual(expected_stance(), output["hookSpecificOutput"]["additionalContext"])
+            output = invoke("SubagentStart", session_id=f"session-{serial}")
+            self.assertEqual(expected_stance(), output["hookSpecificOutput"]["additionalContext"])
+            reminder = invoke("UserPromptSubmit", session_id=f"session-{serial}")["hookSpecificOutput"]["additionalContext"]
+            self.assertLess(len(reminder.split()), 35)
+            self.assertIn("scientific question", reminder)
+
+            start()
+            self.assertEqual({}, invoke("Stop", session_id=f"session-{serial}"))
+            self.assertEqual({}, invoke("Stop", session_id=f"session-{serial}", stop_hook_active=False))
+            self.assertEqual({}, invoke("Stop", session_id=f"session-{serial}", stop_hook_active=True))
+            unavailable = invoke("Stop", session_id="missing-baseline", stop_hook_active=True)
+            self.assertNotIn("decision", unavailable)
+            self.assertIn("not a pass", unavailable["systemMessage"])
+            for state in (repository / ".git/cse-test-advisory").glob("*.json"):
+                state.write_text("[]")
+            invalid = invoke("Stop", session_id=f"session-{serial}", stop_hook_active=True)
+            self.assertNotIn("decision", invalid)
+            self.assertIn("not a pass", invalid["systemMessage"])
+            start()
+            resumed = invoke("SessionStart", source="compact", session_id=f"session-{serial}")
+            self.assertEqual(expected_stance(), resumed["hookSpecificOutput"]["additionalContext"])
 
             probes = (
                 (lambda: existing.write_text("assert True\n"), "expanded test: engine/tests/test_model.py"),
@@ -188,7 +209,10 @@ class ScriptBehaviorTests(unittest.TestCase):
                 mutate()
                 advisory = invoke("Stop", session_id=f"session-{serial}")
                 self.assertNotIn("decision", advisory)
-                self.assertIn(expected, advisory["hookSpecificOutput"]["additionalContext"])
+                self.assertIn(expected, advisory["systemMessage"])
+                repeated = invoke("Stop", session_id=f"session-{serial}", stop_hook_active=True)
+                self.assertNotIn("decision", repeated)
+                self.assertIn(expected, repeated["systemMessage"])
 
     def test_repo_hooks_survive_plugin_removal(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -244,14 +268,16 @@ class ScriptBehaviorTests(unittest.TestCase):
             unrelated_context.write_text("# Scientific context\n")
             unrelated_hooks = unrelated / ".codex/hooks.json"
             unrelated_hooks.parent.mkdir()
-            unrelated_hooks.write_text('{"hooks":{"Stop":[{"hooks":[{"command":"other"}]}]}}')
+            unrelated_hooks.write_text('{"description":"User hook notes","hooks":{"Stop":[{"hooks":[{"command":"other"}]}]}}')
             refused = subprocess.run(
                 [sys.executable, str(plugin / "scripts/install_cse_hooks.py"),
                  "--home", str(home), "--repo", str(unrelated)],
                 text=True, capture_output=True, check=False,
             )
-            self.assertEqual(refused.returncode, 1)
-            self.assertEqual(unrelated_hooks.read_text(), '{"hooks":{"Stop":[{"hooks":[{"command":"other"}]}]}}')
+            self.assertEqual(refused.returncode, 0, refused.stderr)
+            self.assertEqual(json.loads(unrelated_hooks.read_text())["description"], "User hook notes")
+            self.assertEqual(json.loads(unrelated_hooks.read_text())["hooks"]["Stop"][0],
+                             {"hooks": [{"command": "other"}]})
             shutil.rmtree(plugin)
 
             config = json.loads((project / ".codex/hooks.json").read_text())
@@ -260,6 +286,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             base_event = {"cwd": str(project), "session_id": "survives-upgrade"}
             for event in ("SessionStart", "SubagentStart", "UserPromptSubmit", "Stop"):
                 command = config["hooks"][event][0]["hooks"][0]["command"]
+                self.assertTrue(command.startswith('python3 "$HOME/'))
                 values = {**base_event}
                 if event == "SessionStart":
                     values["source"] = "startup"
@@ -276,12 +303,141 @@ class ScriptBehaviorTests(unittest.TestCase):
                 if result.stdout:
                     json.loads(result.stdout)
 
-            self.assertTrue((home / ".codex/hooks/cse_hook_common.py").is_file())
-            self.assertTrue((home / ".codex/hooks/cse-scientific-stance.txt").is_file())
+            self.assertTrue((home / ".local/share/cse/hooks/cse_hook_common.py").is_file())
+            self.assertTrue((home / ".local/share/cse/hooks/cse-scientific-stance.txt").is_file())
 
             self.assertNotIn("plugins/cache", json.dumps(config))
             self.assertNotIn("PLUGIN_ROOT", json.dumps(config))
             self.assertNotIn("CLAUDE_PLUGIN_ROOT", json.dumps(config))
+
+    def test_claude_hook_installation_preserves_settings_and_diagnoses_without_writes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home"
+            repo = root / "repo"
+            repo.mkdir()
+            self.initialize_git_repository(repo)
+            context = repo / "docs/scientific/CONTEXT.md"
+            context.parent.mkdir(parents=True)
+            context.write_text("# Scientific context\n")
+            config = repo / ".claude/settings.json"
+            config.parent.mkdir()
+            config.write_text(json.dumps({"permissions": {"deny": ["Bash(rm *)"]},
+                "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "echo keep"}]}]}}))
+            args = ("--agent", "claude", "--home", str(home), "--repo", str(repo))
+            before = config.read_bytes()
+            report = self.run_script("install_cse_hooks.py", *args, "--diagnose")
+            self.assertEqual(report.returncode, 0, report.stderr)
+            self.assertFalse(json.loads(report.stdout)[0]["configuration_current"])
+            self.assertEqual(config.read_bytes(), before)
+            self.assertFalse(home.exists())
+            installed = self.run_script("install_cse_hooks.py", *args)
+            self.assertEqual(installed.returncode, 0, installed.stderr)
+            data = json.loads(config.read_text())
+            self.assertEqual(data["permissions"], {"deny": ["Bash(rm *)"]})
+            self.assertEqual(data["hooks"]["Stop"][0]["hooks"][0]["command"], "echo keep")
+            self.assertNotIn("statusMessage", data["hooks"]["Stop"][1]["hooks"][0])
+            self.assertFalse((repo / ".codex").exists())
+            again = self.run_script("install_cse_hooks.py", *args)
+            self.assertEqual(again.returncode, 0, again.stderr)
+            self.assertEqual(json.loads(config.read_text()), data)
+            report = json.loads(self.run_script("install_cse_hooks.py", *args, "--diagnose").stdout)[0]
+            self.assertTrue(report["configuration_current"])
+            self.assertTrue(all(item["matches_source"] for item in report["runtime"]))
+            self.assertIn("unverified", report["trust_and_activation"])
+            runtime = home / ".local/share/cse/hooks"
+            installed_file = runtime / "cse-test-gate.py"
+            installed_file.unlink()
+            installed_file.symlink_to(ROOT / "scripts/cse-test-gate.py")
+            report = json.loads(self.run_script("install_cse_hooks.py", *args, "--diagnose").stdout)[0]
+            self.assertFalse(report["runtime"][0]["matches_source"])
+            self.assertIsNone(report["runtime"][0]["sha256"])
+            self.assertIn("symlink", report["runtime"][0]["error"])
+            installed_file.unlink()
+            shutil.copyfile(ROOT / "scripts/cse-test-gate.py", installed_file)
+            runtime.rename(runtime.with_name("real-hooks"))
+            runtime.symlink_to(runtime.with_name("real-hooks"), target_is_directory=True)
+            report = json.loads(self.run_script("install_cse_hooks.py", *args, "--diagnose").stdout)[0]
+            self.assertTrue(all("symlink" in item["error"] for item in report["runtime"]))
+            runtime.unlink()
+            runtime.with_name("real-hooks").rename(runtime)
+            config.unlink()
+            config.parent.rmdir()
+            config.parent.symlink_to(home, target_is_directory=True)
+            refused = self.run_script("install_cse_hooks.py", *args)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertFalse((home / "settings.json").exists())
+
+    def test_hook_diagnosis_separates_legacy_missing_targets_and_saved_disables(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home, repo = root / "home", root / "repo"
+            repo.mkdir()
+            self.initialize_git_repository(repo)
+            context = repo / "docs/scientific/CONTEXT.md"
+            context.parent.mkdir(parents=True)
+            context.write_text("# Scientific context\n")
+            legacy = home / ".codex/hooks/cse-test-gate.py"
+            legacy.parent.mkdir(parents=True)
+            legacy.write_text("legacy runtime; must not execute\n")
+            settings = home / ".codex/config.toml"
+            settings.write_text('[hooks.state."cse@personal:hooks/hooks.json:stop:0:0"]\nenabled = false\ntrusted_hash = "private"\n'
+                                '[hooks.state."unrelated:stop"]\nenabled = true\n')
+            configs = [home / ".codex/hooks.json", repo / ".codex/hooks.json"]
+            for config, runtime in zip(configs, (".local/share/cse/hooks", ".codex/hooks")):
+                config.parent.mkdir(exist_ok=True)
+                config.write_text(json.dumps({"hooks": {"Stop": [{"hooks": [{"type": "command",
+                    "command": f'python3 "$HOME/{runtime}/cse-test-gate.py" Stop'}]}]}}))
+            before = {path: path.read_bytes() for path in [settings, legacy, *configs]}
+            result = self.run_script("install_cse_hooks.py", "--diagnose", "--home", str(home), "--repo", str(repo))
+            self.assertEqual(0, result.returncode, result.stderr)
+            report = json.loads(result.stdout)[0]
+            sources = {item["path"]: item for item in report["configuration_sources"]}
+            self.assertFalse(sources[str(configs[0])]["registrations"][0]["target_exists"])
+            registered = sources[str(configs[1])]["registrations"][0]
+            self.assertTrue(registered["target_exists"])
+            self.assertTrue(registered["legacy"])
+            self.assertEqual({"cse@personal:hooks/hooks.json:stop:0:0": {"enabled": False}},
+                             sources[str(settings)]["saved_cse_state"])
+            self.assertNotIn("private", result.stdout)
+            self.assertIn("unverified", report["trust_and_activation"])
+            self.assertFalse((home / ".local").exists())
+            self.assertEqual(before, {path: path.read_bytes() for path in before})
+
+    def test_hook_diagnosis_retains_other_sources_and_repositories_after_malformed_config(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            home = root / "home"
+            repos = [root / "bad", root / "good"]
+            for repo in repos:
+                repo.mkdir()
+                self.initialize_git_repository(repo)
+                context = repo / "docs/scientific/CONTEXT.md"
+                context.parent.mkdir(parents=True)
+                context.write_text("# Scientific context\n")
+            for agent, relative in (("codex", ".codex/hooks.json"), ("claude", ".claude/settings.json")):
+                configs = [base / relative for base in [home, *repos]]
+                for config in configs:
+                    config.parent.mkdir(parents=True, exist_ok=True)
+                    config.write_text('{"hooks": {}}')
+                configs[0].write_text('{"hooks": {"Stop": {}}}')
+                for malformed in ('{"hooks":{"Stop":{}}}', '{"hooks":{"Stop":[{}]}}',
+                                  '{"hooks":{"Stop":[{"hooks":[{"type":"command","command":null}]}]}}', '{'):
+                    with self.subTest(agent=agent, malformed=malformed):
+                        configs[1].write_text(malformed)
+                        before = {path: path.read_bytes() for path in configs}
+                        result = self.run_script("install_cse_hooks.py", "--diagnose", "--agent", agent,
+                                                 "--home", str(home), "--repo", str(repos[0]), "--repo", str(repos[1]))
+                        self.assertEqual(0, result.returncode, result.stderr)
+                        reports = json.loads(result.stdout)
+                        self.assertEqual(2, len(reports))
+                        for report, config in zip(reports, configs[1:]):
+                            sources = {item["path"]: item for item in report["configuration_sources"]}
+                            self.assertIn("error", sources[str(configs[0])])
+                            self.assertEqual(config == configs[1], "error" in sources[str(config)])
+                        self.assertFalse(reports[0]["configuration_current"])
+                        self.assertEqual(before, {path: path.read_bytes() for path in configs})
+                self.assertFalse((home / ".local").exists())
 
     def test_installed_check_reports_missing_disabled_mismatch_and_pass(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -303,7 +459,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                     text=True, capture_output=True, check=False,
                 )
                 self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertTrue(json.loads(result.stdout)["enabled"])
+                self.assertNotIn("enabled", json.loads(result.stdout))
 
             command_dir = root / "bin"
             command_dir.mkdir()
@@ -363,6 +519,22 @@ class ScriptBehaviorTests(unittest.TestCase):
                 env=environment, text=True, capture_output=True, check=False,
             )
             self.assertEqual(passed.returncode, 0, passed.stderr)
+            self.assertEqual("unverified", json.loads(passed.stdout)["active_task_loaded_state"])
+            core_identity_path = home / ".codex/plugins/cse/.codex-plugin/installed.json"
+            original_identity = core_identity_path.read_bytes()
+            for changes, expected_message in (
+                ({"sourceCommit": "0" * 40}, "source revision differs"),
+                ({"enabled": True}, "identity format or metadata differs: enabled"),
+            ):
+                core_identity_path.write_text(json.dumps({**json.loads(original_identity), **changes}))
+                result = subprocess.run(
+                    [sys.executable, str(check), "--all", "--home", str(home)],
+                    env=environment, text=True, capture_output=True, check=False,
+                )
+                self.assertEqual(result.returncode, 1)
+                self.assertIn(expected_message, result.stderr)
+                self.assertNotIn("payload altered", result.stderr)
+            core_identity_path.write_bytes(original_identity)
             for selected in (("cse",), ("cse", "cse-sources"), ("cse", "cse-visualize")):
                 listing.write_text(json.dumps({"installed": [record(name) for name in selected]}))
                 configured = subprocess.run(
@@ -388,7 +560,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                 env=environment, text=True, capture_output=True, check=False,
             )
             self.assertEqual(rejected.returncode, 1)
-            self.assertIn("stale, altered, or incompatible", rejected.stderr)
+            self.assertIn("payload altered", rejected.stderr)
             identity_path = home / ".codex/plugins/cse-sources/.codex-plugin/installed.json"
             identity = json.loads(identity_path.read_text())
             inventory = subprocess.run(
@@ -424,7 +596,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             def invoke(event):
                 result = subprocess.run(
                     [sys.executable, str(ROOT / "scripts/cse-test-gate.py"), event],
-                    input=json.dumps({"cwd": str(root), "session_id": "prose-check"}),
+                    input=json.dumps({"cwd": str(root), "session_id": "prose-check", "stop_hook_active": True}),
                     text=True, capture_output=True, check=True)
                 return json.loads(result.stdout) if result.stdout else {}
             invoke("SessionStart")
@@ -717,6 +889,8 @@ class ScriptBehaviorTests(unittest.TestCase):
             proxy_directory.mkdir()
             shutil.copy2(ROOT / "extensions/cse-visualize/assets/project/quarto/_quarto.yml", project)
             shutil.copy2(ROOT / "extensions/cse-visualize/assets/project/quarto/render.sh", project)
+            for name in ("_quarto-promoted-pdf.yml", "promoted-pdf-header.tex"):
+                shutil.copy2(ROOT / "extensions/cse-visualize/assets/project/quarto" / name, project)
             real_quarto = shutil.which("quarto")
             self.assertIsNotNone(real_quarto)
             proxy = proxy_directory / "quarto"
@@ -730,7 +904,8 @@ class ScriptBehaviorTests(unittest.TestCase):
             )
             proxy.chmod(0o755)
             (project / "document.qmd").write_text(
-                "---\nformat: pdf\n---\n\n"
+                "---\ntitle: Nonexecuting notebook\n---\n\n"
+                "Fixed temperature: $T_a = 22\\,^\\circ\\mathrm{C}$.\n\n"
                 "```{python}\nfrom pathlib import Path\n"
                 "Path('model-ran').write_text('unsafe')\n```\n"
             )
@@ -754,7 +929,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             package_database = tinytex_root / "tlpkg/texlive.tlpdb"
             package_database_before = package_database.read_bytes()
             rendered = subprocess.run(
-                ["bash", "render.sh", "document.qmd"],
+                ["bash", "render.sh", "document.qmd", "--profile", "promoted-pdf", "--to", "pdf"],
                 cwd=project,
                 env=environment,
                 text=True,
@@ -828,7 +1003,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             root = Path(directory)
             source = root / "source"
             home = root / "home"
-            shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", ".venv"))
+            shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__", ".pytest_cache", ".runs"))
             (source / "scripts/validate.sh").write_text("#!/usr/bin/env bash\nexit 0\n")
             (source / "scripts/register_marketplace.py").write_text("raise SystemExit(9)\n")
             validator = root / "validator.py"
@@ -845,7 +1020,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             (deployed / "previous.txt").write_text("preserve\n")
             environment = os.environ | {
                 "HOME": str(home),
-                "CSE_PLUGIN_VALIDATOR": str(validator),
+                "CSE_SKILL_VALIDATOR": str(validator),
             }
             result = subprocess.run(
                 ["bash", str(source / "scripts/sync-live.sh"), "--validate"],
@@ -865,7 +1040,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             root = Path(directory)
             source = root / "source"
             home = root / "home"
-            shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", ".venv"))
+            shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__", ".pytest_cache", ".runs"))
             (source / "scripts/validate.sh").write_text("#!/usr/bin/env bash\nexit 0\n")
             validator = root / "validator.py"
             validator.write_text("raise SystemExit(0)\n")
@@ -885,7 +1060,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             )
             environment = os.environ | {
                 "HOME": str(home),
-                "CSE_PLUGIN_VALIDATOR": str(validator),
+                "CSE_SKILL_VALIDATOR": str(validator),
             }
             result = subprocess.run(
                 ["bash", str(source / "scripts/sync-live.sh"), "--validate"],
@@ -987,7 +1162,7 @@ class ScriptBehaviorTests(unittest.TestCase):
 
             def invoke(home: Path, checkpoint: str | None = None):
                 environment = os.environ | {
-                    "HOME": str(home), "CSE_PLUGIN_VALIDATOR": str(validator),
+                    "HOME": str(home), "CSE_SKILL_VALIDATOR": str(validator),
                 }
                 if checkpoint:
                     environment["CSE_FAIL_AT"] = checkpoint

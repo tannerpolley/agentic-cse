@@ -24,7 +24,7 @@ PACKAGES = (
             "analyze", "summarize", "review", "write",
         ),
         "include": (
-            ".codex-plugin", "AGENTS.md", "BANNED.md", "CHANGELOG.md", "LICENSE", "README.md",
+            ".codex-plugin", ".claude-plugin", "AGENTS.md", "BANNED.md", "CHANGELOG.md", "LICENSE", "README.md",
             "assets", "references", "skills", "scripts/change_accounting.py",
             "scripts/check_prose.py", "scripts/cse-test-gate.py", "scripts/cse_hook_common.py",
             "scripts/install_cse_hooks.py",
@@ -134,7 +134,6 @@ def stage(item: dict, destination: Path, commit: str, home: Path | None = None) 
         "pluginId": item["name"],
         "sourceCommit": commit,
         "deploymentRoot": str(deploy_root(item, home)),
-        "enabled": True,
         "runtimeTreeSha256": runtime_tree_hash(destination),
         "payloadSkills": list(item["skills"]),
     }
@@ -159,17 +158,23 @@ def verify(item: dict, root: Path, commit: str, home: Path | None = None) -> dic
         "pluginId": item["name"],
         "sourceCommit": commit,
         "deploymentRoot": str(deploy_root(item, home)),
-        "enabled": True,
         "runtimeTreeSha256": runtime_tree_hash(root),
         "payloadSkills": list(item["skills"]),
     }
     if manifest.get("name") != expected["pluginId"]:
         raise RuntimeError(f"{item['name']} manifest disagrees with its inventory")
-    if identity != expected:
-        fields = sorted(key for key in set(identity) | set(expected) if identity.get(key) != expected.get(key))
-        raise RuntimeError(
-            f"{item['name']} installed identity is stale, altered, or incompatible: {', '.join(fields)}"
-        )
+    problems = []
+    if identity.get("runtimeTreeSha256") != expected["runtimeTreeSha256"]:
+        problems.append("payload altered: on-disk hash differs from the recorded installed hash")
+    if identity.get("sourceCommit") != commit:
+        problems.append(f"source revision differs: deployed {identity.get('sourceCommit')}, requested {commit}; an older revision is not evidence of breakage")
+    fields = sorted(key for key in set(identity) | set(expected)
+                    if key not in {"sourceCommit", "runtimeTreeSha256"}
+                    and identity.get(key) != expected.get(key))
+    if fields:
+        problems.append(f"identity format or metadata differs: {', '.join(fields)}; regenerate through an explicitly authorized source sync, not by editing installed.json")
+    if problems:
+        raise RuntimeError(f"{item['name']}: " + "; ".join(problems))
     with tempfile.TemporaryDirectory() as directory:
         staged = Path(directory) / item["name"]
         stage(item, staged, commit, home)

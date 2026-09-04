@@ -183,9 +183,9 @@ Explore permits disposable calculations but no persistent test or accepted
 claim. Retaining a new or expanded test promotes it to durable scientific work:
 the agent presents the complete scientific-risk, oracle, metric, tolerance,
 failure, replacement, and runtime proposal and obtains explicit user approval.
-The installed lifecycle hooks compare the final test inventory with the exact
-session-start contents and block completion for an unapproved content
-fingerprint. They do not judge whether the proposal or science is correct.
+Optional lifecycle hooks compare test contents with the session-start inventory
+and report changes as advisories. They do not enforce test approval or judge
+whether the proposal or science is correct. Prose violations remain blocking.
 
 Durable equations and correlations receive stable identifiers, exact source
 locators, symbols, units or basis, assumptions, validity domain, and links to
@@ -295,9 +295,9 @@ files govern forbidden language and completeness checks.
 ## Known limitations
 
 - The plugin remains advisory about scientific correctness and interpretation.
-  Its test gate blocks ordinary hook-aware task completion, but it is not an
-  OS sandbox, cannot prevent transient writes, and can be disabled with the
-  plugin or superseded by host-managed hook policy.
+  Optional hooks block on prose violations and report test changes as advisories.
+  They cannot prevent transient writes. Repository hook activation is separate
+  from plugin enablement and remains subject to host-managed hook policy.
 - The domain expert must supply or approve the question, equations, sources,
   conventions, tolerances, intended use, and claims. Missing context can stop
   a route.

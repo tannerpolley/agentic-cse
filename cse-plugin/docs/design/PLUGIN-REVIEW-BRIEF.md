@@ -194,8 +194,8 @@ contain only cited records and are never hand-edited.
 ## Limitations and high-value review questions
 
 The plugin is advisory and depends on the user's scientific context, sources,
-toolchain, and judgment. Its lifecycle gate can block hook-aware task completion
-for unapproved persistent test growth, but cannot guarantee that a model is
+toolchain, and judgment. Optional lifecycle hooks block on prose violations
+and report test changes as advisories. They cannot guarantee that a model is
 physically valid, that an oracle is independent, or that a user will preserve
 claim boundaries.
 The current package has no cross-domain benchmark for question quality,
