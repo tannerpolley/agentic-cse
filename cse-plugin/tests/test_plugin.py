@@ -699,7 +699,8 @@ class PluginBehaviorTests(unittest.TestCase):
             path.read_text(errors="replace")
             for root in roots for path in root.rglob("*") if path.is_file()
         ).casefold()
-        self.assertNotIn("arti" + "fact", text)
+        # `expected_artifacts` is an exact CSE-Pi v1 field, not vague prose.
+        self.assertNotIn("arti" + "fact", text.replace("expected_artifacts", ""))
         self.assertNotIn("datalad", text)
         self.assertNotIn("git-annex", text)
         self.assertNotRegex(text, r"\$(?:project-truss|mattpocock|superpowers)")
