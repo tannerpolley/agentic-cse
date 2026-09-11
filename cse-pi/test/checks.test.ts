@@ -1,0 +1,10 @@
+import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { mkdtemp, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import test from "node:test";
+import { runCheck, shellQuote } from "../src/checks.ts";
+const digest = (s: string) => createHash("sha256").update(s).digest("hex");
+test("scientific checks reject nonfinite and stale input", async () => { const base = await mkdtemp(join(tmpdir(), "cse-pi-check-")); const scratch = await mkdtemp(join(tmpdir(), "cse-pi-check-scratch-")); const path = join(base, "x.json"); try { await writeFile(path, '{"x":1e999}'); const bad = '{"x":1e999}'; assert.match((await runCheck({ id: "x", kind: "json", path, sha256: digest(bad) }, base, scratch)).detail, /nonfinite/); await writeFile(path, '{"x":1}'); assert.match((await runCheck({ id: "x", kind: "json", path, sha256: digest(bad) }, base, scratch)).detail, /stale/); } finally { await rm(base, { recursive: true, force: true }); await rm(scratch, { recursive: true, force: true }); } });
+test("scientific-check paths are shell-quoted", async () => { const base = await mkdtemp(join(tmpdir(), "cse-pi-check-")); const scratch = await mkdtemp(join(tmpdir(), "cse-pi-check-scratch-")); const path = join(base, "literal-$(exit 1).json"); try { const body = '{"ok":true}'; await writeFile(path, body); assert.equal(shellQuote("a'b"), "'a'\"'\"'b'"); const result = await runCheck({ id: "quoted", kind: "json", path, sha256: digest(body) }, base, scratch); assert.equal(result.ok, true); } finally { await rm(base, { recursive: true, force: true }); await rm(scratch, { recursive: true, force: true }); } });
