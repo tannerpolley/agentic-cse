@@ -15,7 +15,7 @@ scientific verdict. The user and the applicable sources remain responsible for
 scientific judgment.
 
 The canonical source is
-[`tannerpolley/cse`](https://github.com/tannerpolley/cse). The behavioral
+[`agentic-cse/cse-plugin`](https://github.com/agentic-cse/cse-plugin). The behavioral
 heat-equation example is embedded at
 [`examples/heat-equation/`](../../examples/heat-equation/README.md), so review
 of the plugin and example uses one repository-local checkout.
