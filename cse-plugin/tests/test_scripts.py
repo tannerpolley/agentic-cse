@@ -1087,7 +1087,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             excluded = tuple(
                 (deployed / relative).exists()
                 for relative in (
-                    "examples", "cse-pi-harness", "docs", "evaluation", ".runs",
+                    "examples", "docs", "evaluation", ".runs",
                     "scripts/cooling_fit_benchmark.py", "hooks/hooks.json",
                 )
             )

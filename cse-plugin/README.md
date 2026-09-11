@@ -70,10 +70,12 @@ A runnable Quarto-managed chemical-engineering article, Moloch Beamer deck,
 and HTML/PDF analysis research notebook live in
 [`examples/quarto-chemical-engineering-showcase/`](examples/quarto-chemical-engineering-showcase/README.md).
 
-The embedded [`heat-equation example`](examples/heat-equation/README.md) and
-[`CSE Pi harness`](cse-pi-harness/README.md) are repository evidence and
-project work, not installed plugin content. The deployment inventory omits both
-directories.
+The embedded [`heat-equation example`](examples/heat-equation/README.md) is
+repository evidence and project work, not installed plugin content. CSE-Pi is
+maintained in the independent
+[`agentic-cse/cse-pi`](https://github.com/agentic-cse/cse-pi) repository; its
+plugin worker interface is documented in
+[`references/cse-pi-worker.md`](references/cse-pi-worker.md).
 
 Tools support a workflow stage and return their evidence or files to that
 stage; they are not additional steps in the workflow spine. A task may start at

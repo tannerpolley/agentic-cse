@@ -721,7 +721,7 @@ class PluginBehaviorTests(unittest.TestCase):
             path.read_text(errors="replace")
             for root in active_roots
             for path in ([root] if root.is_file() else root.rglob("*"))
-            if path.is_file() and "results" not in path.parts and "cse-pi-harness" not in path.parts
+            if path.is_file() and "results" not in path.parts
         )
         forbidden = ["cse" + ":" + name for name in sorted(SOURCES | VISUALIZE)]
         self.assertEqual([], [identifier for identifier in forbidden if identifier in active])
