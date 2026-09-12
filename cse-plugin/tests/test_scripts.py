@@ -3,10 +3,15 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 import shutil
+import signal
+import socket
 import subprocess
 import sys
 import tempfile
+import time
+import urllib.request
 import unittest
 
 
@@ -873,73 +878,465 @@ class ScriptBehaviorTests(unittest.TestCase):
             {issue["code"] for issue in graphic_report["issues"]},
         )
 
-    def test_quarto_scaffold_is_additive_and_refuses_collisions(self):
+    def test_quarto_manuscript_is_idempotent_and_explicit(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            self.initialize_git_repository(root)
-            script = ROOT / "extensions/cse-visualize/assets/project/quarto/scaffold.sh"
-            analysis = root / "analyses" / "case"
-            analysis.mkdir(parents=True)
-            marker = analysis / "results.csv"
-            marker.write_bytes(b"retained\n")
-            retained = marker.read_bytes()
-            created = subprocess.run(
-                ["bash", str(script), str(analysis)],
-                text=True, capture_output=True, check=False,
+            script = ROOT / "extensions/cse-visualize/assets/project/quarto/manuscript.py"
+            article = root / "article.qmd"
+            article.write_text("---\ntitle: Synthesis\n---\n\nRetained synthesis.\n")
+            for name in ("_quarto.yaml", "_quarto-extra.yml"):
+                competing = root / name.replace("_quarto", "competing")
+                competing.mkdir()
+                profile = competing / name
+                profile.write_text("project: {}\n")
+                before = {path: path.read_bytes() for path in competing.iterdir()}
+                refused = self.run_script(
+                    str(script), "init", str(competing), "--article-source", str(article),
+                    "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64,
+                )
+                self.assertNotEqual(refused.returncode, 0)
+                self.assertEqual(before, {path: path.read_bytes() for path in competing.iterdir()})
+            manuscript = root / "analyses"
+            init = self.run_script(
+                str(script), "init", str(manuscript), "--article-source", str(article),
+                "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64,
             )
-            self.assertEqual(created.returncode, 0, created.stderr)
+            self.assertEqual(init.returncode, 0, init.stderr)
             for relative in (
-                ".gitignore", "_quarto.yml", "_quarto-promoted-pdf.yml",
-                "promoted-pdf-header.tex", "render.sh", "notebook.qmd",
+                ".gitignore", "_quarto.yml", "_quarto-presentation.yml", "render.sh",
+                "manuscript.py", "index.qmd", "_cse-manuscript.json",
+                ".cse-quarto-source.json",
             ):
-                self.assertTrue((analysis / relative).is_file(), relative)
-            self.assertIn("enabled: false", (analysis / "notebook.qmd").read_text())
-            self.assertIn("html:", (analysis / "_quarto.yml").read_text())
-            self.assertIn("pdf-engine: lualatex", (analysis / "_quarto-promoted-pdf.yml").read_text())
-            self.assertIn("include-in-header", (analysis / "_quarto-promoted-pdf.yml").read_text())
-            self.assertEqual(retained, marker.read_bytes())
+                self.assertTrue((manuscript / relative).is_file(), relative)
+            self.assertEqual(json.loads((manuscript / "_cse-manuscript.json").read_text()), {
+                "project": {"render": ["index.qmd"]},
+                "manuscript": {"notebooks": []},
+            })
+            self.assertEqual(set(json.loads((manuscript / ".cse-quarto-source.json").read_text())), {
+                "sourceCommit", "runtimeTreeSha256",
+            })
+            self.assertEqual(json.loads((manuscript / "_quarto.yml").read_text())["project"]["type"], "manuscript")
+            self.assertFalse((manuscript / "_quarto-promoted-pdf.yml").exists())
+            before = {path: path.read_bytes() for path in manuscript.iterdir() if path.is_file()}
+            repeated = self.run_script(
+                str(script), "init", str(manuscript), "--article-source", str(article),
+                "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64,
+            )
+            self.assertEqual(repeated.returncode, 0, repeated.stderr)
+            self.assertEqual(before, {path: path.read_bytes() for path in manuscript.iterdir() if path.is_file()})
 
-            header_check = subprocess.run(
-                ["git", "check-ignore", "--no-index", "promoted-pdf-header.tex"],
-                cwd=analysis, text=True, capture_output=True, check=False,
+            notebook = manuscript / "result.qmd"
+            notebook.write_text(
+                "---\ntitle: Retained result\n---\n\n"
+                "```{python}\nfrom pathlib import Path\nPath('model-ran').write_text('unsafe')\n```\n"
             )
-            generated_check = subprocess.run(
-                ["git", "check-ignore", "--no-index", "notebook.tex"],
-                cwd=analysis, text=True, capture_output=True, check=False,
+            included = self.run_script(
+                str(script), "include", str(manuscript), str(notebook), "--title", "Result report"
             )
-            self.assertNotEqual(header_check.returncode, 0, header_check.stdout)
-            self.assertEqual(generated_check.returncode, 0, generated_check.stdout)
+            self.assertEqual(included.returncode, 0, included.stderr)
+            state = json.loads((manuscript / "_cse-manuscript.json").read_text())
+            self.assertEqual(state["project"]["render"], ["index.qmd", "result.qmd"])
+            self.assertEqual(state["manuscript"]["notebooks"], [{
+                "notebook": "result.qmd", "title": "Result report",
+            }])
+            membership = (manuscript / "_cse-manuscript.json").read_bytes()
+            identical = self.run_script(
+                str(script), "include", str(manuscript), str(notebook), "--title", "Result report"
+            )
+            self.assertEqual(identical.returncode, 0, identical.stderr)
+            self.assertEqual(membership, (manuscript / "_cse-manuscript.json").read_bytes())
+            changed = self.run_script(
+                str(script), "include", str(manuscript), str(notebook), "--title", "Updated result"
+            )
+            self.assertEqual(changed.returncode, 0, changed.stderr)
+            state = json.loads((manuscript / "_cse-manuscript.json").read_text())
+            self.assertEqual(state["project"]["render"].count("result.qmd"), 1)
+            self.assertEqual(state["manuscript"]["notebooks"][0]["title"], "Updated result")
+            self.assertEqual(self.run_script(str(script), "validate", str(manuscript)).returncode, 0)
+            extra_profile = manuscript / "_quarto-extra.yml"
+            extra_profile.write_text("project: {}\n")
+            invalid_profile = self.run_script(str(script), "validate", str(manuscript))
+            self.assertNotEqual(invalid_profile.returncode, 0)
+            extra_profile.unlink()
 
-            scaffold_files = (
-                ".gitignore", "_quarto.yml", "_quarto-promoted-pdf.yml",
-                "promoted-pdf-header.tex", "render.sh", "notebook.qmd",
+            auxiliary = manuscript / "auxiliary.qmd"
+            auxiliary.write_text("Auxiliary source is not registered.\n")
+            if shutil.which("jupyter"):
+                rendered = subprocess.run(["bash", str(manuscript / "render.sh")], cwd=manuscript,
+                                          text=True, capture_output=True, check=False)
+                self.assertEqual(rendered.returncode, 0, rendered.stderr)
+                self.assertTrue((manuscript / "_site/index.html").is_file())
+                self.assertTrue((manuscript / "_site/result-preview.html").is_file())
+                self.assertFalse((manuscript / "_site/auxiliary.html").exists())
+                self.assertFalse((manuscript / "model-ran").exists())
+
+            metadata_before = (manuscript / "_cse-manuscript.json").read_bytes()
+            (manuscript / "_cse-manuscript.json").write_text("{broken\n")
+            invalid = self.run_script(str(script), "validate", str(manuscript))
+            self.assertNotEqual(invalid.returncode, 0)
+            self.assertEqual((manuscript / "_cse-manuscript.json").read_text(), "{broken\n")
+            (manuscript / "_cse-manuscript.json").write_bytes(metadata_before)
+            nested = manuscript / "nested"
+            nested.mkdir()
+            (nested / "_quarto.yml").write_text("project: {}\n")
+            invalid_nested = self.run_script(str(script), "validate", str(manuscript))
+            self.assertNotEqual(invalid_nested.returncode, 0)
+
+            if hasattr(os, "symlink"):
+                outside = root / "outside.qmd"
+                outside.write_text("outside\n")
+                link = manuscript / "linked.qmd"
+                link.symlink_to(outside)
+                refused = self.run_script(
+                    str(script), "include", str(manuscript), str(link), "--title", "Escape"
+                )
+                self.assertNotEqual(refused.returncode, 0)
+
+    def test_quarto_management_delegates_refresh_and_preview(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = ROOT / "extensions/cse-visualize/assets/project/quarto/manuscript.py"
+            article = root / "article.qmd"
+            article.write_text("---\ntitle: Synthesis\n---\n\nRetained synthesis.\n")
+            manuscript = root / "analyses"
+            initialized = self.run_script(
+                str(script), "init", str(manuscript), "--article-source", str(article),
+                "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64,
             )
-            before_refusal = {
-                relative: (analysis / relative).read_bytes()
-                for relative in (*scaffold_files, "results.csv")
+            self.assertEqual(initialized.returncode, 0, initialized.stderr)
+            notebook = manuscript / "result.qmd"
+            notebook.write_text("---\ntitle: Result\n---\n\nRetained result.\n")
+            included = self.run_script(
+                str(script), "include", str(manuscript), str(notebook), "--title", "Result"
+            )
+            self.assertEqual(included.returncode, 0, included.stderr)
+
+            proxy_dir = root / "bin"
+            proxy_dir.mkdir()
+            log = root / "quarto.log"
+            proxy = proxy_dir / "quarto"
+            proxy.write_text(
+                "#!/usr/bin/env python3\n"
+                "import os, pathlib, sys\n"
+                "if sys.argv[1] == 'inspect':\n"
+                "    os.execv(os.environ['CSE_REAL_QUARTO'], [os.environ['CSE_REAL_QUARTO'], *sys.argv[1:]])\n"
+                "pathlib.Path(os.environ['CSE_QUARTO_LOG']).write_text(chr(10).join([os.getcwd(), *sys.argv[1:]]) + chr(10))\n"
+            )
+            proxy.chmod(0o755)
+            environment = os.environ | {
+                "PATH": f"{proxy_dir}{os.pathsep}{os.environ['PATH']}",
+                "CSE_QUARTO_LOG": str(log),
+                "CSE_REAL_QUARTO": shutil.which("quarto"),
             }
-            refused = subprocess.run(
-                ["bash", str(script), str(analysis)],
-                text=True, capture_output=True, check=False,
+            refreshed = subprocess.run(
+                [sys.executable, str(script), "refresh", str(manuscript), str(notebook)],
+                env=environment, text=True, capture_output=True, check=False,
             )
-            self.assertEqual(refused.returncode, 1)
-            self.assertIn("scaffold-owned", refused.stderr)
-            after_refusal = {
-                relative: (analysis / relative).read_bytes()
-                for relative in (*scaffold_files, "results.csv")
-            }
-            self.assertEqual(before_refusal, after_refusal)
+            self.assertEqual(refreshed.returncode, 0, refreshed.stderr)
+            self.assertEqual(log.read_text().splitlines(), [
+                str(manuscript), "render", "result.qmd", "--profile", "presentation",
+            ])
+            forced = subprocess.run(
+                [sys.executable, str(script), "refresh", str(manuscript), str(notebook), "--external-results-changed"],
+                env=environment, text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(forced.returncode, 0, forced.stderr)
+            self.assertEqual(log.read_text().splitlines()[-1], "--cache-refresh")
+            previewed = subprocess.run(
+                [sys.executable, str(script), "preview", str(manuscript),
+                 "--host", "127.0.0.1", "--port", "8123"],
+                env=environment, text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(previewed.returncode, 0, previewed.stderr)
+            self.assertEqual(log.read_text().splitlines(), [
+                str(manuscript), "preview", "--profile", "presentation", "--no-browser",
+                "--host", "127.0.0.1", "--port", "8123",
+            ])
 
-            notebook_collision = root / "analyses" / "notebook-collision"
-            notebook_collision.mkdir()
-            (notebook_collision / "notebook.qmd").write_text("existing\n")
-            refused_notebook = subprocess.run(
-                ["bash", str(script), str(notebook_collision)],
-                text=True, capture_output=True, check=False,
+    def test_quarto_preflight_preserves_original_and_rejects_competing_owners(self):
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            root = parent / "analyses"
+            script = ROOT / "extensions/cse-visualize/assets/project/quarto/manuscript.py"
+            article = parent / "article.qmd"
+            article.write_text("---\ntitle: Synthesis\n---\n\nRetained synthesis.\n")
+            init_args = ["init", str(root), "--article-source", str(article),
+                         "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64]
+            initialized = self.run_script(str(script), *init_args)
+            self.assertEqual(initialized.returncode, 0, initialized.stderr)
+            notebook = root / "result.qmd"
+            notebook.write_text("---\ntitle: Result\n---\n\n```{python}\nraise RuntimeError('cell must not execute during inspection')\n```\n")
+            included = self.run_script(str(script), "include", str(root), str(notebook), "--title", "Result")
+            self.assertEqual(included.returncode, 0, included.stderr)
+            second = root / "nested/second.qmd"
+            second.parent.mkdir()
+            second.write_text("---\ntitle: Second\n---\n\nAnother substantive retained result.\n")
+            included = self.run_script(str(script), "include", str(root), str(second), "--title", "Second")
+            self.assertEqual(included.returncode, 0, included.stderr)
+            state = json.loads((root / "_cse-manuscript.json").read_text())
+            self.assertEqual(state["project"]["render"], ["index.qmd", "result.qmd", "nested/second.qmd"])
+            config = json.loads((root / "_quarto.yml").read_text())
+            profile = json.loads((root / "_quarto-presentation.yml").read_text())
+            config.update({"title": "Preserved title", "author": ["Investigator"]})
+            config["format"]["html"]["theme"] = "cosmo"
+            (root / "_quarto.yml").write_text(json.dumps(config, indent=4) + "\n")
+
+            def snapshot():
+                return {str(p.relative_to(parent)): (str(p.readlink()) if p.is_symlink()
+                        else None if p.is_dir() else p.read_bytes()) for p in parent.rglob("*")}
+
+            for has_cache in (False, True):
+                if has_cache:
+                    cache = root / ".quarto/project-cache/sentinel"
+                    cache.parent.mkdir(parents=True)
+                    cache.write_bytes(b"existing cache must remain untouched")
+                before = snapshot()
+                valid = self.run_script(str(script), "validate", str(root))
+                self.assertEqual(valid.returncode, 0, valid.stderr)
+                self.assertEqual(snapshot(), before)
+                repeated = self.run_script(str(script), *init_args)
+                self.assertEqual(repeated.returncode, 0, repeated.stderr)
+                self.assertEqual(snapshot(), before)
+
+            # Native inspect remains real; any attempted render/preview is recorded and exits.
+            bin_dir = parent / "bin"
+            bin_dir.mkdir()
+            proxy = bin_dir / "quarto"
+            proxy.write_text("#!/usr/bin/env python3\nimport os, pathlib, sys\n"
+                             "if sys.argv[1] == 'inspect':\n"
+                             "    os.execv(os.environ['CSE_REAL_QUARTO'], [os.environ['CSE_REAL_QUARTO'], *sys.argv[1:]])\n"
+                             "pathlib.Path(os.environ['CSE_NATIVE_SENTINEL']).write_text('executed')\n")
+            proxy.chmod(0o755)
+            environment = os.environ | {"PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
+                                       "CSE_REAL_QUARTO": shutil.which("quarto"),
+                                       "CSE_NATIVE_SENTINEL": str(parent / "native-executed")}
+            candidate = root / "candidate.qmd"
+            candidate.write_text("---\ntitle: Candidate\n---\n\nSubstantive unregistered report.\n")
+            commands = [["validate", str(root)], ["include", str(root), str(candidate), "--title", "Candidate"],
+                        ["refresh", str(root), str(notebook)], ["preview", str(root)], init_args]
+
+            def refused(path):
+                before = snapshot()
+                for args in commands:
+                    with self.subTest(path=str(path), command=args[0]):
+                        result = subprocess.run([sys.executable, str(script), *args], env=environment,
+                                                text=True, capture_output=True, timeout=30)
+                        self.assertNotEqual(result.returncode, 0, result.stdout)
+                        self.assertIn(str(path), result.stderr)
+                        self.assertEqual(snapshot(), before)
+                rendered = subprocess.run(["bash", "render.sh"], cwd=root, env=environment,
+                                          text=True, capture_output=True, timeout=30)
+                self.assertNotEqual(rendered.returncode, 0, rendered.stdout)
+                self.assertIn(str(path), rendered.stderr)
+                self.assertEqual(snapshot(), before)
+
+            cases = []
+            for hook in ("pre-render", "post-render"):
+                changed = json.loads(json.dumps(config))
+                changed["project"][hook] = f"python {parent / 'model.py'}"
+                cases.append(("_quarto.yml", json.dumps(changed)))
+            for owner, key, value in (("project", "render", state["project"]["render"]),
+                                      ("manuscript", "notebooks", state["manuscript"]["notebooks"])):
+                changed = json.loads(json.dumps(config))
+                changed[owner][key] = value
+                cases.append(("_quarto.yml", json.dumps(changed)))
+            cases.extend([
+                ("_quarto.yml", json.dumps(config | {"metadata-files": ["_cse-manuscript.json", "extra.json"]})),
+                ("_quarto.yml", json.dumps(config | {"filters": ["model.lua"]})),
+                ("_quarto.yml", json.dumps(config | {"keep-md": False})),
+                ("_quarto.yml", "project:\n  type: manuscript\n"),
+                ("_quarto.yml", '{"project": {}, "project": {}}'),
+                ("_quarto-presentation.yml", json.dumps(profile | {"project": {"pre-render": "python model.py"}})),
+                ("_quarto-presentation.yml", json.dumps(profile | {"manuscript": {"notebooks": []}})),
+            ])
+            for key, value in (("enabled", False), ("daemon", True), ("cache", False), ("error", True)):
+                cases.append(("_quarto-presentation.yml", json.dumps({"execute": profile["execute"] | {key: value}})))
+            cases.extend([
+                ("_cse-manuscript.json", '{broken'),
+                ("_cse-manuscript.json", json.dumps({"project": {"render": ["index.qmd"]}, "manuscript": state["manuscript"]})),
+                (".cse-quarto-source.json", '{broken'),
+            ])
+            for name, content in cases:
+                target = root / name
+                original = target.read_bytes()
+                target.write_text(content)
+                refused(target)
+                target.write_bytes(original)
+            for name in ("_metadata.yml", "nested/_metadata.yaml", "_quarto-extra.yml", ".env"):
+                target = root / name
+                target.write_text("{}\n")
+                refused(target)
+                target.unlink()
+            site = root / "_site"
+            site.write_bytes(b"output collision")
+            refused(site)
+            site.unlink()
+            outside = parent / "outside"
+            outside.mkdir()
+            (outside / "retained").write_bytes(b"unchanged external bytes")
+            site.symlink_to(outside, target_is_directory=True)
+            refused(site)
+            site.unlink()
+            for link in (root / ".quarto/escaped", site / "nested"):
+                link.parent.mkdir(exist_ok=True)
+                link.symlink_to(outside, target_is_directory=True)
+                refused(link)
+                link.unlink()
+
+            # A source parse failure occurs inside native inspection, without touching the original.
+            original = notebook.read_bytes()
+            notebook.write_text("---\ntitle: [\n---\n\nMalformed metadata.\n")
+            refused(notebook)
+            notebook.write_bytes(original)
+            membership = root / "_cse-manuscript.json"
+            original = membership.read_bytes()
+            membership.unlink()
+            refused(membership)
+            membership.write_bytes(original)
+            # Adoption supplies only missing assets and preserves compatible JSON settings and membership.
+            preserved_config = (root / "_quarto.yml").read_bytes()
+            (root / "render.sh").unlink()
+            adopted = self.run_script(str(script), *init_args)
+            self.assertEqual(adopted.returncode, 0, adopted.stderr)
+            self.assertEqual((root / "_quarto.yml").read_bytes(), preserved_config)
+            self.assertEqual(json.loads((root / "_cse-manuscript.json").read_text()), state)
+            self.assertFalse(list(parent.glob(".cse-*")))
+
+    def test_quarto_presentation_cache_and_external_result_refresh(self):
+        if not shutil.which("jupyter"):
+            self.skipTest("Jupyter unavailable: native presentation/cache behavior unverified")
+        with tempfile.TemporaryDirectory() as directory:
+            parent = Path(directory)
+            root = parent / "analyses"
+            script = ROOT / "extensions/cse-visualize/assets/project/quarto/manuscript.py"
+            article = parent / "article.qmd"
+            article.write_text("---\ntitle: Synthesis\n---\n\nRetained synthesis.\n")
+            initialized = self.run_script(str(script), "init", str(root), "--article-source", str(article),
+                                          "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64)
+            self.assertEqual(initialized.returncode, 0, initialized.stderr)
+            retained = root / "retained.txt"
+            retained.write_text("value-one")
+            notebook = root / "result.qmd"
+            source = ("---\ntitle: Result\n---\n\nRetained presentation.\n\n"
+                      "```{python}\n#| output: asis\nfrom pathlib import Path\nfrom uuid import uuid4\n"
+                      "print('| View |\\n|---|\\n| view-' + Path('retained.txt').read_text() + '-source-one |\\n')\n"
+                      "print('execution-' + str(uuid4()))\n```\n\n"
+                      "```{python}\n#| eval: false\nPath('model-ran').write_text('unsafe')\n```\n")
+            notebook.write_text(source)
+            included = self.run_script(str(script), "include", str(root), str(notebook), "--title", "Result")
+            self.assertEqual(included.returncode, 0, included.stderr)
+            (root / "auxiliary.qmd").write_text("Unregistered source must not render.\n")
+            normal = subprocess.run(["bash", "render.sh"], cwd=root, text=True, capture_output=True)
+            self.assertEqual(normal.returncode, 0, normal.stderr)
+            self.assertTrue((root / "_site/index.html").is_file())
+            self.assertTrue((root / "_site/result-preview.html").is_file())
+            self.assertIn("result-preview.html", (root / "_site/index.html").read_text())
+            self.assertFalse((root / "_site/auxiliary.html").exists())
+            self.assertNotIn("view-value-one-source-one", (root / "_site/result-preview.html").read_text())
+            tokens = []
+            for expected, changed, force in [("value-one-source-one", False, False),
+                                              ("value-one-source-one", False, False),
+                                              ("value-one-source-two", True, False),
+                                              ("value-one-source-two", False, False),
+                                              ("value-two-source-two", False, True)]:
+                if changed:
+                    notebook.write_text(source.replace("source-one", "source-two"))
+                if len(tokens) == 3:
+                    retained.write_text("value-two")
+                before = retained.read_bytes()
+                result = self.run_script(str(script), "refresh", str(root), str(notebook),
+                                         *(["--external-results-changed"] if force else []))
+                self.assertEqual(result.returncode, 0, result.stderr)
+                html = (root / "_site/result-preview.html").read_text()
+                self.assertIn("view-" + expected, html)
+                self.assertIn("<table", html)
+                executed = re.findall(r"execution-([0-9a-f-]{36})", html)
+                self.assertEqual(len(executed), 1, "expected one rendered execution UUID")
+                tokens.append(executed[0])
+                self.assertEqual(retained.read_bytes(), before)
+                self.assertFalse((root / "model-ran").exists())
+            self.assertEqual(tokens[0], tokens[1], "unchanged refresh must reuse native cached execution")
+            self.assertNotEqual(tokens[1], tokens[2], "changed source must invalidate cache")
+            self.assertEqual(tokens[2], tokens[3], "external inputs are not automatically detected")
+            self.assertNotEqual(tokens[3], tokens[4], "explicit external change must refresh cache")
+            self.assertFalse((root / "_site/auxiliary.html").exists())
+
+    def test_quarto_article_preview_refreshes_and_rejects_occupied_port(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = ROOT / "extensions/cse-visualize/assets/project/quarto/manuscript.py"
+            article = root / "article.qmd"
+            article.write_text("---\ntitle: Synthesis\n---\n\ninitial-preview\n")
+            manuscript = root / "analyses"
+            initialized = self.run_script(
+                str(script), "init", str(manuscript), "--article-source", str(article),
+                "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64,
             )
-            self.assertEqual(refused_notebook.returncode, 1)
-            self.assertIn("notebook.qmd", refused_notebook.stderr)
-            self.assertFalse((notebook_collision / ".gitignore").exists())
+            self.assertEqual(initialized.returncode, 0, initialized.stderr)
+            retained = manuscript / "retained.csv"
+            retained.write_bytes(b"retained\n")
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            process = subprocess.Popen(
+                [sys.executable, str(script), "preview", str(manuscript),
+                 "--host", "127.0.0.1", "--port", str(port)],
+                stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+                start_new_session=True,
+            )
+            try:
+                url = f"http://127.0.0.1:{port}/index.html"
+                deadline = time.monotonic() + 20
+                while time.monotonic() < deadline:
+                    if process.poll() is not None:
+                        stdout, stderr = process.communicate()
+                        self.fail(f"preview exited early: {stdout}\n{stderr}")
+                    try:
+                        with urllib.request.urlopen(url, timeout=0.5) as response:
+                            response.read()
+                        break
+                    except OSError:
+                        time.sleep(0.2)
+                else:
+                    self.fail("native Quarto preview did not start")
+                (manuscript / "index.qmd").write_text(
+                    "---\ntitle: Synthesis\n---\n\nchanged-preview\n"
+                )
+                deadline = time.monotonic() + 20
+                while time.monotonic() < deadline:
+                    try:
+                        with urllib.request.urlopen(url, timeout=0.5) as response:
+                            if b"changed-preview" in response.read():
+                                break
+                    except OSError:
+                        pass
+                    time.sleep(0.2)
+                else:
+                    self.fail("native Quarto preview did not refresh the article")
+                self.assertEqual(retained.read_bytes(), b"retained\n")
+            finally:
+                if process.poll() is None:
+                    os.killpg(process.pid, signal.SIGINT)
+                try:
+                    process.communicate(timeout=10)
+                except subprocess.TimeoutExpired:
+                    os.killpg(process.pid, signal.SIGTERM)
+                    try:
+                        process.communicate(timeout=10)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(process.pid, signal.SIGKILL)
+                        process.communicate(timeout=10)
+            self.assertIsNotNone(process.returncode)
+
+            with socket.socket() as occupied:
+                occupied.bind(("127.0.0.1", 0))
+                occupied_port = occupied.getsockname()[1]
+                refused = subprocess.run(
+                    [sys.executable, str(script), "preview", str(manuscript),
+                     "--host", "127.0.0.1", "--port", str(occupied_port)],
+                    text=True, capture_output=True, check=False,
+                )
+            self.assertNotEqual(refused.returncode, 0)
 
     def test_quarto_release_entrypoint_isolates_lualatex_runtime(self):
         with tempfile.TemporaryDirectory() as directory:

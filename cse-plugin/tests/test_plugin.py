@@ -402,7 +402,8 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertIn("execute.enabled: false", quarto)
         self.assertIn("--no-execute", quarto)
         self.assertIn("Ordinary Quarto HTML", quarto)
-        self.assertIn("scaffold.sh", quarto)
+        self.assertIn("manuscript.py", quarto)
+        self.assertIn("project.render", quarto)
         self.assertIn("promoted-pdf", quarto)
 
     def test_three_sections_and_review_lenses_keep_ownership_boundaries(self):
@@ -475,6 +476,7 @@ class PluginBehaviorTests(unittest.TestCase):
         setup = skill_text("setup")
         self.assertIn("do not rename or migrate it solely", setup)
         self.assertIn("`analyses/<short-id>/{inputs,scripts,results,figures}`", setup)
+        self.assertIn("manuscript.py init", setup)
         design = skill_text("design")
         self.assertRegex(design, r"(?is)publish.*one issue.*before.*Build")
         self.assertRegex(design, r"(?is)only a \*\*Ready\*\*.*permits")
@@ -518,7 +520,7 @@ class PluginBehaviorTests(unittest.TestCase):
         plotting = (VISUALIZE_ROOT / "references/plotting.md").read_text()
         for text, patterns in (
             (latex, (r"one\s+retained data authority", r"never authorizes.*model execution", r"visual")),
-            (quarto, (r"execute\.enabled: false", r"--no-execute", r"scaffold\.sh", r"material.*return to `cse:review`")),
+            (quarto, (r"execute\.enabled: false", r"--no-execute", r"manuscript\.py", r"material.*return to `cse:review`")),
             (plot, (r"retained continuous relationship", r"`o`/`x`", r"project.*intended use")),
             (summarize, (r"useful method-specific result", r"must\s+not\s+rerun", r"before Review")),
             (profile, (r"Manuscript", r"Analysis research notebook", r"one continuous story", r"selected render")),
