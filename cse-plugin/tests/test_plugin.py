@@ -332,7 +332,8 @@ class PluginBehaviorTests(unittest.TestCase):
         text = (ROOT / "references/operating-model.md").read_text()
         for phrase in (
             "Must — invariant", "Should — default", "May — option",
-            "At an initial workflow entrypoint", "Ask only\nquestions",
+            "At every Setup, Research, Diagnose, or Design entry",
+            "Ask only when an answer changes scientific",
             "internal CSE handoff inherits", "must not reread an unchanged",
             "fresh reviewer independently loads", "working notebook",
             "Review inspects that complete notebook", "material changes",
@@ -643,7 +644,7 @@ class PluginBehaviorTests(unittest.TestCase):
         project = ROOT / "assets/project"
         self.assertTrue((project / "README.md").is_file())
         context = (project / "CONTEXT.md").read_text()
-        for phrase in ("default deliverable: result", "## Owners", "## Glossary", "## Avoid", "Source"):
+        for phrase in ("repository role: analysis", "## Owners", "## Glossary", "## Avoid", "Source"):
             self.assertIn(phrase, context)
         for name in ("formulation.md", "methods.md", "evidence.md", "decisions/README.md", "writing/STYLE.md", "writing/RULES.md"):
             self.assertTrue((project / name).is_file(), name)
