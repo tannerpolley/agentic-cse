@@ -82,12 +82,12 @@ re-OCRs a PDF.
 ## Commands
 
 ```bash
-uv run zotero-companion wiki-record equation:figiel-born-solvation-shell --json
-uv run zotero-companion wiki-record-template equation --zotero-key YEENX35P --json
-uv run zotero-companion wiki-paper-template YEENX35P --json
-uv run zotero-companion wiki-lineage equation:figiel-born-solvation-shell --json
-uv run zotero-companion wiki-lint --registry-root data/domains/thermophysical/source/registry --json
-uv run zotero-companion wiki-context --global --query "Born activity coefficients" --json
+uv run cse-zotero wiki-record equation:figiel-born-solvation-shell --json
+uv run cse-zotero wiki-record-template equation --zotero-key YEENX35P --json
+uv run cse-zotero wiki-paper-template YEENX35P --json
+uv run cse-zotero wiki-lineage equation:figiel-born-solvation-shell --json
+uv run cse-zotero wiki-lint --registry-root data/domains/thermophysical/source/registry --json
+uv run cse-zotero wiki-context --global --query "Born activity coefficients" --json
 ```
 
 All commands are read-only. Record authoring is a deliberate repository

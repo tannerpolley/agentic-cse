@@ -1,4 +1,4 @@
-"""Pure inventory/report functions for Zotero Companion dry runs."""
+"""Pure inventory/report functions for CSE Zotero dry runs."""
 
 from __future__ import annotations
 

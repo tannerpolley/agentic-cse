@@ -1,4 +1,4 @@
-"""Read-only dependency health and review-queue reporting.
+"""Read-only dependency health and on-demand review reporting.
 
 The wiki has several deliberately separate layers: generated Zotero source
 records, evidence companions, curated knowledge records, typed relations,
@@ -175,7 +175,9 @@ def health_report(
     }
     relations = load_relations(root)
     graph = _dependency_graph(record_map, relations)
-    source_keys = {str(value).strip() for value in stale_source_keys if str(value).strip()}
+    source_keys = {
+        str(value).strip() for value in stale_source_keys if str(value).strip()
+    }
     registry_values = {str(value).strip() for value in changed_registry_ids if str(value).strip()}
     explicit_record_ids = {str(value).strip() for value in record_ids if str(value).strip()}
 
@@ -274,13 +276,23 @@ def health_report(
     ]
     record_lint = lint_records(root, registry_root=registry_root)
     manifest_lint = lint_manifests(root, registry_root=registry_root)
+    structural_ok = bool(record_lint.get("ok") and manifest_lint.get("ok"))
+    review_required = bool(
+        review_queue
+        or attention_queue
+        or orphaned
+        or contradictions
+    )
     return {
-        "ok": bool(record_lint.get("ok") and manifest_lint.get("ok") and not contradictions),
+        "ok": bool(structural_ok and not contradictions),
+        "structural_ok": structural_ok,
+        "review_required": review_required,
         "inputs": {
             "stale_source_keys": sorted(source_keys),
             "changed_registry_ids": sorted(registry_values),
             "record_ids": sorted(explicit_record_ids),
         },
+        "errors": [],
         "review_queue": review_queue[:limit],
         "review_queue_total": len(review_queue),
         "attention_queue": attention_queue[:limit],

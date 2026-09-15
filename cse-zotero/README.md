@@ -1,8 +1,8 @@
-# Zotero Companion
+# CSE Zotero
 
-Zotero Companion adds source-linked synthesis and scientific data to a local
+CSE Zotero adds source-linked synthesis and scientific data to a local
 Zotero library. Zotero remains the authority for citations, collections, and
-attachments. Companion preserves exact source locators, typed scientific
+attachments. CSE Zotero preserves exact source locators, typed scientific
 records, transformations, uncertainty, lineage, and domain data.
 
 The installable package contains the domain-neutral LinkML model in
@@ -14,17 +14,51 @@ indexes over declared CSV, Parquet, or JSON sources without becoming a second
 scientific authority.
 
 Each scientific project declares its own data authority, formats, lineage,
-retention, versioning, and recovery strategy. Companion does not prescribe a
+retention, versioning, and recovery strategy. CSE Zotero does not prescribe a
 dataset versioning system.
 
 ```bash
-uv run zotero-companion init --json
-uv run zotero-companion doctor --json
-uv run zotero-companion schema-validate data/examples/core-records.yaml --json
-uv run zotero-companion data-query \
+uv run cse-zotero init --json
+uv run cse-zotero doctor --json
+uv run cse-zotero schema-validate data/examples/core-records.yaml --json
+uv run cse-zotero data-query \
   "$HOME/.local/share/zotero-companion/corpus/data/domains/thermophysical/normalized/registry-records.csv" \
   --sql "SELECT record_type, count(*) AS count FROM records GROUP BY record_type" --json
+uv run cse-zotero data-search "MEA density" --json
 ```
+
+`zotero-companion` remains a CLI alias, and existing
+`~/.config/zotero-companion` and `~/.local/share/zotero-companion` state stays
+in place. These compatibility identities require no migration.
+
+`data-search` is a read-only registry front door. It searches the normalized
+registry inventory, resolves each package's absolute resource paths, reports
+source-reported units and composition basis, and checks metadata/resource
+hashes when the normalized file inventory is available.
+
+For discovery, a package is registered by its metadata row in
+`normalized/registry-records.csv`; its metadata declares the resource paths
+and source locators, with units in metadata or table columns.
+`normalized/source-files.csv` supplies resource
+hashes (a resource may also declare its own hash). The existing
+`registry-migrate REGISTRY --companion-root CORPUS` command plans a snapshot
+from a Git-tracked thermophysical registry; after reviewing the plan, `--apply`
+copies source files and generates those inventories. It refuses an existing
+destination. There is no incremental dataset-registration command here, and
+Zotero attachment synchronization does not register numerical packages.
+
+To check discovery and reuse without touching a live corpus, run:
+
+```bash
+uv run python -m pytest -q tests/test_scientific_data.py::test_cli_dataset_discovery_and_local_reuse
+```
+
+This fixture-only CLI smoke test searches a known dataset, checks its location,
+source locator, units, and hashes, copies the selected table into a temporary
+project, and queries known values from that local copy. It checks that the
+original fixture files remain unchanged and removes the temporary project.
+Passing establishes this software path; scientific suitability still depends
+on the selected dataset's quality, units, composition basis, and conditions.
 
 `init` is dry-run by default. `init --apply` creates the private configuration
 and empty corpus directories. For the one-time migration from an older source
@@ -37,9 +71,10 @@ The configured bibliography target defaults to
 `~/Zotero/exports/references.bib`. `bibliography-export` is dry-run by default;
 `bibliography-export --apply --json` requests a whole-personal-library Better
 BibTeX export and atomically refreshes that file. The request enforces
-`skipFields=file`, and Companion refuses to replace the target if a local
-attachment path is still present. Refresh is task-triggered, not a background
-daemon, and the command never rewrites project bibliography consumers.
+`skipFields=file`, and CSE Zotero refuses to replace the target if a local
+attachment path is still present. The command runs once and never rewrites project bibliography consumers.
+For scheduled maintenance, invoke it after `wiki-maintain` in the same user
+service.
 
 ## Scientific source front doors
 
@@ -85,12 +120,12 @@ counts. It does not modify Zotero, files, or preferences.
 ## Agent wiki
 
 The canonical broad-corpus architecture and delivery roadmap is
-[docs/zotero-companion-design.md](docs/zotero-companion-design.md). The shared
+[docs/cse-zotero-design.md](docs/cse-zotero-design.md). The shared
 domain vocabulary is [CONTEXT.md](CONTEXT.md). All Zotero sources remain
 discoverable; the current project pages are only initial views, while relevant
 papers can be connected to multiple projects, domains, and research threads.
 The reusable agent operating protocol is
-[.agent/skills/zotero-companion/SKILL.md](.agent/skills/zotero-companion/SKILL.md), with
+[.agent/skills/cse-zotero/SKILL.md](.agent/skills/cse-zotero/SKILL.md), with
 the answer-grounding rubric in [docs/agent-answer-rubric.md](docs/agent-answer-rubric.md).
 
 The retrieval and curation slices now build indexed Markdown evidence chunks,
@@ -101,9 +136,9 @@ different from scientific conclusions.
 Inspect the bounded queues with:
 
 ~~~bash
-uv run zotero-companion wiki-triage --queue unbriefed_relevant --limit 20 --json
-uv run zotero-companion wiki-triage --queue needs_classification --limit 20 --json
-uv run zotero-companion wiki-triage --domain electrolyte-thermodynamics --json
+uv run cse-zotero wiki-triage --queue unbriefed_relevant --limit 20 --json
+uv run cse-zotero wiki-triage --queue needs_classification --limit 20 --json
+uv run cse-zotero wiki-triage --domain electrolyte-thermodynamics --json
 ~~~
 
 The configured `corpus/wiki/` directory is the durable agent-facing layer. Zotero remains the
@@ -122,31 +157,31 @@ remain metadata-based discovery aids until an assignment is recorded.
 The first sync is intentionally a dry run:
 
 ```bash
-uv run zotero-companion wiki-sync --json
-uv run zotero-companion wiki-sync --apply --json
+uv run cse-zotero wiki-sync --json
+uv run cse-zotero wiki-sync --apply --json
 ```
 
 The apply flag writes only repository files and never writes to Zotero. The
 generated SQLite index is ignored and can be rebuilt at any time:
 
 ```bash
-uv run zotero-companion wiki-search "phase equilibrium" --json
-uv run zotero-companion wiki-search "activity coefficient" --project epcsaft-equilibrium --json
-uv run zotero-companion wiki-source ABCD2345 --json
-uv run zotero-companion wiki-evidence ABCD2345 --query "Born diameter" --json
-uv run zotero-companion wiki-context epcsaft-equilibrium --json
-uv run zotero-companion wiki-context --global --query "Born activity coefficient" --json
-uv run zotero-companion wiki-record equation:figiel-born-solvation-shell --json
-uv run zotero-companion wiki-record-template equation --zotero-key YEENX35P --json
-uv run zotero-companion wiki-paper-template YEENX35P --json
-uv run zotero-companion wiki-lineage dataset:hamer-1972-aqueous-coefficients --json
-uv run zotero-companion wiki-health --stale-source 28NPJ5H6 --json
-uv run zotero-companion wiki-coverage --json
-uv run zotero-companion wiki-lint --registry-root data/domains/thermophysical/source/registry --json
-uv run zotero-companion wiki-release --registry-root data/domains/thermophysical/source/registry --json
-uv run zotero-companion wiki-refresh --json
-uv run zotero-companion wiki-verify --json
-uv run zotero-companion wiki-stale --json
+uv run cse-zotero wiki-search "phase equilibrium" --json
+uv run cse-zotero wiki-search "activity coefficient" --project epcsaft-equilibrium --json
+uv run cse-zotero wiki-source ABCD2345 --json
+uv run cse-zotero wiki-evidence ABCD2345 --query "Born diameter" --json
+uv run cse-zotero wiki-context epcsaft-equilibrium --json
+uv run cse-zotero wiki-context --global --query "Born activity coefficient" --json
+uv run cse-zotero wiki-record equation:figiel-born-solvation-shell --json
+uv run cse-zotero wiki-record-template equation --zotero-key YEENX35P --json
+uv run cse-zotero wiki-paper-template YEENX35P --json
+uv run cse-zotero wiki-lineage dataset:hamer-1972-aqueous-coefficients --json
+uv run cse-zotero wiki-health --stale-source 28NPJ5H6 --json
+uv run cse-zotero wiki-coverage --json
+uv run cse-zotero wiki-lint --registry-root data/domains/thermophysical/source/registry --json
+uv run cse-zotero wiki-release --registry-root data/domains/thermophysical/source/registry --json
+uv run cse-zotero wiki-refresh --json
+uv run cse-zotero wiki-verify --json
+uv run cse-zotero wiki-stale --json
 ```
 
 Agent authority rules are deliberately explicit:
@@ -202,7 +237,7 @@ without scanning the folder layout. `wiki-source KEY` exposes the same
 brief/evidence routes under `wiki` without embedding PDF text.
 
 ```bash
-uv run zotero-companion wiki-context epcsaft-equilibrium \
+uv run cse-zotero wiki-context epcsaft-equilibrium \
   --query "Born term mixed solvent" --json
 ```
 
@@ -219,9 +254,9 @@ are reviewed.
 Before a review or handoff, run the local-only checks:
 
 ```bash
-uv run zotero-companion wiki-verify --json
-uv run zotero-companion wiki-manifest-lint --registry-root data/domains/thermophysical/source/registry --json
-uv run zotero-companion wiki-release --registry-root data/domains/thermophysical/source/registry --json
+uv run cse-zotero wiki-verify --json
+uv run cse-zotero wiki-manifest-lint --registry-root data/domains/thermophysical/source/registry --json
+uv run cse-zotero wiki-release --registry-root data/domains/thermophysical/source/registry --json
 uv run python scripts/benchmark_wiki.py --json
 uv run python scripts/agent_smoke.py --json
 ```
@@ -244,13 +279,27 @@ It never refreshes the repository implicitly. Use the explicit refresh gate
 only after reviewing its dry-run output:
 
 ```bash
-uv run zotero-companion wiki-refresh --json
-uv run zotero-companion wiki-refresh --apply --json
+uv run cse-zotero wiki-refresh --json
+uv run cse-zotero wiki-refresh --apply --json
 ```
 
 `wiki-refresh --apply` updates only generated source records, the catalog,
 manifest, and search index. Curated claims, graphs, and evidence companions
 remain untouched.
+
+For a deterministic periodic pass, use `wiki-maintain --apply --json`. It gets
+one live Zotero snapshot, refreshes source metadata, syncs existing Markdown
+companions, rebuilds the index once, and verifies the repository. Changed or
+unavailable companions are preserved and reported with concrete errors; PDFs
+are never converted and Zotero is never mutated.
+An overlapping pass exits successfully with a skipped status; unavailable
+Zotero or other maintenance errors exit nonzero. A 15-minute user scheduler
+can invoke:
+
+```bash
+cse-zotero wiki-maintain --apply --json
+cse-zotero bibliography-export --apply --json
+```
 
 ## Stage 2 background plugin
 
@@ -260,7 +309,7 @@ Build the bootstrapped plugin package with:
 uv run python scripts/build_plugin.py
 ```
 
-Install `dist/zotero-companion-1.0.0.xpi` from Zotero's Add-ons manager, then
+Install `dist/cse-zotero-1.0.0.xpi` from Zotero's Add-ons manager, then
 restart Zotero once. The plugin runs in the background and adds these
 loopback-only endpoints to Zotero's existing local server:
 
@@ -271,9 +320,9 @@ loopback-only endpoints to Zotero's existing local server:
 The CLI never controls the desktop pointer or keyboard:
 
 ```bash
-uv run zotero-companion plugin-status --json
-uv run zotero-companion plugin-tag-cleanup --json
-uv run zotero-companion plugin-searches --json
+uv run cse-zotero plugin-status --json
+uv run cse-zotero plugin-tag-cleanup --json
+uv run cse-zotero plugin-searches --json
 ```
 
 Mutating commands are deliberately separate and explicit (`--apply`). They
@@ -284,22 +333,22 @@ are not run as part of installation or startup.
 Check the key file and local API without changing Zotero:
 
 ```bash
-uv run zotero-companion local-status --json
+uv run cse-zotero local-status --json
 ```
 
 The REST organization commands are dry-run by default:
 
 ```bash
-uv run zotero-companion local-tag-cleanup --json
-uv run zotero-companion local-searches --json
+uv run cse-zotero local-tag-cleanup --json
+uv run cse-zotero local-searches --json
 ```
 
 Only run an apply command after reviewing its dry-run output and confirming
 the intended scope:
 
 ```bash
-uv run zotero-companion local-tag-cleanup --apply --json
-uv run zotero-companion local-searches --apply --json
+uv run cse-zotero local-tag-cleanup --apply --json
+uv run cse-zotero local-searches --apply --json
 ```
 
 Item tag updates preserve unrelated tags and use the item's version when the

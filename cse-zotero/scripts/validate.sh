@@ -4,27 +4,27 @@ set -euo pipefail
 repo_root="$(git rev-parse --show-toplevel)"
 cd "$repo_root"
 
-companion_status="$(uv run zotero-companion doctor --json || true)"
+companion_status="$(uv run cse-zotero doctor --json || true)"
 wiki_root="$(jq -r '.wiki_root' <<<"$companion_status")"
 data_root="$(jq -r '.data_root' <<<"$companion_status")"
 registry_root="$data_root/domains/thermophysical/source/registry"
 normalized_records="$data_root/domains/thermophysical/normalized/registry-records.csv"
 
 uv run linkml-validate schema/companion.yaml schema/thermophysical.yaml
-uv run zotero-companion schema-validate data/examples/core-records.yaml --json \
+uv run cse-zotero schema-validate data/examples/core-records.yaml --json \
   | jq -e '.ok == true' >/dev/null
-uv run zotero-companion schema-validate data/examples/thermophysical-record.yaml \
+uv run cse-zotero schema-validate data/examples/thermophysical-record.yaml \
   --schema schema/thermophysical.yaml --class ThermophysicalRecord --json \
   | jq -e '.ok == true' >/dev/null
 PYTHONDONTWRITEBYTECODE=1 uv run pytest -q -p no:cacheprovider
 
-uv run zotero-companion wiki-verify --json \
+uv run cse-zotero wiki-verify --json \
   | jq -e '.ok == true' >/dev/null
-uv run zotero-companion wiki-lint --registry-root "$registry_root" --json \
+uv run cse-zotero wiki-lint --registry-root "$registry_root" --json \
   | jq -e '.ok == true' >/dev/null
-uv run zotero-companion wiki-manifest-lint --registry-root "$registry_root" --json \
+uv run cse-zotero wiki-manifest-lint --registry-root "$registry_root" --json \
   | jq -e '.ok == true' >/dev/null
-uv run zotero-companion wiki-coverage --json \
+uv run cse-zotero wiki-coverage --json \
   | jq -e '.ok == true' >/dev/null
 
 uv run python scripts/benchmark_wiki.py --json \
@@ -37,9 +37,9 @@ trap 'rm -f -- "$plugin_package"' EXIT
 uv run python scripts/build_plugin.py --output "$plugin_package" >/dev/null
 node --test tests/test_plugin_plan.mjs
 
-uv run zotero-companion data-query \
+uv run cse-zotero data-query \
   "$normalized_records" \
   --sql 'SELECT record_type, count(*) AS count FROM records GROUP BY record_type ORDER BY record_type' \
   --json | jq -e '.rows | length == 5' >/dev/null
 
-echo "Zotero Companion validation passed."
+echo "CSE Zotero validation passed."

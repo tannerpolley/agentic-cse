@@ -121,6 +121,159 @@ def test_materialize_search_context_and_verify(tmp_path):
     assert checked["uncited_claim_count"] == 0
 
 
+def test_index_uses_manifest_sources_but_keeps_orphan_evidence_searchable(tmp_path):
+    root = tmp_path / "wiki"
+    full_snapshot = snapshot()
+    materialize_snapshot(full_snapshot, root, apply=True)
+    active_snapshot = WikiSnapshot(
+        items=tuple(item for item in full_snapshot.items if item["key"] == "EQ123456"),
+        collections=full_snapshot.collections[:1],
+        tags=full_snapshot.tags[:1],
+        searches=full_snapshot.searches,
+    )
+    materialize_snapshot(active_snapshot, root, apply=True)
+
+    bundle = root / "evidence/LI123456"
+    bundle.mkdir(parents=True)
+    text = "# Retained orphan evidence\n\nRemoved source passage.\n"
+    (bundle / "paper.md").write_text(text, encoding="utf-8")
+    (bundle / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "parent_zotero_key": "LI123456",
+                "files": [
+                    {
+                        "path": "paper.md",
+                        "format": "markdown",
+                        "role": "main_article",
+                        "zotero_attachment_key": "MD123456",
+                        "source_filename": "paper.md",
+                        "sha256": hashlib.sha256(text.encode()).hexdigest(),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    indexed = index_wiki(root)
+    checked = verify_wiki(root)
+
+    assert indexed["documents"] == 1
+    assert json.loads((root / "triage.json").read_text(encoding="utf-8"))["source_count"] == 1
+    assert indexed["evidence_files"] == 1
+    assert checked["ok"] is True
+    assert any("LI123456" in warning for warning in checked["warnings"])
+    assert search_evidence_chunks(
+        root, source_keys=["LI123456"], query="Removed source passage"
+    )
+
+
+def test_search_wiki_applies_project_filter_before_limit(tmp_path):
+    root = tmp_path / "wiki"
+    records = [
+        {
+            "zotero_key": f"AA{i:06d}",
+            "title": f"Project A source {i}",
+            "projects": ["project-a"],
+            "item_type": "journalArticle",
+        }
+        for i in range(6)
+    ] + [
+        {
+            "zotero_key": "ZZ999999",
+            "title": "Project B source",
+            "projects": ["project-b"],
+            "item_type": "journalArticle",
+        }
+    ]
+    for record in records:
+        source_path = root / "sources" / record["zotero_key"]
+        source_path.mkdir(parents=True)
+        (source_path / "record.json").write_text(json.dumps(record), encoding="utf-8")
+
+    index_wiki(root, records=records)
+
+    matches = search_wiki(root, project="project-b", limit=1)
+
+    assert [match["zotero_key"] for match in matches] == ["ZZ999999"]
+
+
+def test_search_wiki_ranks_before_limit_with_and_without_fts(tmp_path):
+    root = tmp_path / "wiki"
+    records = [
+        {"zotero_key": "AA000001", "title": "Background", "abstract": "density " + "other " * 100},
+        {"zotero_key": "ZZ000001", "title": "Density density density"},
+    ]
+    for record in records:
+        path = root / "sources" / record["zotero_key"]
+        path.mkdir(parents=True)
+        (path / "record.json").write_text(json.dumps(record))
+    index_wiki(root, records=records)
+    assert search_wiki(root, query="density", limit=1)[0]["zotero_key"] == "ZZ000001"
+    with sqlite3.connect(root / "index.sqlite") as connection:
+        connection.execute("UPDATE index_metadata SET value='false' WHERE key='fts5'")
+    assert search_wiki(root, query="density", limit=1)[0]["zotero_key"] == "ZZ000001"
+
+
+def test_context_limit_retains_source_for_evidence_hit(tmp_path):
+    root = tmp_path / "wiki"
+    materialize_snapshot(snapshot(), root, apply=True)
+    (root / "manifests").mkdir()
+    (root / "manifests/epcsaft-equilibrium.json").write_text(json.dumps({
+        "project_id": "epcsaft-equilibrium", "source_keys": ["EQ123456", "LI123456"],
+    }))
+    bundle = root / "evidence/LI123456"
+    bundle.mkdir(parents=True)
+    text = "# Retained evidence\n\nEquilibrium evidence from a different source.\n"
+    (bundle / "paper.md").write_text(text)
+    (bundle / "manifest.json").write_text(json.dumps({
+        "schema_version": 1, "parent_zotero_key": "LI123456", "files": [{
+            "path": "paper.md", "format": "markdown", "role": "main_article",
+            "zotero_attachment_key": "MD123456", "source_filename": "paper.md",
+            "sha256": hashlib.sha256(text.encode()).hexdigest(),
+        }],
+    }))
+    index_wiki(root)
+    context = context_pack(root, project="epcsaft-equilibrium", query="equilibrium", limit=1)
+    assert context["evidence_hits"][0]["zotero_key"] == "LI123456"
+    assert [source["zotero_key"] for source in context["sources"]] == ["LI123456"]
+
+
+def test_search_wiki_uses_manifest_source_keys_for_project_membership(tmp_path):
+    root = tmp_path / "wiki"
+    records = [
+        {
+            "zotero_key": "MANIFEST1",
+            "title": "Manifest-only source",
+            "projects": [],
+            "item_type": "journalArticle",
+        },
+        {
+            "zotero_key": "COLLECTION1",
+            "title": "Collection source",
+            "projects": ["project-a"],
+            "item_type": "journalArticle",
+        },
+    ]
+    (root / "manifests").mkdir(parents=True)
+    (root / "manifests/project-a.json").write_text(
+        json.dumps({"project_id": "project-a", "source_keys": ["MANIFEST1"]}),
+        encoding="utf-8",
+    )
+    for record in records:
+        source_path = root / "sources" / record["zotero_key"]
+        source_path.mkdir(parents=True)
+        (source_path / "record.json").write_text(json.dumps(record), encoding="utf-8")
+
+    index_wiki(root, records=records)
+
+    matches = search_wiki(root, project="project-a", limit=10)
+
+    assert {match["zotero_key"] for match in matches} == {"MANIFEST1", "COLLECTION1"}
+
+
 def test_manifest_is_deterministic_and_stale_report_uses_top_level_versions(tmp_path):
     root = tmp_path / "wiki"
     materialize_snapshot(snapshot(), root, apply=True)

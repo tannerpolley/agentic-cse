@@ -1,4 +1,4 @@
-"""Build the bootstrapped Zotero Companion plugin XPI."""
+"""Build the bootstrapped CSE Zotero plugin XPI."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugin"
 DIST = ROOT / "dist"
-OUTPUT = DIST / "zotero-companion-1.0.0.xpi"
+OUTPUT = DIST / "cse-zotero-1.0.0.xpi"
 FILES = ("manifest.json", "bootstrap.js", "cleanup-plan.js", "zotero-companion.js")
 
 

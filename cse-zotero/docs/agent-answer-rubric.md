@@ -55,8 +55,8 @@ The repository-level checks are the executable acceptance gate:
 ```bash
 uv run python scripts/agent_smoke.py --json
 uv run python scripts/benchmark_wiki.py --json
-uv run zotero-companion wiki-lint --registry-root data/domains/thermophysical/source/registry --json
-uv run zotero-companion wiki-manifest-lint --registry-root data/domains/thermophysical/source/registry --json
+uv run cse-zotero wiki-lint --registry-root data/domains/thermophysical/source/registry --json
+uv run cse-zotero wiki-manifest-lint --registry-root data/domains/thermophysical/source/registry --json
 ```
 
 These checks validate retrieval and provenance plumbing; they do not replace

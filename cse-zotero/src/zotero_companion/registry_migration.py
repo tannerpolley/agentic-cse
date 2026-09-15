@@ -1,4 +1,4 @@
-"""Preserve and index the thermophysical registry as a Companion domain pack."""
+"""Preserve and index the thermophysical registry as a CSE Zotero domain pack."""
 
 from __future__ import annotations
 

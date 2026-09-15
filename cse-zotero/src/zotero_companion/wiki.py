@@ -19,7 +19,7 @@ from pathlib import Path
 from typing import Any
 
 from .manifests import ManifestError, lint_manifests, manifest_lookup
-from .records import lint_records, search_records
+from .records import _registry_root, lint_records, search_records
 
 WIKI_SCHEMA_VERSION = 1
 INDEX_SCHEMA_VERSION = 2
@@ -683,13 +683,17 @@ def _suggested_classification(record: Mapping[str, Any]) -> dict[str, list[str]]
 
 def _child_metadata(item: Mapping[str, Any]) -> dict[str, Any]:
     data = _data(item)
+    link_mode = data.get("linkMode", "")
+    filename = data.get("filename", "")
+    if link_mode == "linked_file" and not filename:
+        filename = Path(str(data.get("path", ""))).name
     return {
         "key": _key(item),
         "item_type": data.get("itemType", ""),
         "title": data.get("title", ""),
-        "filename": data.get("filename", ""),
+        "filename": filename,
         "content_type": data.get("contentType", ""),
-        "link_mode": data.get("linkMode", ""),
+        "link_mode": link_mode,
         "parent_key": data.get("parentItem", ""),
     }
 
@@ -864,11 +868,13 @@ def materialize_snapshot(
     root: Path = Path("wiki"),
     *,
     apply: bool = False,
+    records: Sequence[Mapping[str, Any]] | None = None,
+    rebuild_index: bool = True,
 ) -> dict[str, Any]:
     """Plan or write a Zotero snapshot without deleting existing wiki records."""
 
     root = Path(root)
-    records = build_source_records(snapshot)
+    records = list(records) if records is not None else build_source_records(snapshot)
     manifest = _manifest(snapshot, records)
     catalog = _catalog(snapshot)
     previous = _existing_manifest(root)
@@ -915,13 +921,14 @@ def materialize_snapshot(
         _write_atomic(source_root / "source.md", _source_markdown(record))
     _write_atomic(root / CATALOG_FILENAME, _stable_json(catalog))
     _write_atomic(root / MANIFEST_FILENAME, _stable_json(manifest))
-    index_result = index_wiki(root, records=records)
     result["changed_keys"] = changed
-    result["index"] = str(root / INDEX_FILENAME)
-    result["triage"] = str(root / TRIAGE_FILENAME)
-    result["evidence_files"] = index_result["evidence_files"]
-    result["evidence_chunks"] = index_result["evidence_chunks"]
-    result["triage_queues"] = index_result["triage_queues"]
+    if rebuild_index:
+        index_result = index_wiki(root, records=records)
+        result["index"] = str(root / INDEX_FILENAME)
+        result["triage"] = str(root / TRIAGE_FILENAME)
+        result["evidence_files"] = index_result["evidence_files"]
+        result["evidence_chunks"] = index_result["evidence_chunks"]
+        result["triage_queues"] = index_result["triage_queues"]
     return result
 
 
@@ -1451,8 +1458,26 @@ def index_wiki(root: Path = Path("wiki"), *, records: Sequence[Mapping[str, Any]
 
     root = Path(root)
     if records is None:
+        manifest_path = root / MANIFEST_FILENAME
+        if manifest_path.exists():
+            try:
+                manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+            except (OSError, json.JSONDecodeError) as exc:
+                raise WikiError(f"Could not read manifest {manifest_path}: {exc}") from exc
+            if not isinstance(manifest, Mapping):
+                raise WikiError(f"Manifest is not a JSON object: {manifest_path}")
+            manifest_records = manifest.get("records", [])
+            if not isinstance(manifest_records, Sequence) or isinstance(manifest_records, (str, bytes)):
+                raise WikiError(f"Manifest records are not a list: {manifest_path}")
+            paths = [
+                root / SOURCE_DIRNAME / str(entry.get("zotero_key")) / "record.json"
+                for entry in manifest_records
+                if isinstance(entry, Mapping) and str(entry.get("zotero_key", "")).strip()
+            ]
+        else:
+            paths = sorted((root / SOURCE_DIRNAME).glob("*/record.json"))
         records = []
-        for path in sorted((root / SOURCE_DIRNAME).glob("*/record.json")):
+        for path in paths:
             try:
                 record = json.loads(path.read_text(encoding="utf-8"))
             except (OSError, json.JSONDecodeError) as exc:
@@ -1617,47 +1642,82 @@ def search_wiki(
     *,
     query: str = "",
     project: str | None = None,
-    limit: int = 20,
+    limit: int | None = 20,
 ) -> list[dict[str, Any]]:
     """Search materialized source records using the local SQLite index."""
 
-    if limit < 1:
+    if limit is not None and limit < 1:
         raise ValueError("limit must be positive")
+    sql_limit = -1 if limit is None else limit
     index_path = Path(root) / INDEX_FILENAME
     if not index_path.exists():
         raise WikiError(f"Search index is missing: {index_path}; run sync --apply first")
     connection = sqlite3.connect(index_path)
     try:
         fts = _load_index_metadata(connection)
+        project_filter = ""
+        project_params: list[str] = []
+        if project:
+            manifest_keys: set[str] = set()
+            try:
+                manifest = manifest_lookup(Path(root), project)
+            except ManifestError:
+                manifest = None
+            if manifest is not None:
+                raw_source_keys = manifest.get("source_keys", [])
+                if isinstance(raw_source_keys, (str, bytes)) or not isinstance(
+                    raw_source_keys, Sequence
+                ):
+                    raw_source_keys = []
+                manifest_keys = {
+                    str(key).strip()
+                    for key in raw_source_keys
+                    if str(key).strip()
+                }
+            project_filter = " AND (instr(' ' || projects || ' ', ' ' || ? || ' ') > 0"
+            project_params.append(project)
+            if manifest_keys:
+                placeholders = ",".join("?" for _ in manifest_keys)
+                project_filter += f" OR zotero_key IN ({placeholders})"
+                project_params.extend(sorted(manifest_keys))
+            project_filter += ")"
         if query.strip() and fts:
             terms = [term for term in re.findall(r"[\w-]+", query, flags=re.UNICODE) if term]
             if not terms:
                 rows = []
             else:
                 match = " AND ".join(f'"{term.replace(chr(34), "")}"' for term in terms)
+                params = [match, *project_params, sql_limit]
                 rows = connection.execute(
-                    "SELECT zotero_key, title, projects, path FROM documents WHERE documents MATCH ? LIMIT ?",
-                    (match, limit * 5),
+                    "SELECT zotero_key, title, projects, path FROM documents "
+                    "WHERE documents MATCH ?" + project_filter
+                    + " ORDER BY bm25(documents, 0, 5, 1, 0, 0), zotero_key LIMIT ?",
+                    params,
                 ).fetchall()
         elif query.strip():
             pattern = f"%{query.casefold()}%"
+            params = [pattern, *project_params, sql_limit]
+            connection.create_function(
+                "relevance", 2,
+                lambda title, body: 5 * _query_score(query, [title]) + _query_score(query, [body]),
+            )
             rows = connection.execute(
                 "SELECT zotero_key, title, projects, path FROM documents "
-                "WHERE lower(title || ' ' || body) LIKE ? LIMIT ?",
-                (pattern, limit * 5),
+                "WHERE lower(title || ' ' || body) LIKE ?" + project_filter
+                + " ORDER BY relevance(title, body) DESC, zotero_key LIMIT ?",
+                params,
             ).fetchall()
         else:
+            params = [*project_params, sql_limit]
             rows = connection.execute(
-                "SELECT zotero_key, title, projects, path FROM documents LIMIT ?",
-                (limit * 5,),
+                "SELECT zotero_key, title, projects, path FROM documents "
+                "WHERE 1=1" + project_filter + " ORDER BY zotero_key LIMIT ?",
+                params,
             ).fetchall()
     finally:
         connection.close()
     results = []
     for key, title, projects, path in rows:
-        project_names = str(projects or "").split()
-        if project and project not in project_names:
-            continue
         record_path = Path(root) / path
         try:
             record = json.loads(record_path.read_text(encoding="utf-8"))
@@ -1675,7 +1735,7 @@ def search_wiki(
                 "year": record.get("year", ""),
             }
         )
-        if len(results) >= limit:
+        if limit is not None and len(results) >= limit:
             break
     return results
 
@@ -1819,6 +1879,7 @@ def search_evidence_chunks(
             "content_sha256": content_sha256,
             "declared_sha256": declared_sha256,
             "hash_matches": None if hash_matches is None else bool(hash_matches),
+            "hash_verification": "index-time; current companion file not rechecked",
             "line_start": line_start,
             "line_end": line_end,
             "section": section,
@@ -2792,20 +2853,45 @@ def context_pack(
     project: str,
     query: str = "",
     limit: int = 12,
+    registry_root: str | Path | None = None,
+    data_root: str | Path | None = None,
     api: Any | None = None,
 ) -> dict[str, Any]:
     """Return a compact, provenance-linked project context pack for an agent."""
 
     project_path = Path(root) / PROJECT_DIRNAME / f"{project}.md"
     warnings: list[str] = []
+    resolved_registry_root = (
+        _registry_root(Path(root), registry_root)
+        if registry_root is not None
+        else (
+            Path(data_root)
+            / "domains"
+            / "thermophysical"
+            / "source"
+            / "registry"
+            if data_root is not None
+            else None
+        )
+    )
     project_text = ""
     if project_path.exists():
         project_text = project_path.read_text(encoding="utf-8")
     else:
         warnings.append(f"Project scaffold is missing: {project_path}")
-    sources = search_wiki(root, query=query, project=project, limit=limit)
+    project_sources = search_wiki(
+        root,
+        query="",
+        project=project,
+        limit=None if query else limit,
+    )
+    sources = (
+        search_wiki(root, query=query, project=project, limit=limit)
+        if query
+        else project_sources
+    )
     if not sources:
-        warnings.append("No materialized Zotero sources matched this project/query")
+        warnings.append("No source metadata matched project/query; evidence may match independently")
     freshness = freshness_status(Path(root), api=api)
     if freshness["refresh_required"]:
         warnings.append(
@@ -2838,16 +2924,8 @@ def context_pack(
     implementation = _implementation_documents(claims)
     if not implementation:
         warnings.append("No implementation references are linked from the matched claims")
-    evidence_scope_sources = list(sources)
-    if query:
-        evidence_scope_sources.extend(
-            search_wiki(
-                root,
-                query="",
-                project=project,
-                limit=limit,
-            )
-        )
+    evidence_scope_sources = list(project_sources if query else sources)
+    evidence_scope_sources.extend(source for source in sources if source not in evidence_scope_sources)
     evidence_source_keys = {
         str(source.get("zotero_key", ""))
         for source in evidence_scope_sources
@@ -2880,6 +2958,14 @@ def context_pack(
         )
     if query and not evidence_hits and evidence_coverage_result["index_available"]:
         warnings.append("No indexed evidence chunks matched this context query")
+    source_by_key = {
+        str(source.get("zotero_key")): source
+        for source in project_sources
+        if str(source.get("zotero_key", "")).strip()
+    }
+    evidence_keys = list(dict.fromkeys(str(hit.get("zotero_key", "")) for hit in evidence_hits))
+    evidence_sources = [source_by_key[key] for key in evidence_keys if key in source_by_key]
+    sources = (evidence_sources + [source for source in sources if source not in evidence_sources])[:limit]
     knowledge_records: list[dict[str, Any]] = []
     try:
         project_manifest = manifest_lookup(Path(root), project)
@@ -2899,6 +2985,31 @@ def context_pack(
         knowledge_records = search_records(Path(root), query=query, limit=limit)
     if not knowledge_records:
         warnings.append("No typed knowledge records matched this project/query")
+    registry_context: dict[str, Any] = {
+        "registry_root": "",
+        "query": query,
+        "count": 0,
+        "total_matches": 0,
+        "results": [],
+        "warnings": ["No registry root was provided"],
+        "read_only": True,
+    }
+    registry_query = query or ("MEA" if project == "mea-thermodynamics" else "")
+    if resolved_registry_root is not None and registry_query:
+        try:
+            from .scientific_data import search_registry
+
+            registry_context = search_registry(
+                resolved_registry_root,
+                query=registry_query,
+                limit=limit,
+            )
+        except Exception as exc:  # pragma: no cover - defensive CLI boundary
+            registry_context["warnings"] = [f"Registry discovery unavailable: {exc}"]
+            warnings.append(registry_context["warnings"][0])
+    elif resolved_registry_root is not None:
+        registry_context["registry_root"] = str(Path(resolved_registry_root).expanduser().resolve())
+        registry_context["warnings"] = ["Registry discovery requires a query"]
     synthesis = []
     synthesis_path = Path(root) / "synthesis"
     if synthesis_path.exists():
@@ -2922,6 +3033,7 @@ def context_pack(
         "evidence": evidence,
         "evidence_hits": evidence_hits,
         "evidence_coverage": evidence_coverage_result,
+        "data": registry_context,
         "implementation": implementation,
         "knowledge_records": knowledge_records,
         "synthesis": synthesis[:limit],
@@ -3106,7 +3218,10 @@ def stale_report(root: Path, api: Any) -> dict[str, Any]:
     }
     from .health import health_report
 
-    health = health_report(Path(root), stale_source_keys=changed)
+    health = health_report(
+        Path(root),
+        stale_source_keys=[*changed, *removed],
+    )
     result["curated_review_queue"] = health["review_queue"]
     result["curated_review_queue_total"] = health["review_queue_total"]
     result["dependency_health_ok"] = health["ok"]

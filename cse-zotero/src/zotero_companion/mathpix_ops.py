@@ -68,7 +68,7 @@ def mathpix_conversion(
     converter: Callable[[Path, Path], None] | None = None,
 ) -> dict[str, Any]:
     if not config.mathpix_library_consent:
-        raise MathpixOperationError("Mathpix library consent is not recorded in Companion config")
+        raise MathpixOperationError("Mathpix library consent is not recorded in CSE Zotero config")
     api = api or ZoteroLocalAPI()
     parent = api.get(f"/api/users/0/items/{parent_key}")
     data = parent.get("data", {}) if isinstance(parent, dict) else {}

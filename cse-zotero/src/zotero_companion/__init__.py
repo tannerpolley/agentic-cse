@@ -1,10 +1,11 @@
-"""Zotero Companion inventory, agent wiki, and explicit write foundations."""
+"""CSE Zotero inventory, agent wiki, and explicit write foundations."""
 
 __all__ = [
     "coverage",
     "evidence_sync",
     "health",
     "local_api",
+    "maintenance",
     "manifests",
     "records",
     "release",

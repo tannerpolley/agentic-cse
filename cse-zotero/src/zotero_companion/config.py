@@ -1,4 +1,4 @@
-"""User-owned configuration and installation contract for Zotero Companion."""
+"""User-owned configuration and installation contract for CSE Zotero."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ CAPABILITIES = (
 
 
 class ConfigError(RuntimeError):
-    """Raised when the user-owned Companion configuration is invalid."""
+    """Raised when the user-owned CSE Zotero configuration is invalid."""
 
 
 def default_config_path() -> Path:
@@ -113,14 +113,14 @@ def load_config(path: Path | None = None, *, allow_proposed: bool = False) -> Co
     if not path.is_file():
         if allow_proposed:
             return proposed_config()
-        raise ConfigError(f"Companion configuration is missing: {path}; run `zotero-companion init --apply`")
+        raise ConfigError(f"CSE Zotero configuration is missing: {path}; run `cse-zotero init --apply`")
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     paths = data.get("paths", {})
     mathpix = data.get("mathpix", {})
     required = ("corpus_root", "zotero_data_dir", "bibliography_export")
     missing = [name for name in required if not str(paths.get(name, "")).strip()]
     if missing:
-        raise ConfigError(f"Companion configuration is missing paths: {', '.join(missing)}")
+        raise ConfigError(f"CSE Zotero configuration is missing paths: {', '.join(missing)}")
     return CompanionConfig(
         corpus_root=Path(paths["corpus_root"]).expanduser().resolve(),
         zotero_data_dir=Path(paths["zotero_data_dir"]).expanduser().resolve(),

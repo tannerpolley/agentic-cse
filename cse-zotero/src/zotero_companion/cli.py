@@ -1,4 +1,4 @@
-"""Command-line entry point for Zotero Companion."""
+"""Command-line entry point for CSE Zotero."""
 
 from __future__ import annotations
 
@@ -22,6 +22,7 @@ from .corpus_migration import CorpusMigrationError, migrate_corpus
 from .coverage import CoverageError, coverage_report
 from .evidence_sync import EvidenceSyncError, sync_evidence
 from .local_api import LocalAPIError, ZoteroLocalAPI
+from .maintenance import maintain_wiki
 from .mathpix_ops import MathpixOperationError, mathpix_conversion
 from .manifests import ManifestError, lint_manifests, load_manifests, manifest_lookup
 from .plugin_client import PluginClientError, ZoteroPluginClient
@@ -37,7 +38,7 @@ from .records import (
 from .release import ReleaseError, release_plan
 from .registry_migration import RegistryMigrationError, build_registry_pack
 from .report import audit_payload
-from .scientific_data import ScientificDataError, query_table, validate_catalog
+from .scientific_data import ScientificDataError, query_table, search_registry, validate_catalog
 from .source_ops import attachment_path, search_sources, source_children
 from .templates import paper_brief_template, record_template
 from .wiki import (
@@ -82,12 +83,12 @@ def emit_json(payload: object) -> None:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(prog="zotero-companion")
+    parser = argparse.ArgumentParser(prog="cse-zotero")
     subparsers = parser.add_subparsers(dest="command", required=True)
     doctor = subparsers.add_parser("doctor", help="report installed protocol and capability readiness")
     doctor.add_argument("--config", type=Path, default=default_config_path())
     doctor.add_argument("--json", action="store_true")
-    initialize = subparsers.add_parser("init", help="plan or initialize user-owned Companion configuration")
+    initialize = subparsers.add_parser("init", help="plan or initialize user-owned CSE Zotero configuration")
     initialize.add_argument("--config", type=Path, default=default_config_path())
     initialize.add_argument("--corpus-root", type=Path)
     initialize.add_argument("--apply", action="store_true")
@@ -142,6 +143,13 @@ def main() -> int:
     data_query.add_argument("--sql", default="SELECT * FROM records")
     data_query.add_argument("--limit", type=int, default=100)
     data_query.add_argument("--json", action="store_true")
+    data_search = subparsers.add_parser(
+        "data-search", help="find retained scientific data packages and resolve their resources"
+    )
+    data_search.add_argument("query", nargs="?", default="", help="terms such as MEA density")
+    data_search.add_argument("--registry-root", type=Path, help="thermophysical registry root")
+    data_search.add_argument("--limit", type=int, default=20)
+    data_search.add_argument("--json", action="store_true")
     registry_migrate = subparsers.add_parser(
         "registry-migrate", help="plan or create the thermophysical domain pack"
     )
@@ -183,6 +191,16 @@ def main() -> int:
         help="write generated source records and rebuild the index",
     )
     add_wiki_options(wiki_refresh)
+    wiki_maintain = subparsers.add_parser(
+        "wiki-maintain",
+        help="run one repository-only Zotero wiki maintenance pass",
+    )
+    wiki_maintain.add_argument(
+        "--apply",
+        action="store_true",
+        help="refresh sources, sync existing companions, and verify the wiki",
+    )
+    add_wiki_options(wiki_maintain)
     wiki_index = subparsers.add_parser("wiki-index", help="rebuild the agent wiki search index")
     wiki_index.add_argument("--apply", action="store_true", help="write the SQLite index")
     add_wiki_options(wiki_index)
@@ -490,12 +508,27 @@ def main() -> int:
             args.wiki_root = load_config().wiki_root
         except ConfigError as exc:
             parser.error(str(exc))
-    if args.command in {"schema-validate", "data-query", "registry-migrate"}:
+    if args.command in {"schema-validate", "data-query", "data-search", "registry-migrate"}:
         try:
             if args.command == "schema-validate":
                 payload = validate_catalog(args.data, args.schema, args.target_class)
             elif args.command == "data-query":
                 payload = query_table(args.table, args.sql, args.limit)
+            elif args.command == "data-search":
+                registry_root = args.registry_root
+                if registry_root is None:
+                    registry_root = (
+                        load_config().data_root
+                        / "domains"
+                        / "thermophysical"
+                        / "source"
+                        / "registry"
+                    )
+                payload = search_registry(
+                    registry_root,
+                    query=args.query,
+                    limit=args.limit,
+                )
             else:
                 payload = build_registry_pack(
                     args.registry_root, args.companion_root, apply=args.apply
@@ -550,6 +583,7 @@ def main() -> int:
     if args.command in {
         "wiki-sync",
         "wiki-refresh",
+        "wiki-maintain",
         "wiki-index",
         "wiki-search",
         "wiki-source",
@@ -579,6 +613,12 @@ def main() -> int:
                 if args.command == "wiki-refresh":
                     payload["refresh_scope"] = "generated_source_layer_only"
                     payload["zotero_mutation"] = False
+            elif args.command == "wiki-maintain":
+                payload = maintain_wiki(
+                    args.wiki_root,
+                    api=ZoteroLocalAPI(),
+                    apply=args.apply,
+                )
             elif args.command == "wiki-index":
                 if args.apply:
                     payload = index_wiki(args.wiki_root)
@@ -621,6 +661,7 @@ def main() -> int:
                         query=args.query,
                         limit=args.limit,
                         registry_root=args.registry_root,
+                        data_root=args.wiki_root.parent / "data",
                         api=ZoteroLocalAPI(),
                     )
                 elif args.project:
@@ -629,6 +670,8 @@ def main() -> int:
                         project=args.project,
                         query=args.query,
                         limit=args.limit,
+                        registry_root=args.registry_root,
+                        data_root=args.wiki_root.parent / "data",
                         api=ZoteroLocalAPI(),
                     )
                 else:
@@ -733,7 +776,7 @@ def main() -> int:
         ) as exc:
             parser.error(str(exc))
         emit_json(payload)
-        if args.command in {"wiki-verify", "wiki-lint", "wiki-manifest-lint", "wiki-health", "wiki-coverage"} and isinstance(payload, dict) and not payload.get("ok", False):
+        if args.command in {"wiki-maintain", "wiki-verify", "wiki-lint", "wiki-manifest-lint", "wiki-health", "wiki-coverage"} and isinstance(payload, dict) and not payload.get("ok", False):
             return 1
         return 0
     return 2

@@ -1,4 +1,5 @@
 import json
+import hashlib
 from pathlib import Path
 
 from zotero_companion.records import (
@@ -14,6 +15,43 @@ from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_context_registry_paths_resolve_from_corpus_not_cwd(tmp_path, monkeypatch):
+    from test_scientific_data import _registry_fixture
+    from test_wiki import snapshot
+    from zotero_companion.wiki import context_pack, materialize_snapshot
+
+    registry, _ = _registry_fixture(tmp_path)
+    wiki = tmp_path / "wiki"
+    materialize_snapshot(snapshot(), wiki, apply=True)
+    elsewhere = tmp_path / "unrelated"
+    elsewhere.mkdir()
+    monkeypatch.chdir(elsewhere)
+    for result in [
+        global_context(wiki, query="MEA", registry_root="source/registry"),
+        context_pack(wiki, project="epcsaft-equilibrium", query="MEA", registry_root="source/registry"),
+    ]:
+        assert result["data"]["registry_root"] == str(registry.resolve())
+        assert result["data"]["count"] == 1
+
+
+def test_explicit_corpus_cli_does_not_load_another_corpus_config(tmp_path, monkeypatch, capsys):
+    from test_wiki import snapshot
+    from zotero_companion import cli
+    from zotero_companion.wiki import materialize_snapshot
+
+    wiki = tmp_path / "wiki"
+    materialize_snapshot(snapshot(), wiki, apply=True)
+    def unexpected_config():
+        raise AssertionError("Explicit wiki must not load the user's other corpus")
+    monkeypatch.setattr(cli, "load_config", unexpected_config)
+    monkeypatch.setattr(cli, "ZoteroLocalAPI", lambda: object())
+    monkeypatch.setattr("sys.argv", ["cse-zotero", "wiki-context", "--global",
+                                  "--wiki-root", str(wiki), "--query", "MEA", "--json"])
+    assert cli.main() == 0
+    result = json.loads(capsys.readouterr().out)
+    assert str(tmp_path / "data") in result["data"]["warnings"][0]
 
 
 def test_current_typed_records_and_lineage_are_auditable():
@@ -46,6 +84,16 @@ def test_current_typed_records_and_lineage_are_auditable():
     assert "equation:hamer-excess-gibbs-bridge" in upstream_ids
     assert trace["read_only"] is True
 
+    downstream = lineage(
+        root,
+        "paper:hamer-1972",
+        direction="downstream",
+        registry_root=REGISTRY_ROOT,
+    )
+    assert "dataset:hamer-1972-aqueous-coefficients" in {
+        entry["record_id"] for entry in downstream["downstream"]
+    }
+
 
 def test_global_agent_context_exposes_the_whole_corpus_and_curated_matches():
     context = global_context(
@@ -74,6 +122,44 @@ def test_global_agent_context_exposes_the_whole_corpus_and_curated_matches():
     assert context["health"]["read_only"] is True
 
 
+def test_global_context_searches_evidence_when_metadata_does_not_match(tmp_path):
+    root = tmp_path / "wiki"
+    from test_wiki import snapshot
+
+    from zotero_companion.wiki import index_wiki, materialize_snapshot
+
+    materialize_snapshot(snapshot(), root, apply=True)
+    bundle = root / "evidence/EQ123456"
+    bundle.mkdir(parents=True)
+    companion = "# Evidence\n\nThe only-evidence phrase appears here.\n"
+    (bundle / "paper.md").write_text(companion, encoding="utf-8")
+    (bundle / "manifest.json").write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "parent_zotero_key": "EQ123456",
+                "files": [
+                    {
+                        "role": "main_article",
+                        "zotero_attachment_key": "MD123456",
+                        "source_filename": "paper.md",
+                        "path": "paper.md",
+                        "format": "markdown",
+                        "sha256": hashlib.sha256(companion.encode()).hexdigest(),
+                    }
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    index_wiki(root)
+
+    context = global_context(root, query="only-evidence phrase", limit=2)
+
+    assert context["evidence_hits"][0]["zotero_key"] == "EQ123456"
+    assert "EQ123456" in context["matched_source_keys"]
+
+
 def test_global_context_accepts_an_explicit_read_only_freshness_probe():
     class FakeAPI:
         def items(self):
@@ -83,7 +169,24 @@ def test_global_context_accepts_an_explicit_read_only_freshness_probe():
 
     assert context["freshness"]["live_check"]["checked"] is True
     assert context["freshness"]["live_check"]["available"] is True
+    assert "readiness" not in context
     assert context["read_only"] is True
+
+
+def test_global_context_exposes_resolved_registry_packets():
+    context = global_context(
+        WIKI_ROOT,
+        query="MEA",
+        limit=8,
+        registry_root=REGISTRY_ROOT,
+    )
+
+    assert context["data"]["read_only"] is True
+    assert context["data"]["count"] == 8
+    assert all(
+        result["resources"][0]["path"].startswith(str(REGISTRY_ROOT.resolve()))
+        for result in context["data"]["results"]
+    )
 
 
 def test_hamer_companion_is_exactly_the_declared_existing_zotero_file():

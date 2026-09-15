@@ -1,4 +1,4 @@
-"""Exercise the public Zotero Companion CLI as a read-only agent workflow.
+"""Exercise the public CSE Zotero CLI as a read-only agent workflow.
 
 This is intentionally deterministic and local.  It checks that an agent can
 discover a typed record, retrieve a source and its companion evidence, and

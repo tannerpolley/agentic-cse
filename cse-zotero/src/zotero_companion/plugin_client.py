@@ -1,4 +1,4 @@
-"""Client for the optional background Zotero Companion plugin."""
+"""Client for the optional background CSE Zotero plugin."""
 
 from __future__ import annotations
 
@@ -32,7 +32,7 @@ class ZoteroPluginClient:
         try:
             return json.loads(raw)
         except json.JSONDecodeError as exc:
-            raise PluginClientError("Zotero Companion plugin returned invalid JSON") from exc
+            raise PluginClientError("CSE Zotero plugin returned invalid JSON") from exc
 
     def status(self) -> dict:
         return self._request("/zotero-companion/status", method="GET")

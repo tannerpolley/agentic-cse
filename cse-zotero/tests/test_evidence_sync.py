@@ -147,3 +147,45 @@ def test_changed_companion_is_a_conflict_and_is_not_overwritten(tmp_path: Path):
 
     assert result["actions"]["conflict"] == 1
     assert (root / "evidence/PARENT123/article.md").read_bytes() == original
+
+
+def test_linked_file_uses_path_basename_when_filename_is_missing(tmp_path: Path):
+    root = tmp_path / "wiki"
+    linked = tmp_path / "linked-companion.mmd"
+    linked.write_bytes(b"# linked companion\n")
+    snapshot = WikiSnapshot(
+        items=(
+            {
+                "key": "PARENT123",
+                "version": 1,
+                "data": {"itemType": "journalArticle", "title": "Linked source"},
+            },
+            {
+                "key": "LINK123456",
+                "version": 1,
+                "data": {
+                    "itemType": "attachment",
+                    "parentItem": "PARENT123",
+                    "linkMode": "linked_file",
+                    "path": str(linked),
+                    "title": linked.name,
+                    "contentType": "text/markdown",
+                },
+            },
+        ),
+        collections=(),
+        tags=(),
+        searches=(),
+    )
+    materialize_snapshot(snapshot, root, apply=True)
+    api = CompanionAPI({"LINK123456": linked.as_uri()})
+
+    result = sync_evidence(root, api=api, apply=True)
+
+    assert result["candidate_count"] == 1
+    assert result["applied_count"] == 1
+    record = json.loads(
+        (root / "sources/PARENT123/record.json").read_text(encoding="utf-8")
+    )
+    assert record["attachments"][0]["filename"] == linked.name
+    assert (root / "evidence/PARENT123" / linked.name).read_bytes() == linked.read_bytes()

@@ -6,7 +6,7 @@ description: Use when extracting a PDF or image attachment is likely to be bette
 # Mathpix
 
 This is the repository-local copy of the Mathpix workflow used by
-Zotero Companion. It is based on the local Scientific-Codex-Skills Mathpix skill.
+CSE Zotero. It is based on the local Scientific-Codex-Skills Mathpix skill.
 
 Use the official Mathpix `mpx` CLI through the signed-in Snip account to
 convert difficult PDFs or images into Markdown-like companion files only when

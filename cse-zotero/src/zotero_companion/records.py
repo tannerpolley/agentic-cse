@@ -283,10 +283,10 @@ def _registry_ids(registry_root: Path) -> set[str]:
 
 
 def _registry_root(root: Path, value: str | Path) -> Path:
-    candidate = Path(value)
+    candidate = Path(value).expanduser()
     if not candidate.is_absolute():
         candidate = (Path(root).resolve().parent / candidate).resolve()
-    return candidate
+    return candidate.resolve()
 
 
 def _workspace_root(root: Path) -> Path:
@@ -494,13 +494,13 @@ def _synthetic_edges(root: Path, records: Mapping[str, Mapping[str, Any]]) -> li
         if isinstance(provenance, Mapping):
             for upstream in provenance.get("derived_from", []) or []:
                 if isinstance(upstream, str) and upstream:
-                    edges.append((record_id, upstream, "derived_from"))
+                    edges.append((upstream, record_id, "derived_from"))
             for source in provenance.get("sources", []) or []:
                 if isinstance(source, Mapping) and source.get("zotero_key"):
-                    edges.append((record_id, f"source:{source['zotero_key']}", "extracted_from"))
+                    edges.append((f"source:{source['zotero_key']}", record_id, "extracted_from"))
         for reference in record.get("registry_refs", []) or []:
             if isinstance(reference, Mapping) and reference.get("registry_id"):
-                edges.append((record_id, f"registry:{reference['registry_id']}", "uses"))
+                edges.append((f"registry:{reference['registry_id']}", record_id, "uses"))
         for reference in record.get("implementation_refs", []) or []:
             if isinstance(reference, Mapping):
                 repository = str(reference.get("repository", "")).strip()
@@ -572,6 +572,7 @@ def global_context(
     query: str = "",
     limit: int = 12,
     registry_root: str | Path | None = None,
+    data_root: str | Path | None = None,
     api: Any | None = None,
 ) -> dict[str, Any]:
     """Return the documented low-friction starting context for any agent."""
@@ -579,6 +580,19 @@ def global_context(
     if limit < 1:
         raise ValueError("limit must be positive")
     root = Path(root)
+    resolved_registry_root = (
+        _registry_root(root, registry_root)
+        if registry_root is not None
+        else (
+            Path(data_root)
+            / "domains"
+            / "thermophysical"
+            / "source"
+            / "registry"
+            if data_root is not None
+            else None
+        )
+    )
     warnings: list[str] = []
     triage: dict[str, Any] = {}
     source_matches: list[dict[str, Any]] = []
@@ -600,22 +614,15 @@ def global_context(
     records = load_records(root)
     record_matches = search_records(root, query=query, limit=limit)
     relations = load_relations(root)
-    lint = lint_records(root, registry_root=registry_root)
-    from .manifests import lint_manifests, load_manifests
+    from .manifests import load_manifests
     from .health import health_report
     from .coverage import coverage_report
 
-    manifest_lint = lint_manifests(root, registry_root=registry_root)
-    health = health_report(root, registry_root=registry_root)
     try:
         coverage = coverage_report(root)
     except Exception as exc:  # pragma: no cover - defensive CLI boundary
         coverage = {"ok": False, "error": str(exc), "read_only": True}
         warnings.append(f"Coverage unavailable: {exc}")
-    if lint["warnings"]:
-        warnings.extend(lint["warnings"])
-    if not health["ok"]:
-        warnings.append("Dependency health requires review before promoting this context")
     generated_triage: dict[str, Any] = {}
     triage_path = root / "triage.json"
     if triage_path.exists():
@@ -638,6 +645,26 @@ def global_context(
                 source_keys.add(str(source["zotero_key"]))
     matched_source_keys = sorted(source_keys)
     evidence_hits: list[dict[str, Any]] = []
+    try:
+        from .wiki import search_evidence_chunks
+
+        if query:
+            # Search companions independently of metadata. A term may occur
+            # only in evidence, so metadata hits must not gate retrieval.
+            evidence_hits = search_evidence_chunks(
+                root,
+                source_keys=None,
+                query=query,
+                limit=limit,
+            )
+            source_keys.update(
+                str(hit.get("zotero_key", ""))
+                for hit in evidence_hits
+                if str(hit.get("zotero_key", "")).strip()
+            )
+            matched_source_keys = sorted(source_keys)
+    except Exception as exc:  # pragma: no cover - defensive CLI boundary
+        warnings.append(f"Evidence hydration unavailable: {exc}")
     evidence_coverage: dict[str, Any] = {
         "matched_source_count": len(matched_source_keys),
         "sources_without_indexed_evidence": matched_source_keys,
@@ -648,18 +675,10 @@ def global_context(
         try:
             from .wiki import (
                 evidence_coverage as build_evidence_coverage,
-                search_evidence_chunks,
             )
 
             evidence_coverage = build_evidence_coverage(root, source_keys=matched_source_keys)
             evidence_coverage["read_only"] = True
-            if query:
-                evidence_hits = search_evidence_chunks(
-                    root,
-                    source_keys=matched_source_keys,
-                    query=query,
-                    limit=limit,
-                )
         except Exception as exc:  # pragma: no cover - defensive CLI boundary
             warnings.append(f"Evidence hydration unavailable: {exc}")
     elif query:
@@ -686,6 +705,46 @@ def global_context(
                     else {},
                 }
             )
+    stale_source_keys = [
+        *freshness.get("live_check", {}).get("changed", []),
+        *freshness.get("live_check", {}).get("removed", []),
+    ]
+    health = health_report(
+        root,
+        stale_source_keys=stale_source_keys,
+        registry_root=resolved_registry_root,
+    )
+    lint = health["lint"]
+    manifest_lint = health["manifest_lint"]
+    warnings.extend(lint["warnings"])
+    if not health["ok"]:
+        warnings.append("Dependency health requires review before promoting this context")
+    registry_context: dict[str, Any] = {
+        "registry_root": "",
+        "query": query,
+        "count": 0,
+        "total_matches": 0,
+        "results": [],
+        "warnings": ["No registry root was provided"],
+        "read_only": True,
+    }
+    if resolved_registry_root is not None and query:
+        try:
+            from .scientific_data import search_registry
+
+            registry_context = search_registry(
+                resolved_registry_root,
+                query=query,
+                limit=limit,
+            )
+        except Exception as exc:  # pragma: no cover - defensive CLI boundary
+            registry_context["warnings"] = [f"Registry discovery unavailable: {exc}"]
+            warnings.append(registry_context["warnings"][0])
+    elif resolved_registry_root is not None:
+        registry_context["registry_root"] = str(
+            Path(resolved_registry_root).expanduser().resolve()
+        )
+        registry_context["warnings"] = ["Registry discovery requires a query"]
     return {
         "scope": "global",
         "start_here": [
@@ -694,6 +753,7 @@ def global_context(
             "wiki-evidence <ZOTERO_KEY> --query '<terms>' --json",
             "wiki-record-search '<terms>' --json",
             "wiki-lineage <RECORD_ID> --json",
+            "data-search '<terms>' --json",
             "wiki-health --json",
         ],
         "query": query,
@@ -718,6 +778,7 @@ def global_context(
         "briefs": briefs,
         "evidence_hits": evidence_hits,
         "evidence_coverage": evidence_coverage,
+        "data": registry_context,
         "project_manifests": [
             {key: value for key, value in manifest.items() if key != "_path"}
             for manifest in load_manifests(root)

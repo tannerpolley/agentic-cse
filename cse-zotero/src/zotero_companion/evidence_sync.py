@@ -327,13 +327,22 @@ def sync_evidence(
     *,
     api: Any | None = None,
     keys: Sequence[str] | None = None,
+    records: Sequence[Mapping[str, Any]] | None = None,
     apply: bool = False,
 ) -> dict[str, Any]:
-    """Plan or materialize all existing Markdown companions in Zotero."""
+    """Plan or materialize all existing Markdown companions in Zotero.
+
+    ``records`` lets a caller pass a just-read snapshot so attachment lists are
+    resolved from the live library rather than from an older source file.
+    """
 
     root = Path(root)
     api = api or ZoteroLocalAPI()
-    records = _load_source_records(root)
+    records = (
+        [dict(record) for record in records]
+        if records is not None
+        else _load_source_records(root)
+    )
     requested = {str(key) for key in (keys or []) if str(key)}
     record_by_key = {str(record.get("zotero_key", "")): record for record in records}
     selected = [
