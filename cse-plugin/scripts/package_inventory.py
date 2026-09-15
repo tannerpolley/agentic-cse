@@ -20,7 +20,7 @@ PACKAGES = (
         "name": "cse",
         "root": ".",
         "skills": (
-            "audit", "setup", "research", "diagnose", "design", "build",
+            "audit", "workflow", "setup", "research", "diagnose", "design", "build",
             "analyze", "summarize", "review", "write",
         ),
         "include": (

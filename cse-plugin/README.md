@@ -2,8 +2,8 @@
 
 Agentic Computational Science and Engineering (`cse`) gives coding agents a disciplined working method for computational science and physical-world engineering. It supports mechanical, chemical, electrical, civil, and related work—not generic software engineering—by keeping attention on the scientific question, equations, numerical method, reference cases, uncertainty, interpretation, and supported writing.
 
-Core CSE has nine workflow skills across eight normal levels and one read-only
-supporting `audit` skill. Optional
+Core CSE has nine stage skills across eight normal levels, one coordinating
+`workflow` skill, and one read-only supporting `audit` skill. Optional
 companions add Sources or Visualize capabilities when a project explicitly
 needs them; core remains usable when neither is installed.
 
@@ -12,6 +12,10 @@ needs them; core remains usable when neither is installed.
 The normal agent path is:
 
 `setup → research or diagnose → design → build → analyze → summarize → review → write`
+
+Use `workflow` to run that spine in the default single-task `direct` mode or an
+explicitly selected `baton` mode with separate architect, manager, Build worker,
+and fresh reviewer ownership.
 
 - `setup` establishes or revises repository vocabulary and scientific conventions.
 - `research` investigates literature, theory, and data.

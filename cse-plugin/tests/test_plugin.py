@@ -15,7 +15,7 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = {"setup", "research", "diagnose", "design", "build", "analyze", "review", "summarize", "write"}
-SUPPORTING = {"audit"}
+SUPPORTING = {"audit", "workflow"}
 CORE = WORKFLOW | SUPPORTING
 SOURCES = {"zotero", "mathpix", "data", "digitize"}
 VISUALIZE = {"plot", "tikz", "pgfplots", "latex", "quarto", "beamer"}
@@ -199,7 +199,7 @@ class PluginBehaviorTests(unittest.TestCase):
         routing = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())
         cases = routing["cases"]
         self.assertGreaterEqual(len(cases), 15)
-        self.assertEqual(30, len(cases))
+        self.assertEqual(34, len(cases))
         self.assertEqual(len(cases), len({case["id"] for case in cases}))
         self.assertEqual(
             {"direct", "indirect", "incomplete", "negative", "unsupported"},
@@ -245,7 +245,7 @@ class PluginBehaviorTests(unittest.TestCase):
                 ))
             else:
                 self.assertTrue(frontmatter["description"].startswith(
-                    f"CSE {'Supporting Audit' if name in SUPPORTING else 'Visualize' if name in VISUALIZE else 'Sources'} —"
+                    f"CSE {'Supporting' if name in SUPPORTING else 'Visualize' if name in VISUALIZE else 'Sources'}"
                 ))
             self.assertLessEqual(len(skill_text(name).splitlines()), 80)
             self.assertNotIn("[" + "TODO", skill_text(name))
@@ -257,6 +257,19 @@ class PluginBehaviorTests(unittest.TestCase):
             self.assertRegex(interface["short_description"], r"^.{25,64}$")
             namespace = "cse-sources" if name in SOURCES else "cse-visualize" if name in VISUALIZE else "cse"
             self.assertTrue(interface["default_prompt"].startswith(f"Use ${namespace}:"))
+
+    def test_workflow_modes_keep_role_ownership_small(self):
+        text = (ROOT / "references/execution-modes.md").read_text()
+        for required in (
+            "Direct is the default",
+            "Required fresh native read-only",
+            "Architect owns Research, Diagnose, and Design",
+            "Manager alone owns Git and GitHub",
+            "Worker owns Build only",
+            "Manager owns Analyze and Summarize",
+            "fresh native read-only",
+        ):
+            self.assertIn(required, text)
 
     def test_durable_prose_routes_reach_both_language_references(self):
         for name in DURABLE_PROSE_SKILLS:
@@ -682,7 +695,7 @@ class PluginBehaviorTests(unittest.TestCase):
             self.assertEqual(
                 identity["payloadSkills"],
                 [
-                    "audit", "setup", "research", "diagnose", "design",
+                    "audit", "workflow", "setup", "research", "diagnose", "design",
                     "build", "analyze", "summarize", "review", "write",
                 ],
             )
