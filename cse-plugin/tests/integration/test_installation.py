@@ -201,7 +201,7 @@ class InstallationBehaviorTests(unittest.TestCase):
                 args = sys.argv[1:]
                 real_git = os.environ["CSE_REAL_GIT"]
                 runtime = Path(os.environ["CSE_TEST_ZOTERO_ROOT"]).resolve()
-                expected = "2ec40ed1abe8eb63496f99d3d9e3f0575553453e"
+                expected = "e82ebbee4b6896b0f513727cdbac2a18e31bbf24"
                 if args[:2] == ["-C", str(runtime)]:
                     if args[2:] == ["rev-parse", "HEAD"]:
                         print(expected)
@@ -238,7 +238,7 @@ class InstallationBehaviorTests(unittest.TestCase):
 
             untrusted = root / "untrusted-zotero"
             shutil.copytree(runtime, untrusted, ignore=shutil.ignore_patterns(".git"))
-            (untrusted / ".cse-source-commit").write_text("2ec40ed1abe8eb63496f99d3d9e3f0575553453e\n")
+            (untrusted / ".cse-source-commit").write_text("e82ebbee4b6896b0f513727cdbac2a18e31bbf24\n")
             rejected = subprocess.run(
                 ["bash", "scripts/sync-live.sh", "--check", "--zotero-source", str(untrusted)],
                 cwd=source, env=test_env, text=True, capture_output=True, check=False,
@@ -285,7 +285,7 @@ class InstallationBehaviorTests(unittest.TestCase):
             status = subprocess.run(["git", "status", "--porcelain"], cwd=source, env={**os.environ, "HOME": str(home)}, text=True, capture_output=True, check=True).stdout
             self.assertEqual(0, installed.returncode, f"{installed.stderr}\nstatus={status}")
             identity = json.loads(next(line for line in installed.stdout.splitlines() if '"pluginCommit"' in line))
-            self.assertEqual("2ec40ed1abe8eb63496f99d3d9e3f0575553453e", identity["zoteroCommit"])
+            self.assertEqual("e82ebbee4b6896b0f513727cdbac2a18e31bbf24", identity["zoteroCommit"])
             self.assertEqual(40, len(identity["pluginCommit"]))
             self.assertEqual(64, len(identity["payloadSha256"]))
             self.assertTrue((deploy / "cse").is_dir())

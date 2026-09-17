@@ -8,7 +8,7 @@ runtime_target="$HOME/.local/share/cse/zotero"
 runtime_bin_dir="$HOME/.local/bin"
 runtime_commands=(cse-zotero zotero-companion)
 legacy_names=(cse-sources cse-visualize scientific-codex)
-expected_zotero_commit="2ec40ed1abe8eb63496f99d3d9e3f0575553453e"
+expected_zotero_commit="e82ebbee4b6896b0f513727cdbac2a18e31bbf24"
 codex_bin="${CSE_CODEX_BIN:-codex}"
 
 usage() {
