@@ -10,9 +10,8 @@ computational science and physical-world engineering.
 The research is deliberately separate from the accepted plugin design. The
 current plugin remains the installed and validated product. Nothing in this
 directory selects a runtime, commits the project to a desktop framework, or
-changes the three-package surface: nine core `cse` workflow skills, four
-optional Sources (`cse-sources`) skills, and six optional Visualize
-(`cse-visualize`) skills.
+changes the one-plugin surface: 21 individually callable `cse:<skill>` skills
+across the three canonical phases.
 
 ## Current decision
 

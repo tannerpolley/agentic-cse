@@ -254,10 +254,10 @@ the smaller Beamer header. Shared notation and figures stay in common source.
 
 ## Agent lookup and QA resources
 
-The repository guidance in `extensions/cse-visualize/references/latex-layout-and-qa.md` defines label
+The repository guidance in `plugin/references/visualize/latex-layout-and-qa.md` defines label
 zones, connector clearance, bounding-box padding, profile-width checks, log
 inspection, and full-size raster inspection. The searchable local official
-manual cache is built with `extensions/cse-visualize/scripts/cache-latex-manuals.sh` and indexed at
+manual cache is built with `plugin/scripts/visualize/cache-latex-manuals.sh` and indexed at
 `~/.local/share/cse/latex-manuals/INDEX.md`.
 
 The release order is source review, real Quarto build, log review, automated
@@ -265,6 +265,6 @@ visual QA, full-size manual inspection, and a recorded disposition. Automated
 success never certifies path crossings, schematic truth, or scientific claims.
 
 ```bash
-python3 extensions/cse-visualize/scripts/latex_visual_qa.py builds/article.pdf \
+python3 plugin/scripts/visualize/latex_visual_qa.py builds/article.pdf \
   --profile article --output-dir builds/visual-qa/article --contact-sheet
 ```

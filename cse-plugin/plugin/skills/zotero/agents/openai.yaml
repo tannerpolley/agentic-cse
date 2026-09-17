@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Sources — Zotero"
+  short_description: "Find, acquire, and cite source evidence"
+  default_prompt: "Use $cse:zotero to find and ground the sources for this work in Zotero."

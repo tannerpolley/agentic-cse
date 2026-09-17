@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Independent Review"
+  short_description: "Check design readiness or delivered scientific evidence"
+  default_prompt: "Use $cse:review for an independent readiness or delivered-evidence review of this work."

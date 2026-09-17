@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Rendering — Quarto"
+  short_description: "Render shared scientific source to multiple formats"
+  default_prompt: "Use $cse:quarto to manage and render this scientific document."

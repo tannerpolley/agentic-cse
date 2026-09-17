@@ -1,0 +1,54 @@
+\documentclass[11pt,oneside]{scrartcl}
+\KOMAoptions{DIV=calc,headings=normal,parskip=never}
+
+\usepackage{fontspec}
+\usepackage{mathtools}
+\usepackage{unicode-math}
+\usepackage{microtype}
+\usepackage{siunitx}
+\usepackage[version=4]{mhchem}
+\usepackage{graphicx}
+\usepackage{xcolor}
+\usepackage{booktabs}
+\usepackage{threeparttable}
+\usepackage{csquotes}
+\usepackage[backend=biber,style=authoryear]{biblatex}
+\usepackage{xurl}
+\usepackage[hidelinks]{hyperref}
+\usepackage{bookmark}
+\usepackage[nameinlink,noabbrev]{cleveref}
+
+\sisetup{
+  detect-all,
+  separate-uncertainty=true,
+  range-phrase=--,
+  range-units=single
+}
+
+% Any article-capable tool in references/visualize/latex-packages.md may be added when
+% the manuscript exercises that capability. Load only the required packages
+% and TikZ or PGFPlots libraries.
+% This author-controlled default uses biblatex, Biber, and csquotes. A venue
+% template and its bibliography system take precedence for submission.
+\addbibresource{latex/references.bib}
+\nocite{starter-source}
+
+\title{Scientific study}
+\author{}
+\date{}
+\begin{document}
+\maketitle
+\begin{abstract}
+State the question, method, principal result with conditions, and supported implication.
+\end{abstract}
+\noindent\textbf{Keywords:} keyword; keyword; keyword
+
+\section{Introduction}
+\section{Formulation}
+\section{Methods}
+\section{Results}
+\section{Discussion}
+\section{Conclusions}
+% Add data, code, funding, conflict, or appendix sections only when applicable.
+\printbibliography
+\end{document}

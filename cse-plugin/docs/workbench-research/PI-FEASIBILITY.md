@@ -85,8 +85,8 @@ Pi extensions can:
 
 Those capabilities are sufficient for a CSE Pi package containing:
 
-- the current three-package instructions: nine core workflow skills, four
-  optional Sources skills, and six optional Visualize skills;
+- the current one-plugin instructions: 21 callable skills across the three
+  canonical phases;
 - a project-profile reader;
 - scientific terminology guidance and prose checks;
 - figure-description and result-table schemas;

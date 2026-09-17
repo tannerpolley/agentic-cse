@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Rendering — TikZ"
+  short_description: "Draw document-native scientific diagrams"
+  default_prompt: "Use $cse:tikz to create a LaTeX-native scientific diagram."

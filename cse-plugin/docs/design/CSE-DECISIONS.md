@@ -6,26 +6,23 @@ embedded [heat-equation example](../../examples/heat-equation/README.md).
 It is a decision summary, not a transcript. Statements below are separated into
 plugin-wide decisions and choices made only for that example.
 
-## Companion package decision
+## Unified plugin decision
 
-Core `cse` remains the workflow spine: it owns scientific questions, retained
-records, Review, interpretation, and claim boundaries.
-`cse-sources` owns Zotero, Mathpix, data-lineage, and digitization operations;
-`cse-visualize` owns Plot, TikZ, PGFPlots, LaTeX, Quarto, and Beamer
-rendering. Both companions require core CSE, are independently installable
-from this repository, and do not depend on one another.
+The `cse` plugin owns all 21 individually callable workflow, source, data, and
+rendering skills under the `cse:<skill>` namespace. It is staged from the single
+`plugin/` payload, identified by source commit and payload hash, and installed
+as one package. External Zotero, corpus, authentication, and renderer
+capabilities remain separately checked at use time.
 
-The allowed dependency graph is one-way: each companion may route back to core
-Review, while core never requires a companion for its workflow spine and the
-companions never invoke one another. The three package roots remain in this
-repository so one issue, compatibility tuple, and atomic deployment govern a
-release without creating a meta-plugin.
+The three canonical phases are Research and design, Build, and Summarize,
+review, and write. Direct execution remains the default; a named skill does
+not create role tasks unless the user explicitly requests them.
 
-Rejected alternatives are a Sources or Visualize mega skill, separate source
-repositories, compatibility aliases under `cse:*`, and duplicated scientific
-doctrine. Sources returns provenance and QA without judging claims. Visualize
-consumes retained values or supported claims, never runs the scientific model,
-and treats successful rendering as distinct from Review Pass.
+Rejected alternatives are duplicate plugin roots, forwarding skills,
+compatibility aliases, and duplicated scientific doctrine. Source skills return
+provenance and QA without judging claims. Rendering skills consume retained
+values, never run the scientific model, and treat successful rendering as
+distinct from Review Pass.
 
 ## Product vision
 
@@ -81,56 +78,56 @@ physical model.
 
 ## Self-contained architecture
 
-Core keeps public skills thin and puts shared scientific behavior in versioned
-root references. The [operating model](../../references/operating-model.md),
-[scientific method](../../references/scientific-method.md),
-[numerical testing](../../references/numerical-testing.md),
-[scientific project records](../../references/scientific-projects.md),
-[GitHub and Git](../../references/github-and-git.md) references are the shared
+The plugin keeps public skills thin and puts shared scientific behavior in
+versioned references. The [operating model](../../plugin/references/workflow/operating-model.md),
+[scientific method](../../plugin/references/workflow/scientific-method.md),
+[numerical testing](../../plugin/references/workflow/numerical-testing.md),
+[scientific project records](../../plugin/references/workflow/scientific-projects.md),
+[GitHub and Git](../../plugin/references/workflow/github-and-git.md) references are the shared
 doctrine. Sources owns its operational
-[Zotero Companion](../../extensions/cse-sources/references/zotero-companion.md)
+[Zotero Companion](../../plugin/references/sources/zotero-companion.md)
 behavior, and Visualize owns its rendering references. Repository-specific
 equations, methods, evidence, notebooks, analyses, and writing rules remain in
 the user repository.
 
-The [terminology reference](../../references/terminology.md) is the canonical
+The [terminology reference](../../plugin/references/workflow/terminology.md) is the canonical
 glossary for workflow stages, supporting tools, sources, extraction,
 figures, and claims.
 
 The nine workflow stages form the default agent path:
 
-1. [`setup`](../../skills/setup/SKILL.md) establishes repository vocabulary,
+1. [`setup`](../../plugin/skills/setup/SKILL.md) establishes repository vocabulary,
    scientific documents, bibliography, writing rules, and integration paths.
-2. [`research`](../../skills/research/SKILL.md) investigates literature, theory,
+2. [`research`](../../plugin/skills/research/SKILL.md) investigates literature, theory,
    data, equations, and numerical methods.
-3. [`diagnose`](../../skills/diagnose/SKILL.md) establishes the cause of a
+3. [`diagnose`](../../plugin/skills/diagnose/SKILL.md) establishes the cause of a
    numerical or scientific disagreement.
-4. [`design`](../../skills/design/SKILL.md) lays out substantive work and
+4. [`design`](../../plugin/skills/design/SKILL.md) lays out substantive work and
    publishes its native GitHub issue.
-5. [`build`](../../skills/build/SKILL.md) implements equations, models,
+5. [`build`](../../plugin/skills/build/SKILL.md) implements equations, models,
    numerical methods, solvers, and data transformations.
-6. [`analyze`](../../skills/analyze/SKILL.md) runs studies for convergence,
+6. [`analyze`](../../plugin/skills/analyze/SKILL.md) runs studies for convergence,
    sensitivity, uncertainty, comparison, and figures.
-7. [`summarize`](../../skills/summarize/SKILL.md) replaces the analysis
+7. [`summarize`](../../plugin/skills/summarize/SKILL.md) replaces the analysis
    research notebook with the current retained results and selected render.
-8. [`review`](../../skills/review/SKILL.md) checks the full scientific chain,
+8. [`review`](../../plugin/skills/review/SKILL.md) checks the full scientific chain,
    including the notebook and selected render.
-9. [`write`](../../skills/write/SKILL.md) uses only reviewed notebook results
+9. [`write`](../../plugin/skills/write/SKILL.md) uses only reviewed notebook results
    the investigator promotes for the named manuscript use.
 
-The eleven companion skills are public skills but are not workflow stages:
+The eleven specialist skills are public skills but are not workflow stages:
 
-- Sources: [`zotero`](../../extensions/cse-sources/skills/zotero/SKILL.md),
-  [`mathpix`](../../extensions/cse-sources/skills/mathpix/SKILL.md),
-  [`data`](../../extensions/cse-sources/skills/data/SKILL.md), and
-  [`digitize`](../../extensions/cse-sources/skills/digitize/SKILL.md) own source
+- Sources: [`zotero`](../../plugin/skills/zotero/SKILL.md),
+  [`mathpix`](../../plugin/skills/mathpix/SKILL.md),
+  [`data`](../../plugin/skills/data/SKILL.md), and
+  [`digitize`](../../plugin/skills/digitize/SKILL.md) own source
   evidence, extraction, data lineage, and digitization QA.
-- Visualize: [`plot`](../../extensions/cse-visualize/skills/plot/SKILL.md),
-  [`tikz`](../../extensions/cse-visualize/skills/tikz/SKILL.md),
-  [`pgfplots`](../../extensions/cse-visualize/skills/pgfplots/SKILL.md),
-  [`latex`](../../extensions/cse-visualize/skills/latex/SKILL.md),
-  [`quarto`](../../extensions/cse-visualize/skills/quarto/SKILL.md),
-  [`beamer`](../../extensions/cse-visualize/skills/beamer/SKILL.md) own figures,
+- Visualize: [`plot`](../../plugin/skills/plot/SKILL.md),
+  [`tikz`](../../plugin/skills/tikz/SKILL.md),
+  [`pgfplots`](../../plugin/skills/pgfplots/SKILL.md),
+  [`latex`](../../plugin/skills/latex/SKILL.md),
+  [`quarto`](../../plugin/skills/quarto/SKILL.md),
+  [`beamer`](../../plugin/skills/beamer/SKILL.md) own figures,
   LaTeX, and non-executing document rendering.
 
 The workflow stages are connected routes rather than isolated commands. Tools
@@ -190,7 +187,7 @@ whether the proposal or science is correct. Prose violations remain blocking.
 Durable equations and correlations receive stable identifiers, exact source
 locators, symbols, units or basis, assumptions, validity domain, and links to
 implementation and tests. Alternate conventions stay named and distinct.
-The [scientific-method reference](../../references/scientific-method.md)
+The [scientific-method reference](../../plugin/references/workflow/scientific-method.md)
 separates formulation, methods, and evidence so an implementation cannot
 silently replace the stated mathematics.
 
@@ -204,7 +201,7 @@ interpretation record exact page, section, equation, table, figure, or row
 locators. Metadata or a paper alone is not treated as a validated project
 conclusion without an applicability check.
 
-[Zotero Companion](../../extensions/cse-sources/references/zotero-companion.md) is the separately
+[Zotero Companion](../../plugin/references/sources/zotero-companion.md) is the separately
 installed capability-gated evidence and lineage layer. Zotero remains authoritative for
 bibliographic metadata, collections, and attachments. Companion can hold
 source-linked briefs, claims, equations, limitations, and structured data; it
@@ -263,7 +260,7 @@ Review checks that complete view; the investigator decides whether to promote
 its reviewed commit for manuscript use. Git and retained results preserve
 history. A manuscript is a selected scientific story, not a replacement for
 the notebook.
-The [project-record reference](../../references/scientific-projects.md) expects
+The [project-record reference](../../plugin/references/workflow/scientific-projects.md) expects
 questions and conditions, methods and sources, results, interpretation,
 limitations, claim boundaries, and relevant convergence, uncertainty,
 sensitivity, alternatives, and negative results.

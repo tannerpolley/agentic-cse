@@ -1,0 +1,6 @@
+interface:
+  display_name: "CSE: Rendering — LaTeX"
+  short_description: "Route and verify complete scientific documents"
+  default_prompt: "Use $cse:latex to create or revise this scientific document."
+policy:
+  allow_implicit_invocation: false

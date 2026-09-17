@@ -118,9 +118,8 @@ flowchart TB
 
 The CSE family should initially contain only:
 
-- the existing three-package instructions from one shared authoritative source:
-  nine core workflow skills, four optional Sources skills, and six optional
-  Visualize skills;
+- the existing one-plugin instructions from one shared authoritative source:
+  21 callable skills across the three canonical phases;
 - one typed scientific-figure result description;
 - one typed numerical-check result description;
 - the terminology and banned-language checks;
@@ -138,9 +137,9 @@ files.
 
 No existing package reviewed here supplies:
 
-- the nine core CSE workflow skills and their continuation rules;
-- the four Sources and six Visualize companion skills as an optional,
-  coherent family;
+- the 21 callable CSE skills and their continuation rules;
+- the four source and six rendering specialist skills within the unified
+  `cse` plugin as a coherent installed family;
 - distinction among code verification, solution verification, model
   validation, and uncertainty analysis;
 - quantity, unit, basis, assumption, and validity-bound records;

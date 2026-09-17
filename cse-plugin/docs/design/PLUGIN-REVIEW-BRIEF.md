@@ -40,47 +40,46 @@ CSE does not:
 
 ## Architecture
 
-The plugin manifest is [`plugin.json`](../../.codex-plugin/plugin.json). Public
+The plugin manifest is [`plugin.json`](../../plugin/.codex-plugin/plugin.json). Public
 skills stay intentionally thin and route through shared references:
 
-- [`operating-model.md`](../../references/operating-model.md) defines opening
+- [`operating-model.md`](../../plugin/references/workflow/operating-model.md) defines opening
   alignment, question rounds, confirmation, continuation, and stop conditions.
-- [`scientific-method.md`](../../references/scientific-method.md) defines
+- [`scientific-method.md`](../../plugin/references/workflow/scientific-method.md) defines
   equations, sources, verification, validation, uncertainty, issue content,
   and scientific language.
-- [`numerical-testing.md`](../../references/numerical-testing.md) defines
+- [`numerical-testing.md`](../../plugin/references/workflow/numerical-testing.md) defines
   result-first numerical expectations, independent oracles, metrics, tolerance
   rationale, and risk-based test selection.
-- [`scientific-projects.md`](../../references/scientific-projects.md) defines
+- [`scientific-projects.md`](../../plugin/references/workflow/scientific-projects.md) defines
   repository records, analysis directories, plots, notebooks, bibliography,
   and manuscript conventions.
-- [`github-and-git.md`](../../references/github-and-git.md) defines the
+- [`github-and-git.md`](../../plugin/references/workflow/github-and-git.md) defines the
   authoritative GitHub lifecycle and guarded synchronization and cleanup.
-- [`zotero-companion.md`](../../extensions/cse-sources/references/zotero-companion.md) defines the
+- [`zotero-companion.md`](../../plugin/references/sources/zotero-companion.md) defines the
   Zotero authority, Companion capability boundary, exact source lineage,
   bibliography, and on-demand extraction boundaries.
-- [`terminology.md`](../../references/terminology.md) defines canonical
+- [`terminology.md`](../../plugin/references/workflow/terminology.md) defines canonical
   workflow, tool, source, extraction, figure, and claim language.
 
 The nine workflow stages are:
 
 | Entry point | Main endpoint | Next route when work continues |
 | --- | --- | --- |
-| [`setup`](../../skills/setup/SKILL.md) | Repository vocabulary, scientific records, bibliography, plotting, writing, and integration defaults | The skill that owns the selected scientific endpoint |
-| [`research`](../../skills/research/SKILL.md) | Literature, theory, data, equations, and method evidence | `design` for substantive repository work |
-| [`diagnose`](../../skills/diagnose/SKILL.md) | Cause of numerical or scientific disagreement | `design` with the correction boundary |
-| [`design`](../../skills/design/SKILL.md) | A complete question and native GitHub issue | `build`, `analyze`, or `write` |
-| [`build`](../../skills/build/SKILL.md) | Equations, models, numerical methods, solvers, or data transformations | `analyze` |
-| [`analyze`](../../skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `summarize` or `diagnose` |
-| [`summarize`](../../skills/summarize/SKILL.md) | The working analysis research notebook and selected render | `review` |
-| [`review`](../../skills/review/SKILL.md) | Whole-chain scientific and repository review, including the notebook and render | Route material corrections to the owning skill or advise Pass for the stated use |
-| [`write`](../../skills/write/SKILL.md) | Evidence-supported papers, reports, captions, and LaTeX | `review` |
+| [`setup`](../../plugin/skills/setup/SKILL.md) | Repository vocabulary, scientific records, bibliography, plotting, writing, and integration defaults | The skill that owns the selected scientific endpoint |
+| [`research`](../../plugin/skills/research/SKILL.md) | Literature, theory, data, equations, and method evidence | `design` for substantive repository work |
+| [`diagnose`](../../plugin/skills/diagnose/SKILL.md) | Cause of numerical or scientific disagreement | `design` with the correction boundary |
+| [`design`](../../plugin/skills/design/SKILL.md) | A complete question and native GitHub issue | `build`, `analyze`, or `write` |
+| [`build`](../../plugin/skills/build/SKILL.md) | Equations, models, numerical methods, solvers, or data transformations | `analyze` |
+| [`analyze`](../../plugin/skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `summarize` or `diagnose` |
+| [`summarize`](../../plugin/skills/summarize/SKILL.md) | The working analysis research notebook and selected render | `review` |
+| [`review`](../../plugin/skills/review/SKILL.md) | Whole-chain scientific and repository review, including the notebook and render | Route material corrections to the owning skill or advise Pass for the stated use |
+| [`write`](../../plugin/skills/write/SKILL.md) | Evidence-supported papers, reports, captions, and LaTeX | `review` |
 
-The installable family has three packages: core `cse` provides these nine
-workflow skills; optional `cse-sources` provides four source and data skills;
-optional `cse-visualize` provides six rendering and document skills. Companion
-skills return evidence or files to their invoking core workflow stage rather
-than becoming workflow stages themselves.
+The installable package is one `cse` plugin rooted at `plugin/`, with all 21
+skills under the `cse:<skill>` namespace. Source and rendering skills return
+evidence or files to their invoking workflow stage rather than becoming extra
+workflow phases.
 
 The initial workflow entrypoint inspects the repository and asks a material question
 round. After confirmation, internal handoffs inherit decisions and ask only
@@ -96,15 +95,13 @@ hidden plugin dependencies.
 ## Repository layout
 
 ```text
-.codex-plugin/plugin.json       core manifest and interface metadata
-skills/<stage>/SKILL.md         nine core workflow stages
-extensions/cse-sources/         four optional source and data skills
-extensions/cse-visualize/       six optional rendering and document skills
-references/*.md                 shared core scientific, numerical, and Git doctrine
+plugin/.codex-plugin/plugin.json plugin manifest and interface metadata
+plugin/skills/<skill>/SKILL.md  all 21 callable skills
+plugin/references/{workflow,sources,visualize}/ shared doctrine
 scripts/validate.sh             source validation and plugin checks
 scripts/sync-live.sh             guarded source-to-marketplace deployment
-scripts/check_prose.py          forbidden-language check
-extensions/cse-sources/scripts/sync_bibliography.py  one-way bibliography snapshot helper
+plugin/scripts/workflow/check_prose.py          forbidden-language check
+plugin/scripts/sources/sync_bibliography.py  one-way bibliography snapshot helper
 tests/                          front-door and destructive-operation safeguards
 docs/design/                    product decisions and external-review package
 ```
@@ -152,7 +149,7 @@ currently:
 
 The plugin checks in
 [`tests/test_plugin.py`](../../tests/test_plugin.py) protect the manifest,
-the exact three-package, 9-core/4-Sources/7-Visualize skill surface, thin
+the exact one-plugin, 21-skill surface, thin
 skills, shared-reference links, opening alignment anchors, numerical doctrine,
 optional GitHub features,
 forbidden runtime workflow names, and the absence of generic coverage
@@ -211,7 +208,7 @@ An external review would be most valuable on these questions:
   discretization error, physical validation, and scientific acceptance in
   practice?
 - Do the nine workflow stages form a coherent route with useful continuity,
-  and do the eleven optional companion skills avoid becoming competing stages?
+  and do the eleven specialist skills avoid becoming competing stages?
 - Is the grilling quality material and adaptive without blocking ordinary work?
 - Is the Zotero and Companion boundary safe, understandable, and useful for
   source-linked research?

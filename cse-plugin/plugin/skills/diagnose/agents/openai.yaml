@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Research and design — Diagnose"
+  short_description: "Explain numerical failures and result disagreements"
+  default_prompt: "Use $cse:diagnose to establish why this numerical result disagrees with the expected behavior."

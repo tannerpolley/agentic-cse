@@ -3,8 +3,8 @@ set -euo pipefail
 
 showcase_root="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 repository_root="$(cd "$showcase_root/../.." && pwd)"
-render="$repository_root/extensions/cse-visualize/assets/project/quarto/render.sh"
-visual_qa="$repository_root/extensions/cse-visualize/scripts/latex_visual_qa.py"
+render="$repository_root/plugin/assets/visualize/project/quarto/render.sh"
+visual_qa="$repository_root/plugin/scripts/visualize/latex_visual_qa.py"
 
 cd "$showcase_root"
 mkdir -p builds/figures figures/generated

@@ -1,0 +1,57 @@
+---
+title: "Retained profile comparison"
+subtitle: "One source for HTML and promoted LuaLaTeX PDF"
+execute:
+  enabled: false
+resources:
+  - data/profile.csv
+  - figures/profile.tex
+  - figures/generated/profile.svg
+---
+
+This compact example demonstrates the document route with retained values. It
+does not execute a model and does not establish physical-model validity.
+
+## Question
+
+How closely does the retained model profile follow the retained observations
+over the measured position range?
+
+## Conditions
+
+The horizontal quantity is position in metres and the response is a
+dimensionless concentration fraction. The blue line is the retained model
+relationship; orange open circles are retained observations with assigned
+uncertainty intervals. The data authority is `data/profile.csv`.
+
+## Result
+
+::: {#fig-profile}
+
+```{=latex}
+\centering
+\providecommand{\profiledatatable}{data/profile.csv}
+\input{figures/profile.tex}
+```
+
+::: {.content-visible when-format="html"}
+![Retained model profile and observation points with uncertainty intervals.](figures/generated/profile.svg){width=94%}
+:::
+
+The shared LaTeX-native figure reads the retained CSV in both output routes.
+The line represents the retained continuous relationship and the points are
+the retained observations.
+:::
+
+## Interpretation and limitation
+
+The example reports the displayed retained comparison consistently in both
+formats. The values are a small teaching set with assigned uncertainty; they
+support the rendering route only, not code verification, solution verification,
+or physical validation.
+
+## Provenance
+
+The retained table is `data/profile.csv`; the figure source is
+`figures/profile.tex`; the SVG is generated from the same source with
+`dvilualatex` and `dvisvgm`. Rendering uses `../render.sh` with `--no-execute`.

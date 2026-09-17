@@ -33,9 +33,8 @@ def main() -> int:
     selected_names = {item["name"] for item in selected}
     if len(selected_names) != len(selected):
         parser.error("duplicate selected package")
-    companions = selected_names - {"cse"}
-    if companions and "cse" not in selected_names:
-        parser.error(f"{', '.join(sorted(companions))} requires the core cse plugin")
+    if selected_names != {"cse"}:
+        parser.error("the unified CSE payload is selected as cse only")
     home = args.home.resolve()
     try:
         commit = source_commit()

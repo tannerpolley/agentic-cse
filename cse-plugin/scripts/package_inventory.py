@@ -18,30 +18,16 @@ ROOT = Path(__file__).resolve().parents[1]
 PACKAGES = (
     {
         "name": "cse",
-        "root": ".",
+        "root": "plugin",
         "skills": (
             "audit", "workflow", "setup", "research", "diagnose", "design", "build",
-            "analyze", "summarize", "review", "write",
+            "analyze", "summarize", "review", "write", "prose", "zotero", "mathpix", "data",
+            "digitize", "plot", "tikz", "pgfplots", "latex", "quarto", "beamer",
         ),
         "include": (
-            ".codex-plugin", ".claude-plugin", "AGENTS.md", "BANNED.md", "CHANGELOG.md", "LICENSE", "README.md",
-            "assets", "references", "skills", "scripts/change_accounting.py",
-            "scripts/check_prose.py", "scripts/cse-test-gate.py", "scripts/cse_hook_common.py",
-            "scripts/install_cse_hooks.py",
-            "scripts/setup_scientific_project.py",
+            ".codex-plugin", ".claude-plugin", "BANNED.md", "LICENSE", "README.md",
+            "assets", "references", "scripts", "skills",
         ),
-    },
-    {
-        "name": "cse-sources",
-        "root": "extensions/cse-sources",
-        "skills": ("zotero", "mathpix", "data", "digitize"),
-        "include": (".codex-plugin", "README.md", "references", "scripts", "skills"),
-    },
-    {
-        "name": "cse-visualize",
-        "root": "extensions/cse-visualize",
-        "skills": ("plot", "tikz", "pgfplots", "latex", "quarto", "beamer"),
-        "include": (".codex-plugin", "README.md", "assets", "references", "scripts", "skills"),
     },
 )
 LEGACY_NAME = "scientific-codex"
@@ -61,11 +47,12 @@ def source_root(item: dict) -> Path:
 
 def check_source(item: dict) -> None:
     root = source_root(item)
-    manifest = json.loads((root / ".codex-plugin/plugin.json").read_text())
-    if manifest.get("name") != item["name"] or not manifest.get("description"):
-        raise RuntimeError(f"{item['name']} requires its package name and description")
-    if "version" in manifest:
-        raise RuntimeError("CSE packages use source commits, not release numbers")
+    for manifest_path in (root / ".codex-plugin/plugin.json", root / ".claude-plugin/plugin.json"):
+        manifest = json.loads(manifest_path.read_text())
+        if manifest.get("name") != item["name"] or not manifest.get("description"):
+            raise RuntimeError(f"{item['name']} requires its package name and description")
+        if "version" in manifest:
+            raise RuntimeError("CSE packages use source commits, not release numbers")
     for relative in item["include"]:
         if not (root / relative).exists():
             raise RuntimeError(f"{item['name']} payload is missing: {relative}")
@@ -121,7 +108,7 @@ def stage(item: dict, destination: Path, commit: str, home: Path | None = None) 
         target = destination / relative
         target.parent.mkdir(parents=True, exist_ok=True)
         if origin.is_dir():
-            shutil.copytree(origin, target)
+            shutil.copytree(origin, target, ignore=shutil.ignore_patterns("__pycache__", "*.pyc", "*.pyo"))
         else:
             shutil.copy2(origin, target)
     manifest = json.loads((destination / ".codex-plugin/plugin.json").read_text())

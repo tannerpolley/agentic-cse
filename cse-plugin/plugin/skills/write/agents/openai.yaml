@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Execute and deliver — Write"
+  short_description: "Turn accepted evidence into a paper or report"
+  default_prompt: "Use $cse:write to write an evidence-supported paper from these findings."

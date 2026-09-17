@@ -1,0 +1,23 @@
+% Copy this body into docs/scientific/latex/figures/pgfplots/<figure-id>.tex.
+% Replace the table path and named columns with a retained project table.
+\begin{tikzpicture}
+  \begin{axis}[
+    cse axis,
+    xlabel={Independent quantity [unit]},
+    ylabel={Response quantity [unit]},
+  ]
+    \addplot[cse model] table[
+      x=independent,
+      y=model,
+      col sep=comma,
+    ] {figures/data/retained-values.csv};
+    \addlegendentry{Model or fit}
+
+    \addplot[cse data] table[
+      x=independent,
+      y=observation,
+      col sep=comma,
+    ] {figures/data/retained-values.csv};
+    \addlegendentry{Observations}
+  \end{axis}
+\end{tikzpicture}

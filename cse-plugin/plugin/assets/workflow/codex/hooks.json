@@ -1,0 +1,54 @@
+{
+  "description": "Refresh scientific priorities; check prose and report test changes at Stop",
+  "hooks": {
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" SessionStart",
+            "timeout": 10,
+            "statusMessage": "Loading the CSE scientific stance..."
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" SubagentStart",
+            "timeout": 5,
+            "statusMessage": "Loading the CSE scientific stance..."
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" UserPromptSubmit",
+            "timeout": 5,
+            "statusMessage": "Loading the CSE scientific stance..."
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" Stop",
+            "timeout": 10,
+            "statusMessage": "Checking CSE prose and test changes..."
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Supporting Prose"
+  short_description: "Inspect scientific writing without editing it"
+  default_prompt: "Use $cse:prose to inspect this scientific writing and report exact evidence-backed findings without rewriting it."

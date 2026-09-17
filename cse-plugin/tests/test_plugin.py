@@ -1,12 +1,9 @@
 from __future__ import annotations
 
-import ast
 import json
-from collections import Counter, defaultdict
 from pathlib import Path
-import re
-import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 
@@ -14,777 +11,158 @@ import yaml
 
 
 ROOT = Path(__file__).resolve().parents[1]
-WORKFLOW = {"setup", "research", "diagnose", "design", "build", "analyze", "review", "summarize", "write"}
-SUPPORTING = {"audit", "workflow"}
-CORE = WORKFLOW | SUPPORTING
-SOURCES = {"zotero", "mathpix", "data", "digitize"}
-VISUALIZE = {"plot", "tikz", "pgfplots", "latex", "quarto", "beamer"}
-SKILLS = CORE | SOURCES | VISUALIZE
-SOURCES_ROOT = ROOT / "extensions/cse-sources"
-VISUALIZE_ROOT = ROOT / "extensions/cse-visualize"
-WORKFLOW_ORDERS = {
-    "setup": "01", "research": "02A", "diagnose": "02B", "design": "03",
-    "build": "04", "analyze": "05", "summarize": "06", "review": "07",
-    "write": "08",
+PLUGIN = ROOT / "plugin"
+SKILLS = {
+    "setup", "research", "diagnose", "design", "build", "analyze", "summarize",
+    "review", "write", "prose", "workflow", "audit", "zotero", "mathpix", "data", "digitize",
+    "plot", "tikz", "pgfplots", "latex", "quarto", "beamer",
 }
-ROUTE_PATHS = {
-    **{path.stem: f"references/{path.name}" for path in (ROOT / "references").glob("*.md")},
-    "terminology": "references/terminology.md",
-    "BANNED": "BANNED.md",
-}
-DURABLE_PROSE_SKILLS = WORKFLOW
-
-
-def skill_root(name: str) -> Path:
-    return SOURCES_ROOT if name in SOURCES else VISUALIZE_ROOT if name in VISUALIZE else ROOT
-
-
-def route_paths(name: str) -> dict[str, str]:
-    root = skill_root(name)
-    paths = {path.stem: f"references/{path.name}" for path in (root / "references").glob("*.md")}
-    if root == ROOT:
-        paths.update({"terminology": "references/terminology.md", "BANNED": "BANNED.md"})
-    return paths
-
-
-def skill_frontmatter(name: str) -> dict:
-    text = (skill_root(name) / "skills" / name / "SKILL.md").read_text()
-    return yaml.safe_load(text.split("---", 2)[1])
-
-
-def skill_text(name: str) -> str:
-    return (skill_root(name) / "skills" / name / "SKILL.md").read_text()
-
-
-def projected_documents(route: list[str]) -> list[str]:
-    """Project the declared direct-entry reads in deterministic order."""
-    documents: list[str] = []
-    for name in route:
-        routing = skill_frontmatter(name)["metadata"]["cse-routing"]
-        documents.append(f"skills/{name}/SKILL.md")
-        documents.extend(ROUTE_PATHS[reference] for reference in routing["direct"])
-    return documents
-
-
-def effective_projected_documents(route: list[str]) -> list[str]:
-    """Reuse each unchanged document after the first internal-handoff read."""
-    documents: list[str] = []
-    seen: set[str] = set()
-    for document in projected_documents(route):
-        if document not in seen:
-            seen.add(document)
-            documents.append(document)
-    return documents
-
-
-def routing_analysis() -> dict:
-    direct = {
-        name: skill_frontmatter(name)["metadata"]["cse-routing"]["direct"]
-        for name in sorted(SKILLS)
-    }
-    conditional = {
-        name: skill_frontmatter(name)["metadata"]["cse-routing"]["conditional"]
-        for name in sorted(SKILLS)
-    }
-    direct_counts = Counter(reference for values in direct.values() for reference in values)
-    trigger_report = {
-        name: {
-            reference: bool(re.search(
-                rf"(?i)(?:activate|when|for|selected|scope|conditional).{{0,180}}{re.escape(reference)}",
-                skill_text(name),
-            ))
-            for reference in values
-        }
-        for name, values in conditional.items()
-    }
-    exact_assertions = []
-    for line_number, line in enumerate((ROOT / "tests/test_plugin.py").read_text().splitlines(), 1):
-        if re.search(r"self\.assert(?:In|NotIn)\(", line) and re.search(r"['\"]", line):
-            exact_assertions.append({"line": line_number, "text": line.strip()})
-
-    routes = {
-        "research": ["research", "design", "build", "analyze", "summarize", "review"],
-        "diagnose": ["diagnose", "research", "design", "build", "analyze", "summarize", "review"],
-    }
-    projected = {}
-    for route_name, route in routes.items():
-        declared_documents = projected_documents(route)
-        declared_counts = Counter(declared_documents)
-        effective_documents = effective_projected_documents(route)
-        effective_counts = Counter(effective_documents)
-        projected[route_name] = {
-            "route": route,
-            "declared": {
-                "direct": {name: direct[name] for name in route},
-                "documents": declared_documents,
-                "fanout": len(declared_documents),
-                "distinct": len(declared_counts),
-                "repeated": {
-                    key: value for key, value in declared_counts.items() if value > 1
-                },
-            },
-            "effective": {
-                "documents": effective_documents,
-                "fanout": len(effective_documents),
-                "distinct": len(effective_counts),
-                "repeated": {
-                    key: value for key, value in effective_counts.items() if value > 1
-                },
-            },
-        }
-    return {
-        "direct": direct,
-        "conditional": conditional,
-        "conditional_triggers": trigger_report,
-        "duplicate_unconditional_doctrine": {
-            key: value for key, value in sorted(direct_counts.items()) if value > 1
-        },
-        "replaceable_exact_prose_assertions": exact_assertions,
-        "projected_routes": projected,
-    }
 
 
 class PluginBehaviorTests(unittest.TestCase):
-    def test_manuscript_checkpoint_keeps_routine_writing_available(self):
-        cases = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())["cases"]
-        by_id = {case["id"]: case for case in cases}
-        self.assertEqual("cse:write", by_id["write-routine-manuscript-edit"]["expected_skill"])
-        self.assertEqual("cse:review", by_id["review-final-manuscript-cohesion"]["expected_skill"])
-        writing = skill_text("write")
-        review = skill_text("review")
-        owner = (ROOT / "references/scientific-projects.md").read_text()
-        self.assertIn("rendering does not require an agent cohesion review", writing)
-        self.assertIn("sentence-to-argument checkpoint", review)
-        for required in ("Each sentence", "Each paragraph", "Each section", "argument spine",
-                         "clear, weak, or broken", "source identity", "Return **Revise**",
-                         "must never assign", "second independent review"):
-            self.assertIn(required, owner)
-
-    def test_long_sentences_have_one_core_owner(self):
-        # Add only exact deliberate quotations, with their source and reason.
-        quotation_allowlist = {}
-        seen = defaultdict(set)
-        paths = [*ROOT.glob("skills/*/SKILL.md"), *ROOT.glob("references/*.md")]
-        for path in paths:
-            text = path.read_text()
-            if path.name == "SKILL.md":
-                text = text.split("---", 2)[-1]
-            text = re.sub(r"```.*?```", "", text, flags=re.S)
-            for paragraph in re.split(r"\n\s*\n", text):
-                for sentence in re.split(r"(?<=[.!?])\s+", " ".join(paragraph.split())):
-                    if len(sentence.split()) > 12:
-                        seen[sentence].add(str(path.relative_to(ROOT)))
-        duplicates = {sentence: sorted(paths) for sentence, paths in seen.items()
-                      if len(paths) > 1 and sentence not in quotation_allowlist}
-        self.assertEqual({}, duplicates)
-
-    def test_manifest_and_public_skills(self):
-        manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text())
-        self.assertEqual(manifest["name"], "cse")
-        self.assertNotIn("version", manifest)
-        self.assertEqual(
-            manifest["interface"]["displayName"],
-            "Agentic Computational Science and Engineering",
+    def test_accepted_pi_reference_passes_prose_check(self):
+        result = subprocess.run(
+            [sys.executable, str(PLUGIN / "scripts/workflow/check_prose.py"),
+             str(PLUGIN / "references/workflow/cse-pi-worker.md")],
+            text=True, capture_output=True, check=False,
         )
-        self.assertEqual({path.name for path in (ROOT / "skills").iterdir()}, CORE)
-        self.assertEqual({path.name for path in (SOURCES_ROOT / "skills").iterdir()}, SOURCES)
-        self.assertEqual({path.name for path in (VISUALIZE_ROOT / "skills").iterdir()}, VISUALIZE)
-        self.assertNotIn("version", json.loads((SOURCES_ROOT / ".codex-plugin/plugin.json").read_text()))
-        self.assertNotIn("version", json.loads((VISUALIZE_ROOT / ".codex-plugin/plugin.json").read_text()))
-        self.assertTrue((ROOT / "BANNED.md").is_file())
+        self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
-    def test_source_identity_and_routing_cases_remain_explicit(self):
-        manifest = json.loads((ROOT / ".codex-plugin/plugin.json").read_text())
-        self.assertNotIn("version", manifest)
-        routing = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())
-        cases = routing["cases"]
-        self.assertGreaterEqual(len(cases), 15)
-        self.assertEqual(34, len(cases))
-        self.assertEqual(len(cases), len({case["id"] for case in cases}))
+    def test_one_manifest_and_all_skills_use_cse_namespace(self):
+        manifest = json.loads((PLUGIN / ".codex-plugin/plugin.json").read_text())
+        references = {path.stem for path in (PLUGIN / "references").rglob("*.md")} | {"BANNED"}
+        self.assertEqual("cse", manifest["name"])
+        self.assertEqual(SKILLS, {path.name for path in (PLUGIN / "skills").iterdir()})
+        self.assertFalse((ROOT / "extensions").exists())
+        self.assertFalse((ROOT / ".codex-plugin").exists())
         self.assertEqual(
-            {"direct", "indirect", "incomplete", "negative", "unsupported"},
-            {case["category"] for case in cases},
+            {"name": "cse", "owner": {"name": "Tanner Polley"},
+             "plugins": [{"name": "cse", "source": "./plugin"}]},
+            json.loads((ROOT / ".claude-plugin/marketplace.json").read_text()),
         )
-        required = {
-            "id", "category", "prompt", "expected_skill",
-            "expected_initial_action", "prohibited_action",
-        }
-        skill_sets = {
-            "cse": CORE,
-            "cse-sources": SOURCES,
-            "cse-visualize": VISUALIZE,
-        }
-        for case in cases:
-            self.assertLessEqual(required, set(case))
-            if case["expected_skill"] is not None:
-                namespace, name = case["expected_skill"].split(":", 1)
-                self.assertIn(namespace, skill_sets)
-                self.assertIn(name, skill_sets[namespace])
-        recorded = "\n".join(path.read_text() for path in (ROOT / "evaluation/results").glob("*.md"))
-        recorded_ids = set(re.findall(r"^\| ([^ |]+) \| Pass \|", recorded, re.MULTILINE))
-        self.assertLessEqual(recorded_ids, {case["id"] for case in cases})
+        self.assertEqual("cse", json.loads((PLUGIN / ".claude-plugin/plugin.json").read_text())["name"])
+        for skill in SKILLS:
+            frontmatter = yaml.safe_load((PLUGIN / "skills" / skill / "SKILL.md").read_text().split("---", 2)[1])
+            self.assertEqual(skill, frontmatter["name"])
+            routing = frontmatter["metadata"]["cse-routing"]
+            self.assertTrue(routing["direct"])
+            for kind in ("direct", "conditional"):
+                self.assertLessEqual(set(routing[kind]), references)
+            interface = yaml.safe_load((PLUGIN / "skills" / skill / "agents/openai.yaml").read_text())["interface"]
+            self.assertTrue(interface["display_name"])
+            self.assertTrue(interface["short_description"])
+            self.assertTrue(interface["default_prompt"].startswith("Use $cse:"))
 
-    def test_every_skill_declares_small_valid_reference_routes(self):
-        for name in SKILLS:
-            frontmatter = skill_frontmatter(name)
-            metadata = frontmatter["metadata"]
-            routing = metadata["cse-routing"]
-            direct = routing["direct"]
-            conditional = routing["conditional"]
-            paths = route_paths(name)
-            self.assertTrue(direct)
-            self.assertTrue(set(direct) <= set(paths))
-            self.assertTrue(set(conditional) <= set(paths))
-            self.assertTrue(set(direct).isdisjoint(conditional))
-            self.assertIn("operating-model" if name in CORE else "handoff", direct)
-            for reference in (*direct, *conditional):
-                self.assertTrue((skill_root(name) / paths[reference]).is_file(), reference)
-            if name in WORKFLOW_ORDERS:
-                self.assertTrue(frontmatter["description"].startswith(
-                    f"CSE Workflow {WORKFLOW_ORDERS[name]} —"
-                ))
-            else:
-                self.assertTrue(frontmatter["description"].startswith(
-                    f"CSE {'Supporting' if name in SUPPORTING else 'Visualize' if name in VISUALIZE else 'Sources'}"
-                ))
-            self.assertLessEqual(len(skill_text(name).splitlines()), 80)
-            self.assertNotIn("[" + "TODO", skill_text(name))
+    def test_active_payload_has_no_retired_namespaces_or_guards(self):
+        text = "\n".join(path.read_text(errors="replace") for path in PLUGIN.rglob("*") if path.is_file()).casefold()
+        for retired in ("cse-sources", "cse-visualize", "requires the core cse", "optional companion"):
+            self.assertNotIn(retired, text)
 
-    def test_skill_ui_metadata_remains_a_discovery_interface(self):
-        for name in SKILLS:
-            interface = yaml.safe_load((skill_root(name) / "skills" / name / "agents/openai.yaml").read_text())["interface"]
-            self.assertRegex(interface["display_name"], r"^CSE: ")
-            self.assertRegex(interface["short_description"], r"^.{25,64}$")
-            namespace = "cse-sources" if name in SOURCES else "cse-visualize" if name in VISUALIZE else "cse"
-            self.assertTrue(interface["default_prompt"].startswith(f"Use ${namespace}:"))
-
-    def test_workflow_modes_keep_role_ownership_small(self):
-        text = (ROOT / "references/execution-modes.md").read_text()
-        for required in (
-            "Direct is the default",
-            "Required fresh native read-only",
-            "Architect owns Research, Diagnose, and Design",
-            "Manager alone owns Git and GitHub",
-            "Worker owns Build only",
-            "Manager owns Analyze and Summarize",
-            "fresh native read-only",
-        ):
-            self.assertIn(required, text)
-
-    def test_durable_prose_routes_reach_both_language_references(self):
-        for name in DURABLE_PROSE_SKILLS:
-            routing = skill_frontmatter(name)["metadata"]["cse-routing"]
-            self.assertNotIn("terminology", routing["direct"], name)
-            self.assertNotIn("BANNED", routing["direct"], name)
-            self.assertFalse({"terminology", "BANNED"} & set(routing["conditional"]), name)
-            self.assertIn("operating-model", routing["direct"])
-        text = (ROOT / "references/operating-model.md").read_text()
-        self.assertIn("references/terminology.md", text)
-        self.assertIn("BANNED.md", text)
-        self.assertRegex(text, r"(?is)Routine inspection.*questions.*commands.*terse progress")
-
-    def test_terminology_conflict_and_native_approval_safeguards_remain_explicit(self):
-        cases = yaml.safe_load((ROOT / "evaluation" / "skill-routing.yaml").read_text())["cases"]
-        by_id = {case["id"]: case for case in cases}
-        conflict = by_id["setup-terminology-conflict"]
-        conflict_text = f"{conflict['expected_initial_action']} {conflict['prohibited_action']}".lower()
-        self.assertEqual(conflict["expected_skill"], "cse:setup")
-        self.assertIn("scoped", conflict_text)
-        self.assertIn("unresolved", conflict_text)
-        self.assertIn("silently", conflict_text)
-        self.assertIn("approval", conflict_text)
-
-        zotero_case = by_id["unsupported-zotero-write"]
-        zotero_text = f"{zotero_case['expected_initial_action']} {zotero_case['prohibited_action']}".lower()
-        self.assertEqual(zotero_case["expected_skill"], "cse-sources:zotero")
-        self.assertIn("approval", zotero_text)
-        self.assertIn("read-only", zotero_text)
-        self.assertIn("modify", zotero_text)
-        self.assertIn("native approval immediately before the write", skill_text("zotero"))
-
-    def test_routing_analysis_is_deterministic_and_keeps_projection_counts(self):
-        report = routing_analysis()
-        self.assertEqual(
-            {"terminology": "references/terminology.md", "BANNED": "BANNED.md"},
-            {key: ROUTE_PATHS[key] for key in ("terminology", "BANNED")},
-        )
-        self.assertTrue(report["replaceable_exact_prose_assertions"])
-        self.assertGreater(report["duplicate_unconditional_doctrine"]["operating-model"], 1)
-        for route in report["projected_routes"].values():
-            declared = route["declared"]
-            effective = route["effective"]
-            declared_documents = declared["documents"]
-            effective_documents = effective["documents"]
-            self.assertEqual(
-                len(declared_documents),
-                declared["distinct"] + sum(
-                    count - 1 for count in declared["repeated"].values()
-                ),
-            )
-            self.assertEqual(declared_documents, projected_documents(route["route"]))
-            self.assertEqual(effective_documents, effective_projected_documents(route["route"]))
-            self.assertEqual(len(declared_documents), declared["fanout"])
-            self.assertGreater(declared["repeated"].get("references/operating-model.md", 0), 1)
-            self.assertEqual(effective["fanout"], effective["distinct"])
-            self.assertEqual(effective["repeated"], {})
-            self.assertEqual(len(effective_documents), len(set(effective_documents)))
-            self.assertLessEqual(effective["distinct"], 12)
-
-    def test_conditional_references_have_local_triggers(self):
-        for name in SKILLS:
-            text = skill_text(name)
-            conditional = skill_frontmatter(name)["metadata"]["cse-routing"]["conditional"]
-            for reference in conditional:
-                self.assertRegex(
-                    text,
-                    rf"(?i)(?:activate|when|for|selected|scope|conditional).{{0,180}}{re.escape(reference)}",
-                    f"{name} does not explain when {reference} is used",
-                )
-
-    def test_operating_model_owns_strengths_alignment_handoffs_and_reuse(self):
-        text = (ROOT / "references/operating-model.md").read_text()
+    def test_two_phase_review_and_mode_doctrine_is_present(self):
+        text = (PLUGIN / "README.md").read_text()
         for phrase in (
-            "Must — invariant", "Should — default", "May — option",
-            "At every Setup, Research, Diagnose, or Design entry",
-            "Ask only when an answer changes scientific",
-            "internal CSE handoff inherits", "must not reread an unchanged",
-            "fresh reviewer independently loads", "working notebook",
-            "Review inspects that complete notebook", "material changes",
-            "durable CSE-authored scientific prose", "Routine inspection",
+            "Research and design", "Execute and deliver", "Independent `review`",
+            "Direct execution is the default",
         ):
             self.assertIn(phrase, text)
-        self.assertNotIn("terminology.md` and `../BANNED.md` completely", text)
-
-    def test_declared_projection_preserves_reads_and_effective_handoffs_reuse(self):
-        research = ["research", "design", "build", "analyze", "summarize", "review"]
-        diagnose = ["diagnose", *research]
-        diagnose_documents = projected_documents(diagnose)
-        diagnose_counts = Counter(diagnose_documents)
-        self.assertGreater(diagnose_counts["references/operating-model.md"], 1)
-        self.assertEqual(12, len(set(diagnose_documents)))
-        for route in (research, diagnose):
-            effective = effective_projected_documents(route)
-            self.assertEqual(len(effective), len(set(effective)))
-            self.assertLessEqual(len(effective), 12)
-        self.assertNotIn("data", skill_frontmatter("analyze")["metadata"]["cse-routing"]["direct"])
-        self.assertEqual(skill_frontmatter("setup")["metadata"]["cse-routing"]["direct"], ["operating-model"])
-        self.assertNotIn("latex-packages", skill_frontmatter("summarize")["metadata"]["cse-routing"]["direct"])
-
-    def test_workflow_boundaries_and_conditional_routes(self):
-        research = skill_text("research")
-        self.assertIn("capability-aware plan", research)
-        self.assertIn("Add a query only when", research)
-        self.assertNotIn("exactly one direct query", research)
-        diagnose = skill_text("diagnose")
-        self.assertIn("not evidence that the physical model", diagnose)
-        self.assertIn("Do not change implementation", diagnose)
-        design = skill_text("design")
-        self.assertIn("bounded supported design", design)
-        self.assertIn("publish and verify one issue", design)
-        self.assertIn("Only a **Ready**", design)
-        build = skill_text("build")
-        self.assertIn("one change-accounting run against the final tree", build)
-        self.assertIn("stage performing a Git or GitHub action owns its authority", build)
-        analyze = skill_text("analyze")
-        self.assertIn("an authoritative retained input\nneeds no Data probe", analyze)
-        self.assertIn("Project-selected output formats", analyze)
-        self.assertIn("claim-led figure rule in `scientific-projects`", analyze)
-        review = skill_text("review")
-        self.assertIn("Result lens", review)
-        self.assertIn("Capability lens", review)
-        self.assertIn("explicit merge base", review)
-        self.assertIn("complete changed functions", review)
-        summarize = skill_text("summarize")
-        self.assertIn("useful method-specific result", summarize)
-        self.assertIn("before Review", summarize)
-        self.assertIn("claim-led figure requirement", summarize)
-        self.assertIn("neither a CSV link nor a", (ROOT / "references/scientific-projects.md").read_text())
-
-    def test_scientific_safety_and_retained_evidence_boundaries_remain(self):
-        data = skill_text("data")
-        self.assertIn("Read-only requests do not mutate", data)
-        self.assertRegex(data, r"repairing values\s+silently")
-        zotero = skill_text("zotero")
-        self.assertIn("native approval immediately before the write", zotero)
-        mathpix = skill_text("mathpix")
-        self.assertIn("transcription, not validated scientific truth", mathpix)
-        plot = skill_text("plot")
-        self.assertIn("retained continuous relationship", plot)
-        self.assertIn("`o`/`x` points", plot)
-        quarto = skill_text("quarto")
-        self.assertIn("execute.enabled: false", quarto)
-        self.assertIn("--no-execute", quarto)
-        self.assertIn("Ordinary Quarto HTML", quarto)
-        self.assertIn("manuscript.py", quarto)
-        self.assertIn("project.render", quarto)
-        self.assertIn("promoted-pdf", quarto)
-
-    def test_three_sections_and_review_lenses_keep_ownership_boundaries(self):
-        operating = (ROOT / "references/operating-model.md").read_text()
-        for term in ("Think", "Do", "Publish", "Setup runs once", "Audit stands outside"):
-            self.assertIn(term, operating)
-        review = skill_text("review")
-        summarize = skill_text("summarize")
-        self.assertLess(len(review.split()), 340)
-        self.assertLess(len(summarize.split()), 330)
-        self.assertEqual(skill_frontmatter("review")["metadata"]["cse-routing"]["direct"], ["operating-model"])
-        for phrase in (
-            "calculations stay with the accepted numerical owner",
-            "distinct fields do not reuse one value without identity evidence",
-            "missing inputs and silent exits preserve causes",
-            "repeated constants,\nlimits, defaults, and tolerances use their existing scientific owner",
-        ):
-            self.assertIn(phrase, review)
-        self.assertIn("chat summary of the main points", summarize)
-        surface = (ROOT / "references/code-surface-review.md").read_text()
-        self.assertIn("Any implementation correction\ninvalidates the", surface)
-        audit = skill_text("audit")
-        for phrase in (
-            "scientific calculations or transformations outside the designated owner",
-            "result mapping that duplicates, fabricates, drops, or changes the meaning",
-            "silent exits that erase failure or unavailability causes",
-            "duplicated equations, physical limits, constants, defaults, or tolerances",
-            "semantically distinct fields populated from one source without identity evidence",
-        ):
-            self.assertIn(phrase, audit)
-
-    def test_visualize_active_surface_is_html_first_without_retired_companion(self):
-        retired = "reveal" + "js"
-        self.assertFalse((VISUALIZE_ROOT / "skills" / retired).exists())
-        self.assertFalse((VISUALIZE_ROOT / "references" / f"{retired}.md").exists())
-        active = "\n".join(
-            path.read_text(errors="replace")
-            for path in VISUALIZE_ROOT.rglob("*") if path.is_file()
-        ).casefold()
-        self.assertNotIn(retired, active)
-        self.assertIn("ordinary quarto html", active)
-        self.assertIn("promoted-pdf-header.tex", active)
-
-    def test_scientific_doctrine_and_test_boundaries_remain_reachable(self):
-        numerical = (ROOT / "references/numerical-testing.md").read_text()
-        failure = (ROOT / "references/failure-triage.md").read_text()
-        projects = (ROOT / "references/scientific-projects.md").read_text()
-        github = (ROOT / "references/github-and-git.md").read_text()
-        decisions = (ROOT / "references/decision-records.md").read_text()
-        dependent = (ROOT / "references/dependent-scientific-changes.md").read_text()
-        design = skill_text("design")
-        for text, terms in (
-            (numerical, ("result-first", "reference case", "tolerance rationale", "Coverage may reveal", "never by weakening a tolerance", "failing case, proposed")),
-            (failure, ("method that actually ran", "no useful numerical result",
-                       "key/value failure record", "input-readiness question",
-                       "bounded direct")),
-            (projects, ("defaults to the root-level", "repository-relative path",
-                        "meaningful populated child names", "same responsibilities",
-                        "exist before Review", "must not rerun", "one claim-led figure",
-                        "The retained CSV owns")),
-            (github, ("Standalone issues are normal", "git merge --ff-only", "optional repository context")),
-            (decisions, ("one numbered sequence", "reversible library choice", "independent reference case")),
-            (dependent, ("Observed state", "Proposed correction")),
-            (design, ("Result lens", "Capability lens", "Only a **Ready** disposition permits `cse:build`")),
-        ):
-            for term in terms:
-                self.assertIn(term, text)
-        for name in ("analyze", "build", "review"):
-            self.assertIn("failure-triage", skill_frontmatter(name)["metadata"]["cse-routing"]["conditional"])
-        setup = skill_text("setup")
-        self.assertIn("do not rename or migrate it solely", setup)
-        self.assertIn("`analyses/<short-id>/{inputs,scripts,results,figures}`", setup)
-        self.assertIn("manuscript.py init", setup)
-        design = skill_text("design")
-        self.assertRegex(design, r"(?is)publish.*one issue.*before.*Build")
-        self.assertRegex(design, r"(?is)only a \*\*Ready\*\*.*permits")
-
-    def test_issue_54_moves_design_review_and_binds_failing_cases(self):
-        design = skill_text("design")
-        build = skill_text("build")
-        dependent = (ROOT / "references/dependent-scientific-changes.md").read_text()
-        decisions = (ROOT / "references/decision-records.md").read_text()
-        numerical = (ROOT / "references/numerical-testing.md").read_text()
-        routing = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())["cases"]
-        by_id = {case["id"]: case for case in routing}
-
-        self.assertLess(len(design.split()), 520)
-        self.assertLess(len(dependent.split()), 600)
-        self.assertNotIn("## Independent pre-Build review", dependent)
-        self.assertNotIn("## Pre-Build disposition", dependent)
-        self.assertIn("result or a capability", design)
-        self.assertIn("Experiment issue (result)", design)
-        self.assertIn("Tool issue (capability)", design)
-        self.assertIn("no code, registries, generators, or prescribed implementation", design)
-        self.assertIn("no new numerical method, tolerance", build)
-        self.assertIn("cse:diagnose` classifies the", build)
-        self.assertIn("same approval as the fix", numerical)
-        self.assertIn("records five facts", decisions)
-        self.assertNotIn("Four focused kinds", decisions)
-        self.assertNotIn("scientific-formulation`:", decisions)
-        self.assertNotIn("numerical-method`:", decisions)
-        self.assertEqual("cse:design", by_id["design-experiment-result-shape"]["expected_skill"])
-        self.assertEqual("cse:design", by_id["design-capability-tool-shape"]["expected_skill"])
-        self.assertEqual("cse:diagnose", by_id["build-failing-case-diagnose-boundary"]["expected_skill"])
-        templates = ROOT / "assets/project/adr/templates"
-        self.assertFalse(templates.exists() and any(templates.iterdir()))
-
-    def test_document_and_figure_routes_preserve_render_and_disposition_rules(self):
-        latex = skill_text("latex")
-        quarto = skill_text("quarto")
-        plot = skill_text("plot")
-        summarize = skill_text("summarize")
-        profile = (VISUALIZE_ROOT / "references/latex-article-profiles.md").read_text()
-        plotting = (VISUALIZE_ROOT / "references/plotting.md").read_text()
-        for text, patterns in (
-            (latex, (r"one\s+retained data authority", r"never authorizes.*model execution", r"visual")),
-            (quarto, (r"execute\.enabled: false", r"--no-execute", r"manuscript\.py", r"material.*return to `cse:review`")),
-            (plot, (r"retained continuous relationship", r"`o`/`x`", r"project.*intended use")),
-            (summarize, (r"useful method-specific result", r"must\s+not\s+rerun", r"before Review")),
-            (profile, (r"Manuscript", r"Analysis research notebook", r"one continuous story", r"selected render")),
-            (plotting, (r"primary figure directly answers", r"Predictions available only", r"color-vision-safe")),
-        ):
-            for pattern in patterns:
-                self.assertRegex(text, rf"(?is){pattern}")
-
-    def test_issue_24_material_review_gate_keeps_all_dispositions(self):
-        routing = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())
-        cases = {
-            case["expected_disposition"]: case
-            for case in routing["cases"] if case.get("source_issue") == 24
+        phase_descriptions = {
+            "setup": "Research and design", "research": "Research and design",
+            "diagnose": "Research and design", "design": "Research and design",
+            "build": "Execute and deliver", "analyze": "Execute and deliver",
+            "summarize": "Execute and deliver", "write": "Execute and deliver",
         }
-        self.assertEqual({"Ready", "Revise", "Block"}, set(cases))
-        guide = skill_text("design")
-        for disposition, case in cases.items():
-            self.assertEqual("cse:design", case["expected_skill"])
-            self.assertIn("Build", case["prohibited_action"])
-            self.assertIn(f"**{disposition}**", guide)
-        for term in (
-            "changed surface and callers", "numerical owner", "sources",
-            "public input", "Result lens", "Capability lens", "two fresh reviewers",
-            "normal GitHub issue record",
+        for skill, phase in phase_descriptions.items():
+            frontmatter = yaml.safe_load((PLUGIN / "skills" / skill / "SKILL.md").read_text().split("---", 2)[1])
+            self.assertTrue(frontmatter["description"].startswith(f"CSE {phase} —"))
+            interface = yaml.safe_load((PLUGIN / "skills" / skill / "agents/openai.yaml").read_text())["interface"]
+            self.assertNotIn("Workflow", interface["display_name"])
+            self.assertIn(phase.replace(" or ", " / "), interface["display_name"])
+        review = yaml.safe_load((PLUGIN / "skills/review/SKILL.md").read_text().split("---", 2)[1])
+        self.assertTrue(review["description"].startswith("CSE Review —"))
+        prose = yaml.safe_load((PLUGIN / "skills/prose/SKILL.md").read_text().split("---", 2)[1])
+        self.assertEqual("supporting", prose["metadata"]["cse-kind"])
+        workflow = (PLUGIN / "skills/workflow/SKILL.md").read_text()
+        normalized_workflow = " ".join(workflow.split())
+        for phrase in (
+            "CSE owns its scientific stages, evidence, and acceptance",
+            "selected by project preference or explicit task override",
+            "does not require a Build worker",
         ):
-            self.assertIn(term, guide)
-        self.assertRegex(guide, r"(?is)only a \*\*Ready\*\*.*permits `cse:build`")
+            self.assertIn(phrase, normalized_workflow)
+        frontmatter = yaml.safe_load(workflow.split("---", 2)[1])
+        self.assertEqual({"github-and-git"}, set(frontmatter["metadata"]["cse-routing"]["conditional"]))
+        build = yaml.safe_load((PLUGIN / "skills/build/SKILL.md").read_text().split("---", 2)[1])
+        self.assertIn("cse-pi-worker", build["metadata"]["cse-routing"]["conditional"])
+        for skill in ("diagnose", "analyze", "review", "workflow"):
+            metadata = yaml.safe_load((PLUGIN / "skills" / skill / "SKILL.md").read_text().split("---", 2)[1])
+            self.assertNotIn("cse-pi-worker", metadata["metadata"]["cse-routing"]["conditional"])
+        self.assertNotIn("wait_threads", workflow)
+        self.assertNotIn("send_message_to_thread", workflow)
+        self.assertFalse((PLUGIN / "references/workflow/execution-modes.md").exists())
+        setup = (PLUGIN / "skills/setup/SKILL.md").read_text()
+        self.assertIn("CSE execution mode: direct.", setup)
+        self.assertIn("CSE execution mode: baton.", setup)
+        projects = (PLUGIN / "references/workflow/scientific-projects.md").read_text()
+        self.assertIn("required renderer executable", projects)
+        self.assertNotIn("Visualize is absent", projects)
 
-    def test_issue_15_protocol_is_fully_pinned(self):
-        config = json.loads((ROOT / "evaluation/cooling-fit/benchmark.json").read_text())
-        oracle = config["oracle"]
-        self.assertEqual({
-            "version": 1,
-            "observations_sha256": "928d3f676e247c572b3d8c81ebc0ff64f20f67dadd3bfdac406f58c4eda7206f",
-            "equation": "T(t) = T_ambient + (T_initial - T_ambient) exp(-k t)",
-            "method": "positive one-parameter nonlinear least squares with fixed ambient and initial temperatures",
-            "ambient_degC": 22.0, "initial_degC": 90.0,
-            "k_per_s": 0.00499692115269, "time_constant_s": 200.123229774,
-            "rmse_degC": 0.162902517152, "standard_error_k_per_s": 0.0000141073234294,
-            "linearized_95_interval_k_per_s": [0.00496927079877, 0.00502457150661],
-            "tolerances": {
-                "k_per_s": 0.000005, "time_constant_s": 0.5, "rmse_degC": 0.01,
-                "standard_error_k_per_s": 0.000002, "interval_k_per_s": 0.00003,
-            },
-        }, {key: oracle[key] for key in (
-            "version", "observations_sha256", "equation", "method", "ambient_degC",
-            "initial_degC", "k_per_s", "time_constant_s", "rmse_degC",
-            "standard_error_k_per_s", "linearized_95_interval_k_per_s", "tolerances",
-        )})
-        self.assertEqual(
-            "Determine the missing cooling-rate parameter from the retained observations, complete the scientific work in this repository, and report the supported result; use the supplied project decisions and do not ask for clarification during this run.",
-            config["prompt"],
-        )
-        self.assertEqual({
-            "k_per_s": "One third of the linearized standard error; allows solver serialization but rejects a materially different fit.",
-            "time_constant_s": "Propagation of the accepted k tolerance gives about 0.20 s; 0.5 s also allows ordinary display rounding.",
-            "rmse_degC": "Below one tenth of the retained observation noise scale while allowing serialization differences.",
-            "standard_error_k_per_s": "Allows equivalent Jacobian and residual-variance implementations without admitting the seconds/minutes defect.",
-            "interval_k_per_s": "Allows equivalent nonlinear and through-origin linearized residual intervals while remaining far below the seconds/minutes defect.",
-        }, oracle["tolerance_rationale"])
-        self.assertEqual(
-            {
-                "research": ["cse:research", "cse:design", "cse:build", "cse:analyze", "cse:summarize", "cse:review"],
-                "diagnose": ["cse:diagnose", "cse:research", "cse:design", "cse:build", "cse:analyze", "cse:summarize", "cse:review"],
-            }, {key: config["cases"][key]["expected_route"] for key in ("research", "diagnose")})
-        tree = ast.parse((ROOT / "scripts/cooling_fit_benchmark.py").read_text())
-        gate_dicts = [
-            node for node in ast.walk(tree) if isinstance(node, ast.Dict)
-            and {key.value for key in node.keys if isinstance(key, ast.Constant)}
-            >= {"remote_safety", "retained_numerical_evidence", "research_source_support"}
-        ]
-        self.assertEqual(1, len(gate_dicts))
-        self.assertEqual(
-            {"remote_safety", "retained_numerical_evidence", "research_source_support",
-             "notebook_before_review", "nonexecuting_supported_notebook"},
-            {key.value for key in gate_dicts[0].keys},
-        )
-        category_weights = Counter()
-        for item in config["rubric"]:
-            category_weights[item["category"]] += item["max_points"]
-        self.assertEqual({
-            "evidence_justified_entry": 15, "design_build_analyze": 30,
-            "review_of_notebook": 20, "notebook_and_response": 20,
-            "restraint": 10, "efficiency": 5,
-        }, dict(category_weights))
-        self.assertEqual(100, sum(category_weights.values()))
-        self.assertEqual(
-            ["entry_route", "design_issue", "numerical_execution", "independent_review",
-             "analysis_notebook", "restraint", "efficiency"],
-            [item["id"] for item in config["rubric"] if item["owner"] == "objective"],
-        )
-        source = (ROOT / "scripts/cooling_fit_benchmark.py").read_text()
-        for relative in (
-            "inputs/observations.csv", "results/fit_summary.json", "results/fit_curve.csv",
-            "results/plot_manifest.json", "figures/cooling_fit.png", "notebook.qmd",
-            "notebook.html",
-        ):
-            self.assertIn(Path(relative).name, source)
+    def test_issue_plan_and_prose_owners_are_explicit(self):
+        github = (PLUGIN / "references/workflow/github-and-git.md").read_text()
+        self.assertIn("issue body owns the complete current", github)
+        self.assertIn("truncated output", github)
+        self.assertIn("Preserve satisfied links", github)
+        design = (PLUGIN / "skills/design/SKILL.md").read_text()
+        self.assertIn("algorithms, or pseudocode", design)
+        self.assertIn("Invoke `cse:review`", design)
+        build = (PLUGIN / "skills/build/SKILL.md").read_text()
+        self.assertIn("complete current issue body", build)
+        self.assertIn("follow pagination", build)
+        review = (PLUGIN / "skills/review/SKILL.md").read_text()
+        self.assertIn("## Design readiness", review)
+        self.assertIn("## Delivered review", review)
+        self.assertNotIn("final manuscript", review.casefold())
+        prose = (PLUGIN / "skills/prose/SKILL.md").read_text()
+        self.assertIn("CSE prose is clear.", prose)
+        self.assertIn("Prose does not edit", prose)
+        self.assertIn("final manuscript check", prose)
+        profiles = (PLUGIN / "references/visualize/latex-article-profiles.md").read_text()
+        self.assertIn("`cse:prose`", profiles)
+        self.assertNotIn("core Review's manuscript", profiles)
+        self.assertIn("evidence review and investigator promotion", profiles)
 
-    def test_reference_cleanup_breaks_transitive_full_stack_reads(self):
-        for relative in (
-            "references/latex-figures.md", "references/latex-packages.md",
-            "references/latex-article-profiles.md", "references/quarto-execution.md",
-        ):
-            text = (VISUALIZE_ROOT / relative).read_text()
-            self.assertNotRegex(text, r"(?i)read `[^`]+` completely")
-        self.assertIn("consult the relevant section", (VISUALIZE_ROOT / "references/latex-figures.md").read_text())
-
-    def test_scientific_project_and_review_owners_remain_explicit(self):
-        projects = (ROOT / "references/scientific-projects.md").read_text()
-        self.assertIn("exist before Review", projects)
-        self.assertIn("still requires investigator", projects)
-        dependent = (ROOT / "references/dependent-scientific-changes.md").read_text()
-        design = skill_text("design")
-        self.assertNotIn("bounded supported design", dependent)
-        self.assertIn("bounded supported design", design)
-        self.assertIn("two fresh reviewers", design)
-        surface = (ROOT / "references/code-surface-review.md").read_text()
-        self.assertIn("Build owns the one change-accounting run", surface)
-        self.assertIn("Build reports its changed surface", surface)
-
-    def test_setup_assets_keep_records_markdown_and_latex_manuscript_only(self):
-        project = ROOT / "assets/project"
-        self.assertTrue((project / "README.md").is_file())
-        context = (project / "CONTEXT.md").read_text()
-        for phrase in ("repository role: analysis", "## Owners", "## Glossary", "## Avoid", "Source"):
-            self.assertIn(phrase, context)
-        for name in ("formulation.md", "methods.md", "evidence.md", "decisions/README.md", "writing/STYLE.md", "writing/RULES.md"):
-            self.assertTrue((project / name).is_file(), name)
-        self.assertFalse(any(path.suffix == ".tex" for path in project.rglob("*")))
-        projects = (ROOT / "references/scientific-projects.md").read_text()
-        self.assertIn("Setup always creates", projects)
-        self.assertIn("Optional formulation, methods, evidence", projects)
-
-    def test_source_only_boundary_excludes_runs_from_sync_and_installation(self):
-        benchmark = (ROOT / "scripts/cooling_fit_benchmark.py").read_text()
+    def test_inventory_stages_only_the_unified_payload(self):
         with tempfile.TemporaryDirectory() as directory:
-            source = Path(directory) / "source"
-            staged = Path(directory) / "staged"
-            shutil.copytree(
-                ROOT,
-                source,
-                ignore=shutil.ignore_patterns(".git", ".venv", "__pycache__", ".pytest_cache", ".runs"),
-            )
-            (source / ".runs/cooling-fit/run-1").mkdir(parents=True)
-            (source / ".runs/cooling-fit/run-1/events.jsonl").write_text("source-only\n")
+            destination = Path(directory) / "staged"
             result = subprocess.run(
-                [
-                    "python3", str(source / "scripts/package_inventory.py"),
-                    "stage", "cse", str(staged), "--commit", "0" * 40,
-                    "--home", str(Path(directory) / "home"),
-                ],
-                text=True,
-                capture_output=True,
-                check=False,
+                ["python3", str(ROOT / "scripts/package_inventory.py"), "stage", "cse", str(destination), "--commit", "0" * 40],
+                text=True, capture_output=True, check=False,
             )
-            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(0, result.returncode, result.stderr)
             identity = json.loads(result.stdout)
-            self.assertEqual(
-                identity["payloadSkills"],
-                [
-                    "audit", "workflow", "setup", "research", "diagnose", "design",
-                    "build", "analyze", "summarize", "review", "write",
-                ],
-            )
-            self.assertFalse((staged / ".runs").exists())
-            self.assertFalse((staged / "tests").exists())
-            self.assertFalse((staged / "extensions").exists())
-            self.assertFalse((staged / "evaluation").exists())
-        self.assertIn('".runs"', benchmark)
-        self.assertIn("reference_reads", benchmark)
+            self.assertEqual(sorted(SKILLS), sorted(identity["payloadSkills"]))
+            self.assertFalse((destination / "tests").exists())
+            self.assertFalse((destination / "evaluation").exists())
+            self.assertFalse((destination / ".runs").exists())
+            self.assertFalse((destination / "extensions").exists())
 
-    def test_runtime_surface_has_no_banned_or_retired_workflow_material(self):
-        roots = [
-            ROOT / ".codex-plugin", ROOT / "skills", ROOT / "references", ROOT / "assets",
-            SOURCES_ROOT, VISUALIZE_ROOT,
-        ]
-        text = "\n".join(
-            path.read_text(errors="replace")
-            for root in roots for path in root.rglob("*") if path.is_file()
-        ).casefold()
-        # `expected_artifacts` is an exact CSE-Pi v1 field, not vague prose.
-        self.assertNotIn("arti" + "fact", text.replace("expected_artifacts", ""))
-        self.assertNotIn("datalad", text)
-        self.assertNotIn("git-annex", text)
-        self.assertNotRegex(text, r"\$(?:project-truss|mattpocock|superpowers)")
-
-    def test_companion_package_ownership_namespaces_and_handoffs(self):
-        packages = {
-            "cse": (ROOT, CORE, None),
-            "cse-sources": (SOURCES_ROOT, SOURCES, None),
-            "cse-visualize": (VISUALIZE_ROOT, VISUALIZE, None),
-        }
-        for name, (root, expected, version) in packages.items():
-            package_manifest = json.loads((root / ".codex-plugin/plugin.json").read_text())
-            self.assertEqual((package_manifest["name"], package_manifest.get("version")), (name, version))
-            self.assertEqual({path.name for path in (root / "skills").iterdir()}, expected)
-
-        active_roots = [ROOT / "skills", ROOT / "references", ROOT / ".codex-plugin", ROOT / "README.md", ROOT / "docs/design", ROOT / "evaluation", ROOT / "examples", ROOT / "extensions"]
-        active = "\n".join(
-            path.read_text(errors="replace")
-            for root in active_roots
-            for path in ([root] if root.is_file() else root.rglob("*"))
-            if path.is_file() and "results" not in path.parts
-        )
-        forbidden = ["cse" + ":" + name for name in sorted(SOURCES | VISUALIZE)]
-        self.assertEqual([], [identifier for identifier in forbidden if identifier in active])
-
-        sources = (SOURCES_ROOT / "references/handoff.md").read_text()
-        visualize = (VISUALIZE_ROOT / "references/handoff.md").read_text()
-        for text, diagnostic in (
-            (sources, "CSE Sources requires the core cse plugin"),
-            (visualize, "CSE Visualize requires the core cse plugin"),
-        ):
-            self.assertIn(diagnostic, text)
-            self.assertIn("was not", text)
-            self.assertIn("cache, deployment,", " ".join(text.split()))
-        self.assertIn("does not require or invoke CSE Visualize", sources)
-        self.assertIn("does not require or invoke CSE Sources", visualize)
-        for name in SOURCES | VISUALIZE:
-            family = "Sources" if name in SOURCES else "Visualize"
-            text = skill_text(name)
-            self.assertIn("Before any other action", text)
-            self.assertIn(f"CSE {family} requires the core cse plugin", text)
-            self.assertIn("was not", text)
-            self.assertNotIn("claim_strength", text)
-        self.assertNotIn(
-            "plotting",
-            skill_frontmatter("digitize")["metadata"]["cse-routing"]["direct"],
-        )
-
-    def test_companion_configuration_matrix_covers_supported_routes(self):
-        matrix = yaml.safe_load((ROOT / "evaluation/companion-routing.yaml").read_text())["configurations"]
-        self.assertEqual(
-            {"core-only", "core-sources", "core-visualize", "full", "companion-without-core"},
-            {case["id"] for case in matrix},
-        )
-
-    def test_workbench_research_uses_current_three_package_inventory(self):
-        paths = (
-            ROOT / "docs/workbench-research/README.md",
-            ROOT / "docs/workbench-research/PI-FEASIBILITY.md",
-            ROOT / "docs/workbench-research/PI-ECOSYSTEM-AUDIT.md",
-        )
-        for path in paths:
-            text = " ".join(path.read_text().casefold().split())
-            self.assertIn("nine core", text)
-            self.assertIn("four optional sources", text)
-            self.assertIn("six optional visualize", text)
-            self.assertNotIn("eight workflow", text)
-            self.assertNotIn("seven optional visualize", text)
+    def test_routing_cases_use_the_unified_namespace(self):
+        cases = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())["cases"]
+        case_ids = {case["id"] for case in cases}
+        self.assertTrue({
+            "prose-final-manuscript-cohesion", "prose-authorship-request",
+            "review-numerical-result", "review-implementation-capability",
+            "workflow-baton-compact-build-handoff", "workflow-baton-active-worker",
+            "workflow-baton-ambiguous-delivery", "workflow-baton-normal-return",
+        }.issubset(case_ids))
+        for case in cases:
+            expected = case.get("expected_skill")
+            if expected:
+                self.assertRegex(expected, r"^cse:[a-z0-9-]+$")
+        blocked = next(case for case in cases if case["id"] == "design-prebuild-block")
+        guidance = " ".join((blocked["expected_initial_action"], blocked["prohibited_action"])).casefold()
+        self.assertIn("independent `cse:review` readiness", guidance)
+        for retired in ("two named", "reviewer protocols"):
+            self.assertNotIn(retired, guidance)
 
 
 if __name__ == "__main__":

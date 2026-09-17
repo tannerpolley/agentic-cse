@@ -1,0 +1,734 @@
+#!/usr/bin/env python3
+"""Prepare or reconcile the root scientific-records layout."""
+
+from __future__ import annotations
+
+import argparse
+import difflib
+import hashlib
+import json
+import os
+from pathlib import Path
+import re
+import shutil
+import subprocess
+from typing import Iterable
+
+try:
+    from .cse_hook_common import DECLARATION_LINE, ROLE_VALUES, repository_role, role_state
+except ImportError:
+    from cse_hook_common import DECLARATION_LINE, ROLE_VALUES, repository_role, role_state
+
+
+ROOT = Path(__file__).resolve().parents[2]
+ASSETS = ROOT / "assets" / "workflow" / "project"
+MANDATORY = ("README.md", "CONTEXT.md")
+OPTIONAL = {
+    "formulation": "formulation.md",
+    "methods": "methods.md",
+    "evidence": "evidence.md",
+    "decisions": "decisions/README.md",
+    "writing": "writing/STYLE.md",
+    "writing-rules": "writing/RULES.md",
+}
+SKIP_PARTS = {".git", ".venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
+UNSOURCED_TERMS = ("certificate", "fingerprint", "admission", "typed failure", "claim boundary")
+CALLER_SUFFIXES = {".md", ".qmd", ".tex", ".rst", ".yaml", ".yml", ".json", ".py", ".sh", ".cmake", ".cpp", ".h", ".hpp", ".js", ".toml"}
+# Exact unpopulated templates removed in #54; a modified template is a record.
+LEGACY_TEMPLATE_BLOBS = {
+    "7f473a595e439c0c8b232e0f02567c31162ab2db",
+    "4f87c022fba114d0e5eda92e46077d573dbcad89",
+    "478ff1b2d7cce85c314fe6e5cc3d6ea5a7a83090",
+    "b9286a4093b3fd85bb45798a3c242423938ce86f",
+}
+
+
+def obsolete_template(path: Path) -> bool:
+    if not {"docs", "scientific", "adr", "templates"} <= set(path.parts):
+        return False
+    data = path.read_bytes()
+    return hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest() in LEGACY_TEMPLATE_BLOBS
+
+
+class SetupError(RuntimeError):
+    pass
+
+
+def digest(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def source_commit() -> str:
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
+        capture_output=True, check=False,
+    )
+    return result.stdout.strip() if result.returncode == 0 else "unavailable"
+
+
+def relative(path: Path, repo: Path) -> str:
+    return path.relative_to(repo).as_posix()
+
+
+def readable_file(path: Path) -> bool:
+    if not path.is_file():
+        return False
+    try:
+        with path.open("rb") as stream:
+            stream.read(1)
+    except OSError:
+        return False
+    return True
+
+
+def skip(path: Path, repo: Path) -> bool:
+    return bool(set(path.relative_to(repo).parts) & SKIP_PARTS)
+
+
+def repository_files(repo: Path) -> Iterable[Path]:
+    listed = subprocess.run(
+        ["git", "ls-files", "--cached", "--others", "--exclude-standard", "-z"],
+        cwd=repo, capture_output=True, check=False,
+    )
+    if listed.returncode == 0:
+        for item in listed.stdout.split(b"\0"):
+            if item:
+                path = repo / item.decode(errors="surrogateescape")
+                if path.is_file() and not skip(path, repo):
+                    yield path
+        return
+    for directory, names, filenames in os.walk(repo):
+        names[:] = [name for name in names if name not in SKIP_PARTS]
+        for name in filenames:
+            path = Path(directory) / name
+            if not skip(path, repo):
+                yield path
+
+
+def install_file(source: Path, target: Path, *, preserve_existing: bool = False) -> None:
+    if target.exists():
+        if preserve_existing and target.is_file():
+            return
+        if not target.is_file() or target.read_bytes() != source.read_bytes():
+            raise SetupError(f"refusing to overwrite unrecognized file: {target}")
+        return
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(source, target)
+
+
+def canonical_pointer() -> str:
+    return next(
+        paragraph
+        for paragraph in (ASSETS / "AGENTS.md").read_text(encoding="utf-8").split("\n\n")
+        if "MUST use the installed CSE skills" in paragraph
+    )
+
+
+def replaceable_pointer(paragraph: str) -> bool:
+    folded = " ".join(paragraph.split()).casefold()
+    return re.fullmatch(
+        r"use (?:the installed )?cse(?: skills?)? and read "
+        r"docs/scientific/(?:readme|context)\.md(?: before [^.]+)?\.",
+        folded,
+    ) is not None
+
+
+def routing_report(repo: Path) -> dict:
+    repo = repo.resolve()
+    agents = repo / "AGENTS.md"
+    if agents.exists() and not agents.is_file():
+        raise SetupError(f"root guidance is not a file: {agents}")
+    before = agents.read_text(encoding="utf-8") if agents.is_file() else ""
+    folded = before.casefold()
+    checks = {
+        "installed CSE skills": "cse" in folded and "skill" in folded,
+        "docs/scientific/README.md": "docs/scientific/readme.md" in folded,
+        "docs/scientific/CONTEXT.md": "docs/scientific/context.md" in folded,
+        "read before route selection": "before" in folded and "route" in folded,
+    }
+    satisfied = any(
+        all(term in paragraph.casefold() for term in (
+            "cse", "skill", "docs/scientific/readme.md",
+            "docs/scientific/context.md", "before", "route",
+        ))
+        for paragraph in before.split("\n\n")
+    )
+    action = "none"
+    after = before
+    if not before:
+        action = "create"
+        after = (ASSETS / "AGENTS.md").read_text(encoding="utf-8")
+    elif not satisfied:
+        paragraphs = before.rstrip().split("\n\n")
+        replace = next((
+            index for index, paragraph in enumerate(paragraphs)
+            if replaceable_pointer(paragraph)
+        ), None)
+        if replace is None:
+            action = "append"
+            after = before.rstrip() + "\n\n" + canonical_pointer() + "\n"
+        else:
+            action = "replace"
+            paragraphs[replace] = canonical_pointer()
+            after = "\n\n".join(paragraphs) + "\n"
+    targets = {
+        f"docs/scientific/{name}": readable_file(repo / "docs/scientific" / name)
+        for name in MANDATORY
+    }
+    return {
+        "satisfied": satisfied,
+        "missing": [name for name, present in checks.items() if not present],
+        "action": action,
+        "targets": targets,
+        "proposed": after,
+        "diff": "".join(difflib.unified_diff(
+            before.splitlines(keepends=True), after.splitlines(keepends=True),
+            fromfile="AGENTS.md", tofile="AGENTS.md",
+        )),
+    }
+
+
+def ensure_manifest_writable(path: Path) -> None:
+    if path.exists():
+        if not path.is_file() or not os.access(path, os.W_OK):
+            raise SetupError(f"manifest destination is not writable: {path}")
+        return
+    ancestor = path.parent
+    while not ancestor.exists():
+        ancestor = ancestor.parent
+    if not ancestor.is_dir() or not os.access(ancestor, os.W_OK):
+        raise SetupError(f"manifest parent is not writable: {ancestor}")
+
+
+def ensure_installable(source: Path, target: Path, *, preserve_existing: bool = False) -> None:
+    if not target.exists() or preserve_existing and target.is_file():
+        return
+    if not target.is_file() or target.read_bytes() != source.read_bytes():
+        raise SetupError(f"refusing to overwrite unrecognized file: {target}")
+
+
+def tracked(paths: Iterable[Path], repo: Path) -> list[dict[str, str]]:
+    return [
+        {"path": relative(path, repo), "sha256": digest(path)}
+        for path in sorted(paths)
+    ]
+
+
+def table_rows(text: str) -> tuple[list[list[str]], list[list[str]]]:
+    glossary: list[list[str]] = []
+    avoid: list[list[str]] = []
+    lines = text.splitlines()
+    for index, line in enumerate(lines[:-2]):
+        if not line.strip().startswith("|") or "|" not in line[1:]:
+            continue
+        headers = [cell.strip().casefold() for cell in line.strip().strip("|").split("|")]
+        divider = lines[index + 1].strip()
+        if not divider.startswith("|") or not all(set(cell.strip()) <= {"-", ":"} for cell in divider.strip("|").split("|")):
+            continue
+        rows = []
+        for candidate in lines[index + 2:]:
+            if not candidate.strip().startswith("|"):
+                break
+            cells = [cell.strip() for cell in candidate.strip().strip("|").split("|")]
+            if len(cells) == len(headers):
+                rows.append(cells)
+        if "term" in headers and "meaning" in headers:
+            term = headers.index("term")
+            meaning = headers.index("meaning")
+            source_index = headers.index("source") if "source" in headers else None
+            scope_index = headers.index("scope") if "scope" in headers else None
+            for row in rows:
+                glossary.append([
+                    row[term], row[meaning],
+                    row[source_index] if source_index is not None and row[source_index] else "sourceless",
+                    row[scope_index] if scope_index is not None else "",
+                ])
+        if "avoid" in headers and "prefer" in headers and "meaning" in headers:
+            indexes = {name: headers.index(name) for name in headers}
+            for row in rows:
+                avoid.append([
+                    row[indexes["avoid"]], row[indexes["prefer"]], row[indexes["meaning"]],
+                    row[indexes["scope"]] if "scope" in indexes else "",
+                    row[indexes["exceptions"]] if "exceptions" in indexes else "",
+                    row[indexes["evidence"]] if "evidence" in indexes else "sourceless",
+                ])
+    return glossary, avoid
+
+
+def markdown_rows(rows: list[list[str]]) -> str:
+    return "\n".join("| " + " | ".join(cell.replace("|", "\\|") for cell in row) + " |" for row in rows)
+
+
+def markdown_record(text: str) -> str:
+    text = re.sub(r"^\\documentclass\{[^}]+\}\s*", "", text, flags=re.MULTILINE)
+    text = re.sub(r"^\\usepackage(?:\[[^]]*\])?\{[^}]+\}\s*", "", text, flags=re.MULTILINE)
+    text = text.replace("\\begin{document}", "").replace("\\end{document}", "")
+    text = re.sub(r"^\\section\{([^}]+)\}", r"# \1", text, flags=re.MULTILINE)
+    return text.strip() + "\n"
+
+
+def retained_context(path: Path, repo: Path) -> str:
+    text = path.read_text(encoding="utf-8", errors="replace").strip()
+    return DECLARATION_LINE.sub("", text).strip()
+
+
+def validate_role(role: str) -> None:
+    if role not in ROLE_VALUES:
+        raise SetupError("repository role must be analysis or tool")
+
+
+def proposed_role(text: str) -> str | None:
+    state = role_state(text)
+    if state["role"] in ROLE_VALUES:
+        return state["role"]
+    legacy = state["legacy"]
+    if not state["roles"] and len(legacy) == 1:
+        return {"result": "analysis", "capability": "tool"}.get(legacy[0])
+    return None
+
+
+def canonical_context(text: str, role: str) -> str:
+    validate_role(role)
+    text = DECLARATION_LINE.sub("", text).strip()
+    heading = re.search(r"(?m)^#[^#\n].*$", text)
+    if heading:
+        rest = text[heading.end():].lstrip("\n")
+        text = text[:heading.end()] + f"\n\nrepository role: {role}\n\n{rest}"
+    else:
+        text = f"repository role: {role}\n\n{text}" if text else f"repository role: {role}"
+    return text.strip() + "\n"
+
+
+def context_sources(repo: Path) -> list[Path]:
+    return sorted(path for path in repository_files(repo) if path.name == "CONTEXT.md")
+
+
+def record_target(path: Path, repo: Path) -> Path | None:
+    rel = path.relative_to(repo)
+    parts = rel.parts
+    if parts in (("docs", "scientific", "README.md"), ("docs", "scientific", "CONTEXT.md")):
+        return None
+    if parts[-1] == "CONTEXT.md":
+        return None
+    if "docs" in parts and "scientific" in parts:
+        index = max(i for i, part in enumerate(parts) if part == "scientific")
+        suffix = parts[index + 1:]
+        if suffix[:1] == ("adr",):
+            if suffix[-1] == "README.md":
+                return repo / "docs/scientific/decisions/README.md"
+            if "templates" in suffix and obsolete_template(path):
+                return None
+            return repo / "docs/scientific/decisions" / Path(*suffix[1:])
+        if suffix and suffix[0] == "latex":
+            return repo / "docs/scientific/latex" / Path(*suffix[1:])
+        if len(suffix) == 1 and suffix[0] in {"formulation.tex", "methods.tex", "evidence.tex"}:
+            return repo / "docs/scientific" / Path(suffix[0]).with_suffix(".md")
+        if suffix and suffix[-1].endswith(".tex"):
+            return repo / "docs/scientific/latex" / Path(*suffix)
+        return repo / "docs/scientific" / Path(*suffix)
+    if len(parts) >= 2 and parts[:2] == ("docs", "latex"):
+        return repo / "docs/scientific/latex" / Path(*parts[2:])
+    return None
+
+
+def plan_reconciliation(repo: Path, role: str | None = None) -> dict:
+    repo = repo.resolve()
+    if not repo.is_dir():
+        raise SetupError(f"repository does not exist: {repo}")
+    if role is not None:
+        validate_role(role)
+    contexts = context_sources(repo)
+    target = repo / "docs/scientific/CONTEXT.md"
+    all_context_text = "\n".join(path.read_text(encoding="utf-8", errors="replace") for path in contexts)
+    selected_role = role or proposed_role(all_context_text)
+    searchable = all_context_text + "\n" + "\n".join(
+        relative(path, repo) for path in repository_files(repo)
+        if "docs" in path.relative_to(repo).parts
+    )
+    glossary: list[list[str]] = []
+    avoid: list[list[str]] = []
+    for path in contexts:
+        source = relative(path, repo)
+        rows, avoids = table_rows(path.read_text(encoding="utf-8", errors="replace"))
+        glossary.extend([row[:2] + [row[2] or f"sourceless ({source})", row[3]] for row in rows])
+        avoid.extend(avoids)
+    seen = set()
+    glossary = [row for row in glossary if not (tuple(row) in seen or seen.add(tuple(row)))]
+    folded_search = searchable.casefold()
+    sourced = {row[0].strip("`").casefold() for row in glossary
+               if row[2] and not row[2].casefold().startswith("sourceless")}
+    terms = [term for term in UNSOURCED_TERMS if term not in sourced and (
+        all(word in folded_search for word in term.split())
+        or term == "claim boundary" and "claim boundar" in folded_search
+    )]
+    merged = (ASSETS / "CONTEXT.md").read_text(encoding="utf-8")
+    if glossary:
+        merged = merged.replace("|---|---|---|---|\n\n## Avoid", "|---|---|---|---|\n" + markdown_rows(glossary) + "\n\n## Avoid")
+    if avoid:
+        merged = merged.replace("|---|---|---|---|---|---|\n\nLeave the table", "|---|---|---|---|---|---|\n" + markdown_rows(avoid) + "\n\nLeave the table")
+    if contexts:
+        retained = [
+            f"### `{relative(path, repo)}`\n\n{retained_context(path, repo)}"
+            for path in contexts
+        ]
+        if retained:
+            merged += "\n## Retained source records\n\n" + "\n\n".join(retained) + "\n"
+    if contexts == [target]:
+        merged = target.read_text(encoding="utf-8")
+    merged = (canonical_context(merged, selected_role) if selected_role else
+              DECLARATION_LINE.sub("", merged).strip() + "\n")
+    moves = []
+    merges = []
+    deletes = []
+    links = {}
+    reserved = {relative(path, repo) for path in repository_files(repo)}
+    for path in repository_files(repo):
+        destination = record_target(path, repo)
+        if destination is None:
+            continue
+        old = relative(path, repo)
+        new = relative(destination, repo)
+        if old == new:
+            continue
+        entry = {"source": old, "target": new}
+        if path.suffix == ".tex" and destination.suffix == ".md":
+            entry["conversion"] = "Markdown record"
+        if new in reserved:
+            merges.append(entry)
+        else:
+            moves.append(entry)
+            reserved.add(new)
+        links[old] = new
+    for path in contexts:
+        if path != target:
+            merges.append({"source": relative(path, repo), "target": "docs/scientific/CONTEXT.md", "reason": "merge glossary and scientific context"})
+            links[relative(path, repo)] = "docs/scientific/CONTEXT.md"
+    for path in repository_files(repo):
+        rel = path.relative_to(repo).parts
+        if obsolete_template(path):
+            deletes.append({"path": relative(path, repo), "reason": "obsolete unpopulated decision template"})
+    if not target.exists():
+        moves.append({"source": "(new)", "target": "docs/scientific/CONTEXT.md", "reason": "mandatory record"})
+    readme = repo / "docs/scientific/README.md"
+    if not readme.exists() and "docs/scientific/README.md" not in reserved:
+        moves.append({"source": "(asset)", "target": "docs/scientific/README.md", "reason": "mandatory record"})
+    updates = []
+    for path in repository_files(repo):
+        if path == target or path.suffix.lower() not in CALLER_SUFFIXES:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        replacements = [(old, new) for old, new in links.items() if old in text]
+        if replacements:
+            updates.append({"path": relative(path, repo), "replacements": replacements})
+    affected = {"AGENTS.md", "docs/scientific/CONTEXT.md"}
+    for item in moves + merges:
+        affected.add(item["target"])
+        if not item["source"].startswith("("):
+            affected.add(item["source"])
+    affected.update(item["path"] for item in deletes + updates)
+    return {
+        "schema_version": 1,
+        "repository": str(repo),
+        "repository_role": selected_role,
+        "role_state": role_state(all_context_text),
+        "contexts": [relative(path, repo) for path in contexts],
+        "sourceless_terms": terms,
+        "moves": moves,
+        "merges": merges,
+        "deletes": deletes,
+        "updates": updates,
+        "merged_context": merged,
+        "source_hashes": {name: digest(repo / name) if (repo / name).is_file() else None
+                          for name in sorted(affected)},
+    }
+
+
+def plan_text(plan: dict) -> str:
+    role = plan.get("repository_role") or "unresolved"
+    lines = [f"Reconciliation preview: {plan['repository']}", "", f"Repository role: {role}"]
+    legacy = plan.get("role_state", {}).get("legacy", [])
+    roles = plan.get("role_state", {}).get("roles", [])
+    if roles or legacy:
+        lines.append("Role declarations: " + ", ".join([*roles, *[f"default deliverable: {value}" for value in legacy]]))
+    if len(legacy) == 1 and legacy[0] in {"result", "capability"}:
+        lines.append(f"Legacy role proposal: {legacy[0]} → {'analysis' if legacy[0] == 'result' else 'tool'}")
+    if plan["sourceless_terms"]:
+        lines += ["", "Sourceless glossary terms:", *[f"- {term}" for term in plan["sourceless_terms"]]]
+    for title, key in (("Moves", "moves"), ("Merges", "merges"), ("Deletes", "deletes"), ("Caller and link updates", "updates")):
+        lines += ["", f"{title}:"]
+        items = plan[key]
+        if not items:
+            lines.append("- none")
+        for item in items:
+            if key == "updates":
+                replacements = "; ".join(f"`{old}` → `{new}`" for old, new in item["replacements"])
+                lines.append(f"- `{item['path']}`: {replacements}")
+            elif "source" in item:
+                detail = f" ({item.get('reason') or item.get('conversion')})" if item.get("reason") or item.get("conversion") else ""
+                lines.append(f"- `{item['source']}` → `{item['target']}`{detail}")
+            else:
+                lines.append(f"- `{item['path']}` ({item['reason']})")
+    lines += ["", "No files were written by this preview."]
+    return "\n".join(lines) + "\n"
+
+
+def git_tracked(path: Path, repo: Path) -> bool:
+    result = subprocess.run(["git", "ls-files", "--error-unmatch", relative(path, repo)], cwd=repo, capture_output=True, check=False)
+    return result.returncode == 0
+
+
+def move_path(source: Path, target: Path, repo: Path) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    if git_tracked(source, repo):
+        result = subprocess.run(["git", "mv", str(source), str(target)], cwd=repo, capture_output=True, text=True, check=False)
+        if result.returncode:
+            raise SetupError(result.stderr.strip() or f"git mv failed: {source}")
+    else:
+        shutil.move(str(source), str(target))
+
+
+def remove_path(path: Path, repo: Path) -> None:
+    if git_tracked(path, repo):
+        result = subprocess.run(["git", "rm", "-f", "--", relative(path, repo)], cwd=repo, capture_output=True, text=True, check=False)
+        if result.returncode:
+            raise SetupError(result.stderr.strip() or f"git rm failed: {path}")
+    elif path.is_file():
+        path.unlink()
+
+
+def merge_file(source: Path, target: Path, repo: Path) -> None:
+    source_text = source.read_text(encoding="utf-8")
+    if source.suffix == ".tex" and target.suffix == ".md":
+        source_text = markdown_record(source_text)
+    if target.exists():
+        target_text = target.read_text(encoding="utf-8")
+        if source_text.strip() not in target_text:
+            target.write_text(target_text.rstrip() + f"\n\n## Retained from `{relative(source, repo)}`\n\n" + source_text.strip() + "\n", encoding="utf-8")
+        remove_path(source, repo)
+    else:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        target.write_text(source_text, encoding="utf-8")
+        remove_path(source, repo)
+
+
+def validate_reconciliation_plan(repo: Path, plan: dict) -> None:
+    for name, expected in plan["source_hashes"].items():
+        path = repo / name
+        if not path.resolve().is_relative_to(repo) or path.is_symlink():
+            raise SetupError(f"reconciliation path escapes the repository or is a symlink: {name}")
+        actual = digest(path) if path.is_file() else None
+        if actual != expected:
+            raise SetupError(f"record changed after preview; generate a new plan: {name}")
+    for item in plan["moves"]:
+        if item["source"].startswith("("):
+            continue
+        source = repo / item["source"]
+        target = repo / item["target"]
+        if not source.is_file():
+            raise SetupError(f"planned move source is missing: {source}")
+        if target.exists():
+            raise SetupError(f"planned move destination is occupied: {target}")
+    for item in plan["merges"]:
+        source = repo / item["source"]
+        if not source.is_file():
+            raise SetupError(f"planned merge source is missing: {source}")
+        target = repo / item["target"]
+        if target.exists() and not target.is_file():
+            raise SetupError(f"planned merge destination is not a file: {target}")
+        if source.name != "CONTEXT.md" and (source.suffix.lower() not in CALLER_SUFFIXES or target.suffix.lower() not in CALLER_SUFFIXES):
+            raise SetupError(f"manual merge required for non-text records: {source} -> {target}")
+        source.read_text(encoding="utf-8")
+        if target.exists():
+            target.read_text(encoding="utf-8")
+    for item in plan["deletes"]:
+        path = repo / item["path"]
+        if path.exists() and not path.is_file():
+            raise SetupError(f"planned deletion is not a file: {path}")
+
+
+def apply_reconciliation(repo: Path, plan: dict, role: str) -> dict:
+    repo = repo.resolve()
+    validate_role(role)
+    if plan.get("repository") != str(repo):
+        raise SetupError("reconciliation plan belongs to another repository")
+    validate_reconciliation_plan(repo, plan)
+    target_context = repo / "docs/scientific/CONTEXT.md"
+    target_context.parent.mkdir(parents=True, exist_ok=True)
+    target_context.write_text(canonical_context(plan["merged_context"], role), encoding="utf-8")
+    for item in plan["moves"]:
+        if item["source"] in {"(new)", "(asset)"}:
+            source = ASSETS / ("CONTEXT.md" if item["target"].endswith("CONTEXT.md") else "README.md")
+            if not (repo / item["target"]).exists():
+                install_file(source, repo / item["target"])
+            continue
+        source = repo / item["source"]
+        destination = repo / item["target"]
+        if not source.exists():
+            continue
+        if item.get("conversion"):
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(markdown_record(source.read_text(encoding="utf-8", errors="replace")), encoding="utf-8")
+            remove_path(source, repo)
+        else:
+            move_path(source, destination, repo)
+    for item in plan["merges"]:
+        source = repo / item["source"]
+        if source.exists():
+            if source.name == "CONTEXT.md":
+                remove_path(source, repo)
+            else:
+                merge_file(source, repo / item["target"], repo)
+    for item in plan["deletes"]:
+        path = repo / item["path"]
+        if path.exists():
+            remove_path(path, repo)
+    links = {item["source"]: item["target"] for item in [*plan["moves"], *plan["merges"]] if item.get("source") and not item["source"].startswith("(")}
+    for path in repository_files(repo):
+        if path.suffix.lower() not in CALLER_SUFFIXES:
+            continue
+        text = path.read_text(encoding="utf-8", errors="replace")
+        updated = text
+        for old, new in sorted(links.items(), key=lambda item: -len(item[0])):
+            updated = updated.replace(old, new)
+        if path == target_context:
+            for old, new in sorted(links.items(), key=lambda item: -len(item[0])):
+                updated = updated.replace(Path(old).name, Path(new).name)
+        if updated != text:
+            path.write_text(updated, encoding="utf-8")
+    report = routing_report(repo)
+    if report["action"] != "none":
+        (repo / "AGENTS.md").write_text(report["proposed"], encoding="utf-8")
+    final_routing = routing_report(repo)
+    if not final_routing["satisfied"] or not all(final_routing["targets"].values()):
+        raise SetupError("root guidance or its scientific targets failed verification")
+    if repository_role(target_context) != role:
+        raise SetupError("reconciliation did not produce the confirmed repository role")
+    applied_plan = {**plan, "repository_role": role}
+    return {"applied": True, "repository": str(repo), "plan": plan_text(applied_plan).replace("No files were written by this preview.", "Approved plan applied.")}
+
+
+def prepare(repo: Path, analysis_id: str, input_path: Path, manifest: Path,
+            optional: Iterable[str] = (), *, role: str) -> dict:
+    repo = repo.resolve()
+    input_path = input_path.resolve()
+    manifest = manifest.resolve()
+    validate_role(role)
+    if not repo.is_dir() or not input_path.is_file():
+        raise SetupError("repository and retained input must exist")
+    try:
+        input_path.relative_to(repo)
+    except ValueError as exc:
+        raise SetupError("retained input must be inside the repository") from exc
+    if not analysis_id or any(part in {"", ".", ".."} for part in Path(analysis_id).parts) or "/" in analysis_id or "\\" in analysis_id:
+        raise SetupError("analysis id must be one safe relative path component")
+    ensure_manifest_writable(manifest)
+    selected = []
+    for name in optional:
+        if name not in OPTIONAL:
+            raise SetupError(f"unknown optional record: {name}")
+        if name not in selected:
+            selected.append(name)
+    agents = repo / "AGENTS.md"
+    scientific = repo / "docs/scientific"
+    analysis = repo / "analyses" / analysis_id
+    snapshot = analysis / "inputs" / input_path.name
+    provenance = analysis / "inputs/provenance.json"
+    report = routing_report(repo)
+    context_before = scientific / "CONTEXT.md"
+    context_resolved = context_before.resolve()
+    if context_before.is_symlink() or not context_resolved.is_relative_to(repo):
+        raise SetupError("scientific context destination is a symlink or escapes the repository")
+    context_text = (context_before.read_text(encoding="utf-8") if context_before.is_file()
+                    else (ASSETS / "CONTEXT.md").read_text(encoding="utf-8"))
+    context_text = canonical_context(context_text, role)
+    for name in MANDATORY:
+        ensure_installable(ASSETS / name, scientific / name, preserve_existing=name == "CONTEXT.md")
+    for name in selected:
+        ensure_installable(ASSETS / OPTIONAL[name], scientific / OPTIONAL[name], preserve_existing=True)
+    ensure_installable(input_path, snapshot)
+    value = {"schema_version": 1, "source": relative(input_path, repo), "sha256": digest(input_path)}
+    expected = json.dumps(value, indent=2, sort_keys=True) + "\n"
+    if provenance.exists() and (not provenance.is_file() or provenance.read_text(encoding="utf-8") != expected):
+        raise SetupError(f"refusing to overwrite unrecognized file: {provenance}")
+    if report["action"] != "none":
+        agents.parent.mkdir(parents=True, exist_ok=True)
+        agents.write_text(report["proposed"], encoding="utf-8")
+    generated = [agents]
+    for name in MANDATORY:
+        target = scientific / name
+        if name == "CONTEXT.md":
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(context_text, encoding="utf-8")
+        else:
+            install_file(ASSETS / name, target)
+        generated.append(target)
+    for name in selected:
+        target = scientific / OPTIONAL[name]
+        install_file(ASSETS / OPTIONAL[name], target, preserve_existing=True)
+        generated.append(target)
+    install_file(input_path, snapshot)
+    generated.append(snapshot)
+    provenance.parent.mkdir(parents=True, exist_ok=True)
+    provenance.write_text(expected, encoding="utf-8")
+    generated.append(provenance)
+    final_routing = routing_report(repo)
+    if not final_routing["satisfied"] or not all(final_routing["targets"].values()):
+        raise SetupError("root guidance or its scientific targets failed verification")
+    result = {
+        "schema_version": 1, "cse_source_commit": source_commit(), "analysis_id": analysis_id,
+        "input": relative(input_path, repo), "input_sha256": digest(input_path),
+        "generated": tracked(generated, repo),
+    }
+    manifest.parent.mkdir(parents=True, exist_ok=True)
+    manifest.write_text(json.dumps(result, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    return result
+
+
+def main() -> int:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repo", type=Path, required=True)
+    parser.add_argument("--check-routing", action="store_true")
+    parser.add_argument("--reconcile", action="store_true")
+    parser.add_argument("--approve", "--apply", dest="approve", action="store_true")
+    parser.add_argument("--role", choices=sorted(ROLE_VALUES))
+    parser.add_argument("--analysis-id")
+    parser.add_argument("--input", type=Path)
+    parser.add_argument("--manifest", type=Path)
+    parser.add_argument("--optional", default="")
+    args = parser.parse_args()
+    if args.check_routing or args.reconcile:
+        if args.approve and args.role is None:
+            parser.error("--role is required with --approve/--apply")
+        try:
+            plan = plan_reconciliation(args.repo, args.role)
+            if args.approve:
+                print(apply_reconciliation(args.repo, plan, args.role)["plan"], end="")
+            else:
+                print(plan_text(plan), end="")
+            if args.check_routing:
+                report = routing_report(args.repo)
+                print(f"Routing: {'satisfied' if report['satisfied'] else 'needs reconciliation'}")
+                for path, present in report["targets"].items():
+                    print(f"{path}: {'readable' if present else 'missing'}")
+                if report["diff"]:
+                    print(report["diff"], end="")
+        except (OSError, SetupError, ValueError) as exc:
+            parser.exit(1, f"reconciliation failed: {exc}\n")
+        if args.check_routing:
+            report = routing_report(args.repo)
+            return 0 if report["satisfied"] and all(report["targets"].values()) else 1
+        return 0
+    if args.analysis_id is None or args.input is None or args.manifest is None or args.role is None:
+        parser.error("--analysis-id, --input, --manifest, and --role are required for Setup")
+    input_path = args.input if args.input.is_absolute() else args.repo / args.input
+    try:
+        prepare(args.repo, args.analysis_id, input_path, args.manifest,
+                [item for item in args.optional.split(",") if item], role=args.role)
+    except (OSError, SetupError, ValueError) as exc:
+        parser.exit(1, f"setup failed: {exc}\n")
+    print(args.manifest.resolve())
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

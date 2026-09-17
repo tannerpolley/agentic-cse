@@ -1,0 +1,10 @@
+{
+  "execute": {
+    "enabled": true,
+    "daemon": false,
+    "cache": true,
+    "echo": false,
+    "warning": false,
+    "error": false
+  }
+}

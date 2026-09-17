@@ -1,0 +1,43 @@
+{
+  "name": "cse",
+  "description": "Agentic computational science and engineering for physical-world systems, not generic software engineering",
+  "author": {
+    "name": "Tanner Polley",
+    "email": "42780259+tannerpolley@users.noreply.github.com",
+    "url": "https://github.com/tannerpolley"
+  },
+  "homepage": "https://github.com/agentic-cse/cse-plugin",
+  "repository": "https://github.com/agentic-cse/cse-plugin",
+  "license": "MIT",
+  "keywords": [
+    "computational-science",
+    "computational-engineering",
+    "scientific-computing",
+    "physical-systems",
+    "research",
+    "numerical-analysis",
+    "numerical-diagnosis",
+    "scientific-workflow",
+    "scientific-writing",
+    "evidence-review"
+  ],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Agentic Computational Science and Engineering",
+    "shortDescription": "Agentic CSE for physical-world science and engineering",
+    "longDescription": "Guide mechanical, chemical, electrical, civil, and related physical-world work from questions and equations through modeling, simulation, numerical methods, data, validation, uncertainty, visualization, optimization, and technical writing. This plugin is for computational science and engineering, not generic software-engineering workflows.",
+    "developerName": "Tanner Polley",
+    "category": "Productivity",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Set up this research repository.",
+      "Design a numerical study for this question.",
+      "Write from accepted scientific evidence.",
+      "Inspect this scientific writing without rewriting it.",
+      "Review the full reasoning chain."
+    ]
+  }
+}

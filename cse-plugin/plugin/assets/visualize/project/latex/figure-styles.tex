@@ -1,0 +1,39 @@
+% CSE semantic figure styles. Load after tikz and pgfplots.
+\definecolor{cseBlue}{HTML}{0072B2}
+\definecolor{cseOrange}{HTML}{D55E00}
+\definecolor{cseGreen}{HTML}{009E73}
+\definecolor{csePurple}{HTML}{CC79A7}
+\definecolor{cseGold}{HTML}{E69F00}
+\definecolor{cseSky}{HTML}{56B4E9}
+
+\tikzset{
+  cse node/.style={
+    draw,
+    rounded corners=2pt,
+    align=center,
+    minimum width=25mm,
+    minimum height=9mm,
+    inner sep=3pt,
+  },
+  cse arrow/.style={-{Latex[length=2mm]}, thick},
+  cse panel frame/.style={
+    draw=cseSky,
+    fill=cseSky!7,
+    rounded corners=2pt,
+    inner sep=3mm,
+  },
+  cse panel caption/.style={font=\scriptsize, align=center},
+}
+
+\pgfplotsset{
+  cse axis/.style={
+    width=0.86\linewidth,
+    grid=both,
+    tick align=outside,
+    legend style={draw=none, fill=none},
+  },
+  cse model/.style={very thick, cseBlue, no marks},
+  cse data/.style={only marks, mark=o, mark size=2.2pt, cseOrange},
+  cse reference/.style={only marks, mark=x, mark size=2.5pt, cseGreen},
+  cse uncertainty/.style={draw=none, fill=cseSky, fill opacity=0.24},
+}

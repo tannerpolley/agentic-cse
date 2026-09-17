@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Supporting Audit"
+  short_description: "Find generic software ceremony that displaces CSE"
+  default_prompt: "Use $cse:audit to inspect this repository for generic software-engineering ceremony that displaces computational science."
