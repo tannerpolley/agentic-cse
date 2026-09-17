@@ -6,8 +6,8 @@ attachments. CSE Zotero preserves exact source locators, typed scientific
 records, transformations, uncertainty, lineage, and domain data.
 
 The installable package contains the domain-neutral LinkML model in
-[`schema/companion.yaml`](schema/companion.yaml) and optional domain packs such
-as [`schema/thermophysical.yaml`](schema/thermophysical.yaml). The active corpus
+the packaged resource `zotero_companion/schemas/linkml/companion.yaml` and
+optional domain packs such as `thermophysical.yaml`. The active corpus
 is user-owned local state under the configured XDG data directory, not package
 content. LinkML validates retained record shape and DuckDB builds rebuildable
 indexes over declared CSV, Parquet, or JSON sources without becoming a second
@@ -17,10 +17,20 @@ Each scientific project declares its own data authority, formats, lineage,
 retention, versioning, and recovery strategy. CSE Zotero does not prescribe a
 dataset versioning system.
 
+## Contributor entry points
+
+Edit Python in `src/zotero_companion/`, packaged schemas in
+`src/zotero_companion/schemas/`, controlled examples in `examples/`, and the
+native Zotero add-on in `zotero-plugin/`. Run `scripts/validate.sh` for offline
+checks. `scripts/check-library.sh` is the explicit live-library/corpus check
+and reports missing prerequisites before it runs. See
+[`CONTRIBUTING.md`](CONTRIBUTING.md) for the complete map and
+[`AGENTS.md`](AGENTS.md) for source/data ownership boundaries.
+
 ```bash
 uv run cse-zotero init --json
 uv run cse-zotero doctor --json
-uv run cse-zotero schema-validate data/examples/core-records.yaml --json
+uv run cse-zotero schema-validate examples/core-records.yaml --json
 uv run cse-zotero data-query \
   "$HOME/.local/share/zotero-companion/corpus/data/domains/thermophysical/normalized/registry-records.csv" \
   --sql "SELECT record_type, count(*) AS count FROM records GROUP BY record_type" --json
@@ -206,7 +216,7 @@ attachments in Zotero, which are used directly by the repo evidence bundle.
 For future PDFs without companions, use the repository-local Mathpix workflow:
 
 ```bash
-python .agent/skills/mathpix/scripts/convert_with_mpx.py \
+python scripts/convert_with_mpx.py \
   "/absolute/path/to/paper.pdf" \
   --out "wiki/evidence/YEENX35P/paper.md" \
   --format md \

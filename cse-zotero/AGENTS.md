@@ -1,5 +1,21 @@
 # CSE Zotero agent contract
 
+## Contributor routing
+
+- Change Python behavior in `src/zotero_companion/` and keep LinkML/JSON
+  schemas in `src/zotero_companion/schemas/`.
+- Use controlled examples in `examples/`; do not treat `wiki/` or `data/` as
+  package fixtures or delete them without checking their external owner.
+- Build the native Zotero add-on from `zotero-plugin/` with
+  `uv run python scripts/build_plugin.py`.
+- Run `scripts/validate.sh` for offline package checks. Run
+  `scripts/check-library.sh` only when the configured Zotero library, corpus,
+  and Better BibTeX prerequisites are intentionally available.
+- Use `CONTRIBUTING.md` for the edit/test/install map. Source-use guidance is
+  retained in `.agent/skills/` for the later integrated-plugin transfer;
+  runtime data contracts and operational commands remain here and in the
+  product README.
+
 Repository Profile: scientific-computing
 
 This repository maintains the installable source-linked research companion for

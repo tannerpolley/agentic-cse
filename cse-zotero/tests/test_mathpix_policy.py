@@ -4,7 +4,7 @@ import subprocess
 import sys
 from pathlib import Path
 
-SCRIPT = Path(__file__).parents[1] / ".agent/skills/mathpix/scripts/convert_with_mpx.py"
+SCRIPT = Path(__file__).parents[1] / "scripts/convert_with_mpx.py"
 
 
 def run_wrapper(source: Path, destination: Path, *extra: str) -> subprocess.CompletedProcess[str]:

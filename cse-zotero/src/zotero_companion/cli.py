@@ -133,7 +133,9 @@ def main() -> int:
         "schema-validate", help="validate scientific data against a LinkML class"
     )
     schema_validate.add_argument("data", type=Path)
-    schema_validate.add_argument("--schema", type=Path, default=Path("schema/companion.yaml"))
+    schema_validate.add_argument(
+        "--schema", type=Path, help="explicit LinkML schema path (default: packaged companion schema)"
+    )
     schema_validate.add_argument("--class", dest="target_class", default="CompanionCatalog")
     schema_validate.add_argument("--json", action="store_true")
     data_query = subparsers.add_parser(

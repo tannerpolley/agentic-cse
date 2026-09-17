@@ -1,0 +1,243 @@
+id: https://w3id.org/zotero-companion/schema/companion
+name: zotero_companion
+title: CSE Zotero scientific provenance model
+description: Domain-neutral source, data, uncertainty, transformation, and lineage records.
+license: MIT
+prefixes:
+  linkml: https://w3id.org/linkml/
+  companion: https://w3id.org/zotero-companion/
+default_prefix: companion
+imports:
+  - linkml:types
+
+enums:
+  ProvenanceStatus:
+    permissible_values:
+      verified: {}
+      source_linked: {}
+      unresolved: {}
+      rejected: {}
+  RecordKind:
+    permissible_values:
+      source: {}
+      dataset: {}
+      observation: {}
+      quantity: {}
+      uncertainty: {}
+      transformation: {}
+      lineage: {}
+
+slots:
+  sources:
+    range: SourceRecord
+    multivalued: true
+    inlined_as_list: true
+  datasets:
+    range: DatasetRecord
+    multivalued: true
+    inlined_as_list: true
+  catalog_observations:
+    range: ObservationRecord
+    multivalued: true
+    inlined_as_list: true
+  quantities:
+    range: QuantityRecord
+    multivalued: true
+    inlined_as_list: true
+  uncertainties:
+    range: UncertaintyRecord
+    multivalued: true
+    inlined_as_list: true
+  transformations:
+    range: TransformationRecord
+    multivalued: true
+    inlined_as_list: true
+  lineages:
+    range: LineageRecord
+    multivalued: true
+    inlined_as_list: true
+  record_id:
+    identifier: true
+    range: string
+    required: true
+    pattern: ^[A-Za-z][A-Za-z0-9_.:-]+$
+  record_kind:
+    range: RecordKind
+    required: true
+  title:
+    range: string
+    required: true
+  description:
+    range: string
+  provenance_status:
+    range: ProvenanceStatus
+    required: true
+  source_ids:
+    range: string
+    multivalued: true
+  exact_locators:
+    range: string
+    multivalued: true
+  domain:
+    range: string
+  zotero_key:
+    range: string
+  citation_key:
+    range: string
+  doi:
+    range: string
+  attachment_keys:
+    range: string
+    multivalued: true
+  media_type:
+    range: string
+  data_path:
+    range: string
+  observations:
+    range: ObservationRecord
+    multivalued: true
+    inlined_as_list: true
+  quantity_id:
+    range: string
+  value:
+    range: double
+  text_value:
+    range: string
+  unit:
+    range: string
+  basis:
+    range: string
+  conditions:
+    range: string
+  uncertainty_id:
+    range: string
+  uncertainty_kind:
+    range: string
+  standard_uncertainty:
+    range: double
+  coverage_factor:
+    range: double
+  distribution:
+    range: string
+  transformation_id:
+    range: string
+  method:
+    range: string
+  input_ids:
+    range: string
+    multivalued: true
+  output_ids:
+    range: string
+    multivalued: true
+  code_reference:
+    range: string
+  relation:
+    range: string
+  subject_id:
+    range: string
+  object_id:
+    range: string
+
+classes:
+  CompanionCatalog:
+    tree_root: true
+    slots:
+      - sources
+      - datasets
+      - catalog_observations
+      - quantities
+      - uncertainties
+      - transformations
+      - lineages
+  ScientificRecord:
+    slots:
+      - record_id
+      - record_kind
+      - title
+      - description
+      - provenance_status
+      - source_ids
+      - exact_locators
+      - domain
+  SourceRecord:
+    is_a: ScientificRecord
+    slots:
+      - zotero_key
+      - citation_key
+      - doi
+      - attachment_keys
+    slot_usage:
+      zotero_key:
+        required: true
+  DatasetRecord:
+    is_a: ScientificRecord
+    slots:
+      - media_type
+      - data_path
+      - observations
+    slot_usage:
+      data_path:
+        required: true
+  ObservationRecord:
+    is_a: ScientificRecord
+    slots:
+      - quantity_id
+      - value
+      - text_value
+      - unit
+      - basis
+      - conditions
+    slot_usage:
+      quantity_id:
+        required: true
+  QuantityRecord:
+    is_a: ScientificRecord
+    slots:
+      - unit
+      - basis
+    slot_usage:
+      unit:
+        required: true
+  UncertaintyRecord:
+    is_a: ScientificRecord
+    slots:
+      - uncertainty_id
+      - uncertainty_kind
+      - standard_uncertainty
+      - coverage_factor
+      - distribution
+    slot_usage:
+      uncertainty_id:
+        required: true
+      uncertainty_kind:
+        required: true
+  TransformationRecord:
+    is_a: ScientificRecord
+    slots:
+      - transformation_id
+      - method
+      - input_ids
+      - output_ids
+      - code_reference
+    slot_usage:
+      transformation_id:
+        required: true
+      method:
+        required: true
+      input_ids:
+        required: true
+      output_ids:
+        required: true
+  LineageRecord:
+    is_a: ScientificRecord
+    slots:
+      - relation
+      - subject_id
+      - object_id
+    slot_usage:
+      relation:
+        required: true
+      subject_id:
+        required: true
+      object_id:
+        required: true

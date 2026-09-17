@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.zotero-companion/schemas/project-manifest.schema.json",
+  "title": "CSE Zotero project data manifest",
+  "type": "object",
+  "required": ["schema_version", "project_id", "title", "status", "record_ids", "registry"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "project_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"},
+    "title": {"type": "string", "minLength": 1},
+    "status": {"enum": ["scaffold", "proposed", "active", "released", "needs-review"]},
+    "record_ids": {"type": "array", "items": {"type": "string"}},
+    "registry": {"type": "object", "required": ["name", "repository", "revision"]},
+    "registry_refs": {"type": "array", "items": {"type": "object"}},
+    "validation_runs": {"type": "array", "items": {"type": "string"}},
+    "source_keys": {"type": "array", "items": {"type": "string"}},
+    "filters": {"type": "object"},
+    "notes": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

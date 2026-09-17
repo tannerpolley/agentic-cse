@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import plan from "../plugin/cleanup-plan.js";
+import plan from "../zotero-plugin/cleanup-plan.js";
 
 test("cleanup plan separates automatic and manual assignments", () => {
   const report = plan.summarizeRows([

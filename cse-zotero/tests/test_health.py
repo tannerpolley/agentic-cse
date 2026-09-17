@@ -1,8 +1,12 @@
+import pytest
+
 from zotero_companion.health import health_report
-from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
 
 
+@pytest.mark.live
 def test_health_propagates_stale_source_to_linked_records_without_writes():
+    from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
+
     report = health_report(
         WIKI_ROOT,
         stale_source_keys=["28NPJ5H6"],
@@ -18,7 +22,10 @@ def test_health_propagates_stale_source_to_linked_records_without_writes():
     assert any(entry["impact"] == "direct" for entry in report["review_queue"])
 
 
+@pytest.mark.live
 def test_health_matches_registry_ids_and_reports_attention_records():
+    from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
+
     report = health_report(
         WIKI_ROOT,
         changed_registry_ids=["registry:figiel2025-table1-water-relative-dielectric-constant"],

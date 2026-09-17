@@ -1,11 +1,15 @@
 import json
 from pathlib import Path
 
+import pytest
+
 from zotero_companion.manifests import lint_manifests, manifest_lookup
-from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
 
 
+@pytest.mark.live
 def test_project_manifests_pin_records_and_registry_paths():
+    from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
+
     root = WIKI_ROOT
     checked = lint_manifests(
         root,

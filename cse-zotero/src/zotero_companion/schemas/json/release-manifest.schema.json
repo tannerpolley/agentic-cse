@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.zotero-companion/schemas/release-manifest.schema.json",
+  "title": "CSE Zotero reproducibility release manifest",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "scope",
+    "repository",
+    "source_inventory",
+    "artifacts",
+    "record_lint",
+    "manifest_lint",
+    "reproducibility"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "scope": {"const": "zotero-companion"},
+    "repository": {"type": "object"},
+    "source_inventory": {"type": "object"},
+    "registry_revisions": {"type": "object"},
+    "artifacts": {"type": "object", "additionalProperties": {"type": "string"}},
+    "record_lint": {"type": "object"},
+    "manifest_lint": {"type": "object"},
+    "dependency_health": {"type": "object"},
+    "reproducibility": {
+      "type": "object",
+      "required": ["zotero_mutation", "pdf_conversion", "secret_material_included"],
+      "properties": {
+        "zotero_mutation": {"const": false},
+        "pdf_conversion": {"const": false},
+        "secret_material_included": {"const": false}
+      }
+    }
+  },
+  "additionalProperties": true
+}

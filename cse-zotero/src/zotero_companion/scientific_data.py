@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 import csv
+from contextlib import contextmanager
 from datetime import date, datetime, time
 from decimal import Decimal
 import hashlib
+from importlib.resources import as_file, files
 import json
 from pathlib import Path
 import re
-from collections.abc import Mapping
+from collections.abc import Iterator, Mapping
 from typing import Any
 
 import duckdb
@@ -29,6 +31,18 @@ _QUERY_ALIASES = {
     "density": ("mass density", "liquid density"),
     "viscosity": ("dynamic viscosity",),
 }
+
+
+@contextmanager
+def _linkml_schema(schema_path: Path | None) -> Iterator[tuple[Path, str]]:
+    if schema_path is not None:
+        path = Path(schema_path)
+        yield path, str(path)
+        return
+
+    resource = files("zotero_companion").joinpath("schemas/linkml/companion.yaml")
+    with as_file(resource) as path:
+        yield path, "zotero_companion/schemas/linkml/companion.yaml"
 
 
 def _normalise_text(value: Any) -> str:
@@ -366,28 +380,28 @@ def search_registry(
 
 def validate_catalog(
     data_path: Path,
-    schema_path: Path = Path("schema/companion.yaml"),
+    schema_path: Path | None = None,
     target_class: str = "CompanionCatalog",
 ) -> dict[str, Any]:
     """Validate one YAML, JSON, CSV, or TSV file against a LinkML class."""
 
     data_path = Path(data_path)
-    schema_path = Path(schema_path)
     if not data_path.is_file():
         raise ScientificDataError(f"Data file does not exist: {data_path}")
-    if not schema_path.is_file():
-        raise ScientificDataError(f"LinkML schema does not exist: {schema_path}")
-    schema = SchemaView(
-        schema_path.resolve(),
-        base_dir=str(schema_path.resolve().parent),
-        merge_imports=True,
-    ).schema
-    report = validate_file(data_path, schema, target_class)
+    with _linkml_schema(schema_path) as (resolved_schema, schema_label):
+        if not resolved_schema.is_file():
+            raise ScientificDataError(f"LinkML schema does not exist: {resolved_schema}")
+        schema = SchemaView(
+            resolved_schema.resolve(),
+            base_dir=str(resolved_schema.resolve().parent),
+            merge_imports=True,
+        ).schema
+        report = validate_file(data_path, schema, target_class)
     results = [str(result) for result in report.results]
     return {
         "ok": not results,
         "data": str(data_path),
-        "schema": str(schema_path),
+        "schema": schema_label,
         "target_class": target_class,
         "errors": results,
     }

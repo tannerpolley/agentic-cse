@@ -2,6 +2,8 @@ import json
 import hashlib
 from pathlib import Path
 
+import pytest
+
 from zotero_companion.records import (
     global_context,
     lineage,
@@ -11,7 +13,6 @@ from zotero_companion.records import (
     search_records,
 )
 from zotero_companion.wiki import source_record
-from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
 
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
@@ -54,7 +55,10 @@ def test_explicit_corpus_cli_does_not_load_another_corpus_config(tmp_path, monke
     assert str(tmp_path / "data") in result["data"]["warnings"][0]
 
 
+@pytest.mark.live
 def test_current_typed_records_and_lineage_are_auditable():
+    from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
+
     root = WIKI_ROOT
     checked = lint_records(
         root,
@@ -95,7 +99,10 @@ def test_current_typed_records_and_lineage_are_auditable():
     }
 
 
+@pytest.mark.live
 def test_global_agent_context_exposes_the_whole_corpus_and_curated_matches():
+    from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
+
     context = global_context(
         WIKI_ROOT,
         query="Born",
@@ -160,12 +167,17 @@ def test_global_context_searches_evidence_when_metadata_does_not_match(tmp_path)
     assert "EQ123456" in context["matched_source_keys"]
 
 
-def test_global_context_accepts_an_explicit_read_only_freshness_probe():
+def test_global_context_accepts_an_explicit_read_only_freshness_probe(tmp_path):
+    from test_wiki import snapshot
+    from zotero_companion.wiki import materialize_snapshot
+
     class FakeAPI:
         def items(self):
             return []
 
-    context = global_context(WIKI_ROOT, query="Born", api=FakeAPI())
+    root = tmp_path / "wiki"
+    materialize_snapshot(snapshot(), root, apply=True)
+    context = global_context(root, query="Born", api=FakeAPI())
 
     assert context["freshness"]["live_check"]["checked"] is True
     assert context["freshness"]["live_check"]["available"] is True
@@ -173,7 +185,10 @@ def test_global_context_accepts_an_explicit_read_only_freshness_probe():
     assert context["read_only"] is True
 
 
+@pytest.mark.live
 def test_global_context_exposes_resolved_registry_packets():
+    from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
+
     context = global_context(
         WIKI_ROOT,
         query="MEA",
@@ -189,7 +204,10 @@ def test_global_context_exposes_resolved_registry_packets():
     )
 
 
+@pytest.mark.live
 def test_hamer_companion_is_exactly_the_declared_existing_zotero_file():
+    from corpus_paths import WIKI_ROOT
+
     manifest = json.loads(
         (WIKI_ROOT / "evidence/28NPJ5H6/manifest.json").read_text(encoding="utf-8")
     )
@@ -201,7 +219,10 @@ def test_hamer_companion_is_exactly_the_declared_existing_zotero_file():
     assert hashlib.sha256(companion.read_bytes()).hexdigest() == manifest["files"][0]["sha256"]
 
 
+@pytest.mark.live
 def test_source_lookup_exposes_brief_and_companion_routes_without_pdf_text():
+    from corpus_paths import WIKI_ROOT
+
     source = source_record(WIKI_ROOT, "YEENX35P")
     metadata = source["wiki"]
 
@@ -263,7 +284,10 @@ def test_record_lint_rejects_missing_provenance_and_unresolved_relation(tmp_path
     assert any("unresolved relation endpoint" in error for error in checked["errors"])
 
 
+@pytest.mark.live
 def test_record_search_is_deterministic():
+    from corpus_paths import WIKI_ROOT
+
     matches = search_records(WIKI_ROOT, query="Born-provider", limit=10)
     assert [record["record_id"] for record in matches] == [
         "implementation:epcsaft-born-provider",
@@ -279,7 +303,10 @@ def test_agent_task_contract_is_bounded_and_explicit():
     assert all(task["min_evidence_hits"] >= 1 for task in tasks)
 
 
+@pytest.mark.live
 def test_priority_model_records_resolve_to_typed_records():
+    from corpus_paths import WIKI_ROOT
+
     priority = json.loads(
         (WIKI_ROOT / "curation/model-driving-records.json").read_text(
             encoding="utf-8"

@@ -16,6 +16,10 @@ dependencies = [
 cse-zotero = "zotero_companion.cli:main"
 zotero-companion = "zotero_companion.cli:main"
 
+[tool.setuptools.package-data]
+zotero_companion = ["schemas/linkml/*.yaml", "schemas/json/*.json"]
+
 [tool.pytest.ini_options]
+markers = ["live: requires the configured Zotero library or corpus"]
 pythonpath = ["src", "."]
 testpaths = ["tests"]

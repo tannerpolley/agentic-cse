@@ -1,10 +1,14 @@
 from pathlib import Path
 
+import pytest
+
 from zotero_companion.release import RELEASE_FILENAME, release_plan
-from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
 
 
+@pytest.mark.live
 def test_release_dry_run_is_local_and_reports_reproducibility_state():
+    from corpus_paths import REGISTRY_ROOT, WIKI_ROOT
+
     root = WIKI_ROOT
     release_path = root / RELEASE_FILENAME
     before = release_path.read_bytes() if release_path.exists() else None

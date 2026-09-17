@@ -41,7 +41,7 @@ for an explicitly requested comparison or re-OCR, not routine ingestion.
 Run the wrapper from the repository root or any other directory:
 
 ```bash
-python .agent/skills/mathpix/scripts/convert_with_mpx.py \
+python scripts/convert_with_mpx.py \
   "/absolute/path/article.pdf" \
   --out "wiki/evidence/ITEMKEY/article.mmd" \
   --confirmed-no-companion
@@ -50,7 +50,7 @@ python .agent/skills/mathpix/scripts/convert_with_mpx.py \
 The wrapper supports `.mmd` (preferred for Mathpix equations) and `.md`:
 
 ```bash
-python .agent/skills/mathpix/scripts/convert_with_mpx.py \
+python scripts/convert_with_mpx.py \
   "/absolute/path/article.pdf" \
   --out "wiki/evidence/ITEMKEY/article.md" \
   --format md \
@@ -99,12 +99,12 @@ visible Zotero child attachment is a separate, explicit Zotero write action.
 
 ```bash
 # Mathpix Markdown companion (only after the Zotero companion gate)
-python .agent/skills/mathpix/scripts/convert_with_mpx.py \
+python scripts/convert_with_mpx.py \
   "/path/to/paper.pdf" --out "wiki/evidence/ITEMKEY/paper.mmd" \
   --confirmed-no-companion
 
 # Standard Markdown extension, retaining Mathpix-compatible math syntax
-python .agent/skills/mathpix/scripts/convert_with_mpx.py \
+python scripts/convert_with_mpx.py \
   "/path/to/paper.pdf" --out "wiki/evidence/ITEMKEY/paper.md" --format md \
   --confirmed-no-companion
 ```

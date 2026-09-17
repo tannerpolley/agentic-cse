@@ -1,9 +1,12 @@
 import importlib.util
 from pathlib import Path
 
+import pytest
+
+pytestmark = pytest.mark.live
+
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
-from corpus_paths import WIKI_ROOT
 
 
 def _benchmark_module():
@@ -16,6 +19,8 @@ def _benchmark_module():
 
 
 def test_seed_agent_tasks_pass_without_pdf_reads():
+    from corpus_paths import WIKI_ROOT
+
     result = _benchmark_module().run_benchmark(
         WIKI_ROOT,
         REPO_ROOT / "benchmarks/agent_tasks.json",

@@ -1,8 +1,9 @@
 from pathlib import Path
 
+import pytest
+
 from zotero_companion.coverage import coverage_report
 from zotero_companion.wiki import WikiSnapshot, index_wiki, materialize_snapshot
-from corpus_paths import WIKI_ROOT
 
 
 def _snapshot() -> WikiSnapshot:
@@ -72,7 +73,10 @@ def test_metadata_brief_scaffolds_remain_in_the_unbriefed_queue(tmp_path: Path):
     assert triage["unbriefed_relevant"]["examples"][0]["zotero_key"] == "EQ123456"
 
 
+@pytest.mark.live
 def test_current_coverage_is_available_for_the_full_materialized_corpus():
+    from corpus_paths import WIKI_ROOT
+
     report = coverage_report(WIKI_ROOT)
 
     # The Zotero library is a live corpus; new top-level items must not make

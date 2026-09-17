@@ -1,3 +1,5 @@
+import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -7,7 +9,6 @@ import duckdb
 import pytest
 import csv
 import hashlib
-import json
 
 from zotero_companion.scientific_data import (
     ScientificDataError,
@@ -84,17 +85,38 @@ def _registry_fixture(tmp_path: Path) -> tuple[Path, Path]:
 
 
 def test_linkml_example_is_valid():
-    result = validate_catalog(
-        ROOT / "data/examples/core-records.yaml", ROOT / "schema/companion.yaml"
-    )
+    result = validate_catalog(ROOT / "examples/core-records.yaml")
     assert result["ok"] is True
     assert result["errors"] == []
 
 
+def test_default_schema_cli_works_from_unrelated_directory(tmp_path):
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(ROOT / "src")
+    result = subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "zotero_companion.cli",
+            "schema-validate",
+            str(ROOT / "examples/core-records.yaml"),
+            "--json",
+        ],
+        cwd=tmp_path,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["ok"] is True
+
+
 def test_thermophysical_domain_record_is_valid():
     result = validate_catalog(
-        ROOT / "data/examples/thermophysical-record.yaml",
-        ROOT / "schema/thermophysical.yaml",
+        ROOT / "examples/thermophysical-record.yaml",
+        ROOT / "src/zotero_companion/schemas/linkml/thermophysical.yaml",
         "ThermophysicalRecord",
     )
     assert result["ok"] is True
