@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { run } from "./worker.js";
 
-const help = "Usage: cse-pi run --task /absolute/work-order.json --result-dir /absolute/new-run-directory [--role ROLE] [--no-inference]\\n\\nSupports schema v1 investigate and schema v2 implement, analyze, and review one-shot workers. --no-inference validates and retains a preflight without provider authentication or model execution.";
+const help = "Usage: cse-pi run --task /absolute/work-order.json --result-dir /absolute/new-run-directory [--role build] [--no-inference]\\n\\nSupports schema v3 build-only one-shot workers. --no-inference validates and retains a preflight without provider authentication or model execution.";
 
 function option(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);
@@ -31,6 +31,7 @@ async function main(): Promise<void> {
   const taskPath = option(args, "--task");
   const resultDir = option(args, "--result-dir");
   const role = option(args, "--role");
+  if (role && role !== "build") throw new Error("CSE-Pi only supports --role build");
   const noInference = args.includes("--no-inference");
   const supported = new Set(["run", "--task", "--result-dir", "--role", "--no-inference"]);
   for (let index = 0; index < args.length; index += 1) {
@@ -41,6 +42,7 @@ async function main(): Promise<void> {
     throw new Error("--task and --result-dir must be absolute paths");
   }
   const order = JSON.parse(await readFile(resolve(taskPath), "utf8")) as { role?: string };
+  if (order.role !== "build") throw new Error("CSE-Pi only supports role=build");
   if (role && order.role !== role) throw new Error("--role does not match work-order role");
   const controller = new AbortController();
   process.once("SIGINT", () => controller.abort());
