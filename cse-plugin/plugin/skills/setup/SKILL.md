@@ -66,6 +66,11 @@ generates it from `docs/scientific/CONTEXT.md`; never hand-edit it or keep a
 second copy. In the material-choice round ask once for a missing scientific
 discipline and specialization and one paragraph of project responsibilities;
 retain confirmed values on later passes and ask only about proposed changes.
+Offer the explicit source/data adoption choice `none`, `zotero`, or
+`project-data`; when supplied, persist it in `docs/scientific/CONTEXT.md` and
+regenerate the managed protocol pointer from that record. An omitted choice
+preserves an existing adoption decision and adds no pointer to an existing
+repository.
 `python3 scripts/workflow/setup_scientific_project.py --repo <root> --check-routing`
 reports a missing, stale, or malformed block, a missing agent role, and the exact
 proposed repair; approved application replaces the legacy pointer paragraph and
@@ -88,8 +93,10 @@ workflow and record the investigator's choice; do not require Snakemake for
 Setup or for repositories that do not adopt it. Read the [Snakemake workflow reference](../../references/workflow/snakemake.md).
 For confirmed deterministic preparation, use
 `python3 scripts/workflow/setup_scientific_project.py --role <role> --agent-role "<discipline and specialization>" --responsibilities "<paragraph>"`;
-the same two options apply to `--reconcile --approve`, and omitted values are
-retained from the existing scientific context.
+add `--source-data-adoption <none|zotero|project-data>` when the investigator
+confirms that material choice. The same option applies to
+`--reconcile --approve`; omitted values are retained from the existing
+scientific records.
 Preflight all destinations before the first write, then verify the final pointer and both readable
 scientific files. In the existing material-choice round, inspect the selected host's hook state with
 `scripts/workflow/install_cse_hooks.py --diagnose --agent <host> --repo <root>` (always name the

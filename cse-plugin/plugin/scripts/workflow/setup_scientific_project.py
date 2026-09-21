@@ -32,6 +32,10 @@ PROTOCOL_TEMPLATE = ROOT / "assets" / "workflow" / "protocol.md"
 BLOCK_BEGIN = "<!-- CSE:BEGIN PROTOCOL -->"
 BLOCK_END = "<!-- CSE:END PROTOCOL -->"
 AGENT_ROLE_SECTION = re.compile(r"(?ms)^## Agent role[ \t]*\n.*?(?=^#{1,2}[ \t]|\Z)")
+SOURCE_DATA_ADOPTION_SECTION = re.compile(r"(?ms)^## Source/data adoption[ \t]*\n.*?(?=^#{1,2}[ \t]|\Z)")
+SOURCE_DATA_ADOPTION_DECLARATION = re.compile(r"(?mi)^source/data adoption:[ \t]*(none|zotero|project-data)[ \t]*$")
+SOURCE_DATA_ADOPTION_VALUES = ("none", "zotero", "project-data")
+SOURCE_DATA_ADOPTION_POINTER = "Use the source/data adoption recorded in `docs/scientific/CONTEXT.md`."
 MANDATORY = ("README.md", "CONTEXT.md")
 OPTIONAL = {
     "formulation": "formulation.md",
@@ -143,10 +147,40 @@ def replaceable_pointer(paragraph: str) -> bool:
     ) is not None
 
 
-def render_protocol(repository_role_value: str, agent_role_value: str, responsibilities: str = "") -> str:
+def validate_source_data_adoption(value: str) -> None:
+    if value not in SOURCE_DATA_ADOPTION_VALUES:
+        choices = ", ".join(SOURCE_DATA_ADOPTION_VALUES)
+        raise SetupError(f"source/data adoption must be one of: {choices}")
+
+
+def stored_source_data_adoption(text: str) -> str | None:
+    matches = list(SOURCE_DATA_ADOPTION_DECLARATION.finditer(text))
+    choices = {match.group(1).casefold() for match in matches}
+    if len(matches) > 1 or len(choices) > 1:
+        raise SetupError("docs/scientific/CONTEXT.md must declare one source/data adoption choice")
+    return next(iter(choices), None)
+
+
+def set_source_data_adoption(text: str, value: str) -> str:
+    validate_source_data_adoption(value)
+    text = SOURCE_DATA_ADOPTION_SECTION.sub("", text)
+    text = SOURCE_DATA_ADOPTION_DECLARATION.sub("", text).strip()
+    section = f"## Source/data adoption\n\nsource/data adoption: {value}\n"
+    heading = re.search(r"(?m)^## Claim boundaries[ \t]*$", text)
+    if heading:
+        return text[:heading.start()].rstrip() + f"\n\n{section}\n" + text[heading.start():].lstrip()
+    return text.rstrip() + f"\n\n{section}"
+
+
+def render_protocol(repository_role_value: str, agent_role_value: str, responsibilities: str = "",
+                    source_data_adoption: str | None = None) -> str:
+    if source_data_adoption is not None:
+        validate_source_data_adoption(source_data_adoption)
     text = PROTOCOL_TEMPLATE.read_text(encoding="utf-8").strip()
     text = text.replace("{agent_role}", agent_role_value).replace("{repository_role}", repository_role_value)
     text = text.replace("{responsibilities}", responsibilities.strip()) if responsibilities.strip() else text.replace("{responsibilities}\n\n", "")
+    pointer = SOURCE_DATA_ADOPTION_POINTER if source_data_adoption not in {None, "none"} else ""
+    text = text.replace("{source_data_adoption}", pointer) if pointer else text.replace("\n{source_data_adoption}\n", "")
     return f"{BLOCK_BEGIN}\n{text}\n{BLOCK_END}"
 
 
@@ -183,7 +217,8 @@ def insert_block(before: str, block: str) -> str:
 
 
 def routing_report(repo: Path, role: str | None = None, agent_role_value: str | None = None,
-                   responsibilities: str | None = None) -> dict:
+                   responsibilities: str | None = None,
+                   source_data_adoption: str | None = None) -> dict:
     repo = repo.resolve()
     agents = repo / "AGENTS.md"
     if agents.exists() and not agents.is_file():
@@ -195,6 +230,9 @@ def routing_report(repo: Path, role: str | None = None, agent_role_value: str | 
     role = role or role_state(context_text)["role"]
     agent_role_value = agent_role_value or declared["role"]
     responsibilities = declared["responsibilities"] if responsibilities is None else responsibilities
+    requested_adoption = source_data_adoption
+    persisted_adoption = stored_source_data_adoption(context_text)
+    source_data_adoption = persisted_adoption if source_data_adoption is None else source_data_adoption
     existing, status = managed_block(before)
     missing = []
     if role is None:
@@ -203,7 +241,11 @@ def routing_report(repo: Path, role: str | None = None, agent_role_value: str | 
         missing.append("agent role (supply --agent-role or `agent role:` in docs/scientific/CONTEXT.md)")
     if len(declared["roles"]) > 1:
         missing.append("one agent role (docs/scientific/CONTEXT.md declares several)")
-    rendered = render_protocol(role, agent_role_value, responsibilities) if role and agent_role_value else None
+    rendered_adoption = requested_adoption
+    if rendered_adoption is None and existing is not None:
+        rendered_adoption = "zotero" if SOURCE_DATA_ADOPTION_POINTER in existing.splitlines() else None
+    rendered = (render_protocol(role, agent_role_value, responsibilities, rendered_adoption)
+                if role and agent_role_value else None)
     action = "none"
     after = before
     if status == "malformed":
@@ -232,6 +274,7 @@ def routing_report(repo: Path, role: str | None = None, agent_role_value: str | 
         "block": block_state,
         "repository_role": role,
         "agent_role": agent_role_value,
+        "source_data_adoption": source_data_adoption,
         "targets": targets,
         "proposed": after,
         "diff": "".join(difflib.unified_diff(
@@ -341,8 +384,12 @@ def proposed_role(text: str) -> str | None:
 
 
 def canonical_context(text: str, role: str, agent_role_value: str | None = None,
-                      responsibilities: str | None = None) -> str:
+                      responsibilities: str | None = None,
+                      source_data_adoption: str | None = None) -> str:
     validate_role(role)
+    if source_data_adoption is not None:
+        if source_data_adoption != stored_source_data_adoption(text):
+            text = set_source_data_adoption(text, source_data_adoption)
     text = DECLARATION_LINE.sub("", text).strip()
     if agent_role_value:
         declared = agent_role_state(text)
@@ -395,16 +442,20 @@ def record_target(path: Path, repo: Path) -> Path | None:
     return None
 
 
-def plan_reconciliation(repo: Path, role: str | None = None) -> dict:
+def plan_reconciliation(repo: Path, role: str | None = None,
+                        source_data_adoption: str | None = None) -> dict:
     repo = repo.resolve()
     if not repo.is_dir():
         raise SetupError(f"repository does not exist: {repo}")
     if role is not None:
         validate_role(role)
+    if source_data_adoption is not None:
+        validate_source_data_adoption(source_data_adoption)
     contexts = context_sources(repo)
     target = repo / "docs/scientific/CONTEXT.md"
     all_context_text = "\n".join(path.read_text(encoding="utf-8", errors="replace") for path in contexts)
     selected_role = role or proposed_role(all_context_text)
+    persisted_adoption = stored_source_data_adoption(all_context_text)
     searchable = all_context_text + "\n" + "\n".join(
         relative(path, repo) for path in repository_files(repo)
         if "docs" in path.relative_to(repo).parts
@@ -439,6 +490,10 @@ def plan_reconciliation(repo: Path, role: str | None = None) -> dict:
             merged += "\n## Retained source records\n\n" + "\n\n".join(retained) + "\n"
     if contexts == [target]:
         merged = target.read_text(encoding="utf-8")
+    if source_data_adoption is not None and source_data_adoption != persisted_adoption:
+        merged = set_source_data_adoption(merged, source_data_adoption)
+    elif contexts != [target] and persisted_adoption is not None:
+        merged = set_source_data_adoption(merged, persisted_adoption)
     merged = (canonical_context(merged, selected_role) if selected_role else
               DECLARATION_LINE.sub("", merged).strip() + "\n")
     moves = []
@@ -495,6 +550,7 @@ def plan_reconciliation(repo: Path, role: str | None = None) -> dict:
         "repository": str(repo),
         "repository_role": selected_role,
         "agent_role": agent_role_state(all_context_text)["role"],
+        "source_data_adoption": source_data_adoption or persisted_adoption,
         "role_state": role_state(all_context_text),
         "contexts": [relative(path, repo) for path in contexts],
         "sourceless_terms": terms,
@@ -512,6 +568,8 @@ def plan_text(plan: dict) -> str:
     role = plan.get("repository_role") or "unresolved"
     lines = [f"Reconciliation preview: {plan['repository']}", "", f"Repository role: {role}",
              f"Agent role: {plan.get('agent_role') or 'missing'}"]
+    if plan.get("source_data_adoption") is not None:
+        lines.append(f"Source/data adoption: {plan['source_data_adoption']}")
     legacy = plan.get("role_state", {}).get("legacy", [])
     roles = plan.get("role_state", {}).get("roles", [])
     if roles or legacy:
@@ -620,7 +678,8 @@ def require_agent_role(context_text: str, agent_role_value: str | None) -> str:
 
 
 def apply_reconciliation(repo: Path, plan: dict, role: str, agent_role_value: str | None = None,
-                         responsibilities: str | None = None) -> dict:
+                         responsibilities: str | None = None,
+                         source_data_adoption: str | None = None) -> dict:
     repo = repo.resolve()
     validate_role(role)
     if plan.get("repository") != str(repo):
@@ -631,7 +690,8 @@ def apply_reconciliation(repo: Path, plan: dict, role: str, agent_role_value: st
     agent_role_value = require_agent_role(plan["merged_context"], agent_role_value)
     target_context = repo / "docs/scientific/CONTEXT.md"
     target_context.parent.mkdir(parents=True, exist_ok=True)
-    new_context = canonical_context(plan["merged_context"], role, agent_role_value, responsibilities)
+    new_context = canonical_context(plan["merged_context"], role, agent_role_value, responsibilities,
+                                    source_data_adoption)
     if not target_context.is_file() or target_context.read_text(encoding="utf-8") != new_context:
         target_context.write_text(new_context, encoding="utf-8")
     for item in plan["moves"]:
@@ -674,7 +734,7 @@ def apply_reconciliation(repo: Path, plan: dict, role: str, agent_role_value: st
                 updated = updated.replace(Path(old).name, Path(new).name)
         if updated != text:
             path.write_text(updated, encoding="utf-8")
-    report = routing_report(repo, role)
+    report = routing_report(repo, role, source_data_adoption=source_data_adoption)
     if report["action"] != "none":
         (repo / "AGENTS.md").write_text(report["proposed"], encoding="utf-8")
     final_routing = routing_report(repo, role)
@@ -688,7 +748,8 @@ def apply_reconciliation(repo: Path, plan: dict, role: str, agent_role_value: st
 
 def prepare(repo: Path, analysis_id: str, input_path: Path, manifest: Path,
             optional: Iterable[str] = (), *, role: str, agent_role_value: str | None = None,
-            responsibilities: str | None = None) -> dict:
+            responsibilities: str | None = None,
+            source_data_adoption: str | None = None) -> dict:
     repo = repo.resolve()
     input_path = input_path.resolve()
     manifest = manifest.resolve()
@@ -720,10 +781,12 @@ def prepare(repo: Path, analysis_id: str, input_path: Path, manifest: Path,
     context_text = (context_before.read_text(encoding="utf-8") if context_before.is_file()
                     else (ASSETS / "CONTEXT.md").read_text(encoding="utf-8"))
     agent_role_value = require_agent_role(context_text, agent_role_value)
-    context_text = canonical_context(context_text, role, agent_role_value, responsibilities)
+    context_text = canonical_context(context_text, role, agent_role_value, responsibilities,
+                                     source_data_adoption)
     if malformed_markers(agents):
         raise SetupError("root AGENTS.md has duplicate or unmatched CSE Protocol markers; reconcile it manually first")
-    report = routing_report(repo, role, agent_role_value, agent_role_state(context_text)["responsibilities"])
+    report = routing_report(repo, role, agent_role_value, agent_role_state(context_text)["responsibilities"],
+                            source_data_adoption)
     for name in MANDATORY:
         ensure_installable(ASSETS / name, scientific / name, preserve_existing=name == "CONTEXT.md")
     for name in selected:
@@ -777,6 +840,8 @@ def main() -> int:
     parser.add_argument("--role", choices=sorted(ROLE_VALUES))
     parser.add_argument("--agent-role", help="confirmed scientific discipline and specialization")
     parser.add_argument("--responsibilities", help="one paragraph of project-specific responsibilities")
+    parser.add_argument("--source-data-adoption", choices=SOURCE_DATA_ADOPTION_VALUES,
+                        help="record none, Zotero-curated sources, or project data adoption")
     parser.add_argument("--analysis-id")
     parser.add_argument("--input", type=Path)
     parser.add_argument("--manifest", type=Path)
@@ -786,13 +851,15 @@ def main() -> int:
         if args.approve and args.role is None:
             parser.error("--role is required with --approve/--apply")
         try:
-            plan = plan_reconciliation(args.repo, args.role)
+            plan = plan_reconciliation(args.repo, args.role, args.source_data_adoption)
             if args.approve:
-                print(apply_reconciliation(args.repo, plan, args.role, args.agent_role, args.responsibilities)["plan"], end="")
+                print(apply_reconciliation(args.repo, plan, args.role, args.agent_role, args.responsibilities,
+                                           args.source_data_adoption)["plan"], end="")
             else:
                 print(plan_text(plan), end="")
             if args.check_routing:
-                report = routing_report(args.repo, args.role, args.agent_role, args.responsibilities)
+                report = routing_report(args.repo, args.role, args.agent_role, args.responsibilities,
+                                        args.source_data_adoption)
                 print(f"Routing: {'satisfied' if report['satisfied'] else 'needs reconciliation'}")
                 print(f"Managed CSE Protocol block: {report['block']}; agent role: {report['agent_role'] or 'missing'}")
                 for item in report["missing"]:
@@ -804,7 +871,8 @@ def main() -> int:
         except (OSError, SetupError, ValueError) as exc:
             parser.exit(1, f"reconciliation failed: {exc}\n")
         if args.check_routing:
-            report = routing_report(args.repo, args.role, args.agent_role, args.responsibilities)
+            report = routing_report(args.repo, args.role, args.agent_role, args.responsibilities,
+                                    args.source_data_adoption)
             return 0 if report["satisfied"] and all(report["targets"].values()) else 1
         return 0
     if args.analysis_id is None or args.input is None or args.manifest is None or args.role is None:
@@ -813,7 +881,8 @@ def main() -> int:
     try:
         prepare(args.repo, args.analysis_id, input_path, args.manifest,
                 [item for item in args.optional.split(",") if item], role=args.role,
-                agent_role_value=args.agent_role, responsibilities=args.responsibilities)
+                agent_role_value=args.agent_role, responsibilities=args.responsibilities,
+                source_data_adoption=args.source_data_adoption)
     except (OSError, SetupError, ValueError) as exc:
         parser.exit(1, f"setup failed: {exc}\n")
     print(args.manifest.resolve())

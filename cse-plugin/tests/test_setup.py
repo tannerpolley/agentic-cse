@@ -30,6 +30,27 @@ def load_module(name: str, path: Path):
 
 setup = load_module("setup_scientific_project", SCRIPT)
 
+ADOPTION_POINTER = "Use the source/data adoption recorded in `docs/scientific/CONTEXT.md`."
+PRE_FEATURE_PROTOCOL = f"""## CSE Protocol
+
+**Agent role:** Work as {ROLE}.
+**Repository role:** analysis.
+
+{DUTIES}
+
+Apply this scientific role to investigation, implementation, review, handoffs,
+and responses. Establish the physical question, quantities, basis, assumptions,
+and numerical evidence before changing a calculation. Reuse accepted decisions.
+
+Use the installed CSE skills. Read `docs/scientific/README.md` and
+`docs/scientific/CONTEXT.md` before selecting the evidence-justified route.
+
+Report the engineering result or capability, supporting evidence, meaning,
+and limits before software provenance. Do not invent physical results.
+
+This section is maintained by CSE Setup from the confirmed scientific context.
+Revise its inputs through Setup rather than maintaining a separate copy here."""
+
 
 def run(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
     return subprocess.run([sys.executable, str(SCRIPT), *args], cwd=cwd, text=True, capture_output=True, check=False)
@@ -355,6 +376,97 @@ class ManagedProtocolTests(unittest.TestCase):
 
         before = (text, self.context())
         again = self.prepare()
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertEqual((self.agents(), self.context()), before)
+
+    def test_fresh_setup_records_zotero_adoption_and_one_protocol_pointer(self):
+        result = self.approve("--agent-role", ROLE, "--responsibilities", DUTIES,
+                              "--source-data-adoption", "zotero")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        context = self.context()
+        self.assertIn("source/data adoption: zotero", context)
+        self.assertEqual(self.block(self.agents()).count(ADOPTION_POINTER), 1)
+
+    def test_prepare_path_records_project_data_adoption(self):
+        result = self.prepare("--agent-role", ROLE, "--responsibilities", DUTIES,
+                              "--source-data-adoption", "project-data")
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertIn("source/data adoption: project-data", self.context())
+        self.assertEqual(self.block(self.agents()).count(ADOPTION_POINTER), 1)
+
+    def test_repeating_source_data_adoption_is_a_byte_for_byte_no_op(self):
+        first = self.approve("--agent-role", ROLE, "--responsibilities", DUTIES,
+                             "--source-data-adoption", "zotero")
+        self.assertEqual(first.returncode, 0, first.stderr)
+        before = (self.agents(), self.context())
+
+        again = self.approve("--source-data-adoption", "zotero")
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertEqual((self.agents(), self.context()), before)
+
+    def test_source_data_adoption_revision_rewrites_record_and_pointer(self):
+        first = self.approve("--agent-role", ROLE, "--responsibilities", DUTIES,
+                             "--source-data-adoption", "zotero")
+        self.assertEqual(first.returncode, 0, first.stderr)
+        before = (self.agents(), self.context())
+
+        revised = self.approve("--source-data-adoption", "project-data")
+        self.assertEqual(revised.returncode, 0, revised.stderr)
+        self.assertNotEqual((self.agents(), self.context()), before)
+        context = self.context()
+        self.assertIn("source/data adoption: project-data", context)
+        self.assertNotIn("source/data adoption: zotero", context)
+        self.assertEqual(self.block(self.agents()).count(ADOPTION_POINTER), 1)
+
+    def test_explicit_none_persists_choice_and_removes_protocol_pointer(self):
+        first = self.approve("--agent-role", ROLE, "--responsibilities", DUTIES,
+                             "--source-data-adoption", "zotero")
+        self.assertEqual(first.returncode, 0, first.stderr)
+
+        cleared = self.approve("--source-data-adoption", "none")
+        self.assertEqual(cleared.returncode, 0, cleared.stderr)
+        context = self.context()
+        self.assertIn("source/data adoption: none", context)
+        self.assertNotIn("cse-zotero", context)
+        self.assertEqual(self.block(self.agents()).count(ADOPTION_POINTER), 0)
+
+    def test_check_routing_reports_unsupplied_adoption_change(self):
+        initial = self.approve("--agent-role", ROLE, "--responsibilities", DUTIES)
+        self.assertEqual(initial.returncode, 0, initial.stderr)
+
+        proposed = run("--repo", str(self.repo), "--check-routing", "--role", "analysis",
+                       "--source-data-adoption", "zotero", cwd=self.repo)
+        self.assertEqual(proposed.returncode, 1)
+        self.assertIn("Routing: needs reconciliation", proposed.stdout)
+
+        applied = self.approve("--source-data-adoption", "zotero")
+        self.assertEqual(applied.returncode, 0, applied.stderr)
+        self.assertEqual(self.check().returncode, 0)
+
+    def test_unset_source_data_adoption_leaves_existing_block_unchanged(self):
+        initial = self.approve("--agent-role", ROLE, "--responsibilities", DUTIES)
+        self.assertEqual(initial.returncode, 0, initial.stderr)
+        before = (self.agents(), self.context())
+
+        again = self.approve()
+        self.assertEqual(again.returncode, 0, again.stderr)
+        self.assertEqual((self.agents(), self.context()), before)
+        self.assertNotIn(ADOPTION_POINTER, self.block(self.agents()))
+        self.assertNotIn("source/data adoption:", self.context())
+
+    def test_unset_source_data_adoption_preserves_pre_feature_block(self):
+        self.legacy_repository()
+        context = self.context().replace(
+            "## Claim boundaries",
+            "## Source/data adoption\n\nsource/data adoption: zotero\n\n## Claim boundaries",
+        )
+        context += f"\n## Agent role\n\nagent role: {ROLE}\n\n{DUTIES}\n"
+        (self.repo / "docs/scientific/CONTEXT.md").write_text(context, encoding="utf-8")
+        block = f"{BEGIN}\n{PRE_FEATURE_PROTOCOL}\n{END}"
+        (self.repo / "AGENTS.md").write_text(f"# My project\n\n{block}\n", encoding="utf-8")
+        before = (self.agents(), self.context())
+
+        again = self.approve()
         self.assertEqual(again.returncode, 0, again.stderr)
         self.assertEqual((self.agents(), self.context()), before)
 

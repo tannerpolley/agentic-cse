@@ -5,6 +5,8 @@
 
 {responsibilities}
 
+{source_data_adoption}
+
 Apply this scientific role to investigation, implementation, review, handoffs,
 and responses. Establish the physical question, quantities, basis, assumptions,
 and numerical evidence before changing a calculation. Reuse accepted decisions.
