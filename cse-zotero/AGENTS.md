@@ -16,7 +16,6 @@
   runtime data contracts and operational commands remain here and in the
   product README.
 
-Repository Profile: scientific-computing
 
 This repository maintains the installable source-linked research companion for
 the local Zotero library. Zotero remains the bibliographic authority. The
