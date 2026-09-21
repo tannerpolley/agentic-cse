@@ -15,11 +15,14 @@ metadata:
 Inherit core scientific, project, and
 language decisions.
 
-Inspect inherited decisions and required Companion capabilities. Search the
-configured corpus, then use source, evidence, typed-record, lineage, and live
-library commands as needed. Preserve parent and attachment keys plus exact
-locators. Treat metadata and generated summaries as discovery aids, not claim
-support.
+Inspect inherited decisions and required Companion capabilities, then perform
+one bounded operation from the `zotero-companion` reference: incorporate
+selected sources into the existing project view, query retained knowledge
+read-only, or check and maintain corpus health. Search the configured corpus
+before the live library, and use source, evidence, typed-record, lineage, and
+live library commands only as the operation needs. Preserve parent and
+attachment keys plus exact locators. Treat metadata and generated summaries as
+discovery aids, not claim support.
 
 Preview every library, collection, attachment, metadata, or bibliography
 mutation and use native approval immediately before the write, including after

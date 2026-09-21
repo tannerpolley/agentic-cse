@@ -4,7 +4,7 @@ Zotero owns bibliographic records, collections, PDFs, and attachments. Zotero Co
 
 ## Supported operations
 
-Start with `zotero-companion doctor --json`. Require only the capabilities needed by the task:
+Start with `cse-zotero doctor --json` (`zotero-companion` is an equivalent alias). Require only the capabilities needed by the task:
 
 - `zotero-local-api-v1` for live item and attachment reads;
 - `configured-local-corpus-v1` and `project-views-v1` for durable synthesis;
@@ -13,19 +13,27 @@ Start with `zotero-companion doctor --json`. Require only the capabilities neede
 - `mathpix-on-demand-v1` for last-resort PDF conversion;
 - `zotero-linked-companion-v1` for separately approved Markdown attachment writes.
 
-If the executable, configuration, or capability is absent, report that exact condition. Do not fall back to Project Truss, Superpowers, Matt Pocock skills, or generic Zotero/Mathpix skills at runtime.
+If the executable, configuration, or capability is absent, report that exact condition. Do not fall back to Project Truss, Superpowers, Matt Pocock skills, or generic Zotero/Mathpix skills at runtime. A green `doctor` result certifies the software path, not a populated project view, an intact dataset, or scientific suitability.
 
-Before commissioning new research, retrieve Companion's project view:
+## Three ordinary operations
+
+### Incorporate selected sources
+
+Read the existing project view before searching anew:
 
 ```bash
-zotero-companion wiki-context <project> --query <terms> --json
+cse-zotero wiki-context <project> --query "<terms>" --json
 ```
 
-Follow its research, data, and result links. Repeat with `--global` when the
-project view is absent or incomplete; an empty project result does not establish
-that the library lacks evidence. For retained data discovery, use `data-search
-<terms> --json` before `data-query` on an exact returned table. Report freshness
-and review state with the result.
+Repeat with `--global` when the project view is absent or incomplete; an empty project result does not establish that the library lacks evidence. For each selected source, read `wiki-source <KEY> --json` and `wiki-evidence <KEY> --query "<terms>" --json`; evidence search reads existing Markdown companions only and never converts a PDF. Decide whether the source adds knowledge, updates existing knowledge, disputes a claim, or adds nothing material, then update the affected paper brief, concept page, and cross-links rather than writing a parallel summary for every visit. Scaffold only a genuinely new page with `wiki-paper-template <KEY> --json` or `wiki-record-template <record_type> --zotero-key <KEY> --json`, then run `wiki-lint`. Keep source statements, unit and basis transformations, derived insights, hypotheses, and project adoption distinct, and surface incompatible conventions instead of merging them. Registering a dataset is a separate explicit Companion operation; synchronizing an attachment does not register its tables.
+
+### Query retained knowledge
+
+Use the project view command above first and `--global` as the fallback, then `wiki-record-search`, `wiki-record`, and `wiki-lineage` for typed equations, datasets, parameters, and validation records. For retained data, use `data-search <terms> --json` before `data-query` on one exact returned table. Return the known result, supporting source locators, relevant datasets and existing project decisions, uncertainty, and the precise remaining gap. Query-only work is read-only: file no new page, reclassify no source, and write nothing to the library unless retention is requested. A synthesized page is navigation and interpretation, not independent experimental evidence.
+
+### Check and maintain
+
+`wiki-verify` and `wiki-health` are read-only; `wiki-coverage --json` bounds curation work. Separate broken paths and hash drift from scientific disagreement and missing interpretation. `wiki-maintain` is deterministic: it refreshes generated metadata, existing companions, and indexes, and neither synthesizes papers nor replaces curated claims. New evidence never silently alters analysis snapshots or reviewed claims; a changed interpretation goes through explicit incorporation and Review. Report freshness and review state with every result.
 
 ## Evidence and data authority
 
