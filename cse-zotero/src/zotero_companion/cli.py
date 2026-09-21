@@ -36,7 +36,13 @@ from .records import (
 from .release import ReleaseError, release_plan
 from .registry_migration import RegistryMigrationError, build_registry_pack
 from .report import audit_payload, doctor_payload
-from .scientific_data import ScientificDataError, query_table, search_registry, validate_catalog
+from .scientific_data import (
+    ScientificDataError,
+    query_table,
+    register_package,
+    search_registry,
+    validate_catalog,
+)
 from .source_ops import attachment_path, search_sources, source_children
 from .templates import paper_brief_template, record_template
 from .wiki import (
@@ -156,6 +162,14 @@ def main() -> int:
     data_search.add_argument("--registry-root", type=Path, help="thermophysical registry root")
     data_search.add_argument("--limit", type=int, default=20)
     data_search.add_argument("--json", action="store_true")
+    data_register = subparsers.add_parser(
+        "data-register", help="plan or register one existing scientific data package"
+    )
+    data_register.add_argument("package", type=Path)
+    data_register.add_argument("--registry-root", type=Path, help="existing registry root")
+    data_register.add_argument("--supersede", help="explicitly supersede an existing record identity")
+    data_register.add_argument("--apply", action="store_true")
+    data_register.add_argument("--json", action="store_true")
     registry_migrate = subparsers.add_parser(
         "registry-migrate", help="plan or create the thermophysical domain pack"
     )
@@ -533,7 +547,7 @@ def main() -> int:
             args.wiki_root = load_config().wiki_root
         except ConfigError as exc:
             parser.error(str(exc))
-    if args.command in {"schema-validate", "data-query", "data-search", "registry-migrate"}:
+    if args.command in {"schema-validate", "data-query", "data-search", "data-register", "registry-migrate"}:
         try:
             if args.command == "schema-validate":
                 payload = validate_catalog(args.data, args.schema, args.target_class)
@@ -553,6 +567,13 @@ def main() -> int:
                     registry_root,
                     query=args.query,
                     limit=args.limit,
+                )
+            elif args.command == "data-register":
+                payload = register_package(
+                    args.package,
+                    registry_root=args.registry_root,
+                    apply=args.apply,
+                    supersede=args.supersede,
                 )
             else:
                 payload = build_registry_pack(

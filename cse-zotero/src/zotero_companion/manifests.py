@@ -4,12 +4,15 @@ from __future__ import annotations
 
 import json
 from collections.abc import Mapping, Sequence
+import hashlib
 from pathlib import Path
+import re
 from typing import Any
 
 MANIFESTS_DIRNAME = "manifests"
 MANIFEST_SCHEMA_VERSION = 1
 MANIFEST_STATUSES = {"scaffold", "proposed", "active", "released", "needs-review"}
+_SHA256_PATTERN = re.compile(r"^[0-9a-fA-F]{64}$")
 
 
 class ManifestError(ValueError):
@@ -53,6 +56,54 @@ def _registry_candidate(root: Path, repository: str) -> Path:
     return candidate.resolve()
 
 
+def _sha256(path: Path) -> str:
+    digest = hashlib.sha256()
+    with path.open("rb") as stream:
+        for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
+
+
+def _project_data_errors(root: Path, manifest: Mapping[str, Any], path: str) -> list[str]:
+    errors: list[str] = []
+    authority = manifest.get("data_authority")
+    if authority is not None and authority not in {"project", "registry"}:
+        errors.append(f"{path}: unsupported data_authority {authority!r}")
+    datasets = manifest.get("datasets")
+    if datasets is None:
+        return errors
+    if not isinstance(datasets, Sequence) or isinstance(datasets, (str, bytes)):
+        return [f"{path}: datasets must be an array"]
+    for index, dataset in enumerate(datasets):
+        if not isinstance(dataset, Mapping):
+            errors.append(f"{path}: datasets[{index}] must be an object")
+            continue
+        data_path = str(dataset.get("path", dataset.get("data_path", ""))).strip()
+        candidate: Path | None = None
+        if not data_path:
+            errors.append(f"{path}: datasets[{index}] missing path")
+        else:
+            repo_root = Path(root).resolve().parent if Path(root).name == "wiki" else Path(root).resolve()
+            candidate = Path(data_path).expanduser()
+            candidate = (candidate if candidate.is_absolute() else repo_root / candidate).resolve()
+            if candidate != repo_root and repo_root not in candidate.parents:
+                errors.append(f"{path}: datasets[{index}] path escapes repository root: {data_path}")
+            elif not candidate.exists():
+                errors.append(f"{path}: missing project data path {data_path}")
+        declared_hash = str(dataset.get("sha256", "")).strip()
+        if declared_hash and not _SHA256_PATTERN.fullmatch(declared_hash):
+            errors.append(f"{path}: datasets[{index}] sha256 must be 64 hexadecimal characters")
+        elif declared_hash and candidate is not None and candidate.is_file():
+            try:
+                if _sha256(candidate).casefold() != declared_hash.casefold():
+                    errors.append(f"{path}: datasets[{index}] sha256 does not match {data_path}")
+            except OSError as exc:
+                errors.append(f"{path}: could not hash datasets[{index}] {data_path}: {exc}")
+        elif declared_hash and candidate is not None and candidate.exists():
+            errors.append(f"{path}: datasets[{index}] sha256 requires a file path")
+    return errors
+
+
 def validate_manifest(
     root: Path,
     manifest: Mapping[str, Any],
@@ -78,8 +129,21 @@ def validate_manifest(
     for record_id in record_values:
         if not isinstance(record_id, str) or record_id not in record_ids:
             errors.append(f"{path}: unresolved record_id {record_id}")
+    errors.extend(_project_data_errors(root, manifest, path))
     registry = manifest.get("registry")
-    if not isinstance(registry, Mapping):
+    project_data_declared = manifest.get("data_authority") == "project" or (
+        manifest.get("data_authority") is None
+        and
+        isinstance(manifest.get("datasets"), Sequence)
+        and not isinstance(manifest.get("datasets"), (str, bytes))
+        and bool(manifest.get("datasets"))
+    )
+    if registry is None and "registry" not in manifest:
+        if not project_data_declared:
+            errors.append(
+                f"{path}: registry must be an object unless project-owned data is declared"
+            )
+    elif not isinstance(registry, Mapping):
         errors.append(f"{path}: registry must be an object")
     else:
         for field in ("name", "repository", "revision"):

@@ -1,0 +1,27 @@
+{
+  "schema_version": 1,
+  "record_type": "dataset",
+  "dataset_id": "ds:registered-mea-density",
+  "version": "1.0.0",
+  "data_authority": "shared",
+  "title": "Registered monoethanolamine density",
+  "quality_state": "source-backed",
+  "components": ["monoethanolamine"],
+  "composition_basis": "pure component",
+  "conditions": {"temperature_K": 298.15},
+  "uncertainty": {"interpretation": "not reported by source"},
+  "source": {
+    "zotero_key": "ABCD1234",
+    "attachment_key": "ATT1234",
+    "locator": {"kind": "table", "value": "Table 2, row 1"}
+  },
+  "resources": [
+    {
+      "path": "observations.csv",
+      "format": "csv",
+      "role": "source-faithful",
+      "row_count": 1,
+      "required_columns": ["value", "value_unit"]
+    }
+  ]
+}

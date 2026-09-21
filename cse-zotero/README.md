@@ -54,8 +54,20 @@ hashes (a resource may also declare its own hash). The existing
 `registry-migrate REGISTRY --companion-root CORPUS` command plans a snapshot
 from a Git-tracked thermophysical registry; after reviewing the plan, `--apply`
 copies source files and generates those inventories. It refuses an existing
-destination. There is no incremental dataset-registration command here, and
+destination. `data-register PACKAGE [--apply] [--json]` incrementally registers
+one package in those same inventories, dry-running by default. It links an
+existing project-owned table or shared package in place, records its hashes and
+source metadata, and requires `--supersede ID` for a deliberate revision.
 Zotero attachment synchronization does not register numerical packages.
+
+For a package outside the configured registry, pass its inventory root
+explicitly:
+
+```bash
+uv run cse-zotero data-register path/to/dataset.json \
+  --registry-root "$HOME/.local/share/zotero-companion/corpus/data/domains/thermophysical/source/registry" \
+  --json
+```
 
 To check discovery and reuse without touching a live corpus, run:
 

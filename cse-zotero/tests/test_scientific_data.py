@@ -1,6 +1,7 @@
 import json
 import os
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -13,12 +14,22 @@ import hashlib
 from zotero_companion.scientific_data import (
     ScientificDataError,
     query_table,
+    register_package,
     search_registry,
     validate_catalog,
 )
 
 
 ROOT = Path(__file__).resolve().parents[1]
+REGISTER_FIXTURE = ROOT / "examples/data-register/package"
+
+
+def _registration_fixture(tmp_path: Path) -> tuple[Path, Path]:
+    package = tmp_path / "project" / "data" / "registered-package"
+    shutil.copytree(REGISTER_FIXTURE, package)
+    registry = tmp_path / "source" / "registry"
+    registry.mkdir(parents=True)
+    return package, registry
 
 
 def _registry_fixture(tmp_path: Path) -> tuple[Path, Path]:
@@ -274,6 +285,23 @@ def test_registry_search_reports_missing_and_hash_mismatch(tmp_path):
     assert "missing" in missing["integrity"]["errors"][0]
 
 
+def test_registry_search_accepts_case_insensitive_hash_declarations(tmp_path):
+    registry, _ = _registry_fixture(tmp_path)
+    for name in ("registry-records.csv", "source-files.csv"):
+        path = tmp_path / "normalized" / name
+        with path.open(newline="", encoding="utf-8") as stream:
+            rows = list(csv.DictReader(stream))
+            fields = list(rows[0])
+        for row in rows:
+            row["sha256"] = row["sha256"].upper()
+        with path.open("w", newline="", encoding="utf-8") as stream:
+            writer = csv.DictWriter(stream, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows(rows)
+
+    assert search_registry(registry, query="MEA")["results"][0]["integrity"]["verified"] is True
+
+
 def test_registry_search_requires_the_canonical_inventory(tmp_path):
     (tmp_path / "registry").mkdir()
     with pytest.raises(ScientificDataError, match="Normalized registry inventory is missing"):
@@ -319,3 +347,186 @@ def test_registry_aliases_preserve_literal_property_matches(tmp_path, property_n
     registry, _ = _registry_fixture(tmp_path)
     _rewrite_fixture_metadata(registry, property=property_name, title="Measurement")
     assert search_registry(registry, query=property_name)["count"] == 1
+
+
+def test_data_register_links_external_package_and_repeated_registration_is_unchanged(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    metadata = package / "dataset.json"
+
+    preview = register_package(metadata, registry_root=registry)
+    assert preview["mode"] == "dry-run"
+    assert not (tmp_path / "normalized").exists()
+
+    applied = register_package(metadata, registry_root=registry, apply=True)
+    repeated = register_package(metadata, registry_root=registry, apply=True)
+
+    assert applied["mode"] == "apply"
+    assert repeated["mode"] == "unchanged"
+    assert not (registry / "observations.csv").exists()
+    result = search_registry(registry, query="MEA density")
+    assert result["count"] == 1
+    packet = result["results"][0]
+    assert packet["record_id"] == "ds:registered-mea-density"
+    assert packet["data_authority"] == "shared"
+    assert packet["provenance"]["attachment_key"] == "ATT1234"
+    assert packet["resources"][0]["path"] == str(package / "observations.csv")
+    assert packet["integrity"]["verified"] is True
+
+
+def test_data_register_cli_defaults_to_dry_run(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    cli = shutil.which("cse-zotero") or str(Path(sys.executable).with_name("cse-zotero"))
+    result = subprocess.run(
+        [
+            cli,
+            "data-register",
+            str(package),
+            "--registry-root",
+            str(registry),
+            "--json",
+        ],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["mode"] == "dry-run"
+
+
+def test_data_register_revision_keeps_lineage_and_old_input(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    register_package(package, registry_root=registry, apply=True)
+    revision = tmp_path / "project" / "data" / "registered-package-v2"
+    shutil.copytree(package, revision)
+    revision_metadata = revision / "dataset.json"
+    metadata = json.loads(revision_metadata.read_text(encoding="utf-8"))
+    metadata["version"] = "2.0.0"
+    revision_metadata.write_text(json.dumps(metadata), encoding="utf-8")
+    (revision / "observations.csv").write_text(
+        "value,value_unit,uncertainty,uncertainty_unit\n1011.4,kg/m3,,kg/m3\n",
+        encoding="utf-8",
+    )
+
+    result = register_package(
+        revision_metadata,
+        registry_root=registry,
+        apply=True,
+        supersede="ds:registered-mea-density",
+    )
+
+    assert result["lineage"] == {"supersedes": "ds:registered-mea-density"}
+    packets = search_registry(registry)["results"]
+    revised = next(packet for packet in packets if packet["metadata_path"] == str(revision_metadata))
+    assert revised["version"] == "2.0.0"
+    assert revised["supersedes"] == "ds:registered-mea-density"
+    assert len(packets) == 2
+    assert (package / "observations.csv").read_text(encoding="utf-8").startswith("value,value_unit")
+
+
+def test_data_register_rejects_basis_tampering_and_conflicting_identity(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    metadata_path = package / "dataset.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata.pop("composition_basis")
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    with pytest.raises(ScientificDataError, match="composition/amount basis"):
+        register_package(metadata_path, registry_root=registry)
+
+    metadata["composition_basis"] = "pure component"
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+    register_package(metadata_path, registry_root=registry, apply=True)
+    (package / "observations.csv").write_text("value,value_unit\n999,kg/m3\n", encoding="utf-8")
+    with pytest.raises(ScientificDataError, match="resource identity already has a different hash"):
+        register_package(metadata_path, registry_root=registry)
+
+    conflict = tmp_path / "project" / "data" / "conflicting-package"
+    shutil.copytree(REGISTER_FIXTURE, conflict)
+    with pytest.raises(ScientificDataError, match="conflicting record identity"):
+        register_package(conflict / "dataset.json", registry_root=registry)
+
+
+def test_data_register_rejects_incomplete_dataset_metadata_and_external_traversal(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    metadata_path = package / "dataset.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata.pop("source")
+    metadata.pop("uncertainty")
+    metadata.pop("quality_state")
+    (package / "observations.csv").write_text("value\n1010.2\n", encoding="utf-8")
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    with pytest.raises(ScientificDataError, match="source provenance identity"):
+        register_package(metadata_path, registry_root=registry)
+
+    outside = package.parent / "outside.csv"
+    outside.write_text("value,value_unit\n1,kg/m3\n", encoding="utf-8")
+    metadata["source"] = {"repository": "project", "locator": {"kind": "row", "value": "1"}}
+    metadata["uncertainty"] = {"interpretation": "not reported"}
+    metadata["quality_state"] = "unreviewed"
+    metadata["resources"][0]["path"] = "../outside.csv"
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    with pytest.raises(ScientificDataError, match="escapes the package directory"):
+        register_package(metadata_path, registry_root=registry)
+
+
+def test_data_register_requires_parameter_model_conventions(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    metadata_path = package / "dataset.json"
+    metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+    metadata["record_type"] = "parameter_set"
+    metadata["parameter_set_id"] = "ps:registered-mea"
+    metadata.pop("dataset_id")
+    metadata_path.write_text(json.dumps(metadata), encoding="utf-8")
+
+    with pytest.raises(ScientificDataError, match="model or reference-state"):
+        register_package(metadata_path, registry_root=registry)
+
+
+def test_data_register_interruption_rolls_back_both_inventories(tmp_path, monkeypatch):
+    package, registry = _registration_fixture(tmp_path)
+    register_package(package, registry_root=registry, apply=True)
+    inventory = tmp_path / "normalized" / "registry-records.csv"
+    source_files = tmp_path / "normalized" / "source-files.csv"
+    original = {path: path.read_bytes() for path in (inventory, source_files)}
+    second_package = tmp_path / "project" / "data" / "second-package"
+    shutil.copytree(REGISTER_FIXTURE, second_package)
+    second_metadata = second_package / "dataset.json"
+    changed = json.loads(second_metadata.read_text(encoding="utf-8"))
+    changed["dataset_id"] = "ds:second-package"
+    second_metadata.write_text(json.dumps(changed), encoding="utf-8")
+    real_replace = os.replace
+    calls = 0
+
+    def interrupt(source, destination):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise OSError("interrupted")
+        return real_replace(source, destination)
+
+    monkeypatch.setattr("zotero_companion.scientific_data.os.replace", interrupt)
+    with pytest.raises(ScientificDataError, match="safely update registry inventories"):
+        register_package(second_metadata, registry_root=registry, apply=True)
+
+    assert {path: path.read_bytes() for path in (inventory, source_files)} == original
+    assert search_registry(registry)["count"] == 1
+
+    calls = 0
+
+    def interrupt_keyboard(source, destination):
+        nonlocal calls
+        calls += 1
+        if calls == 2:
+            raise KeyboardInterrupt
+        return real_replace(source, destination)
+
+    monkeypatch.setattr("zotero_companion.scientific_data.os.replace", interrupt_keyboard)
+    with pytest.raises(KeyboardInterrupt):
+        register_package(second_metadata, registry_root=registry, apply=True)
+
+    assert {path: path.read_bytes() for path in (inventory, source_files)} == original
+    assert search_registry(registry)["count"] == 1
