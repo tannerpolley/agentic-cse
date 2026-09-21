@@ -60,6 +60,8 @@ existing project-owned table or shared package in place, records its hashes and
 source metadata, and requires `--supersede ID` for a deliberate revision.
 Zotero attachment synchronization does not register numerical packages.
 
+After registration, `data-select RECORD_ID --resource RESOURCE --analysis ANALYSIS [--apply]` copies one verified resource into `ANALYSIS/inputs/` and writes an adjacent `<resource>.lineage.json`. Dry-run is the default; the snapshot and lineage retain the registered metadata, source locators, units/basis, review state, and SHA-256 identity. Existing snapshots are unchanged on repeat, while missing or changed resources and conflicting destinations are refused. If an identity has registered revisions, pass `--version` to choose one explicitly.
+
 For a package outside the configured registry, pass its inventory root
 explicitly:
 
@@ -67,6 +69,12 @@ explicitly:
 uv run cse-zotero data-register path/to/dataset.json \
   --registry-root "$HOME/.local/share/zotero-companion/corpus/data/domains/thermophysical/source/registry" \
   --json
+
+uv run cse-zotero data-select ds:registered-mea-density \
+  --resource observations.csv \
+  --analysis analyses/mea-density \
+  --registry-root "$HOME/.local/share/zotero-companion/corpus/data/domains/thermophysical/source/registry" \
+  --apply --json
 ```
 
 To check discovery and reuse without touching a live corpus, run:

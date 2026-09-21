@@ -16,6 +16,7 @@ from zotero_companion.scientific_data import (
     query_table,
     register_package,
     search_registry,
+    select_resource,
     validate_catalog,
 )
 
@@ -423,6 +424,201 @@ def test_data_register_revision_keeps_lineage_and_old_input(tmp_path):
     assert revised["supersedes"] == "ds:registered-mea-density"
     assert len(packets) == 2
     assert (package / "observations.csv").read_text(encoding="utf-8").startswith("value,value_unit")
+
+
+def test_data_select_copies_one_resource_and_preserves_lineage(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    register_package(package, registry_root=registry, apply=True)
+    analysis = tmp_path / "analyses" / "density"
+
+    result = select_resource(
+        registry,
+        "ds:registered-mea-density",
+        analysis,
+        resource="observations.csv",
+        apply=True,
+    )
+
+    selected = analysis / "inputs/observations.csv"
+    lineage = analysis / "inputs/observations.csv.lineage.json"
+    assert result["mode"] == "apply"
+    assert selected.read_bytes() == (package / "observations.csv").read_bytes()
+    assert not selected.is_symlink()
+    record = json.loads(lineage.read_text(encoding="utf-8"))
+    assert record["record_id"] == "ds:registered-mea-density"
+    assert record["source"]["zotero_key"] == "ABCD1234"
+    assert record["source"]["locator"] == {
+        "kind": "table",
+        "value": "Table 2, row 1",
+    }
+    assert record["composition_basis"] == "pure component"
+    assert record["uncertainty"] == {"interpretation": "not reported by source"}
+    assert record["resource"]["sha256"] == hashlib.sha256(selected.read_bytes()).hexdigest()
+
+
+def test_data_select_unchanged_rerun_does_not_rewrite_snapshot(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    register_package(package, registry_root=registry, apply=True)
+    analysis = tmp_path / "analyses" / "density"
+    first = select_resource(
+        registry,
+        "ds:registered-mea-density",
+        analysis,
+        resource="observations.csv",
+        apply=True,
+    )
+    selected = analysis / "inputs/observations.csv"
+    lineage = analysis / "inputs/observations.csv.lineage.json"
+    before = {
+        path: (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in (selected, lineage)
+    }
+
+    repeated = select_resource(
+        registry,
+        "ds:registered-mea-density",
+        analysis,
+        resource="observations.csv",
+        apply=True,
+    )
+
+    assert first["mode"] == "apply"
+    assert repeated["mode"] == "unchanged"
+    assert repeated["would_write"] == []
+    assert {
+        path: (path.read_bytes(), path.stat().st_mtime_ns)
+        for path in (selected, lineage)
+    } == before
+
+
+def test_data_select_refuses_tampered_registered_resource(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    register_package(package, registry_root=registry, apply=True)
+    (package / "observations.csv").write_text(
+        "value,value_unit,uncertainty,uncertainty_unit\n999,kg/m3,,kg/m3\n",
+        encoding="utf-8",
+    )
+
+    with pytest.raises(ScientificDataError, match="hash mismatch|unverified"):
+        select_resource(
+            registry,
+            "ds:registered-mea-density",
+            tmp_path / "analyses" / "density",
+            resource="observations.csv",
+            apply=True,
+        )
+
+
+def test_data_select_reports_missing_registered_resource(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    register_package(package, registry_root=registry, apply=True)
+    (package / "observations.csv").unlink()
+
+    with pytest.raises(ScientificDataError, match="missing|unverified"):
+        select_resource(
+            registry,
+            "ds:registered-mea-density",
+            tmp_path / "analyses" / "density",
+            resource="observations.csv",
+            apply=True,
+        )
+
+
+def test_data_select_cli_defaults_to_dry_run(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    register_package(package, registry_root=registry, apply=True)
+    analysis = tmp_path / "analyses" / "density"
+    cli = shutil.which("cse-zotero") or str(Path(sys.executable).with_name("cse-zotero"))
+
+    result = subprocess.run(
+        [
+            cli,
+            "data-select",
+            "ds:registered-mea-density",
+            "--resource",
+            "observations.csv",
+            "--analysis",
+            str(analysis),
+            "--registry-root",
+            str(registry),
+            "--json",
+        ],
+        cwd=tmp_path,
+        check=False,
+        capture_output=True,
+        text=True,
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert json.loads(result.stdout)["mode"] == "dry-run"
+    assert not (analysis / "inputs").exists()
+
+
+def test_data_select_requires_explicit_registered_revision(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    register_package(package, registry_root=registry, apply=True)
+    revision = tmp_path / "project" / "data" / "registered-package-v2"
+    shutil.copytree(package, revision)
+    revision_metadata = revision / "dataset.json"
+    metadata = json.loads(revision_metadata.read_text(encoding="utf-8"))
+    metadata["version"] = "2.0.0"
+    revision_metadata.write_text(json.dumps(metadata), encoding="utf-8")
+    (revision / "observations.csv").write_text(
+        "value,value_unit,uncertainty,uncertainty_unit\n1011.4,kg/m3,,kg/m3\n",
+        encoding="utf-8",
+    )
+    register_package(
+        revision_metadata,
+        registry_root=registry,
+        apply=True,
+        supersede="ds:registered-mea-density",
+    )
+
+    with pytest.raises(ScientificDataError, match="--version"):
+        select_resource(
+            registry,
+            "ds:registered-mea-density",
+            tmp_path / "analyses" / "density",
+            resource="observations.csv",
+            apply=True,
+        )
+
+    selected = select_resource(
+        registry,
+        "ds:registered-mea-density",
+        tmp_path / "analyses" / "density-v2",
+        resource="observations.csv",
+        version="2.0.0",
+        apply=True,
+    )
+    assert selected["version"] == "2.0.0"
+    assert json.loads(
+        (tmp_path / "analyses/density-v2/inputs/observations.csv.lineage.json").read_text()
+    )["version"] == "2.0.0"
+
+
+def test_data_select_refuses_conflicting_existing_snapshot(tmp_path):
+    package, registry = _registration_fixture(tmp_path)
+    register_package(package, registry_root=registry, apply=True)
+    analysis = tmp_path / "analyses" / "density"
+    select_resource(
+        registry,
+        "ds:registered-mea-density",
+        analysis,
+        resource="observations.csv",
+        apply=True,
+    )
+    selected = analysis / "inputs/observations.csv"
+    selected.write_text("value,value_unit\n999,kg/m3\n", encoding="utf-8")
+
+    with pytest.raises(ScientificDataError, match="Selected input hash mismatch"):
+        select_resource(
+            registry,
+            "ds:registered-mea-density",
+            analysis,
+            resource="observations.csv",
+            apply=True,
+        )
 
 
 def test_data_register_rejects_basis_tampering_and_conflicting_identity(tmp_path):

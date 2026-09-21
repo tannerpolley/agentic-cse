@@ -12,6 +12,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shutil
 import tempfile
 from collections.abc import Iterator, Mapping
 from typing import Any
@@ -418,6 +419,7 @@ def _resource_packet(
         errors.append("resource and inventory SHA-256 declarations disagree")
     return {
         "path": str(candidate),
+        "declared_path": relative,
         "relative_path": str(candidate.relative_to(registry_root)) if inside_root else str(candidate),
         "format": str(resource.get("format", "")),
         "role": str(resource.get("role", "")),
@@ -653,10 +655,15 @@ def search_registry(
     }
 
 
-def _read_package_metadata(path: Path) -> dict[str, Any]:
+def _read_package_metadata(path: Path, *, expected_hash: str = "") -> dict[str, Any]:
     try:
-        value = json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError) as exc:
+        content = path.read_bytes()
+        if expected_hash and hashlib.sha256(content).hexdigest().casefold() != expected_hash.casefold():
+            raise ScientificDataError(
+                f"Package metadata SHA-256 does not match its declaration: {path}"
+            )
+        value = json.loads(content.decode("utf-8"))
+    except (OSError, UnicodeDecodeError, json.JSONDecodeError) as exc:
         raise ScientificDataError(f"Could not read package metadata {path}: {exc}") from exc
     if not isinstance(value, Mapping):
         raise ScientificDataError("Package metadata must be a JSON object")
@@ -931,6 +938,283 @@ def register_package(
     return payload
 
 
+def _resource_selector_matches(root: Path, resource: Mapping[str, Any], selector: str) -> bool:
+    selector = str(selector).strip()
+    if not selector:
+        return True
+    raw = Path(selector).expanduser()
+    candidates = {
+        str(resource.get("declared_path", "")).strip(),
+        str(resource.get("relative_path", "")).strip(),
+        str(resource.get("path", "")).strip(),
+    }
+    if selector in candidates or raw.as_posix() in candidates:
+        return True
+    if not raw.is_absolute():
+        selected = (root / raw).resolve()
+        return any(
+            Path(candidate).expanduser().resolve() == selected
+            for candidate in candidates
+            if candidate and Path(candidate).expanduser().is_absolute()
+        )
+    return False
+
+
+def _selection_lineage(
+    analysis_dir: Path,
+    destination: Path,
+    packet: Mapping[str, Any],
+    resource: Mapping[str, Any],
+    metadata: Mapping[str, Any],
+) -> dict[str, Any]:
+    preserved_fields = (
+        "values",
+        "value",
+        "quantities",
+        "units",
+        "unit",
+        "composition_basis",
+        "amount_basis",
+        "basis",
+        "conditions",
+        "uncertainty",
+        "uncertainty_interpretation",
+        "transformations",
+        "transformation",
+        "model",
+        "reference_state",
+        "review",
+        "scientific_review",
+        "quality_state",
+        "data_authority",
+        "version",
+        "components",
+        "property",
+        "system",
+        "known_issues",
+        "notes",
+    )
+    lineage = {
+        "schema_version": 1,
+        "record_type": "analysis_input",
+        "record_id": str(packet["record_id"]),
+        "input_id": f"input:{packet['record_id']}:{destination.name}",
+        "title": str(packet.get("title", "")),
+        "analysis_id": analysis_dir.name,
+        "input_path": destination.relative_to(analysis_dir).as_posix(),
+        "selection": {"method": "copy", "query": None, "transform": None},
+        "resource": {
+            "declared_path": str(resource.get("declared_path", "")),
+            "registry_path": str(resource.get("relative_path", "")),
+            "sha256": str(resource["sha256"]),
+            "format": str(resource.get("format", "")),
+            "role": str(resource.get("role", "")),
+            "units_in_table": resource.get("units_in_table", {}),
+        },
+        "source_record": {
+            "record_id": str(packet["record_id"]),
+            "record_type": str(packet.get("record_type", "")),
+            "version": str(packet.get("version", "")),
+            "metadata_path": str(packet.get("metadata_relative_path", "")),
+            "metadata_sha256": str(packet["metadata_sha256"]),
+            "supersedes": str(packet.get("supersedes", "")),
+        },
+        "source": metadata.get("source", metadata.get("provenance", {})),
+        "provenance": metadata.get("provenance", metadata.get("source", {})),
+        "registered_metadata": dict(metadata),
+    }
+    lineage.update({field: metadata[field] for field in preserved_fields if field in metadata})
+    return lineage
+
+
+def _write_selection_snapshot(
+    source: Path,
+    destination: Path,
+    lineage_path: Path,
+    lineage: Mapping[str, Any],
+    expected_hash: str,
+) -> None:
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    originals = {
+        path: path.read_bytes() if path.exists() else None
+        for path in (destination, lineage_path)
+    }
+    temporary_paths: list[Path] = []
+    replaced: list[Path] = []
+    try:
+        with tempfile.NamedTemporaryFile(dir=destination.parent, delete=False) as handle:
+            source_temporary = Path(handle.name)
+        temporary_paths.append(source_temporary)
+        shutil.copyfile(source, source_temporary)
+        if _sha256(source_temporary).casefold() != expected_hash.casefold():
+            raise ScientificDataError(
+                f"resource changed while selecting: {source}"
+            )
+
+        with tempfile.NamedTemporaryFile(
+            mode="w",
+            encoding="utf-8",
+            dir=destination.parent,
+            prefix=f".{lineage_path.name}.",
+            suffix=".tmp",
+            delete=False,
+        ) as handle:
+            json.dump(lineage, handle, indent=2, sort_keys=True)
+            handle.write("\n")
+            lineage_temporary = Path(handle.name)
+        temporary_paths.append(lineage_temporary)
+
+        os.link(source_temporary, destination)
+        replaced.append(destination)
+        os.link(lineage_temporary, lineage_path)
+        replaced.append(lineage_path)
+    except BaseException as exc:
+        for path in reversed(replaced):
+            original = originals[path]
+            try:
+                if original is None:
+                    path.unlink(missing_ok=True)
+                else:
+                    path.write_bytes(original)
+            except OSError:
+                pass
+        if isinstance(exc, OSError):
+            raise ScientificDataError(
+                f"Could not safely materialize selected input: {exc}"
+            ) from exc
+        raise
+    finally:
+        for temporary in temporary_paths:
+            temporary.unlink(missing_ok=True)
+
+
+def select_resource(
+    registry_root: Path,
+    record_id: str,
+    analysis_dir: Path,
+    *,
+    resource: str = "",
+    version: str = "",
+    apply: bool = False,
+) -> dict[str, Any]:
+    """Plan or copy one verified registered resource into an analysis input."""
+
+    root = Path(registry_root).expanduser().resolve()
+    analysis = Path(analysis_dir).expanduser().resolve()
+    record_id = str(record_id).strip()
+    if not record_id:
+        raise ScientificDataError("data-select requires a registered record ID")
+
+    discovered = search_registry(root, query=record_id, limit=10_000)
+    packets = [
+        packet
+        for packet in discovered["results"]
+        if packet.get("record_id") == record_id
+    ]
+    if version:
+        packets = [packet for packet in packets if packet.get("version") == version]
+    matches = [
+        (packet, candidate)
+        for packet in packets
+        for candidate in packet.get("resources", [])
+        if _resource_selector_matches(root, candidate, resource)
+    ]
+    if not matches:
+        if resource:
+            raise ScientificDataError(
+                f"Registered resource not found: {record_id} / {resource}"
+                + (f" / version {version}" if version else "")
+            )
+        raise ScientificDataError(
+            f"Registered record has no unambiguous resource: {record_id}"
+            + (f" / version {version}" if version else "")
+        )
+    if len(matches) > 1:
+        raise ScientificDataError(
+            f"Resource selection is ambiguous for registered record: {record_id}; "
+            "pass --version to choose a registered revision"
+        )
+
+    packet, selected = matches[0]
+    integrity_errors = list(packet.get("integrity", {}).get("errors", []))
+    if not packet.get("integrity", {}).get("verified") or selected.get("hash_matches") is not True:
+        detail = "; ".join(integrity_errors) or "registered hashes could not be verified"
+        raise ScientificDataError(
+            f"Cannot select unverified registered resource {record_id}: {detail}"
+        )
+
+    source = Path(str(selected["path"])).expanduser().resolve()
+    expected_hash = str(selected["sha256"])
+    if not source.is_file():
+        raise ScientificDataError(f"Registered resource is missing: {source}")
+    if _sha256(source).casefold() != expected_hash.casefold():
+        raise ScientificDataError(
+            f"Registered resource hash mismatch; refusing selection: {source}"
+        )
+
+    metadata_path = Path(str(packet["metadata_path"])).expanduser().resolve()
+    try:
+        metadata = _read_package_metadata(
+            metadata_path,
+            expected_hash=str(packet["metadata_sha256"]),
+        )
+    except ScientificDataError as exc:
+        if "SHA-256" in str(exc):
+            raise ScientificDataError(
+                f"Registered metadata hash mismatch; refusing selection: {metadata_path}"
+            ) from exc
+        raise
+
+    input_dir = analysis / "inputs"
+    destination = input_dir / source.name
+    lineage_path = input_dir / f"{source.name}.lineage.json"
+    if destination.is_symlink() or lineage_path.is_symlink():
+        raise ScientificDataError(
+            f"Selected input already uses a live link; refusing overwrite: {destination}"
+        )
+    lineage = _selection_lineage(analysis, destination, packet, selected, metadata)
+    existing = destination.exists() or lineage_path.exists()
+    if existing:
+        if not destination.is_file() or not lineage_path.is_file():
+            raise ScientificDataError(
+                f"Selected input is incomplete; refusing overwrite: {destination}"
+            )
+        if _sha256(destination).casefold() != expected_hash.casefold():
+            raise ScientificDataError(
+                f"Selected input hash mismatch; refusing overwrite: {destination}"
+            )
+        try:
+            existing_lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError) as exc:
+            raise ScientificDataError(
+                f"Selected lineage cannot be verified; refusing overwrite: {lineage_path}"
+            ) from exc
+        if existing_lineage != lineage:
+            raise ScientificDataError(
+                f"Selected lineage differs; refusing overwrite: {lineage_path}"
+            )
+
+    payload = {
+        "ok": True,
+        "mode": "unchanged" if existing else ("apply" if apply else "dry-run"),
+        "apply": apply,
+        "record_id": record_id,
+        "record_type": packet.get("record_type", ""),
+        "version": packet.get("version", ""),
+        "resource": str(selected.get("declared_path", selected["path"])),
+        "resource_path": str(source),
+        "sha256": expected_hash,
+        "analysis": str(analysis),
+        "input_path": str(destination),
+        "lineage_path": str(lineage_path),
+        "lineage": lineage,
+        "would_write": [] if existing else [str(destination), str(lineage_path)],
+    }
+    if apply and not existing:
+        _write_selection_snapshot(source, destination, lineage_path, lineage, expected_hash)
+    return payload
+
+
 def validate_catalog(
     data_path: Path,
     schema_path: Path | None = None,
@@ -1015,5 +1299,6 @@ __all__ = [
     "query_table",
     "register_package",
     "search_registry",
+    "select_resource",
     "validate_catalog",
 ]

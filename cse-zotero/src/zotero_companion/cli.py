@@ -41,6 +41,7 @@ from .scientific_data import (
     query_table,
     register_package,
     search_registry,
+    select_resource,
     validate_catalog,
 )
 from .source_ops import attachment_path, search_sources, source_children
@@ -170,6 +171,34 @@ def main() -> int:
     data_register.add_argument("--supersede", help="explicitly supersede an existing record identity")
     data_register.add_argument("--apply", action="store_true")
     data_register.add_argument("--json", action="store_true")
+    data_select = subparsers.add_parser(
+        "data-select", help="plan or copy one verified registered resource into an analysis"
+    )
+    data_select.add_argument("record_id", help="registered package identity")
+    data_select.add_argument(
+        "--resource",
+        default="",
+        help="declared or registry-relative resource path (required for multiple resources)",
+    )
+    data_select.add_argument(
+        "--version",
+        default="",
+        help="registered package version when an identity has revisions",
+    )
+    data_select.add_argument(
+        "--analysis",
+        "--analysis-dir",
+        dest="analysis",
+        type=Path,
+        required=True,
+        help="analysis directory receiving inputs/",
+    )
+    data_select.add_argument("--registry-root", type=Path, help="existing registry root")
+    select_mode = data_select.add_mutually_exclusive_group()
+    select_mode.add_argument("--apply", action="store_true")
+    select_mode.add_argument("--dry-run", dest="apply", action="store_false")
+    data_select.set_defaults(apply=False)
+    data_select.add_argument("--json", action="store_true")
     registry_migrate = subparsers.add_parser(
         "registry-migrate", help="plan or create the thermophysical domain pack"
     )
@@ -547,7 +576,14 @@ def main() -> int:
             args.wiki_root = load_config().wiki_root
         except ConfigError as exc:
             parser.error(str(exc))
-    if args.command in {"schema-validate", "data-query", "data-search", "data-register", "registry-migrate"}:
+    if args.command in {
+        "schema-validate",
+        "data-query",
+        "data-search",
+        "data-register",
+        "data-select",
+        "registry-migrate",
+    }:
         try:
             if args.command == "schema-validate":
                 payload = validate_catalog(args.data, args.schema, args.target_class)
@@ -574,6 +610,24 @@ def main() -> int:
                     registry_root=args.registry_root,
                     apply=args.apply,
                     supersede=args.supersede,
+                )
+            elif args.command == "data-select":
+                registry_root = args.registry_root
+                if registry_root is None:
+                    registry_root = (
+                        load_config().data_root
+                        / "domains"
+                        / "thermophysical"
+                        / "source"
+                        / "registry"
+                    )
+                payload = select_resource(
+                    registry_root,
+                    args.record_id,
+                    args.analysis,
+                    resource=args.resource,
+                    version=args.version,
+                    apply=args.apply,
                 )
             else:
                 payload = build_registry_pack(
