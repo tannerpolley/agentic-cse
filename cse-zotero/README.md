@@ -70,8 +70,12 @@ original fixture files remain unchanged and removes the temporary project.
 Passing establishes this software path; scientific suitability still depends
 on the selected dataset's quality, units, composition basis, and conditions.
 
-`init` is dry-run by default. `init --apply` creates the private configuration
-and empty corpus directories. For the one-time migration from an older source
+`init` is dry-run by default and reports current and proposed values. On a
+fresh workstation `init --apply` creates the private configuration and empty
+corpus directories without Mathpix consent; pass `--mathpix-consent` to record
+an explicit library-wide decision. On an existing configuration the same
+command preserves retained paths, consent, and deny lists unless an explicit
+option changes them, and an unchanged apply writes nothing (`mode: unchanged`). For the one-time migration from an older source
 checkout, review `corpus-migrate --json`, then use `corpus-migrate --apply
 --json`; it copies and verifies files without deleting the source checkout.
 

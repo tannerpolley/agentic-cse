@@ -92,6 +92,12 @@ def main() -> int:
     initialize.add_argument("--config", type=Path, default=default_config_path())
     initialize.add_argument("--corpus-root", type=Path)
     initialize.add_argument("--apply", action="store_true")
+    initialize.add_argument(
+        "--mathpix-consent",
+        action=argparse.BooleanOptionalAction,
+        default=None,
+        help="record or withdraw library-wide Mathpix consent; a new configuration defaults to no consent",
+    )
     initialize.add_argument("--json", action="store_true")
     bibliography = subparsers.add_parser(
         "bibliography-export", help="plan or refresh the canonical Better BibTeX library export"
@@ -459,12 +465,25 @@ def main() -> int:
     if args.command in {"doctor", "init", "bibliography-export", "corpus-migrate"}:
         try:
             if args.command == "init":
-                config = proposed_config(corpus_root=args.corpus_root)
-                payload = (
-                    write_config(config, args.config)
-                    if args.apply
-                    else config_payload(config, args.config, mode="dry-run")
+                existing = load_config(args.config) if args.config.is_file() else None
+                config = proposed_config(
+                    corpus_root=args.corpus_root,
+                    existing=existing,
+                    mathpix_library_consent=args.mathpix_consent,
                 )
+                if existing == config:
+                    payload = config_payload(config, args.config, mode="unchanged")
+                elif args.apply:
+                    payload = write_config(config, args.config)
+                else:
+                    payload = config_payload(config, args.config, mode="dry-run")
+                if existing is not None:
+                    current = config_payload(existing, args.config, mode="current")
+                    payload["changes"] = {
+                        key: {"current": current[key], "proposed": payload[key]}
+                        for key in current
+                        if key not in {"ok", "mode"} and current[key] != payload[key]
+                    }
             else:
                 config = load_config(args.config, allow_proposed=args.command == "doctor")
                 if args.command == "corpus-migrate":

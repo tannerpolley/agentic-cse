@@ -8,7 +8,7 @@ import os
 import re
 import stat
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 
 
@@ -96,15 +96,34 @@ class CompanionConfig:
         return self.corpus_root / "data"
 
 
-def proposed_config(*, corpus_root: Path | None = None) -> CompanionConfig:
-    data_dir = discover_zotero_data_dir()
-    if data_dir is None:
-        raise ConfigError("Zotero data directory is unavailable")
-    return CompanionConfig(
-        corpus_root=(corpus_root or default_corpus_root()).expanduser().resolve(),
-        zotero_data_dir=data_dir,
-        bibliography_export=data_dir / "exports" / "references.bib",
-        mathpix_library_consent=True,
+def proposed_config(
+    *,
+    corpus_root: Path | None = None,
+    existing: CompanionConfig | None = None,
+    mathpix_library_consent: bool | None = None,
+) -> CompanionConfig:
+    """Propose a configuration from the existing one, or discover a new one.
+
+    Explicit arguments override retained values; everything else is preserved.
+    A new configuration never infers Mathpix consent.
+    """
+    if existing is None:
+        data_dir = discover_zotero_data_dir()
+        if data_dir is None:
+            raise ConfigError("Zotero data directory is unavailable")
+        existing = CompanionConfig(
+            corpus_root=default_corpus_root(),
+            zotero_data_dir=data_dir,
+            bibliography_export=data_dir / "exports" / "references.bib",
+        )
+    return replace(
+        existing,
+        corpus_root=(corpus_root or existing.corpus_root).expanduser().resolve(),
+        mathpix_library_consent=(
+            existing.mathpix_library_consent
+            if mathpix_library_consent is None
+            else mathpix_library_consent
+        ),
     )
 
 
