@@ -8,3 +8,4 @@ docs/scientific/.research/
 # Retained PDFs belong to the embedded heat-equation example; its own ignore
 # rules continue to exclude generated document builds.
 !examples/heat-equation/**/*.pdf
+.runs/
