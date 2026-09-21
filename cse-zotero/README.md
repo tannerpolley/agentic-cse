@@ -79,6 +79,60 @@ option changes them, and an unchanged apply writes nothing (`mode: unchanged`). 
 checkout, review `corpus-migrate --json`, then use `corpus-migrate --apply
 --json`; it copies and verifies files without deleting the source checkout.
 
+## Readiness and retention
+
+`doctor --json` keeps the historical aggregate `ok` field, but an agent must
+use the operation-specific `readiness` object instead of treating that flag as
+proof that every layer is usable. Its keys are `configuration`,
+`zotero_local_api`, `better_bibtex`, `retained_corpus`, `project_views`,
+`data`, `bibliography_export`, and `mathpix`. Each entry reports
+`supported`, `configured`, `readable`, `live_available`, `ready`, and a
+concrete `reason`. The top-level `configured_paths`, `observed_live_checks`,
+`unverified_active_host`, and `identity` fields keep configured paths, live
+probes, host uncertainty, and package/source/payload identity separate.
+
+Better BibTeX and Zotero are live capabilities, not prerequisites for reading
+an intact retained corpus offline. A live library response does not certify a
+project view or dataset. Mathpix readiness requires both the installed `mpx`
+capability and an explicit recorded consent decision; doctor never prints
+Mathpix credentials or makes a paid conversion call.
+
+The active corpus is project-owned state. The older registry-oriented examples
+above, including a separate thermophysical-data-registry or Git-tracked source,
+are historical compatibility paths, not requirements. A project chooses and
+records its own data authority, inventory, retention, versioning, and recovery
+policy. DataLad is not required.
+
+Generated source metadata (`wiki/sources/`, `catalog.json`, `manifest.json`,
+triage data, and SQLite indexes) and evidence-sync indexes are rebuildable.
+Curated briefs, interpretations, typed relations, classification decisions,
+and user-owned source/data files are not. Pushing this runtime repository does
+not back up the external corpus or Zotero attachments.
+
+For each project, select its existing authority and record its exact corpus
+root, representative curated record, representative dataset, and verification
+revision/date. Make an ordinary copy, then hash the selected files and verify
+the copy:
+
+```bash
+copy_root=/path/to/isolated-recovery-check
+mkdir -p "$copy_root"
+cp -a /path/to/selected-corpus/. "$copy_root/"
+(cd /path/to/selected-corpus && \
+  sha256sum wiki/projects/<project>.md data/<dataset>.csv > "$copy_root/expected.sha256")
+(cd "$copy_root" && sha256sum -c expected.sha256 \
+  && test -s wiki/projects/<project>.md \
+  && test -s data/<dataset>.csv)
+uv run --project /path/to/cse-zotero cse-zotero data-query \
+  "$copy_root/data/<dataset>.csv" --sql "SELECT * FROM records LIMIT 1" --json
+```
+
+Run one read-only `data-query` or the project's native reader against the copy,
+compare one known value with the retained record, and discard the isolated
+directory after review. This verifies one curated record and one dataset
+without writing into the live corpus and does not require a new backup product
+or scheduler.
+
 ## Canonical bibliography
 
 The configured bibliography target defaults to
@@ -262,8 +316,8 @@ claims are under that corpus's `wiki/claims/` directory.
 The second vertical-slice evidence candidate is the active corpus's
 `wiki/papers/Hamer1972.md`,
 using the existing Zotero Markdown companion under `wiki/evidence/28NPJ5H6/`.
-Its registry data remains a staging candidate until basis and row membership
-are reviewed.
+Its historical registry data remains a staging candidate until basis and row
+membership are reviewed; a project may instead use its selected data authority.
 
 Before a review or handoff, run the local-only checks:
 
@@ -277,10 +331,10 @@ uv run python scripts/agent_smoke.py --json
 
 `wiki-release` is dry-run by default. `wiki-release --apply` writes only the
 repository-local `wiki/release-manifest.json`; it does not write to Zotero or
-the thermophysical-data registry.
+the selected external data authority. The registry layout is optional.
 
 `wiki-coverage` is the broad-corpus progress view. It reports classification,
-evidence, brief, typed-record, registry, and validation coverage plus bounded
+evidence, brief, typed-record, selected-data-authority, and validation coverage plus bounded
 examples for each gap. Missing coverage is expected and reviewable; it is not
 permission to invent summaries or convert PDFs in bulk.
 

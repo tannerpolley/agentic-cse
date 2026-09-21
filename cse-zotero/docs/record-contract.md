@@ -25,8 +25,10 @@ validation:<slug>
 rel:<slug>
 ```
 
-Registry IDs are not renamed. A record refers to one with a `registry_refs`
-entry containing the external ID, registry name, path, and version or commit.
+External data-authority IDs are not renamed. When a project selects a registry,
+a record may refer to one with a `registry_refs` entry containing the external
+ID, authority name, path, and version or commit. No project is required to
+select that registry layout.
 Zotero parent keys remain the source identity and are never replaced by a
 wiki slug.
 
@@ -69,7 +71,7 @@ invalid because it cannot be audited.
 navigation; a scientific relation needs a type, rationale, and provenance when
 it represents a conclusion. Relations can target a wiki record, a legacy claim
 (`claim:<id>`), a generated Zotero source (`source:<key>`), or an external
-registry reference (`registry:<id>`).
+data-authority reference such as `registry:<id>`.
 
 ## Evidence policy
 
@@ -86,9 +88,10 @@ uv run cse-zotero wiki-record equation:figiel-born-solvation-shell --json
 uv run cse-zotero wiki-record-template equation --zotero-key YEENX35P --json
 uv run cse-zotero wiki-paper-template YEENX35P --json
 uv run cse-zotero wiki-lineage equation:figiel-born-solvation-shell --json
-uv run cse-zotero wiki-lint --registry-root data/domains/thermophysical/source/registry --json
+uv run cse-zotero wiki-lint --json
 uv run cse-zotero wiki-context --global --query "Born activity coefficients" --json
 ```
 
 All commands are read-only. Record authoring is a deliberate repository
-change; Zotero and the registry are not mutated by this interface.
+change; Zotero and a project's selected data authority are not mutated by this
+interface. Add `--registry-root` only when that optional authority is selected.

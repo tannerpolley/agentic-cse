@@ -8,8 +8,9 @@ description: Use for research questions that may cross the local Zotero library,
 Run `cse-zotero doctor --json`, then use the configured corpus wiki as
 the first, read-only retrieval layer. Zotero owns
 the documents and bibliographic metadata; the wiki owns evidence navigation,
-curated records, relations, and synthesis. The thermophysical-data-registry
-owns reusable numerical data and parameter packages.
+curated records, relations, and synthesis. Each project selects the authority
+for reusable numerical data and parameter packages; a separate
+thermophysical-data-registry is optional, not a runtime requirement.
 
 ## Default retrieval recipe
 
@@ -26,10 +27,12 @@ owns reusable numerical data and parameter packages.
 4. Use `wiki-source KEY` for the bibliographic record and its `wiki.brief` /
    `wiki.evidence` routes, then `wiki-record-search`, `wiki-record`, and
    `wiki-lineage` for typed knowledge.
-5. Use `data-search "<species or property>" --json` to discover retained
-   numerical packages, then `data-query` on an exact returned resource path.
-   Require verified integrity and inspect quality, units, basis and source
-   locators; unreviewed data is not automatically an accepted project input.
+5. Use the project's selected data-authority front door to discover retained
+   numerical packages. When that authority is the companion registry, use
+   `data-search "<species or property>" --json` and then `data-query` on an
+   exact returned resource path. Require verified integrity and inspect
+   quality, units, basis and source locators; unreviewed data is not
+   automatically an accepted project input.
 6. Use `wiki-evidence KEY --query "<specific terms>"` for short,
    line-located companion passages before reading a full PDF.
 7. Use `zotero-search`, `zotero-children`, and `zotero-attachment-path` when
@@ -45,8 +48,8 @@ owns reusable numerical data and parameter packages.
   `wiki-evidence-sync --json` and review its plan before `--apply`.
 - Evidence search reads only declared Markdown/Mathpix Markdown companions;
   it never reads PDFs or converts them.
-- Do not treat generated source metadata, a paper brief, a registry staging
-  path, or an implementation pointer as a validated conclusion.
+- Do not treat generated source metadata, a paper brief, a selected-authority
+  staging path, or an implementation pointer as a validated conclusion.
 - Every promoted claim, equation, dataset, parameter, idea, workflow, or
   validation record needs exact source locators and status/confidence.
 - Keep source-reported, normalized, inferred, and project-derived statements
@@ -69,6 +72,35 @@ Zotero is never mutated.
 For model-driving work, use `wiki/curation/model-driving-records.json` as a
 small starting set before expanding through global search and lineage.
 
+## Retention and recovery
+
+Generated source metadata, triage data, SQLite indexes, and evidence-sync
+indexes are rebuildable. Curated briefs, interpretations, relations,
+classification decisions, Zotero attachments, and project-owned data are not.
+Pushing this runtime repository does not back up the external corpus. Each
+project records its own data authority, retention owner, and revision.
+
+Use the project's existing ordinary copy/versioning mechanism: copy the
+selected corpus, hash one curated record and one dataset with `sha256sum`, and
+verify the hashes in an isolated copy. For example:
+
+```bash
+check=/path/to/isolated-recovery-check
+mkdir -p "$check"
+cp -a /path/to/selected-corpus/. "$check/"
+(cd /path/to/selected-corpus && \
+  sha256sum wiki/projects/<project>.md data/<dataset>.csv > "$check/expected.sha256")
+(cd "$check" && sha256sum -c expected.sha256 \
+  && test -s wiki/projects/<project>.md \
+  && test -s data/<dataset>.csv)
+uv run --project /path/to/cse-zotero cse-zotero data-query \
+  "$check/data/<dataset>.csv" --sql "SELECT * FROM records LIMIT 1" --json
+```
+
+Run one read-only native data query against the copied dataset and compare one
+known value with the copied record. Do not write the check into the live
+corpus; no new backup product or scheduler is required.
+
 ## PDF, publisher, and acquisition gates
 
 Never convert a PDF when a usable Zotero Markdown companion exists. If none
@@ -88,6 +120,9 @@ uv run python scripts/benchmark_wiki.py --json
 uv run cse-zotero wiki-verify --json
 uv run cse-zotero wiki-health --json
 ```
+
+Add `--registry-root` to lint or release commands only when the selected
+project authority exposes that optional registry layout.
 
 The smoke/benchmark workflows must remain read-only, report zero PDF reads,
 and preserve attachment keys, hashes, and locators in their evidence path.

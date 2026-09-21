@@ -1,7 +1,7 @@
 # Zotero-LLM-Wiki vocabulary
 
 This glossary defines the domain concepts used by the wiki and its connected
-thermophysical-data and engineering repositories. It intentionally avoids
+project-selected data authorities and engineering repositories. It intentionally avoids
 implementation details; commands and file formats belong in the repository
 instructions and the canonical plan.
 
@@ -48,7 +48,7 @@ parameter set, or derived result against declared data, conditions, and
 acceptance criteria.
 
 **Project** — A bounded engineering effort that consumes selected sources,
-registry records, implementations, and validation results.
+data-authority records, implementations, and validation results.
 
 **Domain** — A subject-area view such as ePC-SAFT, MEA/CO2 capture, lithium
 extraction, transport, phase equilibria, or methodology. A source can belong to
@@ -58,9 +58,10 @@ multiple domains.
 can cross projects and domains, such as a particular electrolyte treatment,
 parameterization strategy, or data-quality issue.
 
-**Registry** — The canonical, versioned home for reusable structured scientific
-data, observations, parameter sets, and correlations. The registry links to
-Zotero sources but does not replace them.
+**Data authority** — The project-selected, versioned home for reusable
+structured scientific data, observations, parameter sets, and correlations.
+An external registry is one possible authority; it links to Zotero sources but
+does not replace them.
 
 **Implementation reference** — A pointer from a knowledge or registry record
 to code, configuration, or executable behavior in an engineering repository,
@@ -76,8 +77,9 @@ validates.
 2. Evidence records what a source says; evidence alone is not project truth.
 3. The wiki owns curated navigation, interpretation, relations, and synthesis,
    with explicit provenance and review state.
-4. The thermophysical-data registry owns reusable numerical data and compatible
-   parameter/correlation versions.
+4. Each project selects and records the authority for reusable numerical data
+   and compatible parameter/correlation versions; a thermophysical-data
+   registry is optional.
 5. Engineering repositories own implementation behavior, fit runs, and
    validation outputs.
 6. A derived statement must remain visibly derived and must link to all
@@ -88,4 +90,3 @@ validates.
 All Zotero sources are discoverable. Relevance is a many-to-many classification
 across domains, projects, and research threads; the initial three project views
 are not a limit on the corpus.
-

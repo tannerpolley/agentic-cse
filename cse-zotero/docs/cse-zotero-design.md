@@ -18,7 +18,7 @@ The intended loop is:
 Zotero source
   -> attachment and exact evidence passage
   -> paper brief, claim, equation, idea, insight, or workflow
-  -> thermophysical-data-registry dataset/parameter/correlation
+  -> project-selected data authority package/parameter/correlation
   -> implementation reference and validation run
   -> project result or cross-paper synthesis
   -> backlink to Zotero key, attachment, and source locator
@@ -65,9 +65,10 @@ The wiki must therefore support:
 | Layer | Owns | Does not own |
 | --- | --- | --- |
 | Zotero | Bibliographic records, PDFs, attachments, annotations, collection context, Zotero keys | Validated model conclusions or canonical normalized data |
-| CSE Zotero | Evidence navigation, briefs, claims, equations, ideas, insights, workflows, relations, synthesis | The original PDF or the authoritative numerical registry |
-| thermophysical-data-registry | Source-faithful tables, normalized observations, parameter sets, correlations, versions, quality state | Bibliographic document storage or project-specific fit results |
-| Engineering repositories | Implementations, regression configuration, executable behavior, validation runs, figures, outputs | Silent corrections to literature or shared registry truth |
+| CSE Zotero | Evidence navigation, briefs, claims, equations, ideas, insights, workflows, relations, synthesis | The original PDF or a project's external data authority |
+| Project-selected data authority | Source-faithful tables, normalized observations, parameter sets, correlations, versions, quality state as chosen by that project | Bibliographic document storage or silent changes to project conclusions |
+| Historical thermophysical-data-registry slice | An optional prior integration pattern retained for historical evidence | A mandatory repository, corpus, or project-wide data authority |
+| Engineering repositories | Implementations, regression configuration, executable behavior, validation runs, figures, outputs | Silent corrections to literature or project-selected data authority |
 | Schema/instructions/indexes | Vocabulary, contracts, deterministic generated indexes, agent operating rules | Scientific evidence itself |
 
 PDFs remain in Zotero. The wiki may use a verified existing Markdown or
@@ -165,18 +166,21 @@ The active corpus's initial curated directories contain a Figiel paper brief,
 atomic claims, and NodeGraph analysis. They are a working seed, not a completed
 schema or package fixture.
 
-### 4. Registry and implementation layer
+### 4. Project data and implementation layer
 
-The future thermophysical-data-registry is the canonical home for reusable
-numerical truth: source-faithful raw tables, normalized observations, units and
-bases, uncertainty, quality decisions, parameter sets, correlations, and
-versioned manifests. It should reference Zotero but not copy PDFs.
+Each project selects the authority for reusable numerical truth: source-faithful
+raw tables, normalized observations, units and bases, uncertainty, quality
+decisions, parameter sets, correlations, and versioned manifests. That
+authority may be a local directory, an existing repository, a database, or a
+service already governed by the project. CSE Zotero records the selected
+authority and its identity; it does not impose a thermophysical-data-registry,
+DataLad, or Git-tracked corpus.
 
 Engineering repositories own code and execution records. Each project should
-pin registry versions and record implementation commits, fitting assumptions,
-validation datasets, exclusions, and generated outputs. A model parameter is
-not promoted to reusable truth merely because a paper mentions it or an agent
-summarizes it.
+pin the selected data-authority revision and record implementation commits,
+fitting assumptions, validation datasets, exclusions, and generated outputs. A
+model parameter is not promoted to reusable truth merely because a paper
+mentions it or an agent summarizes it.
 
 ### 5. Schema, instructions, and compiled indexes
 
@@ -195,7 +199,7 @@ Zotero item
   -> child attachment
   -> evidence passage (exact locator + content hash)
   -> paper brief / claim / equation / idea / insight / workflow
-  -> registry dataset / observation / parameter set / correlation
+  -> selected data-authority dataset / observation / parameter set / correlation
   -> implementation reference
   -> regression or validation run
   -> project result / cross-paper synthesis
@@ -214,7 +218,7 @@ Every promoted item should answer:
 - Where exactly is the supporting evidence?
 - Is it source-reported, normalized, inferred, or project-derived?
 - What assumptions, units, model conventions, and validity limits apply?
-- Which registry version, code version, or validation run consumed it?
+- Which data-authority version, code version, or validation run consumed it?
 - What would become stale if the upstream item changed?
 
 ## Corpus routing and curation lifecycle
@@ -260,8 +264,8 @@ the corpus shows a repeated need for another category.
 ### Query and read
 
 1. Start at wiki/index.md and a global or domain-aware wiki-context.
-2. Read the relevant brief, claims, equations, registry references, and
-   evidence hits.
+2. Read the relevant brief, claims, equations, selected data-authority
+   references when present, and evidence hits.
 3. Open a full normalized source or PDF only for an explicit audit, unresolved
    ambiguity, or missing context.
 4. Preserve new reusable answers as claims, insights, workflows, or synthesis
@@ -273,17 +277,55 @@ should gain a global corpus/context route without removing the existing views.
 ### Connect to data and code
 
 When a paper contributes a dataset, equation, or parameter set, create a
-source-backed wiki record first, then link to the registry package or
-implementation. The registry and project manifest must retain the source key,
-locator, version, transformation, and validation lineage.
+source-backed wiki record first, then link to the project's selected data
+authority or implementation. The project record must retain the source key,
+locator, authority identity/version, transformation, and validation lineage.
 
 ### Validate and audit
 
 Validation must check more than numeric agreement. It should report source
 coverage, unit/composition bases, model convention compatibility, validity
-ranges, excluded observations, code/registry versions, and exact Zotero
+ranges, excluded observations, code/data-authority versions, and exact Zotero
 backlinks. Contradictions and unresolved interpretations remain visible rather
 than being silently merged.
+
+## Retention and recovery
+
+The repository separates rebuildable navigation from irreplaceable research
+decisions. Generated source metadata, catalogs, manifests, triage files,
+SQLite indexes, and evidence-sync indexes can be rebuilt from Zotero or the
+selected data authority. Curated briefs, interpretations, claims, graphs,
+relations, classification decisions, and user-owned source/data files cannot
+be reconstructed reliably from those generated layers. Pushing this runtime
+repository does not back up the external corpus, Zotero attachments, or a
+project's selected data authority.
+
+Each project records its selected authority, root or endpoint, revision, and
+retention owner. Recovery uses the project's existing ordinary copy or
+versioning mechanism: copy the selected corpus, hash representative curated
+and data files with `sha256sum`, and verify the hashes in the copy. No
+thermophysical-data-registry, DataLad, Git-tracked corpus, backup product, or
+scheduler is required.
+
+An isolated check must not write to the live corpus. For example:
+
+~~~bash
+check=/path/to/isolated-recovery-check
+mkdir -p "$check"
+cp -a /path/to/selected-corpus/. "$check/"
+(cd /path/to/selected-corpus && \
+  sha256sum wiki/projects/<project>.md data/<dataset>.csv > "$check/expected.sha256")
+(cd "$check" && sha256sum -c expected.sha256 \
+  && test -s wiki/projects/<project>.md \
+  && test -s data/<dataset>.csv)
+uv run --project /path/to/cse-zotero cse-zotero data-query \
+  "$check/data/<dataset>.csv" --sql "SELECT * FROM records LIMIT 1" --json
+~~~
+
+Then run one read-only native data query against the copied dataset and compare
+one known value with the copied curated record. This verifies one
+representative record and dataset without changing live state; record the
+result and discard the isolated copy after review.
 
 ### Refresh and lint
 
@@ -306,15 +348,14 @@ The phases below are the capability roadmap; implementation follows this
 dependency-aware order so the wiki stays low-friction while it becomes
 auditable:
 
-1. Establish a local version-control baseline for the wiki. The
-   thermophysical-data-registry remains independently owned by its other
-   implementation task.
+1. Establish the selected project's retention and recovery authority for the
+   corpus and data.
 2. Freeze the shared record envelope, stable-ID rules, relation vocabulary,
    and source/evidence contract before adding scientific records.
 3. Build Phase 3 with two vertical slices: Figiel 2025 and Hamer 1972, which
    is intentionally outside the three initial project views.
-4. Connect those records to registry IDs, project manifests, implementation
-   references, and validation inputs.
+4. Connect those records to the selected data authority when one exists,
+   project views, implementation references, and validation inputs.
 5. Add cross-domain concepts, synthesis, typed relations, and
    dependency-aware health checks.
 6. Stabilize the small read-only agent interface, release manifests, and
@@ -322,10 +363,9 @@ auditable:
 7. Add larger retrieval or service infrastructure only if benchmarks show
    that the indexed Markdown/SQLite path is insufficient.
 
-Version control is a prerequisite for curated scientific records, not a late
-Phase 8 feature. The registry keeps its own repository and release history;
-this repository records the cross-repository contract without taking over its
-branch or commit state.
+Version control is useful for curated records but is not a prerequisite for
+the external corpus. The project records whichever authority and recovery
+mechanism it actually uses; this repository does not take over that authority.
 
 ## Delivery roadmap
 
@@ -393,21 +433,24 @@ into generic claims. The shared envelope is implemented before broad record
 creation, and structural lint starts here rather than waiting for dependency
 propagation.
 
-### Phase 4 — Thermophysical registry integration
+### Phase 4 — Optional external data-authority integration (historical registry slice)
 
-Status: implemented as a read-only cross-repository contract on 2026-08-04.
-Wiki records and project manifests point to the registry's source-faithful
-observation and staging paths without copying or editing registry data.
+Historical status: implemented as a read-only cross-repository contract on
+2026-08-04. It is an optional example, not a current project requirement.
+Wiki records and project manifests may point to a selected authority's
+source-faithful observation and staging paths without copying or editing its
+data.
 
-Connect wiki records to stable registry IDs and versions. Define project data
-manifests, source locators, normalization lineage, parameter dependencies,
-validity ranges, and promotion/review states. Keep PDFs in Zotero and keep
-registry data authoritative for reusable numerical values.
+Connect wiki records to stable data-authority IDs and versions when the
+authority provides them. Define project data manifests, source locators,
+normalization lineage, parameter dependencies, validity ranges, and
+promotion/review states. Keep PDFs in Zotero and keep the selected authority
+authoritative for its reusable numerical values.
 
-Exit: a model input or validation dataset can be traced from the registry to a
-specific source passage and Zotero item, and back from Zotero to the consuming
-model/run. Registry integration is read-only from this repository and accepts
-the registry's own stable IDs and versions.
+Exit: a model input or validation dataset can be traced from the selected
+authority to a specific source passage and Zotero item, and back from Zotero to
+the consuming model/run. Any integration is read-only from this repository and
+accepts the authority's own stable IDs and versions.
 
 ### Phase 5 — Cross-domain knowledge and synthesis
 
@@ -427,15 +470,15 @@ their assumptions, methods, data, and insights connect or disagree.
 ### Phase 6 — Dependency-aware health and coverage
 
 Status: implemented on 2026-08-04. `wiki-health`, `wiki-coverage`, and
-`wiki-stale` now report source/registry-triggered review queues, curation gaps,
+`wiki-stale` now report source/data-authority-triggered review queues, curation gaps,
 orphaned dependencies, contradictions, superseded records, and
 record/manifest lint results without refreshing or mutating any source.
 
 Build the typed link/dependency index and stale propagation. Add lint for
 contradictions, orphan pages, broken locators, missing backlinks, unsupported
-claims, unlinked model inputs, registry gaps, and validation coverage gaps.
+claims, unlinked model inputs, selected-authority gaps, and validation coverage gaps.
 
-Exit: a source or registry change produces a bounded review queue instead of
+Exit: a source or selected-authority change produces a bounded review queue instead of
 silently leaving downstream conclusions stale.
 
 ### Phase 7 — Agent interface
@@ -464,14 +507,14 @@ layout.
 
 Status: implementation complete on 2026-08-04. `wiki-release` produces a
 local reproducibility manifest with artifact hashes, source/evidence counts,
-registry revisions, Git state, lint results, and explicit no-mutation flags.
+selected-authority revisions, Git state, lint results, and explicit no-mutation flags.
 The original implementation baseline is preserved in repository history;
 subsequent curation changes remain reviewable repository changes.
 
 Put curated wiki/schema changes under a reviewable version-control workflow.
 Generated source and staging layers remain rebuildable. Add review ownership,
 change logs, release manifests, and reproducibility records containing code,
-registry, wiki, and source snapshot versions.
+selected data-authority, wiki, and source snapshot versions.
 
 Exit: another researcher can reproduce a model/validation result and audit its
 full chain without trusting an undocumented agent memory.
@@ -499,7 +542,7 @@ or fallback path.
 The repository now contains the complete low-friction implementation surface:
 source materialization, whole-corpus companion synchronization, a generated
 source browse table, companion-only evidence retrieval, full-corpus triage,
-reviewable classification, typed records and templates, registry/project
+reviewable classification, typed records and templates, data-authority/project
 contracts, lineage, health and coverage reports, release manifests, and a
 measured read-only agent interface. The remaining work is scientific curation:
 selecting sources from the queues, reading declared companions when available,
@@ -514,12 +557,12 @@ verified without violating authority boundaries.
 
 | Scenario | Expected result |
 | --- | --- |
-| Figiel paper contributes a Born-term equation, data, and validation result | Exact evidence passages link to separate equation/claim/dataset/validation records, the registry reference is versioned, implementation references are explicit, and every path ends at Zotero YEENX35P plus locators. |
+| Figiel paper contributes a Born-term equation, data, and validation result | Exact evidence passages link to separate equation/claim/dataset/validation records, the selected data-authority reference is versioned when applicable, implementation references are explicit, and every path ends at Zotero YEENX35P plus locators. |
 | A relevant paper is not in the three initial project views | It remains discoverable in the all-source index, can be classified into one or more new domains/threads, and can be curated without inventing a new project boundary. |
 | One paper is relevant to ePC-SAFT, transport, and a shared data concept | One source record is reused through many-to-many relations; the wiki updates existing concept/entity pages instead of duplicating the paper. |
 | A source companion or Zotero metadata changes | Hash/version comparison marks only dependent evidence and curated records stale; refresh does not overwrite interpretation. |
 | Two papers disagree or a parameter set is superseded | Both records remain visible with contradicts or supersedes, validity/model conventions are shown, and downstream consumers receive a review warning. |
-| A data record and equation record come from the same paper | They remain separate typed records with shared evidence links and can be traced independently into registry and implementation use. |
+| A data record and equation record come from the same paper | They remain separate typed records with shared evidence links and can be traced independently into the selected data authority and implementation use. |
 | An insight or workflow is synthesized from several papers | It is marked derived, names all supporting sources and uncertainty, and is never mistaken for a direct source quotation. |
 | A source has no usable Markdown companion | The system reports evidence unavailable and follows the strict human acquisition/Mathpix gate; it does not silently convert or invent evidence. |
 | A publisher blocks or challenges access | The agent stops, reports the blocker, and asks the user to complete a normal browser step; it never bypasses, spoofs, or rapidly retries. |
@@ -535,7 +578,7 @@ verified without violating authority boundaries.
 - Do not bypass publisher access controls, CAPTCHA, Cloudflare, VPN/IP bans,
   login walls, or Connector human-presence checks.
 - Do not mutate Zotero as part of wiki refresh, ingestion, or synthesis.
-- Do not promote a paper statement to registry or implementation truth without
+- Do not promote a paper statement to selected data-authority or implementation truth without
   source locators, assumptions, and review status.
 - Do not flatten equations, composition bases, uncertainties, or model
   conventions into unqualified prose.
@@ -565,7 +608,8 @@ The implemented slice includes:
    that are relevant but not yet briefed.
 
 This slice reduces repeated PDF reading immediately and creates the seams for
-registry and cross-paper lineage without requiring a large migration.
+selected data-authority and cross-paper lineage without requiring a large
+migration.
 
 ### Slice 2 — Reviewable broad-corpus classification
 
@@ -576,7 +620,7 @@ domains, research threads, relevance, reasons, and review queues. The curated
 records, and `wiki-classify` is dry-run by default.
 
 Slices 3–9 are now implemented for the initial Figiel/Hamer vertical slice,
-with registry/project-manifest links, cross-paper synthesis, dependency
+with selected-authority/project-manifest links, cross-paper synthesis, dependency
 health, the read-only agent interface, release manifests, and a measured seed
 benchmark. Scaling to more full paper briefs remains a queue-driven curation
 task across the complete 386-source corpus, not a prerequisite for using the
@@ -590,8 +634,8 @@ The system is mature enough when:
   routine question;
 - every model input, equation, dataset, parameter, and validation statement
   has a source/evidence chain to Zotero;
-- reusable numerical truth has a stable registry ID/version and project
-  manifests pin what was used;
+- reusable numerical truth has a stable identity/version from its selected
+  data authority and project records pin what was used;
 - ideas, insights, and workflows are captured as first-class, clearly derived
   knowledge rather than disappearing into chat history;
 - new papers update connected pages and surface contradictions instead of
@@ -605,12 +649,13 @@ The system is mature enough when:
 
 ## Resolved implementation decisions
 
-1. CSE Zotero uses local Git history for curated records, schemas, docs, and
-   reproducibility manifests. Generated source artifacts remain rebuildable;
-   the registry keeps its own repository and release history.
+1. CSE Zotero may use local Git history for curated records, schemas, docs, and
+   reproducibility manifests, but it does not require Git for the external
+   corpus. Generated source artifacts remain rebuildable; a selected external
+   authority keeps its own retention and release history.
 2. Wiki-owned IDs use a type namespace such as `equation:...`, `idea:...`, or
-   `validation:...`. Registry IDs remain external stable IDs and are referenced
-   with an explicit registry name and version/revision.
+   `validation:...`. External data-authority IDs remain stable when provided
+   and are referenced with the authority name and version/revision.
 3. Existing Zotero `.md`/`.mmd` companions are copied exactly into a declared
    evidence bundle when needed. PDFs remain in Zotero; no routine conversion or
    second PDF store is created.

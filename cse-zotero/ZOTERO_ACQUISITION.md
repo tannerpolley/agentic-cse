@@ -96,3 +96,12 @@ Zotero/Connector integration.
 For more than occasional individual papers, use the publisher's approved API or
 text-and-data-mining access and license. Keep credentials and downloaded corpora
 private and follow their sharing and retention terms.
+
+## Retention boundary
+
+Zotero attachments and any project-selected data authority remain external,
+user-owned corpus state. A push of the CSE Zotero runtime repository does not
+back them up. Follow the project's chosen retention policy and verify an
+ordinary copied sample with hashes and a read-only query before relying on a
+restore; this contract does not require DataLad, a Git-tracked corpus, a
+separate registry, or a scheduler.

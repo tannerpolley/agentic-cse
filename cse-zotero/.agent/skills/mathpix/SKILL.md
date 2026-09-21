@@ -84,6 +84,16 @@ The source PDF and Zotero database remain immutable. Creating a repository
 companion file does not attach it back into Zotero. Making the companion a
 visible Zotero child attachment is a separate, explicit Zotero write action.
 
+## Retention boundary
+
+Generated evidence indexes and source metadata can be rebuilt from the
+retained companion and Zotero. Curated briefs, interpretations, relations,
+classification decisions, and user-owned data cannot. Pushing the runtime
+repository does not back up Zotero attachments or the selected project data
+authority. Use that project's existing ordinary copy/versioning mechanism;
+verify an isolated copy with `sha256sum` and a read-only query before treating
+it as recovered. Do not add a backup product or scheduler to this workflow.
+
 ## Agent reading rules
 
 - Read the whole converted article when making a paper-level synthesis; chunk

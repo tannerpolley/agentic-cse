@@ -9,8 +9,6 @@ import shutil
 
 from .better_bibtex import BetterBibTeXClient, BetterBibTeXError, configure_export, export_plan
 from .config import (
-    CAPABILITIES,
-    PROTOCOL_VERSION,
     ConfigError,
     config_payload,
     default_config_path,
@@ -37,7 +35,7 @@ from .records import (
 )
 from .release import ReleaseError, release_plan
 from .registry_migration import RegistryMigrationError, build_registry_pack
-from .report import audit_payload
+from .report import audit_payload, doctor_payload
 from .scientific_data import ScientificDataError, query_table, search_registry, validate_catalog
 from .source_ops import attachment_path, search_sources, source_children
 from .templates import paper_brief_template, record_template
@@ -485,7 +483,15 @@ def main() -> int:
                         if key not in {"ok", "mode"} and current[key] != payload[key]
                     }
             else:
-                config = load_config(args.config, allow_proposed=args.command == "doctor")
+                configuration_error = ""
+                config = None
+                if args.command == "doctor":
+                    try:
+                        config = load_config(args.config)
+                    except (ConfigError, OSError, ValueError) as exc:
+                        configuration_error = str(exc)
+                else:
+                    config = load_config(args.config)
                 if args.command == "corpus-migrate":
                     payload = migrate_corpus(args.source_root, config, apply=args.apply)
                 elif args.command == "bibliography-export":
@@ -510,16 +516,14 @@ def main() -> int:
                         bbt_ok = True
                     except BetterBibTeXError as exc:
                         bbt_error = str(exc)
-                    payload = {
-                        **config_payload(config, args.config, mode="read-only"),
-                        "protocol_version": PROTOCOL_VERSION,
-                        "capabilities": list(CAPABILITIES),
-                        "zotero": {"ok": zotero_ok, "error": zotero_error},
-                        "better_bibtex": {"ok": bbt_ok, "error": bbt_error, **bbt_version},
-                        "mathpix": {"mpx_on_path": shutil.which("mpx") is not None},
-                        "configuration_exists": Path(args.config).is_file(),
-                    }
-                    payload["ok"] = zotero_ok and bbt_ok and Path(args.config).is_file()
+                    payload = doctor_payload(
+                        args.config,
+                        config=config,
+                        configuration_error=configuration_error,
+                        zotero={"ok": zotero_ok, "error": zotero_error},
+                        better_bibtex={"ok": bbt_ok, "error": bbt_error, **bbt_version},
+                        mathpix={"mpx_on_path": shutil.which("mpx") is not None},
+                    )
         except (ConfigError, CorpusMigrationError, BetterBibTeXError, OSError, ValueError) as exc:
             parser.error(str(exc))
         emit_json(payload)

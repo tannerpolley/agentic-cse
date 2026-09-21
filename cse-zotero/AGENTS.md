@@ -12,7 +12,7 @@
   `scripts/check-library.sh` only when the configured Zotero library, corpus,
   and Better BibTeX prerequisites are intentionally available.
 - Use `CONTRIBUTING.md` for the edit/test/install map. Source-use guidance is
-  retained in `.agent/skills/` for the later integrated-plugin transfer;
+  retained in `.agent/skills/` as the standalone runtime's own operating skill;
   runtime data contracts and operational commands remain here and in the
   product README.
 
@@ -21,9 +21,11 @@ This repository maintains the installable source-linked research companion for
 the local Zotero library. Zotero remains the bibliographic authority. The
 active corpus is configured user-owned state outside this package checkout.
 
-For the reusable agent operating protocol, read
+For the standalone runtime's reusable operating protocol, read
 `.agent/skills/cse-zotero/SKILL.md` before a research task that crosses
 Zotero evidence, equations, data, implementation, or validation.
+This remains the runtime's operating guidance; it is not a placeholder for a
+later integrated-plugin transfer.
 
 The canonical full-library Better BibTeX export is the path reported by
 `doctor`. Refresh it only with `bibliography-export --apply` after reviewing
@@ -73,7 +75,7 @@ slugs are initial views, not the boundary of the Zotero corpus.
 7. Use `wiki-record-search`, `wiki-record`, and `wiki-lineage` for typed
    equations, datasets, parameters, ideas, workflows, implementations, and
    validation records before opening a full PDF. Run `wiki-health` when a
-   source or registry dependency may have changed; it is read-only.
+   source or selected data-authority dependency may have changed; it is read-only.
 8. Use `wiki-coverage --json` to choose bounded corpus work, and
    `wiki-record-template <record_type> --zotero-key <KEY> --json` or
    `wiki-paper-template <KEY> --json` when a new curated page is needed. These
