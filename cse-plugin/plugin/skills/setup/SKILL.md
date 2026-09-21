@@ -50,19 +50,29 @@ plan; add `--role analysis` or `--role tool` for a confirmed preview. They
 write nothing until the same plan is rerun with `--approve --role <role>`. Merge
 every root or nested `CONTEXT.md` into the one root `CONTEXT.md`, including
 its sourced glossary and avoid table, and mark missing sources as `sourceless`.
-The scientific context owns the question, intended use, owners, and one
+The scientific context owns the question, intended use, owners, one
 confirmed `repository role: analysis | tool` line consumed by Design and the
-stance hook.
+stance hook, and one `agent role: <discipline and specialization>` line with
+its responsibilities paragraph under `## Agent role`.
 Preview user configuration,
 repository guidance, files to create or migrate, and optional integrations
 before mutation. Reuse the project assets for a populated `docs/scientific/`
 core; do not create placeholders, generic ADR starters, competing owners, or
-unused metadata. Audit the root `AGENTS.md` for the mandatory CSE entry pointer:
-it must require the installed CSE skills and name both `docs/scientific/README.md`
-and `docs/scientific/CONTEXT.md` before route selection. Use
-`python3 scripts/workflow/setup_scientific_project.py --repo <root> --check-routing` to
-preview a minimal reconciliation. Replace one clearly identified weaker CSE
-paragraph or append the canonical pointer; preserve all other guidance. Migrate
+unused metadata. Audit the root `AGENTS.md` for exactly one managed CSE Protocol
+section between `<!-- CSE:BEGIN PROTOCOL -->` and `<!-- CSE:END PROTOCOL -->`,
+placed after the document title, whose first instruction is the confirmed agent
+role followed by the repository role and concise working instructions. Setup
+generates it from `docs/scientific/CONTEXT.md`; never hand-edit it or keep a
+second copy. In the material-choice round ask once for a missing scientific
+discipline and specialization and one paragraph of project responsibilities;
+retain confirmed values on later passes and ask only about proposed changes.
+`python3 scripts/workflow/setup_scientific_project.py --repo <root> --check-routing`
+reports a missing, stale, or malformed block, a missing agent role, and the exact
+proposed repair; approved application replaces the legacy pointer paragraph and
+preserves all other guidance. Duplicate or unmatched markers require manual
+reconciliation, never a guessed overwrite. A drifted block is shown as a diff;
+approved regeneration uses the retained scientific context unless the
+investigator supplies a new decision. Migrate
 established records with exact caller and link updates, preserving ownership;
 use `git mv` where practical and leave no alias, duplicate, or redirect. Create only
 populated analysis inputs, scripts, results, and figures; new sets use
@@ -73,7 +83,10 @@ populated root Quarto Manuscript; do not rename or migrate it solely to match th
 default. Setup does not create substantive per-analysis report; Summarize owns it.
 A confirmed `tool` gets no default Quarto Manuscript; without a renderer, report
 the exact missing capability.
-For confirmed deterministic preparation, use `python3 scripts/workflow/setup_scientific_project.py --role <role>`.
+For confirmed deterministic preparation, use
+`python3 scripts/workflow/setup_scientific_project.py --role <role> --agent-role "<discipline and specialization>" --responsibilities "<paragraph>"`;
+the same two options apply to `--reconcile --approve`, and omitted values are
+retained from the existing scientific context.
 Preflight all destinations before the first write, then verify the final pointer and both readable
 scientific files. Setup prepares scientific records and project guidance; existing hook
 configuration stays untouched. For host invocation, structured questions, native

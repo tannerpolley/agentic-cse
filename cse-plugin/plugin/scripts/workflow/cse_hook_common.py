@@ -48,3 +48,31 @@ def nearest_context(start: Path, boundary: Path) -> Path | None:
         if directory == boundary:
             break
     return None
+
+
+AGENT_ROLE_DECLARATION = re.compile(r"(?im)^[ \t]*agent[ \t]+role[ \t]*:[ \t]*([^\r\n]*?)[ \t]*$")
+HEADING = re.compile(r"(?m)^#{1,6}[ \t]")
+
+
+class AgentRoleState(TypedDict):
+    role: str | None
+    roles: list[str]
+    responsibilities: str
+
+
+def agent_role_state(text: str) -> AgentRoleState:
+    """Return the sole declared agent role and the paragraph(s) that follow it."""
+    matches = list(AGENT_ROLE_DECLARATION.finditer(text))
+    roles = [match.group(1) for match in matches if match.group(1)]
+    role = roles[0] if len(roles) == 1 and len(matches) == 1 else None
+    responsibilities = ""
+    if role:
+        rest = text[matches[0].end():]
+        heading = HEADING.search(rest)
+        responsibilities = (rest[:heading.start()] if heading else rest).strip()
+    return {"role": role, "roles": roles, "responsibilities": responsibilities}
+
+
+def agent_role(context: Path) -> str | None:
+    """Return the sole confirmed agent role, or None if unresolved."""
+    return agent_role_state(context.read_text(encoding="utf-8"))["role"]

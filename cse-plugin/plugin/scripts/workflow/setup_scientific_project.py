@@ -15,13 +15,23 @@ import subprocess
 from typing import Iterable
 
 try:
-    from .cse_hook_common import DECLARATION_LINE, ROLE_VALUES, repository_role, role_state
+    from .cse_hook_common import (
+        AGENT_ROLE_DECLARATION, DECLARATION_LINE, HEADING, ROLE_VALUES,
+        agent_role_state, repository_role, role_state,
+    )
 except ImportError:
-    from cse_hook_common import DECLARATION_LINE, ROLE_VALUES, repository_role, role_state
+    from cse_hook_common import (
+        AGENT_ROLE_DECLARATION, DECLARATION_LINE, HEADING, ROLE_VALUES,
+        agent_role_state, repository_role, role_state,
+    )
 
 
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "assets" / "workflow" / "project"
+PROTOCOL_TEMPLATE = ROOT / "assets" / "workflow" / "protocol.md"
+BLOCK_BEGIN = "<!-- CSE:BEGIN PROTOCOL -->"
+BLOCK_END = "<!-- CSE:END PROTOCOL -->"
+AGENT_ROLE_SECTION = re.compile(r"(?ms)^## Agent role[ \t]*\n.*?(?=^#{1,2}[ \t]|\Z)")
 MANDATORY = ("README.md", "CONTEXT.md")
 OPTIONAL = {
     "formulation": "formulation.md",
@@ -133,52 +143,95 @@ def replaceable_pointer(paragraph: str) -> bool:
     ) is not None
 
 
-def routing_report(repo: Path) -> dict:
+def render_protocol(repository_role_value: str, agent_role_value: str, responsibilities: str = "") -> str:
+    text = PROTOCOL_TEMPLATE.read_text(encoding="utf-8").strip()
+    text = text.replace("{agent_role}", agent_role_value).replace("{repository_role}", repository_role_value)
+    text = text.replace("{responsibilities}", responsibilities.strip()) if responsibilities.strip() else text.replace("{responsibilities}\n\n", "")
+    return f"{BLOCK_BEGIN}\n{text}\n{BLOCK_END}"
+
+
+def role_first(block: str) -> bool:
+    lines = [line.strip() for line in block.splitlines()[1:-1] if line.strip()]
+    return len(lines) >= 2 and lines[0].startswith("## ") and lines[1].startswith("**Agent role:**")
+
+
+def managed_block(text: str) -> tuple[str | None, str]:
+    """Return (existing block or None, status) where status is missing|present|malformed."""
+    begins = [m.start() for m in re.finditer(re.escape(BLOCK_BEGIN), text)]
+    ends = [m.end() for m in re.finditer(re.escape(BLOCK_END), text)]
+    if not begins and not ends:
+        return None, "missing"
+    if len(begins) != 1 or len(ends) != 1 or ends[0] < begins[0]:
+        return None, "malformed"
+    return text[begins[0]:ends[0]], "present"
+
+
+def malformed_markers(agents: Path) -> bool:
+    return agents.is_file() and managed_block(agents.read_text(encoding="utf-8"))[1] == "malformed"
+
+
+def insert_block(before: str, block: str) -> str:
+    """Insert the managed block after the title, removing the legacy CSE pointer paragraph."""
+    paragraphs = [p for p in before.rstrip().split("\n\n") if p.strip()] if before.strip() else []
+    pointer = canonical_pointer().strip()
+    paragraphs = [p for p in paragraphs if not (replaceable_pointer(p) or p.strip() == pointer)]
+    if paragraphs and re.match(r"#[ \t]", paragraphs[0]) and "\n" not in paragraphs[0].strip():
+        paragraphs.insert(1, block)
+    else:
+        paragraphs.insert(0, block)
+    return "\n\n".join(paragraphs) + "\n"
+
+
+def routing_report(repo: Path, role: str | None = None, agent_role_value: str | None = None,
+                   responsibilities: str | None = None) -> dict:
     repo = repo.resolve()
     agents = repo / "AGENTS.md"
     if agents.exists() and not agents.is_file():
         raise SetupError(f"root guidance is not a file: {agents}")
     before = agents.read_text(encoding="utf-8") if agents.is_file() else ""
-    folded = before.casefold()
-    checks = {
-        "installed CSE skills": "cse" in folded and "skill" in folded,
-        "docs/scientific/README.md": "docs/scientific/readme.md" in folded,
-        "docs/scientific/CONTEXT.md": "docs/scientific/context.md" in folded,
-        "read before route selection": "before" in folded and "route" in folded,
-    }
-    satisfied = any(
-        all(term in paragraph.casefold() for term in (
-            "cse", "skill", "docs/scientific/readme.md",
-            "docs/scientific/context.md", "before", "route",
-        ))
-        for paragraph in before.split("\n\n")
-    )
+    context = repo / "docs/scientific/CONTEXT.md"
+    context_text = context.read_text(encoding="utf-8", errors="replace") if context.is_file() else ""
+    declared = agent_role_state(context_text)
+    role = role or role_state(context_text)["role"]
+    agent_role_value = agent_role_value or declared["role"]
+    responsibilities = declared["responsibilities"] if responsibilities is None else responsibilities
+    existing, status = managed_block(before)
+    missing = []
+    if role is None:
+        missing.append("repository role (confirm --role or `repository role:` in docs/scientific/CONTEXT.md)")
+    if agent_role_value is None:
+        missing.append("agent role (supply --agent-role or `agent role:` in docs/scientific/CONTEXT.md)")
+    if len(declared["roles"]) > 1:
+        missing.append("one agent role (docs/scientific/CONTEXT.md declares several)")
+    rendered = render_protocol(role, agent_role_value, responsibilities) if role and agent_role_value else None
     action = "none"
     after = before
-    if not before:
-        action = "create"
-        after = (ASSETS / "AGENTS.md").read_text(encoding="utf-8")
-    elif not satisfied:
-        paragraphs = before.rstrip().split("\n\n")
-        replace = next((
-            index for index, paragraph in enumerate(paragraphs)
-            if replaceable_pointer(paragraph)
-        ), None)
-        if replace is None:
-            action = "append"
-            after = before.rstrip() + "\n\n" + canonical_pointer() + "\n"
-        else:
-            action = "replace"
-            paragraphs[replace] = canonical_pointer()
-            after = "\n\n".join(paragraphs) + "\n"
+    if status == "malformed":
+        missing.append("one managed CSE Protocol block (duplicate or unmatched markers need manual reconciliation)")
+        action = "manual"
+    elif rendered is None:
+        if status == "missing":
+            missing.append("managed CSE Protocol block")
+    elif status == "missing":
+        action = "create" if not before else "insert"
+        after = insert_block(before or (ASSETS / "AGENTS.md").read_text(encoding="utf-8"), rendered)
+    elif existing != rendered:
+        action = "regenerate"
+        after = before.replace(existing, rendered)
+    if status == "present" and not role_first(existing):
+        missing.append("agent role as the first instruction of the managed block")
+    block_state = status if status != "present" else ("current" if existing == rendered else "stale")
     targets = {
         f"docs/scientific/{name}": readable_file(repo / "docs/scientific" / name)
         for name in MANDATORY
     }
     return {
-        "satisfied": satisfied,
-        "missing": [name for name, present in checks.items() if not present],
+        "satisfied": not missing and action == "none",
+        "missing": missing,
         "action": action,
+        "block": block_state,
+        "repository_role": role,
+        "agent_role": agent_role_value,
         "targets": targets,
         "proposed": after,
         "diff": "".join(difflib.unified_diff(
@@ -287,9 +340,20 @@ def proposed_role(text: str) -> str | None:
     return None
 
 
-def canonical_context(text: str, role: str) -> str:
+def canonical_context(text: str, role: str, agent_role_value: str | None = None,
+                      responsibilities: str | None = None) -> str:
     validate_role(role)
     text = DECLARATION_LINE.sub("", text).strip()
+    if agent_role_value:
+        declared = agent_role_state(text)
+        body = responsibilities if responsibilities is not None else declared["responsibilities"]
+        section = f"## Agent role\n\nagent role: {agent_role_value.strip()}\n" + (f"\n{body.strip()}\n" if body.strip() else "")
+        if AGENT_ROLE_SECTION.search(text):
+            text = AGENT_ROLE_SECTION.sub(lambda _: section + "\n", text, count=1).strip()
+        else:
+            text = AGENT_ROLE_DECLARATION.sub("", text)
+            heading = HEADING.search(text, re.match(r"#[ \t][^\n]*\n?", text).end() if re.match(r"#[ \t]", text) else 0)
+            text = (text[:heading.start()].rstrip() + "\n\n" + section + "\n" + text[heading.start():]) if heading else text.rstrip() + "\n\n" + section
     heading = re.search(r"(?m)^#[^#\n].*$", text)
     if heading:
         rest = text[heading.end():].lstrip("\n")
@@ -430,6 +494,7 @@ def plan_reconciliation(repo: Path, role: str | None = None) -> dict:
         "schema_version": 1,
         "repository": str(repo),
         "repository_role": selected_role,
+        "agent_role": agent_role_state(all_context_text)["role"],
         "role_state": role_state(all_context_text),
         "contexts": [relative(path, repo) for path in contexts],
         "sourceless_terms": terms,
@@ -445,7 +510,8 @@ def plan_reconciliation(repo: Path, role: str | None = None) -> dict:
 
 def plan_text(plan: dict) -> str:
     role = plan.get("repository_role") or "unresolved"
-    lines = [f"Reconciliation preview: {plan['repository']}", "", f"Repository role: {role}"]
+    lines = [f"Reconciliation preview: {plan['repository']}", "", f"Repository role: {role}",
+             f"Agent role: {plan.get('agent_role') or 'missing'}"]
     legacy = plan.get("role_state", {}).get("legacy", [])
     roles = plan.get("role_state", {}).get("roles", [])
     if roles or legacy:
@@ -546,15 +612,28 @@ def validate_reconciliation_plan(repo: Path, plan: dict) -> None:
             raise SetupError(f"planned deletion is not a file: {path}")
 
 
-def apply_reconciliation(repo: Path, plan: dict, role: str) -> dict:
+def require_agent_role(context_text: str, agent_role_value: str | None) -> str:
+    resolved = agent_role_value or agent_role_state(context_text)["role"]
+    if not resolved:
+        raise SetupError("agent role is required: supply --agent-role or record `agent role:` in docs/scientific/CONTEXT.md")
+    return resolved
+
+
+def apply_reconciliation(repo: Path, plan: dict, role: str, agent_role_value: str | None = None,
+                         responsibilities: str | None = None) -> dict:
     repo = repo.resolve()
     validate_role(role)
     if plan.get("repository") != str(repo):
         raise SetupError("reconciliation plan belongs to another repository")
     validate_reconciliation_plan(repo, plan)
+    if malformed_markers(repo / "AGENTS.md"):
+        raise SetupError("root AGENTS.md has duplicate or unmatched CSE Protocol markers; reconcile it manually first")
+    agent_role_value = require_agent_role(plan["merged_context"], agent_role_value)
     target_context = repo / "docs/scientific/CONTEXT.md"
     target_context.parent.mkdir(parents=True, exist_ok=True)
-    target_context.write_text(canonical_context(plan["merged_context"], role), encoding="utf-8")
+    new_context = canonical_context(plan["merged_context"], role, agent_role_value, responsibilities)
+    if not target_context.is_file() or target_context.read_text(encoding="utf-8") != new_context:
+        target_context.write_text(new_context, encoding="utf-8")
     for item in plan["moves"]:
         if item["source"] in {"(new)", "(asset)"}:
             source = ASSETS / ("CONTEXT.md" if item["target"].endswith("CONTEXT.md") else "README.md")
@@ -595,20 +674,21 @@ def apply_reconciliation(repo: Path, plan: dict, role: str) -> dict:
                 updated = updated.replace(Path(old).name, Path(new).name)
         if updated != text:
             path.write_text(updated, encoding="utf-8")
-    report = routing_report(repo)
+    report = routing_report(repo, role)
     if report["action"] != "none":
         (repo / "AGENTS.md").write_text(report["proposed"], encoding="utf-8")
-    final_routing = routing_report(repo)
+    final_routing = routing_report(repo, role)
     if not final_routing["satisfied"] or not all(final_routing["targets"].values()):
-        raise SetupError("root guidance or its scientific targets failed verification")
+        raise SetupError("root guidance or its scientific targets failed verification: " + "; ".join(final_routing["missing"]))
     if repository_role(target_context) != role:
         raise SetupError("reconciliation did not produce the confirmed repository role")
-    applied_plan = {**plan, "repository_role": role}
+    applied_plan = {**plan, "repository_role": role, "agent_role": agent_role_value}
     return {"applied": True, "repository": str(repo), "plan": plan_text(applied_plan).replace("No files were written by this preview.", "Approved plan applied.")}
 
 
 def prepare(repo: Path, analysis_id: str, input_path: Path, manifest: Path,
-            optional: Iterable[str] = (), *, role: str) -> dict:
+            optional: Iterable[str] = (), *, role: str, agent_role_value: str | None = None,
+            responsibilities: str | None = None) -> dict:
     repo = repo.resolve()
     input_path = input_path.resolve()
     manifest = manifest.resolve()
@@ -633,14 +713,17 @@ def prepare(repo: Path, analysis_id: str, input_path: Path, manifest: Path,
     analysis = repo / "analyses" / analysis_id
     snapshot = analysis / "inputs" / input_path.name
     provenance = analysis / "inputs/provenance.json"
-    report = routing_report(repo)
     context_before = scientific / "CONTEXT.md"
     context_resolved = context_before.resolve()
     if context_before.is_symlink() or not context_resolved.is_relative_to(repo):
         raise SetupError("scientific context destination is a symlink or escapes the repository")
     context_text = (context_before.read_text(encoding="utf-8") if context_before.is_file()
                     else (ASSETS / "CONTEXT.md").read_text(encoding="utf-8"))
-    context_text = canonical_context(context_text, role)
+    agent_role_value = require_agent_role(context_text, agent_role_value)
+    context_text = canonical_context(context_text, role, agent_role_value, responsibilities)
+    if malformed_markers(agents):
+        raise SetupError("root AGENTS.md has duplicate or unmatched CSE Protocol markers; reconcile it manually first")
+    report = routing_report(repo, role, agent_role_value, agent_role_state(context_text)["responsibilities"])
     for name in MANDATORY:
         ensure_installable(ASSETS / name, scientific / name, preserve_existing=name == "CONTEXT.md")
     for name in selected:
@@ -658,7 +741,8 @@ def prepare(repo: Path, analysis_id: str, input_path: Path, manifest: Path,
         target = scientific / name
         if name == "CONTEXT.md":
             target.parent.mkdir(parents=True, exist_ok=True)
-            target.write_text(context_text, encoding="utf-8")
+            if not target.is_file() or target.read_text(encoding="utf-8") != context_text:
+                target.write_text(context_text, encoding="utf-8")
         else:
             install_file(ASSETS / name, target)
         generated.append(target)
@@ -671,9 +755,9 @@ def prepare(repo: Path, analysis_id: str, input_path: Path, manifest: Path,
     provenance.parent.mkdir(parents=True, exist_ok=True)
     provenance.write_text(expected, encoding="utf-8")
     generated.append(provenance)
-    final_routing = routing_report(repo)
+    final_routing = routing_report(repo, role)
     if not final_routing["satisfied"] or not all(final_routing["targets"].values()):
-        raise SetupError("root guidance or its scientific targets failed verification")
+        raise SetupError("root guidance or its scientific targets failed verification: " + "; ".join(final_routing["missing"]))
     result = {
         "schema_version": 1, "cse_source_commit": source_commit(), "analysis_id": analysis_id,
         "input": relative(input_path, repo), "input_sha256": digest(input_path),
@@ -691,6 +775,8 @@ def main() -> int:
     parser.add_argument("--reconcile", action="store_true")
     parser.add_argument("--approve", "--apply", dest="approve", action="store_true")
     parser.add_argument("--role", choices=sorted(ROLE_VALUES))
+    parser.add_argument("--agent-role", help="confirmed scientific discipline and specialization")
+    parser.add_argument("--responsibilities", help="one paragraph of project-specific responsibilities")
     parser.add_argument("--analysis-id")
     parser.add_argument("--input", type=Path)
     parser.add_argument("--manifest", type=Path)
@@ -702,12 +788,15 @@ def main() -> int:
         try:
             plan = plan_reconciliation(args.repo, args.role)
             if args.approve:
-                print(apply_reconciliation(args.repo, plan, args.role)["plan"], end="")
+                print(apply_reconciliation(args.repo, plan, args.role, args.agent_role, args.responsibilities)["plan"], end="")
             else:
                 print(plan_text(plan), end="")
             if args.check_routing:
-                report = routing_report(args.repo)
+                report = routing_report(args.repo, args.role, args.agent_role, args.responsibilities)
                 print(f"Routing: {'satisfied' if report['satisfied'] else 'needs reconciliation'}")
+                print(f"Managed CSE Protocol block: {report['block']}; agent role: {report['agent_role'] or 'missing'}")
+                for item in report["missing"]:
+                    print(f"missing: {item}")
                 for path, present in report["targets"].items():
                     print(f"{path}: {'readable' if present else 'missing'}")
                 if report["diff"]:
@@ -715,7 +804,7 @@ def main() -> int:
         except (OSError, SetupError, ValueError) as exc:
             parser.exit(1, f"reconciliation failed: {exc}\n")
         if args.check_routing:
-            report = routing_report(args.repo)
+            report = routing_report(args.repo, args.role, args.agent_role, args.responsibilities)
             return 0 if report["satisfied"] and all(report["targets"].values()) else 1
         return 0
     if args.analysis_id is None or args.input is None or args.manifest is None or args.role is None:
@@ -723,7 +812,8 @@ def main() -> int:
     input_path = args.input if args.input.is_absolute() else args.repo / args.input
     try:
         prepare(args.repo, args.analysis_id, input_path, args.manifest,
-                [item for item in args.optional.split(",") if item], role=args.role)
+                [item for item in args.optional.split(",") if item], role=args.role,
+                agent_role_value=args.agent_role, responsibilities=args.responsibilities)
     except (OSError, SetupError, ValueError) as exc:
         parser.exit(1, f"setup failed: {exc}\n")
     print(args.manifest.resolve())

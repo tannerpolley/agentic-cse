@@ -2,6 +2,13 @@
 
 repository role: analysis
 
+## Agent role
+
+Setup records one `agent role: <discipline and specialization>` line here,
+followed by one paragraph of project-specific responsibilities. The role is a
+working mandate applied to investigation, implementation, review, handoffs,
+and responses; it is not a credential.
+
 ## Question and intended use
 
 State the scientific question, intended decision or use, and the domain in which conclusions may apply.

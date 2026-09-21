@@ -23,7 +23,8 @@ Normal CSE work may ask every material question needed. A task-specific request
 not to ask questions does not change the general project doctrine.
 
 - `CONTEXT.md` owns the question, intended use, owners, sourced glossary,
-  avoid table, and one confirmed repository role (`analysis` or `tool`).
+  avoid table, one confirmed repository role (`analysis` or `tool`), and the
+  confirmed agent role with its responsibilities.
 - Optional `formulation.md`, `methods.md`, `evidence.md`, `decisions/`, and
   `writing/` records are Markdown and are created only when selected.
 - LaTeX is reserved for manuscript sources under `latex/`; it is never a
