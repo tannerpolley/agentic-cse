@@ -23,6 +23,13 @@ def refuse(message: str) -> None:
 
 
 def present(args: argparse.Namespace) -> None:
+    input_paths = {
+        "observations_sha256": Path(args.observations),
+        "parameters_sha256": Path(args.parameters),
+        "environment_sha256": Path(args.environment),
+        "script_sha256": Path(args.script),
+        "helper_sha256": Path(args.helper),
+    }
     summary_path = Path(args.summary)
     curve_path = Path(args.curve)
     figure_path = Path(args.figure)
@@ -33,6 +40,12 @@ def present(args: argparse.Namespace) -> None:
     summary = json.loads(summary_path.read_text(encoding="utf-8"))
     if summary.get("complete") is not True:
         refuse(f"{summary_path} is not marked complete")
+    retained_inputs = summary.get("inputs", {})
+    for name, path in input_paths.items():
+        if not path.is_file():
+            refuse(f"missing current input {path}")
+        if sha256(path) != retained_inputs.get(name):
+            refuse(f"{path} changed after the retained calculation; run calculate before present")
     checks = summary.get("checks", {})
     if not checks or not all(isinstance(value, bool) for value in checks.values()):
         refuse("the retained numerical checks are missing or malformed")
@@ -72,6 +85,9 @@ def present(args: argparse.Namespace) -> None:
         "![Cooling fit](../figures/cooling_fit.png)",
         "",
     ]
+    content = "\n".join(table).encode()
+    if output_path.is_file() and output_path.read_bytes() == content:
+        return
     output_path.parent.mkdir(parents=True, exist_ok=True)
     with tempfile.NamedTemporaryFile(
         mode="w",
@@ -81,12 +97,17 @@ def present(args: argparse.Namespace) -> None:
         delete=False,
     ) as stream:
         temporary = Path(stream.name)
-        stream.write("\n".join(table))
+        stream.write(content.decode())
     os.replace(temporary, output_path)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
+    parser.add_argument("--observations", required=True)
+    parser.add_argument("--parameters", required=True)
+    parser.add_argument("--environment", required=True)
+    parser.add_argument("--script", required=True)
+    parser.add_argument("--helper", required=True)
     parser.add_argument("--summary", required=True)
     parser.add_argument("--curve", required=True)
     parser.add_argument("--figure", required=True)

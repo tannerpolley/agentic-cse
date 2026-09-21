@@ -74,12 +74,13 @@ installing or changing TinyTeX remains a separate, explicitly authorized setup
 operation.
 
 When a document needs Python to format a retained table or draw a plot, use
-`manuscript.py refresh <root> <included.qmd>`, which runs native Quarto with
-`_quarto-presentation.yml` and native execution caching. Unchanged presentation
-code reuses cached output; changed code invalidates it. When external retained
-results change, use `manuscript.py refresh <root> <included.qmd>
---external-results-changed`, which supplies native `--cache-refresh`. Quarto
-does not detect arbitrary external-data changes. The following bare Quarto command shows the
+`manuscript.py refresh <root> <included.qmd>`. It runs the presentation-only
+`present` entry, then native Quarto with `_quarto-presentation.yml`, invalidates
+the presentation cache, and updates the included notebook and root article.
+Quarto preview does not detect arbitrary external-data changes; the
+managed preview bridge touches only the affected registered source after the
+presentation hook has been allowed to validate retained inputs. The following
+bare Quarto command shows the
 upstream syntax for the separately authorized presentation-only execution
 route; it is not a normal or release CSE render:
 

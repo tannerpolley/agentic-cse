@@ -94,6 +94,8 @@ def calculate(args: argparse.Namespace) -> None:
     observations_path = Path(args.observations)
     parameters_path = Path(args.parameters)
     environment_path = Path(args.environment)
+    script_path = Path(args.script)
+    helper_path = Path(args.helper)
     summary_path = Path(args.summary)
     curve_path = Path(args.curve)
     figure_path = Path(args.figure)
@@ -156,6 +158,8 @@ def calculate(args: argparse.Namespace) -> None:
                 "observations_sha256": sha256(observations_path),
                 "parameters_sha256": sha256(parameters_path),
                 "environment_sha256": sha256(environment_path),
+                "script_sha256": sha256(script_path),
+                "helper_sha256": sha256(helper_path),
             },
             "generated_files": {
                 "curve": {
@@ -200,6 +204,8 @@ def main() -> int:
     parser.add_argument("--observations", required=True)
     parser.add_argument("--parameters", required=True)
     parser.add_argument("--environment", required=True)
+    parser.add_argument("--script", required=True)
+    parser.add_argument("--helper", required=True)
     parser.add_argument("--summary", required=True)
     parser.add_argument("--curve", required=True)
     parser.add_argument("--figure", required=True)

@@ -24,6 +24,16 @@ needs no Data probe.
 For an adopted analysis with a local Snakefile, use its optional `calculate`
 entry for declared study-level work and hand retained checked outputs to
 Summarize; read the [Snakemake workflow reference](../../references/workflow/snakemake.md).
+Run the calculation and handoff as two commands:
+
+```bash
+snakemake --cores 1 calculate
+python3 analyses/manuscript.py refresh analyses analyses/<id>/notebook.qmd
+```
+
+Refresh runs the presentation-only `present` entry before the notebook/root
+handoff; it never runs calculation, source acquisition, or model-backed
+interpretation.
 
 Inspect the accepted question, model, inputs, method, compute path, prior
 results, and claim limits. Check balances, residuals, invariants, convergence,

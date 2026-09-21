@@ -46,3 +46,13 @@ entry separately so the presentation boundary remains visible.
 Snakemake 9 requires an explicit local core count; for that version use
 `snakemake --cores 1 present` when the bare presentation command rejects local
 execution.
+
+After `calculate` completes with its required checks, run the adopted manuscript
+manager's `refresh <root> <notebook.qmd>` command. Refresh runs the
+presentation-only `present` entry before rendering; it never calls `calculate`.
+A missing, partial, or hash-mismatched retained set fails the render and leaves
+no new success page.
+
+Snakemake still executes top-level Python in a Snakefile while parsing it. That
+is inherent to Snakemake and remains outside this presentation safety boundary;
+the dry-run check only permits execution when the planned job is `present`.

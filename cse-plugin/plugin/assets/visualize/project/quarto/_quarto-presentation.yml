@@ -1,4 +1,7 @@
 {
+  "project": {
+    "pre-render": "python3 manuscript.py prepare"
+  },
   "execute": {
     "enabled": true,
     "daemon": false,

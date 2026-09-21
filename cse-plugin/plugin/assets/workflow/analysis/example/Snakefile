@@ -34,10 +34,15 @@ CALCULATION_OUTPUTS = {
     "figure": "figures/cooling_fit.png",
 }
 PRESENTATION_INPUTS = {
+    "observations": CALCULATION_INPUTS["observations"],
+    "parameters": CALCULATION_INPUTS["parameters"],
+    "environment": CALCULATION_INPUTS["environment"],
     "summary": CALCULATION_OUTPUTS["summary"],
     "curve": CALCULATION_OUTPUTS["curve"],
     "figure": CALCULATION_OUTPUTS["figure"],
-    "script": "scripts/present.py",
+    "script": CALCULATION_INPUTS["script"],
+    "helper": CALCULATION_INPUTS["helper"],
+    "presentation_script": "scripts/present.py",
     "workflow": "Snakefile",
 }
 PRESENTATION_OUTPUT = "results/cooling_fit_include.qmd"
@@ -83,15 +88,23 @@ if _MODE == "present":
 
     rule present:
         input:
+            observations=PRESENTATION_INPUTS["observations"],
+            parameters=PRESENTATION_INPUTS["parameters"],
+            environment=PRESENTATION_INPUTS["environment"],
             summary=PRESENTATION_INPUTS["summary"],
             curve=PRESENTATION_INPUTS["curve"],
             figure=PRESENTATION_INPUTS["figure"],
-            script=PRESENTATION_INPUTS["script"],
+            script=PRESENTATION_INPUTS["presentation_script"],
+            calculation_script=PRESENTATION_INPUTS["script"],
+            helper=PRESENTATION_INPUTS["helper"],
             workflow=PRESENTATION_INPUTS["workflow"],
         output:
             include=PRESENTATION_OUTPUT,
         shell:
             "python {input.script} "
+            "--observations {input.observations} --parameters {input.parameters} "
+            "--environment {input.environment} "
+            "--script {input.calculation_script} --helper {input.helper} "
             "--summary {input.summary} --curve {input.curve} "
             "--figure {input.figure} --output {output.include}"
 else:
@@ -112,4 +125,5 @@ else:
             "python {input.script} "
             "--observations {input.observations} --parameters {input.parameters} "
             "--environment {input.environment} "
+            "--script {input.script} --helper {input.helper} "
             "--summary {output.summary} --curve {output.curve} --figure {output.figure}"

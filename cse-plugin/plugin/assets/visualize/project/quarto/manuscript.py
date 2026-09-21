@@ -6,9 +6,13 @@ import argparse
 import json
 import os
 from pathlib import Path
+import re
+import signal
 import shutil
 import subprocess
+import sys
 import tempfile
+import time
 
 ASSET_ROOT = Path(__file__).resolve().parent
 CONFIG_FILES = ("_quarto.yml", "_cse-manuscript.json", "_quarto-presentation.yml")
@@ -21,6 +25,13 @@ MANUSCRIPT_CONFIG = {
     "format": {"html": {"embed-resources": True}}, "execute": {"enabled": False},
     "keep-md": True,
 }
+PRESENTATION_PRE_RENDER = "python3 manuscript.py prepare"
+WATCH_INTERVAL_SECONDS = 0.25
+WATCH_SETTLE_SECONDS = 0.25
+IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "_freeze", "__pycache__", ".ipynb_checkpoints"}
+IGNORED_WATCH_PARTS |= {".snakemake", ".cache", "tmp", "temp", "support"}
+IGNORED_WATCH_SUFFIXES = ("_files", "_support")
+INCLUDE_RE = re.compile(r"\{\{<\s*include\s+([^\s>]+)")
 
 
 class ManuscriptError(Exception):
@@ -92,17 +103,24 @@ def metadata(data: bytes, path: Path) -> dict:
     return state
 
 
-def check_owners(value, path: Path) -> None:
+def check_owners(value, path: Path, *, allow_presentation_hook: bool = False) -> None:
     if isinstance(value, dict):
         forbidden = {"project", "manuscript", "website", "book", "render", "notebooks",
                      "pre-render", "post-render", "filters", "filter", "profile", "execute",
                      "metadata-files", "metadata-file", "engines", "engine", "knitr",
                      "output-file", "output-dir", "execute-dir", "keep-md",
                      "include-in-header", "include-before-body", "include-after-body"}
+        if allow_presentation_hook and "project" in value:
+            project = value["project"]
+            require(isinstance(project, dict) and set(project) == {"pre-render"}
+                    and project["pre-render"] == PRESENTATION_PRE_RENDER, path,
+                    "unrecognized presentation pre-render hook")
+            forbidden.remove("project")
         require(not forbidden.intersection(value), path,
                 f"competing configuration owner: {sorted(forbidden.intersection(value))}")
-        for child in value.values():
-            check_owners(child, path)
+        for name, child in value.items():
+            if name != "project":
+                check_owners(child, path)
     elif isinstance(value, list):
         for child in value:
             check_owners(child, path)
@@ -120,16 +138,40 @@ def check_boundary(root: Path) -> None:
             if {".quarto", "_site", "_freeze"}.intersection(path.relative_to(root).parts):
                 continue
             config = name.startswith(("_quarto", "_metadata", "_variables")) and path.suffix in {".yml", ".yaml"}
-            require(not (config and (Path(directory) != root or name not in CONFIG_FILES))
+            allowed_variable_file = name == "_variables.yml" and Path(directory) == root
+            require(not (config and not allowed_variable_file
+                         and (Path(directory) != root or name not in CONFIG_FILES))
                     and not name.startswith(".env") and name != "_extensions", path, "unsupported inherited or nested configuration")
+
+
+def included_files(root: Path, files: dict[str, bytes], paths: list[str]) -> dict[str, bytes]:
+    found = {}
+    pending = list(paths)
+    while pending:
+        source = pending.pop()
+        data = files[source] if source in files else found[source]
+        text = data.decode()
+        for target in INCLUDE_RE.findall(text):
+            relative = inside(root, root / Path(source).parent / target)
+            require(relative in paths or "results" in Path(relative).parts,
+                    root / relative, "source include must be registered or generated under results")
+            if relative not in files and relative not in found:
+                found[relative] = read_file(root / relative)
+                pending.append(relative)
+    return found
 
 
 def inspect_config(root: Path, files: dict[str, bytes], state: dict) -> None:
     paths = state["project"]["render"]
+    included = included_files(root, files, paths)
+    files = {**files, **included}
     with tempfile.TemporaryDirectory(prefix=".cse-inspect-", dir=root.parent) as directory:
         shadow = Path(directory)
         try:
-            for name in [*CONFIG_FILES, *paths]:
+            config_files = [*CONFIG_FILES]
+            if "_variables.yml" in files:
+                config_files.append("_variables.yml")
+            for name in [*config_files, *paths, *included]:
                 target = shadow / name
                 target.parent.mkdir(parents=True, exist_ok=True)
                 if (root / name).is_file() and (root / name).read_bytes() == files[name]:
@@ -144,7 +186,10 @@ def inspect_config(root: Path, files: dict[str, bytes], state: dict) -> None:
                 report = read_json(result.stdout.encode(), root / "_quarto.yml")
                 owners = [inside(shadow, Path(p)) for p in report["files"]["config"]]
                 inputs = [inside(shadow, Path(p)) for p in report["files"]["input"]]
-                require(owners == list(CONFIG_FILES if presentation else CONFIG_FILES[:2]), root, f"unexpected configuration paths: {owners}")
+                expected_owners = [*(CONFIG_FILES if presentation else CONFIG_FILES[:2])]
+                if "_variables.yml" in files:
+                    expected_owners.append("_variables.yml")
+                require(owners == expected_owners, root, f"unexpected configuration paths: {owners}")
                 require(sorted(inputs) == sorted(paths), root, f"unexpected native input paths: {inputs}")
                 config = report["config"]
                 project, manuscript, execution = config["project"], config["manuscript"], config["execute"]
@@ -155,7 +200,12 @@ def inspect_config(root: Path, files: dict[str, bytes], state: dict) -> None:
                 require(execution["enabled"] is presentation and config["format"]["html"]["embed-resources"] is True
                         and (not presentation or (execution.get("cache") is True and execution.get("daemon") is False)), root, "native execution contract differs")
                 for name, info in report["fileInformation"].items():
-                    require(name in paths and not info["includeMap"], root / name, "unsupported source include")
+                    require(name in paths, root / name, "unsupported source include")
+                    for mapping in info.get("includeMap") or []:
+                        target = Path(name).parent / mapping["target"]
+                        target = inside(shadow, shadow / target)
+                        require(target in paths or target in included, root / target,
+                                "unsupported source include")
                     check_owners(info["metadata"], root / name)
         except (KeyError, TypeError, ValueError, ManuscriptError) as exc:
             raise ManuscriptError(f"{root}: inspection refused: {str(exc).replace(directory, str(root))}") from exc
@@ -192,7 +242,9 @@ def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
             require(isinstance(formats, dict) and next(iter(formats), None) == "html"
                     and isinstance(formats["html"], dict) and formats["html"].get("embed-resources") is True,
                     root / name, "HTML must be the default format and embed resources")
-        check_owners(config, root / name)
+        check_owners(config, root / name, allow_presentation_hook=profile)
+    if (root / "_variables.yml").is_file():
+        files["_variables.yml"] = read_file(root / "_variables.yml")
     for name in state["project"]["render"]:
         relative = inside(root, root / name)
         require(relative == name and name.endswith(".qmd") and not any(c in name for c in "*?[]!"), root / name, "expected literal relative QMD path")
@@ -293,31 +345,230 @@ def include(root: Path, notebook: Path, title: str) -> Path:
     return root / relative
 
 
-def refresh(root: Path, notebook: Path, external_results_changed: bool = False) -> int:
+def presentation_workflows(root: Path) -> list[Path]:
+    workflows = []
+    for directory, dirs, files in os.walk(root, followlinks=False):
+        dirs[:] = [name for name in dirs if not ignored_watch_part(name)]
+        if "Snakefile" in files:
+            workflows.append(Path(directory))
+    return sorted(workflows)
+
+
+def ignored_watch_part(name: str) -> bool:
+    return name in IGNORED_WATCH_PARTS or name.endswith(IGNORED_WATCH_SUFFIXES)
+
+
+def planned_rules(result: subprocess.CompletedProcess) -> set[str] | None:
+    try:
+        plan = json.loads(result.stdout or "")
+        nodes = plan["nodes"]
+    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
+        return None
+    if not isinstance(nodes, list):
+        return None
+    rules = set()
+    for node in nodes:
+        try:
+            rule = node["value"]["rule"]
+        except (KeyError, TypeError):
+            return None
+        if not isinstance(rule, str) or not rule:
+            return None
+        rules.add(rule)
+    return rules
+
+
+def check_presentation_plan(workflow: Path) -> int:
+    result = subprocess.run(
+        ["snakemake", "--cores", "1", "--dry-run", "--quiet", "--d3dag", "present"],
+        cwd=workflow,
+        check=False,
+        text=True,
+        capture_output=True,
+    )
+    if result.returncode:
+        detail = (result.stderr or "").strip()
+        print(f"presentation dry-run failed in {workflow}: {detail}", file=sys.stderr)
+        return result.returncode
+    rules = planned_rules(result)
+    if rules != {"present"}:
+        extra = sorted(rules - {"present"}) if rules is not None else []
+        detail = f"extra jobs refused: {', '.join(extra)}" if extra else "could not verify a present-only job plan"
+        print(f"presentation refused in {workflow}; {detail}", file=sys.stderr)
+        return 1
+    return 0
+
+
+def prepare(root: Path) -> int:
+    root = root_path(root)
+    workflows = presentation_workflows(root)
+    requested = [Path(value) for value in os.environ.get("QUARTO_PROJECT_INPUT_FILES", "").splitlines() if value]
+    requested = [path if path.is_absolute() else root / path for path in requested]
+    if requested and root / "index.qmd" not in requested:
+        workflows = [workflow for workflow in workflows
+                     if any(path == workflow or path.is_relative_to(workflow) for path in requested)]
+    for workflow in workflows:
+        status = check_presentation_plan(workflow)
+        if status:
+            return status
+        result = subprocess.run(["snakemake", "--cores", "1", "present"], cwd=workflow, check=False)
+        if result.returncode:
+            print(f"presentation failed in {workflow}; retained view is stale", file=sys.stderr)
+            return result.returncode
+    return 0
+
+
+def is_watchable(path: Path, root: Path) -> bool:
+    try:
+        relative = path.absolute().relative_to(root)
+    except ValueError:
+        return False
+    return not any(ignored_watch_part(part) for part in relative.parts) and not (
+        path.name.startswith(".") or path.name.endswith(".html.md")
+        or path.name in {"manuscript.py", "render.sh"}
+    )
+
+
+def watch_snapshot(root: Path) -> dict[Path, tuple[int, int]]:
+    # ponytail: bounded polling scan; use a platform watcher only if project size makes it measurable.
+    snapshot = {}
+    for directory, dirs, files in os.walk(root, followlinks=False):
+        dirs[:] = [name for name in dirs if not ignored_watch_part(name)]
+        for name in files:
+            path = Path(directory) / name
+            if not is_watchable(path, root):
+                continue
+            try:
+                info = path.stat()
+            except FileNotFoundError:
+                continue
+            snapshot[path] = (info.st_mtime_ns, info.st_size)
+    return snapshot
+
+
+def changed_paths(before: dict[Path, tuple[int, int]], after: dict[Path, tuple[int, int]]) -> set[Path]:
+    return {path for path in before.keys() | after.keys() if before.get(path) != after.get(path)}
+
+
+def presentation_targets(root: Path, state: dict, changed: set[Path]) -> set[Path]:
+    article = root / "index.qmd"
+    notebooks = [root / entry["notebook"] for entry in state["manuscript"]["notebooks"]]
+    targets = set()
+    for path in changed:
+        if not is_watchable(path, root) or path == article:
+            continue
+        if path in notebooks:
+            targets.add(article)
+            continue
+        matched = [notebook for notebook in notebooks if path.is_relative_to(notebook.parent)]
+        if matched:
+            targets.update(matched)
+            targets.add(article)
+        elif len(path.relative_to(root).parts) == 1:
+            targets.update(notebooks)
+            targets.add(article)
+    return targets
+
+
+def touch_targets(targets: set[Path]) -> None:
+    for path in targets:
+        if path.is_file():
+            os.utime(path, None)
+
+
+def prepare_and_touch(root: Path, state: dict, changed: set[Path]) -> int:
+    try:
+        status = prepare(root)
+    except (OSError, subprocess.SubprocessError) as exc:
+        print(f"presentation refresh error in {root}: {exc}; retained pages remain stale", file=sys.stderr)
+        return 1
+    if status:
+        print(f"presentation refresh failed in {root} (exit {status}); retained pages remain stale", file=sys.stderr)
+        return status
+    touch_targets(presentation_targets(root, state, changed))
+    return 0
+
+
+def stop_process(process: subprocess.Popen) -> None:
+    if process.poll() is not None:
+        return
+    try:
+        os.killpg(process.pid, signal.SIGTERM)
+    except ProcessLookupError:
+        return
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        os.killpg(process.pid, signal.SIGKILL)
+        process.wait()
+
+
+def refresh(root: Path, notebook: Path) -> int:
     root = root_path(root)
     state = validate_root(root)
     relative = notebook_argument(root, notebook)
     require(relative in state["project"]["render"], notebook, "not an included notebook")
-    command = ["quarto", "render", relative, "--profile", "presentation"]
-    return subprocess.run(command + (["--cache-refresh"] if external_results_changed else []), cwd=root).returncode
+    status = prepare(root)
+    if status:
+        return status
+    for target in (relative, "index.qmd"):
+        result = subprocess.run(
+            ["quarto", "render", target, "--profile", "presentation", "--cache-refresh"], cwd=root
+        )
+        if result.returncode:
+            return result.returncode
+    return 0
 
 
 def preview(root: Path, host: str, port: int) -> int:
     root = root_path(root)
-    validate_root(root)
+    state = validate_root(root)
     require(1 <= port <= 65535, root, "port must be between 1 and 65535")
-    os.chdir(root)
-    os.execvp("quarto", ["quarto", "preview", "--profile", "presentation", "--no-browser",
-                           "--host", host, "--port", str(port)])
-    return 1
+    command = ["quarto", "preview", "--profile", "presentation", "--no-browser",
+               "--host", host, "--port", str(port)]
+    process = subprocess.Popen(command, cwd=root, start_new_session=True)
+    def handle_sigterm(signum, frame):
+        raise KeyboardInterrupt
+
+    previous_sigterm = signal.signal(signal.SIGTERM, handle_sigterm)
+    try:
+        if not presentation_workflows(root):
+            return process.wait()
+        snapshot = watch_snapshot(root)
+        while process.poll() is None:
+            time.sleep(WATCH_INTERVAL_SECONDS)
+            current = watch_snapshot(root)
+            pending = changed_paths(snapshot, current)
+            snapshot = current
+            if not pending:
+                continue
+            while process.poll() is None:
+                time.sleep(WATCH_SETTLE_SECONDS)
+                current = watch_snapshot(root)
+                new = changed_paths(snapshot, current)
+                snapshot = current
+                if not new:
+                    break
+                pending.update(new)
+            prepare_and_touch(root, state, pending)
+            snapshot = watch_snapshot(root)
+        return process.wait()
+    except KeyboardInterrupt:
+        return 130
+    finally:
+        signal.signal(signal.SIGTERM, previous_sigterm)
+        stop_process(process)
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(prog="manuscript.py")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "include", "validate", "refresh", "preview"):
+    for name in ("init", "include", "validate", "refresh", "preview", "prepare"):
         command = commands.add_parser(name)
-        command.add_argument("root", type=Path)
+        if name == "prepare":
+            command.add_argument("root", type=Path, nargs="?", default=Path("."))
+        else:
+            command.add_argument("root", type=Path)
         if name == "init":
             command.add_argument("--article-source", type=Path, required=True)
             command.add_argument("--source-commit", required=True)
@@ -326,8 +577,6 @@ def main() -> int:
             command.add_argument("notebook", type=Path)
         if name == "include":
             command.add_argument("--title", required=True)
-        if name == "refresh":
-            command.add_argument("--external-results-changed", action="store_true")
         if name == "preview":
             command.add_argument("--host", default="127.0.0.1")
             command.add_argument("--port", type=int, default=8000)
@@ -340,8 +589,10 @@ def main() -> int:
         elif args.command == "validate":
             validate_root(root_path(args.root))
             print("valid")
+        elif args.command == "prepare":
+            return prepare(args.root)
         elif args.command == "refresh":
-            return refresh(args.root, args.notebook, args.external_results_changed)
+            return refresh(args.root, args.notebook)
         else:
             return preview(args.root, args.host, args.port)
         return 0

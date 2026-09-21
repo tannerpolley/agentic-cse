@@ -21,6 +21,9 @@ class RenderingBehaviorTests(unittest.TestCase):
         )
 
     def test_quarto_preflight_preserves_original_and_rejects_competing_owner(self):
+        real_quarto = shutil.which("quarto")
+        if real_quarto is None:
+            self.skipTest("quarto is unavailable; skipped native manuscript preflight")
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
             root = parent / "analyses"
@@ -31,6 +34,7 @@ class RenderingBehaviorTests(unittest.TestCase):
                          "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64]
             initialized = self.run_script(str(script), *init_args)
             self.assertEqual(0, initialized.returncode, initialized.stderr)
+            (root / "_variables.yml").write_text("headline: retained\n")
             notebook = root / "result.qmd"
             notebook.write_text(
                 "---\ntitle: Result\n---\n\n```{python}\n"
@@ -58,9 +62,6 @@ class RenderingBehaviorTests(unittest.TestCase):
             self.assertEqual(0, repeated.returncode, repeated.stderr)
             self.assertEqual(before, snapshot())
 
-            real_quarto = shutil.which("quarto")
-            if real_quarto is None:
-                self.skipTest("quarto is unavailable")
             proxy_dir = parent / "bin"
             proxy_dir.mkdir()
             sentinel = parent / "unrequested-render"

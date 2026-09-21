@@ -34,13 +34,17 @@ results.
 For a selected HTML endpoint, completion requires the populated `index.qmd`,
 registered report sources, and their rendered HTML. Select an optional native
 PDF view with `render.sh --to pdf`; the standalone example retains its separate
-`promoted-pdf` profile and header. Use
-`manuscript.py refresh` for explicit presentation-cell refresh and
-`manuscript.py preview` to delegate watching and reloads to native Quarto
-without opening an external browser; open its local URL in the in-app browser.
-Keep the full customizable LaTeX manuscript route separate.
-Follow `quarto-execution` for JSON-compatible configuration adoption and use
-`refresh --external-results-changed` when retained external inputs change.
+`promoted-pdf` profile and header. After an adopted analysis completes, use
+`python3 manuscript.py refresh <root> <notebook.qmd>`; it runs the
+presentation-only `present` target, then refreshes the included notebook and
+root article with the presentation cache invalidated. Use `manuscript.py preview` to let
+native Quarto serve and reload the local HTML without opening an external
+browser; its small bridge watches retained and presentation sources that native
+preview misses and touches only the affected registered sources. The
+presentation profile's sole pre-render hook runs presentation-only preparation
+and never calculation. Keep the full customizable LaTeX manuscript route
+separate.
+Follow `quarto-execution` for JSON-compatible configuration adoption.
 
 Render each selected format from the same source revision and compare values,
 conditions, uncertainty, interpretation, limitations, citations, and figure
