@@ -88,4 +88,8 @@ safe to repeat, and keeps the four `SessionStart`, `SubagentStart`,
 `UserPromptSubmit`, and `Stop` events. A changed installed runtime requires
 the explicit `--replace-runtime` guard. Plugin discovery, native registration,
 enabled state, active-session loading, trust, and observed hook execution are
-separate claims; diagnose and report only what was actually observed.
+separate claims; installed files and registrations do not prove host trust or
+observed execution. For the exact fresh-session check, close the current
+Claude Code session, open a new session in the repository with the plugin
+loaded, and verify that `SessionStart` prints the CSE stance with the repository
+role, confirmed agent role, and the `AGENTS.md` CSE Protocol pointer.

@@ -14,6 +14,7 @@ import tempfile
 import tomllib
 
 from cse_hook_common import nearest_context
+from setup_scientific_project import routing_report
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -235,6 +236,7 @@ def diagnose_configuration(target: Path, home: Path) -> dict:
 def diagnose(path: Path, home: Path, agent: str) -> dict:
     root = project_root(path)
     home = home.resolve()
+    routing = routing_report(root)
     target = root / CONFIG_PATHS[agent]
     runtime = []
     for source, installed, _ in runtime_files(home):
@@ -258,11 +260,23 @@ def diagnose(path: Path, home: Path, agent: str) -> dict:
             current = json.loads(target.read_text()) == merged_configuration(target, agent)
         except (InstallError, OSError, ValueError) as exc:
             selected["error"] = str(exc)
+    fresh_session_check = {
+        "codex": "Fresh Codex check: open a new session in this repository, run /hooks, and verify SessionStart prints the CSE stance with the repository role, confirmed agent role, and AGENTS.md CSE Protocol pointer.",
+        "claude": "Fresh Claude Code check: close the current session, open a new session in this repository with the plugin loaded, and verify SessionStart prints the CSE stance with the repository role, confirmed agent role, and AGENTS.md CSE Protocol pointer.",
+    }[agent]
     return {"agent": agent, "project": str(root), "configuration": str(target),
             "configuration_current": current, "configuration_sources": sources,
             "inspection_home": str(home), "home_matches_environment": home == Path.home().resolve(),
             "runtime": runtime, "dependencies": {name: shutil.which(name) for name in (agent, "python3", "git")},
-            "trust_and_activation": "unverified: inspect /hooks in this checkout and verify a fresh-session event",
+            "managed_protocol": {
+                "block": routing["block"],
+                "repository_role": routing["repository_role"],
+                "agent_role": routing["agent_role"] or "missing",
+                "missing": routing["missing"],
+                "satisfied": routing["satisfied"],
+            },
+            "trust_and_activation": "unverified: installed files and registrations do not prove host trust, active-session loading, or observed hook execution",
+            "fresh_session_check": fresh_session_check,
             "not_inspected": ["plugin-bundled hooks", "managed and ancestor configuration", "active task loaded state"],
             "scope": "on-disk files only; command targets use inspection_home, while execution uses the host's HOME; saved plugin disables do not disable project hooks"}
 

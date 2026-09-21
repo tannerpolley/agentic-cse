@@ -88,8 +88,16 @@ For confirmed deterministic preparation, use
 the same two options apply to `--reconcile --approve`, and omitted values are
 retained from the existing scientific context.
 Preflight all destinations before the first write, then verify the final pointer and both readable
-scientific files. Setup prepares scientific records and project guidance; existing hook
-configuration stays untouched. For host invocation, structured questions, native
+scientific files. In the existing material-choice round, inspect the selected host's hook state with
+`scripts/workflow/install_cse_hooks.py --diagnose --agent <host> --repo <root>` (always name the
+selected host and the actual repository or worktree so the report describes that checkout) and explain once that the reinforcement injects the
+confirmed agent and repository roles at entry and requests one bounded semantic completion review at the
+first Stop; installed files do not establish host trust or scientific truth. On explicit opt-in, invoke the
+same installer with `--agent <host> --repo <root>` and preserve unrelated settings. Whether hooks are
+accepted or declined, Setup maintains the role-first `AGENTS.md` protocol and scientific guidance; declining
+is not Setup failure. Do not re-ask
+after the choice is settled unless host state materially changes. Setup prepares scientific records and project
+guidance; existing hook configuration stays untouched otherwise. For host invocation, structured questions, native
 subagents, instruction discovery, installation, and diagnostics, read the applicable
 [`Codex host reference`](../../references/hosts/codex.md) or
 [`Claude Code host reference`](../../references/hosts/claude.md). Hooks require a

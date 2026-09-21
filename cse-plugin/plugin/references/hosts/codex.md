@@ -68,5 +68,9 @@ recognized CSE registrations, remains safe to repeat, and keeps the four
 `SessionStart`, `SubagentStart`, `UserPromptSubmit`, and `Stop` events. A
 changed installed runtime requires the explicit `--replace-runtime` guard.
 Plugin availability, native registration, enabled state, active-session
-loading, trust, and observed hook execution are separate claims; diagnose and
-report only what was actually observed.
+loading, trust, and observed hook execution are separate claims; installed
+files and registrations do not prove host trust or observed execution. For the
+exact fresh-session check, open a new Codex session in the repository, run
+`/hooks`, and verify that `SessionStart` prints the CSE stance with the
+repository role, confirmed agent role, and the `AGENTS.md` CSE Protocol
+pointer.

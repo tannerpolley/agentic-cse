@@ -1,5 +1,5 @@
 {
-  "description": "Refresh scientific priorities; check prose and report test changes at Stop",
+  "description": "Refresh the scientific stance; review completion and report prose/test changes at Stop",
   "hooks": {
     "SessionStart": [
       {
@@ -45,7 +45,7 @@
             "type": "command",
             "command": "python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" Stop",
             "timeout": 10,
-            "statusMessage": "Checking CSE prose and test changes..."
+            "statusMessage": "Reviewing CSE completion and checking prose/test changes..."
           }
         ]
       }
