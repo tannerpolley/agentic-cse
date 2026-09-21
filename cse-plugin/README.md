@@ -2,8 +2,8 @@
 
 This repository is the source for the single `cse` plugin. The installable
 payload lives in [`plugin/`](plugin/); contributor checks and setup commands
-live in [`scripts/`](scripts/). Repository-only examples, evaluations, and
-tests stay outside the payload.
+live in [`scripts/`](scripts/). Repository-only examples and tests stay outside
+the payload; ScienceBench owns live workflow and routing evaluation.
 
 ## Where to work
 
@@ -38,5 +38,7 @@ default. An explicitly selected installed Baton Pass skill coordinates roles
 and handoffs; individual `cse:<skill>` requests keep CSE stages and acceptance
 in this plugin.
 
-Do not run model-backed routing probes, cooling-fit trials, live Zotero or
-corpus checks, or live installation while validating this candidate.
+Live model-backed workflow and routing trials belong to
+[ScienceBench](https://github.com/agentic-cse/cse-sciencebench) and are never
+part of plugin validation. Do not run live Zotero or corpus checks or live
+installation while validating this candidate.

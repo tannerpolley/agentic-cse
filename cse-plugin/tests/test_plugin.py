@@ -141,28 +141,7 @@ class PluginBehaviorTests(unittest.TestCase):
             identity = json.loads(result.stdout)
             self.assertEqual(sorted(SKILLS), sorted(identity["payloadSkills"]))
             self.assertFalse((destination / "tests").exists())
-            self.assertFalse((destination / "evaluation").exists())
-            self.assertFalse((destination / ".runs").exists())
             self.assertFalse((destination / "extensions").exists())
-
-    def test_routing_cases_use_the_unified_namespace(self):
-        cases = yaml.safe_load((ROOT / "evaluation/skill-routing.yaml").read_text())["cases"]
-        case_ids = {case["id"] for case in cases}
-        self.assertTrue({
-            "prose-final-manuscript-cohesion", "prose-authorship-request",
-            "review-numerical-result", "review-implementation-capability",
-            "workflow-baton-compact-build-handoff", "workflow-baton-active-worker",
-            "workflow-baton-ambiguous-delivery", "workflow-baton-normal-return",
-        }.issubset(case_ids))
-        for case in cases:
-            expected = case.get("expected_skill")
-            if expected:
-                self.assertRegex(expected, r"^cse:[a-z0-9-]+$")
-        blocked = next(case for case in cases if case["id"] == "design-prebuild-block")
-        guidance = " ".join((blocked["expected_initial_action"], blocked["prohibited_action"])).casefold()
-        self.assertIn("independent `cse:review` readiness", guidance)
-        for retired in ("two named", "reviewer protocols"):
-            self.assertNotIn(retired, guidance)
 
 
 if __name__ == "__main__":

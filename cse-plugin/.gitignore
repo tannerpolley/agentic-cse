@@ -1,7 +1,6 @@
 __pycache__/
 .pytest_cache/
 .venv/
-.runs/
 *.pyc
 *.pdf
 docs/scientific/.research/

@@ -9,7 +9,7 @@ name is Agentic Computational Science and Engineering.
 - Reject generic coverage targets and helper-by-helper test expansion. Tests protect front-door behavior, scientific doctrine, installation, and destructive-operation safeguards.
 - Keep GitHub issues and live Git state authoritative. Do not create a lifecycle database.
 - Standalone issues are normal. Labels, milestones, Projects, issue relationships, and Actions remain optional repository context.
-- Match validation to the requested scope and honor explicit test waivers; report checks not run. Model-backed routing probes and cooling-fit trials are opt-in, never automatic completion gates.
+- Match validation to the requested scope and honor explicit test waivers; report checks not run. Model-backed workflow and routing evaluation is owned by agentic-cse/cse-sciencebench and is never part of plugin validation.
 - Identify delivered plugin content by source commit and payload hash, not release numbers. No version bump, release tag, or benchmark score is required for merge. Verify installation when deployment is requested and run the cleanup audit after changes.
 
 Do not edit deployed copies or plugin caches. Edit this source checkout and use the supported sync script.

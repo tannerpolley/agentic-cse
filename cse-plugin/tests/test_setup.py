@@ -1,6 +1,8 @@
 from __future__ import annotations
 
+import importlib.util
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -9,11 +11,24 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPT = ROOT / "plugin/scripts/workflow/setup_scientific_project.py"
+sys.path.insert(0, str(ROOT / "plugin/scripts/workflow"))
 BEGIN = "<!-- CSE:BEGIN PROTOCOL -->"
 END = "<!-- CSE:END PROTOCOL -->"
 ROLE = "chemical engineer and computational thermodynamics researcher"
 DUTIES = "Own the ePC-SAFT parameter decisions and their numerical evidence."
 LEGACY_POINTER = "Use the installed CSE skills and read docs/scientific/README.md before route selection."
+AGENT_ROLE = "chemical engineer and heat-transfer modeling researcher"
+
+
+def load_module(name: str, path: Path):
+    spec = importlib.util.spec_from_file_location(name, path)
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+    return module
+
+
+setup = load_module("setup_scientific_project", SCRIPT)
 
 
 def run(*args: str, cwd: Path) -> subprocess.CompletedProcess[str]:
@@ -49,6 +64,259 @@ class ManagedProtocolTests(unittest.TestCase):
         return run("--repo", str(self.repo), "--role", "tool", "--analysis-id", "cooling-fit",
                    "--input", "data/observations.csv", "--manifest", str(self.repo / ".cse/manifest.json"),
                    *extra, cwd=self.repo)
+
+    def test_setup_generates_cse_pointer_populated_analysis_and_stable_manifest(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = root / "data" / "observations.csv"
+            data.parent.mkdir()
+            data.write_text("time_s,temperature_degC\n0,90\n")
+            first = root.parent / f"{root.name}-setup-1.json"
+            second = root.parent / f"{root.name}-setup-2.json"
+            try:
+                setup.prepare(root, "cooling-fit", data, first, role="analysis", agent_role_value=AGENT_ROLE)
+                configs = [root / ".codex/hooks.json", root / ".claude/settings.json"]
+                for config in configs:
+                    self.assertFalse(config.exists())
+                    config.parent.mkdir()
+                    config.write_text("unrelated configuration; Setup must not parse or change it")
+                setup.prepare(root, "cooling-fit", data, second, role="analysis")
+                for config in configs:
+                    self.assertEqual("unrelated configuration; Setup must not parse or change it", config.read_text())
+                self.assertEqual(first.read_text(), second.read_text())
+                agents = (root / "AGENTS.md").read_text()
+                self.assertIn("<!-- CSE:BEGIN PROTOCOL -->", agents)
+                self.assertIn(f"**Agent role:** Work as {AGENT_ROLE}.", agents)
+                readme = (root / "docs/scientific/README.md").read_text()
+                self.assertIn("Research before Design or Build", readme)
+                self.assertIn("Diagnose first", readme)
+                analysis = root / "analyses/cooling-fit"
+                self.assertTrue((analysis / "inputs/observations.csv").is_file())
+                self.assertTrue((analysis / "inputs/provenance.json").is_file())
+                self.assertFalse((analysis / "notebook.qmd").exists())
+                self.assertFalse((analysis / "results").exists())
+                self.assertFalse((root / "docs/scientific/adr/templates").exists())
+            finally:
+                first.unlink(missing_ok=True)
+                second.unlink(missing_ok=True)
+
+    def test_setup_requires_explicit_role_and_reconciles_legacy_role(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = root / "data.csv"
+            data.write_text("x,y\n")
+            missing = subprocess.run(
+                [sys.executable, str(setup.ROOT / "scripts/workflow/setup_scientific_project.py"),
+                 "--repo", str(root), "--analysis-id", "a", "--input", str(data),
+                 "--manifest", str(root / "missing.json")],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(2, missing.returncode)
+            self.assertFalse((root / "docs/scientific/CONTEXT.md").exists())
+
+            setup.prepare(root, "a", data, root / "manifest.json", role="tool", agent_role_value=AGENT_ROLE)
+            context = root / "docs/scientific/CONTEXT.md"
+            self.assertEqual("tool", setup.repository_role(context))
+            self.assertEqual(1, context.read_text().count("repository role:"))
+            before = {
+                path.relative_to(root): path.read_bytes()
+                for path in root.rglob("*") if path.is_file()
+            }
+            missing_role = subprocess.run(
+                [sys.executable, str(setup.ROOT / "scripts/workflow/setup_scientific_project.py"),
+                 "--repo", str(root), "--reconcile", "--approve"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(2, missing_role.returncode)
+            self.assertIn("--role is required", missing_role.stderr)
+            self.assertEqual(before, {
+                path.relative_to(root): path.read_bytes()
+                for path in root.rglob("*") if path.is_file()
+            })
+
+            for declaration in ("repository role:", "default deliverable:"):
+                malformed = f"# Scientific context\n{declaration}\nBasis: molar\n## Heading\n"
+                repaired = setup.canonical_context(malformed, "tool")
+                self.assertIn("Basis: molar", repaired)
+                self.assertIn("## Heading", repaired)
+            for multiline in (
+                "# Scientific context\nrepository role:\nanalysis\n",
+                "# Scientific context\ndefault deliverable:\nresult\n",
+            ):
+                context.write_text(multiline)
+                self.assertIsNone(setup.repository_role(context))
+                self.assertIsNone(setup.plan_reconciliation(root)["repository_role"])
+
+            for parent_escape in (False, True):
+                escaped = Path(directory) / ("escaped-parent" if parent_escape else "escaped-context")
+                escaped.mkdir()
+                escaped_data = escaped / "data.csv"
+                escaped_data.write_text("x,y\n")
+                external = Path(directory) / f"external-{parent_escape}.md"
+                external.write_text("# Scientific context\nrepository role: analysis\n")
+                if parent_escape:
+                    external_root = Path(directory) / "external-root"
+                    (external_root / "scientific").mkdir(parents=True)
+                    external_context = external_root / "scientific/CONTEXT.md"
+                    external_context.write_bytes(external.read_bytes())
+                    (escaped / "docs").symlink_to(external_root, target_is_directory=True)
+                    external_target = external_context
+                else:
+                    (escaped / "docs/scientific").mkdir(parents=True)
+                    (escaped / "docs/scientific/CONTEXT.md").symlink_to(external)
+                    external_target = external
+                before_files = {
+                    path.relative_to(escaped): path.read_bytes()
+                    for path in escaped.rglob("*") if path.is_file() and not path.is_symlink()
+                }
+                external_before = external_target.read_bytes()
+                with self.assertRaises(setup.SetupError):
+                    setup.prepare(escaped, "a", escaped_data,
+                                  escaped / "manifest.json", role="tool", agent_role_value=AGENT_ROLE)
+                self.assertEqual(before_files, {
+                    path.relative_to(escaped): path.read_bytes()
+                    for path in escaped.rglob("*") if path.is_file() and not path.is_symlink()
+                })
+                self.assertEqual(external_before, external_target.read_bytes())
+                shutil.rmtree(escaped)
+                if parent_escape:
+                    shutil.rmtree(external_root)
+                else:
+                    external.unlink()
+
+            for ambiguous in (
+                "# Scientific context\nrepository role: report\n",
+                "# Scientific context\nrepository role: analysis\nrepository role: tool\n",
+                "# Scientific context\nrepository role: analysis\ndefault deliverable: result\n",
+            ):
+                context.write_text(ambiguous)
+                self.assertIsNone(setup.repository_role(context))
+                self.assertIsNone(setup.plan_reconciliation(root)["repository_role"])
+
+            context.write_text("# Scientific context\n\ndefault deliverable: capability\n")
+            capability_plan = setup.plan_reconciliation(root)
+            self.assertEqual("tool", capability_plan["repository_role"])
+            self.assertIn("Legacy role proposal: capability", setup.plan_text(capability_plan))
+            context.write_text("# Scientific context\n\ndefault deliverable: result\n\nkeep this\n")
+            plan = setup.plan_reconciliation(root)
+            self.assertEqual("analysis", plan["repository_role"])
+            self.assertIn("Legacy role proposal: result", setup.plan_text(plan))
+            setup.apply_reconciliation(root, plan, "tool", AGENT_ROLE)
+            repaired = context.read_text()
+            self.assertEqual("tool", setup.repository_role(context))
+            self.assertEqual(1, repaired.count("repository role:"))
+            self.assertNotIn("default deliverable:", repaired)
+            self.assertIn("keep this", repaired)
+            repeat = setup.plan_reconciliation(root)
+            setup.apply_reconciliation(root, repeat, "tool", AGENT_ROLE)
+            self.assertEqual(repaired, context.read_text())
+            self.assertNotIn("Retained source records", repaired)
+
+    def test_setup_previews_and_reconciles_custom_agents(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = root / "data.csv"
+            data.write_text("x,y\n")
+            agents = root / "AGENTS.md"
+            agents.write_text("# Repository\n\nKeep this guidance.\n\nUse CSE and read docs/scientific/CONTEXT.md.\n")
+            before = agents.read_text()
+            report = setup.routing_report(root, "analysis", AGENT_ROLE)
+            self.assertEqual("insert", report["action"])
+            self.assertNotIn("Use CSE and read docs/scientific/CONTEXT.md.", report["proposed"])
+            self.assertIn("docs/scientific/README.md", report["proposed"])
+            self.assertIn("Keep this guidance.", report["proposed"])
+            check = subprocess.run(
+                [sys.executable, str(setup.ROOT / "scripts/workflow/setup_scientific_project.py"),
+                 "--repo", str(root), "--check-routing"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(1, check.returncode)
+            self.assertIn("needs reconciliation", check.stdout)
+            self.assertEqual(before, agents.read_text())
+            agents.write_text(
+                "# Repository\n\nUse CSE and read docs/scientific/CONTEXT.md. "
+                "Keep the laboratory safety instructions in this paragraph.\n"
+            )
+            mixed = setup.routing_report(root, "analysis", AGENT_ROLE)
+            self.assertEqual("insert", mixed["action"])
+            self.assertIn("Keep the laboratory safety instructions", mixed["proposed"])
+            agents.write_text(before)
+            collision = root / "docs/scientific/README.md"
+            collision.parent.mkdir(parents=True)
+            collision.write_text("unrecognized\n")
+            with self.assertRaises(setup.SetupError):
+                setup.prepare(root, "cooling-fit", data, root / "manifest.json", role="analysis", agent_role_value=AGENT_ROLE)
+            self.assertEqual(before, agents.read_text())
+            self.assertFalse((root / "docs/scientific/CONTEXT.md").exists())
+            collision.unlink()
+            manifest_parent = root / "manifest-parent"
+            manifest_parent.write_text("not a directory\n")
+            with self.assertRaises(setup.SetupError):
+                setup.prepare(
+                    root, "cooling-fit", data,
+                    manifest_parent / "manifest.json",
+                    role="analysis", agent_role_value=AGENT_ROLE,
+                )
+            self.assertEqual(before, agents.read_text())
+            self.assertFalse((root / "docs/scientific/CONTEXT.md").exists())
+            manifest_parent.unlink()
+            setup.prepare(root, "cooling-fit", data, root / "manifest.json", role="analysis", agent_role_value=AGENT_ROLE)
+            self.assertIn("Keep this guidance.", agents.read_text())
+            self.assertTrue(setup.routing_report(root)["satisfied"])
+            self.assertFalse((root / ".codex/hooks.json").exists())
+            self.assertFalse((root / ".claude/settings.json").exists())
+            check = subprocess.run(
+                [sys.executable, str(setup.ROOT / "scripts/workflow/setup_scientific_project.py"),
+                 "--repo", str(root), "--check-routing"],
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(0, check.returncode)
+            self.assertIn("Routing: satisfied", check.stdout)
+
+    def test_reconciliation_previews_without_writing_and_merges_root_glossary(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.name", "Test"], cwd=root, check=True)
+            subprocess.run(["git", "config", "user.email", "test@example.com"], cwd=root, check=True)
+            (root / "CONTEXT.md").write_text(
+                "# Root glossary\n\n| Term | Meaning | Scope |\n|---|---|---|\n"
+                "| certificate | returned proof | engine/* |\n\n"
+                "## Avoid\n\n| Avoid | Prefer | Meaning |\n|---|---|---|\n"
+                "| proof token | certificate | use the project term |\n"
+            )
+            (root / "docs").mkdir()
+            (root / "docs/caller.md").write_text("See docs/scientific/formulation.tex.\n")
+            scientific = root / "docs/scientific"
+            scientific.mkdir()
+            (scientific / "formulation.tex").write_text("\\section{Formulation}\nRetained equation.\n")
+            subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+            subprocess.run(["git", "commit", "-qm", "legacy scientific layout"], cwd=root, check=True)
+            before = (root / "CONTEXT.md").read_text()
+
+            plan = setup.plan_reconciliation(root)
+            self.assertIn("formulation.tex", setup.plan_text(plan))
+            self.assertIn("certificate", plan["merged_context"])
+            self.assertFalse((root / "docs/scientific/CONTEXT.md").exists())
+            self.assertEqual(before, (root / "CONTEXT.md").read_text())
+
+            setup.apply_reconciliation(root, plan, "analysis", AGENT_ROLE)
+            merged = (root / "docs/scientific/CONTEXT.md").read_text()
+            lines = merged.splitlines()
+            self.assertEqual(1, lines.count("| Term | Meaning | Source | Scope |"))
+            self.assertEqual(1, lines.count("|---|---|---|---|"))
+            self.assertEqual(1, lines.count("| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |"))
+            self.assertEqual(1, lines.count("|---|---|---|---|---|---|"))
+            self.assertIn("| certificate | returned proof | sourceless | engine/* |", merged)
+            self.assertIn("| proof token | certificate | use the project term |  |  | sourceless |", merged)
+            self.assertIn("repository role: analysis", merged)
+            self.assertFalse((root / "CONTEXT.md").exists())
+            self.assertFalse((root / "docs/scientific/formulation.tex").exists())
+            self.assertTrue((root / "docs/scientific/formulation.md").is_file())
+            self.assertIn("docs/scientific/formulation.md", (root / "docs/caller.md").read_text())
+            self.assertTrue((root / "docs/scientific/README.md").is_file())
+            self.assertFalse((root / ".codex/hooks.json").exists())
+            self.assertFalse((root / ".claude/settings.json").exists())
 
     def legacy_repository(self) -> None:
         (self.repo / "AGENTS.md").write_text(

@@ -41,7 +41,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertEqual("cse", identity["pluginId"])
                 self.assertEqual(22, len(identity["payloadSkills"]))
                 self.assertIn("prose", identity["payloadSkills"])
-                for excluded in ("tests", "evaluation", ".runs", "docs", "examples", "AGENTS.md", ".claude-plugin/marketplace.json"):
+                for excluded in ("tests", "docs", "examples", "AGENTS.md", ".claude-plugin/marketplace.json"):
                     self.assertFalse((destination / excluded).exists(), excluded)
                 self.assertFalse(any(
                     path.name == "__pycache__" or path.suffix in {".pyc", ".pyo"}
