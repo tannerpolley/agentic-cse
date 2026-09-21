@@ -83,6 +83,9 @@ populated root Quarto Manuscript; do not rename or migrate it solely to match th
 default. Setup does not create substantive per-analysis report; Summarize owns it.
 A confirmed `tool` gets no default Quarto Manuscript; without a renderer, report
 the exact missing capability.
+For a populated analysis, offer optional adoption of the local Snakemake
+workflow and record the investigator's choice; do not require Snakemake for
+Setup or for repositories that do not adopt it. Read the [Snakemake workflow reference](../../references/workflow/snakemake.md).
 For confirmed deterministic preparation, use
 `python3 scripts/workflow/setup_scientific_project.py --role <role> --agent-role "<discipline and specialization>" --responsibilities "<paragraph>"`;
 the same two options apply to `--reconcile --approve`, and omitted values are

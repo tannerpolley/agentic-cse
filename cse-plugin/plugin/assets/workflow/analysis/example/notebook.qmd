@@ -1,0 +1,12 @@
+---
+title: "Cooling-rate fit"
+execute:
+  enabled: false
+---
+
+# Cooling-rate fit
+
+This hand-authored notebook reads the retained presentation prepared by
+Snakemake. It does not execute the numerical model.
+
+{{< include results/cooling_fit_include.qmd >}}

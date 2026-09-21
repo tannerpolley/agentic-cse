@@ -1,0 +1,9 @@
+{
+  "python": "3.13.14",
+  "packages": {
+    "matplotlib": "3.11.2",
+    "numpy": "2.5.3",
+    "snakemake": "9.27.0",
+    "scipy": "1.18.1"
+  }
+}

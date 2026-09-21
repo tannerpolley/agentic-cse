@@ -1,0 +1,5 @@
+{
+  "ambient_temperature_degC": 22.0,
+  "initial_temperature_degC": 90.0,
+  "initial_guesses_per_s": [0.001, 0.02]
+}

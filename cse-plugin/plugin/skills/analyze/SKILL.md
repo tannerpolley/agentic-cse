@@ -21,6 +21,9 @@ Use
 `cse:data` after checking the data capability and retained-input authority, columns,
 lineage, or a bounded query is unresolved; an authoritative retained input
 needs no Data probe.
+For an adopted analysis with a local Snakefile, use its optional `calculate`
+entry for declared study-level work and hand retained checked outputs to
+Summarize; read the [Snakemake workflow reference](../../references/workflow/snakemake.md).
 
 Inspect the accepted question, model, inputs, method, compute path, prior
 results, and claim limits. Check balances, residuals, invariants, convergence,

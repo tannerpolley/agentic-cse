@@ -19,6 +19,9 @@ notebook. For a retained relationship or comparison, use
 `cse:plot` after checking the renderer capability, providing retained values, intended use,
 quantities, units, series roles, uncertainty, and scales. Ordinary Quarto HTML
 is the default living notebook view; the project selects other rendering.
+For an adopted analysis, use the presentation-only `present` entry to prepare
+tables, figures, or include fragments from retained outputs; it must not
+calculate a missing result. Read the [Snakemake workflow reference](../../references/workflow/snakemake.md).
 
 Inspect the useful method-specific result, retained values, figures,
 diagnostics, and existing notebook. A poor result may continue when values and
