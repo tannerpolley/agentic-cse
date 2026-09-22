@@ -80,7 +80,12 @@ class QuartoManagerTests(unittest.TestCase):
             analysis = root / "case"
             analysis.mkdir()
             dry_run = subprocess.CompletedProcess(
-                [], 0, stdout=json.dumps({"nodes": [{"value": {"rule": "present"}}]}), stderr=""
+                [], 0,
+                stdout=(
+                    "Building DAG of jobs...\n"
+                    '{"nodes": [{"id": 0, "value": {"jobid": 0, "label": "present", "rule": "present"}}], "edges": []}\n'
+                ),
+                stderr="",
             )
             completed = subprocess.CompletedProcess([], 0)
             with (

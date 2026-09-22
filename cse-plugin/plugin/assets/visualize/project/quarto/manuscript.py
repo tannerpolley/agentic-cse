@@ -359,11 +359,24 @@ def ignored_watch_part(name: str) -> bool:
 
 
 def planned_rules(result: subprocess.CompletedProcess) -> set[str] | None:
-    try:
-        plan = json.loads(result.stdout or "")
-        nodes = plan["nodes"]
-    except (KeyError, TypeError, ValueError, json.JSONDecodeError):
-        return None
+    output = result.stdout or ""
+    decoder = json.JSONDecoder()
+    offset = 0
+    while True:
+        start = output.find("{", offset)
+        if start < 0:
+            return None
+        try:
+            plan, end = decoder.raw_decode(output, start)
+        except json.JSONDecodeError:
+            offset = start + 1
+            continue
+        if isinstance(plan, dict) and "nodes" in plan:
+            if output[end:].strip():
+                return None
+            nodes = plan["nodes"]
+            break
+        offset = end
     if not isinstance(nodes, list):
         return None
     rules = set()

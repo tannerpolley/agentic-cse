@@ -21,6 +21,9 @@ Use
 `cse:data` after checking the data capability and retained-input authority, columns,
 lineage, or a bounded query is unresolved; an authoritative retained input
 needs no Data probe.
+For a registered source dataset moving into an analysis, follow the [Zotero
+source/data handoff](../../references/sources/zotero-companion.md#source-and-data-handoff-to-analyze)
+before running the calculation.
 For an adopted analysis with a local Snakefile, use its optional `calculate`
 entry for declared study-level work and hand retained checked outputs to
 Summarize; read the [Snakemake workflow reference](../../references/workflow/snakemake.md).
