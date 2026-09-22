@@ -57,6 +57,31 @@ It does not establish parent acceptance or a scientific claim.
 
 ## Invocation
 
+Both launchers run the same Build worker, tools, snapshot, Bubblewrap commands,
+and retained evidence. Choose by host:
+
+### Inside T3 Code
+
+Use a visible T3 Code subagent when the host exposes `orchestrator_capabilities`
+and `delegate_task`, and `orchestrator_capabilities` lists a Pi provider
+instance whose launch arguments load CSE-Pi's `dist/t3-extension.js` (by
+convention the instance id `cse-pi`). Call `delegate_task` with that
+`providerInstanceId`, the work order's worker model, and its effort as the
+model option advertised by `orchestrator_capabilities`, `mode: "async"`, and
+this exact task:
+
+```text
+/cse-build /absolute/path/to/work-order.json /absolute/path/to/new-evidence-directory
+```
+
+Follow the child with `task_status` rather than a long synchronous wait. The
+child may finish shortly before its evidence is complete; `result.json` is
+written last, so wait for that file before inspecting the retained evidence.
+A child whose model differs from the work order writes a failed `result.json`
+without running. The extension setup is recorded in the CSE-Pi `README.md`.
+
+### Without T3 Code
+
 Run a complete hash-bound work order directly:
 
 ```text
