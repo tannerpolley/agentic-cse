@@ -65,18 +65,32 @@ and retained evidence. Choose by host:
 Use a visible T3 Code subagent when the host exposes `orchestrator_capabilities`
 and `delegate_task`, and `orchestrator_capabilities` lists a Pi provider
 instance whose launch arguments load CSE-Pi's `dist/t3-extension.js` (by
-convention the instance id `cse-pi`). Call `delegate_task` with that
-`providerInstanceId`, the work order's worker model, and its effort as the
-model option advertised by `orchestrator_capabilities`, `mode: "async"`, and
-this exact task:
+convention the instance id `cse-pi`). Call `delegate_task` with exactly this
+shape:
 
-```text
-/cse-build /absolute/path/to/work-order.json /absolute/path/to/new-evidence-directory
+```json
+{
+  "task": "/cse-build /absolute/path/to/work-order.json /absolute/path/to/new-evidence-directory",
+  "target": {
+    "providerInstanceId": "cse-pi",
+    "model": "openai-codex/gpt-5.6-luna",
+    "options": { "thinking": "high" }
+  },
+  "mode": "async"
+}
 ```
+
+`model` is the work order's worker provider and model joined as
+`provider/model`, and `thinking` is its effort. Omit `role`: T3 Code prefixes
+the task for any role other than `general`, so the child no longer receives
+the `/cse-build` command. The CSE-Pi session blocks every tool except the
+worker's own, so a malformed task runs no tools and writes no `result.json`.
 
 Follow the child with `task_status` rather than a long synchronous wait. The
 child may finish shortly before its evidence is complete; `result.json` is
 written last, so wait for that file before inspecting the retained evidence.
+If the child is terminal and no `result.json` appears within a minute, report a
+failed delegation rather than waiting further.
 A child whose model differs from the work order writes a failed `result.json`
 without running. The extension setup is recorded in the CSE-Pi `README.md`.
 
