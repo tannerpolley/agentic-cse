@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import shutil
@@ -12,6 +13,7 @@ from .config import (
     ConfigError,
     config_payload,
     default_config_path,
+    _read_config_snapshot,
     load_config,
     proposed_config,
     write_config,
@@ -98,10 +100,14 @@ def main() -> int:
     initialize.add_argument("--corpus-root", type=Path)
     initialize.add_argument("--apply", action="store_true")
     initialize.add_argument(
+        "--preview-sha256",
+        help="SHA-256 token from init dry-run; required when applying a changed existing configuration",
+    )
+    initialize.add_argument(
         "--mathpix-consent",
         action=argparse.BooleanOptionalAction,
         default=None,
-        help="record or withdraw library-wide Mathpix consent; a new configuration defaults to no consent",
+        help="record or withdraw library-wide Mathpix consent; fresh apply requires an explicit choice",
     )
     initialize.add_argument("--json", action="store_true")
     bibliography = subparsers.add_parser(
@@ -506,7 +512,11 @@ def main() -> int:
     if args.command in {"doctor", "init", "bibliography-export", "corpus-migrate"}:
         try:
             if args.command == "init":
-                existing = load_config(args.config) if args.config.is_file() else None
+                existing = None
+                preview_sha256 = None
+                if args.config.is_file():
+                    existing, original = _read_config_snapshot(args.config)
+                    preview_sha256 = hashlib.sha256(original).hexdigest()
                 config = proposed_config(
                     corpus_root=args.corpus_root,
                     existing=existing,
@@ -515,7 +525,19 @@ def main() -> int:
                 if existing == config:
                     payload = config_payload(config, args.config, mode="unchanged")
                 elif args.apply:
-                    payload = write_config(config, args.config)
+                    if existing is None and (args.corpus_root is None or args.mathpix_consent is None):
+                        raise ConfigError(
+                            "fresh init --apply requires --corpus-root and an explicit "
+                            "--mathpix-consent or --no-mathpix-consent choice"
+                        )
+                    if existing is not None and args.preview_sha256 is None:
+                        raise ConfigError(
+                            "init --apply for a changed existing configuration requires "
+                            "--preview-sha256 from the dry-run"
+                        )
+                    payload = write_config(
+                        config, args.config, expected_sha256=args.preview_sha256
+                    )
                 else:
                     payload = config_payload(config, args.config, mode="dry-run")
                 if existing is not None:
@@ -525,6 +547,8 @@ def main() -> int:
                         for key in current
                         if key not in {"ok", "mode"} and current[key] != payload[key]
                     }
+                    if existing != config and not args.apply:
+                        payload["preview_sha256"] = preview_sha256
             else:
                 configuration_error = ""
                 config = None

@@ -91,11 +91,16 @@ Passing establishes this software path; scientific suitability still depends
 on the selected dataset's quality, units, composition basis, and conditions.
 
 `init` is dry-run by default and reports current and proposed values. On a
-fresh workstation `init --apply` creates the private configuration and empty
-corpus directories without Mathpix consent; pass `--mathpix-consent` to record
-an explicit library-wide decision. On an existing configuration the same
+fresh workstation, review the proposal and pass `--corpus-root PATH` with
+either `--mathpix-consent` or `--no-mathpix-consent` to `init --apply`. This
+creates the private configuration and empty corpus directories with the
+investigator's explicit choices. On an existing configuration the same
 command preserves retained paths, consent, and deny lists unless an explicit
-option changes them, and an unchanged apply writes nothing (`mode: unchanged`). For the one-time migration from an older source
+option changes them, and an unchanged apply writes nothing (`mode: unchanged`). For
+a changed existing config, pass the `preview_sha256` from the dry-run as
+`--preview-sha256` to `init --apply`; the token prevents applying against a config
+that changed after preview. A fresh config is created only if the destination is
+still absent. For the one-time migration from an older source
 checkout, review `corpus-migrate --json`, then use `corpus-migrate --apply
 --json`; it copies and verifies files without deleting the source checkout.
 
