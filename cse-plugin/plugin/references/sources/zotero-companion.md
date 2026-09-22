@@ -33,7 +33,7 @@ Use the project view command above first and `--global` as the fallback, then `w
 
 ### Check and maintain
 
-`wiki-verify` and `wiki-health` are read-only; `wiki-coverage --json` bounds curation work. Separate broken paths and hash drift from scientific disagreement and missing interpretation. `wiki-maintain` is deterministic: it refreshes generated metadata, existing companions, and indexes, and neither synthesizes papers nor replaces curated claims. New evidence never silently alters analysis snapshots or reviewed claims; a changed interpretation goes through explicit incorporation and Review. Report freshness and review state with every result.
+`wiki-verify` and `wiki-health` are read-only corpus checks; `wiki-coverage --json` bounds curation work. A green result does not establish evidence Markdown hash integrity. Read the exact passage with `wiki-evidence <KEY> --query "<terms>" --json` and inspect `hash_matches` and mismatch warnings. Use `doctor --json` to check capability and configuration state. Separate broken paths and verified content-hash drift from scientific disagreement and missing interpretation. `wiki-maintain` is deterministic: it refreshes generated metadata, existing companions, and indexes, and neither synthesizes papers nor replaces curated claims. New evidence never silently alters analysis snapshots or reviewed claims; a changed interpretation goes through explicit incorporation and Review. Report freshness and review state with every result.
 
 ## Evidence and data authority
 
@@ -42,6 +42,39 @@ Read repository context and the configured Companion corpus before remote search
 The LinkML core describes sources, quantities, uncertainty, transformations, and lineage; optional domain packs add scientific concepts. DuckDB indexes and queries are rebuildable. Keep generated source layers separate from protected curated synthesis.
 
 Companion's corpus is local and unversioned unless the user chooses another recovery policy. Each scientific project declares its own data authority, formats, lineage, retention, versioning, and recovery strategy. CSE and Companion do not prescribe a dataset versioning tool. Preserve alternate bases, standard states, model conventions, and parameter-set identities; quarantine unmappable records with stable identity and the missing evidence.
+
+## Source and data handoff to Analyze
+
+When a selected source dataset is ready for project use, register it only in the
+project's declared registry and with the project's retention authority. Then
+copy the chosen, hash-verified resource into the analysis input directory with
+`data-select`; the generated `.lineage.json` records the registered identity,
+source locator, metadata, and resource hash. Review that lineage and the copied
+input before Analyze uses them. Query the analysis-local copy or read it with
+the analysis's native reader, so the calculation uses a fixed input snapshot
+rather than a changing registry resource.
+
+```bash
+# Preview registration and review the planned record, source locator, metadata, and hashes.
+cse-zotero data-register <package> --registry-root <project-registry> --json
+
+# Use the reviewed record ID; preview selection and review the copied resource and lineage.
+cse-zotero data-select <record-id> --resource <resource-path> \
+  --analysis analyses/<id> --registry-root <project-registry> --json
+
+# Apply only after reviewing both previews.
+cse-zotero data-register <package> --registry-root <project-registry> --apply --json
+cse-zotero data-select <record-id> --resource <resource-path> \
+  --analysis analyses/<id> --registry-root <project-registry> --apply --json
+cse-zotero data-query analyses/<id>/inputs/<resource-name> \
+  --sql "SELECT * FROM records" --json
+```
+
+Registration and selection write only when `--apply` is supplied. Querying is
+read-only. Use the project's declared authority and verify the source, version,
+locator, units, composition basis, conditions, uncertainty, and hash before
+interpreting the result. `doctor` reports software capabilities; a file-shape check confirms only the
+fields and columns. Neither establishes scientific acceptance.
 
 ## Writes, acquisition, and bibliography
 

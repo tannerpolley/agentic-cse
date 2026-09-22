@@ -11,6 +11,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
+EXPECTED_ZOTERO_COMMIT = "853b0867b14500767713fe99926e40faaa4601ba"
 
 
 class InstallationBehaviorTests(unittest.TestCase):
@@ -201,7 +202,7 @@ class InstallationBehaviorTests(unittest.TestCase):
                 args = sys.argv[1:]
                 real_git = os.environ["CSE_REAL_GIT"]
                 runtime = Path(os.environ["CSE_TEST_ZOTERO_ROOT"]).resolve()
-                expected = "e82ebbee4b6896b0f513727cdbac2a18e31bbf24"
+                expected = "853b0867b14500767713fe99926e40faaa4601ba"
                 if args[:2] == ["-C", str(runtime)]:
                     if args[2:] == ["rev-parse", "HEAD"]:
                         print(expected)
@@ -238,7 +239,7 @@ class InstallationBehaviorTests(unittest.TestCase):
 
             untrusted = root / "untrusted-zotero"
             shutil.copytree(runtime, untrusted, ignore=shutil.ignore_patterns(".git"))
-            (untrusted / ".cse-source-commit").write_text("e82ebbee4b6896b0f513727cdbac2a18e31bbf24\n")
+            (untrusted / ".cse-source-commit").write_text(EXPECTED_ZOTERO_COMMIT + "\n")
             rejected = subprocess.run(
                 ["bash", "scripts/sync-live.sh", "--check", "--zotero-source", str(untrusted)],
                 cwd=source, env=test_env, text=True, capture_output=True, check=False,
@@ -285,7 +286,7 @@ class InstallationBehaviorTests(unittest.TestCase):
             status = subprocess.run(["git", "status", "--porcelain"], cwd=source, env={**os.environ, "HOME": str(home)}, text=True, capture_output=True, check=True).stdout
             self.assertEqual(0, installed.returncode, f"{installed.stderr}\nstatus={status}")
             identity = json.loads(next(line for line in installed.stdout.splitlines() if '"pluginCommit"' in line))
-            self.assertEqual("e82ebbee4b6896b0f513727cdbac2a18e31bbf24", identity["zoteroCommit"])
+            self.assertEqual(EXPECTED_ZOTERO_COMMIT, identity["zoteroCommit"])
             self.assertEqual(40, len(identity["pluginCommit"]))
             self.assertEqual(64, len(identity["payloadSha256"]))
             self.assertTrue((deploy / "cse").is_dir())
@@ -303,6 +304,43 @@ class InstallationBehaviorTests(unittest.TestCase):
             ))
             names = [item["name"] for item in json.loads(unrelated.read_text())["plugins"]]
             self.assertEqual(["other", "cse"], names)
+
+    def test_sync_check_exercises_data_handoff_in_the_installed_wheel(self):
+        zotero_source = ROOT.parent / "cse-zotero"
+        if not zotero_source.is_dir():
+            self.skipTest("data handoff integration check needs the sibling cse-zotero checkout")
+        commit = subprocess.run(
+            ["git", "-C", str(zotero_source), "rev-parse", "HEAD"],
+            text=True, capture_output=True, check=True,
+        ).stdout.strip()
+        self.assertEqual(EXPECTED_ZOTERO_COMMIT, commit)
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "source"
+            shutil.copytree(ROOT, source, ignore=shutil.ignore_patterns(".git", ".runs", "__pycache__", ".pytest_cache"))
+            validate = source / "scripts/validate.sh"
+            validate.write_text("#!/usr/bin/env bash\nexit 0\n")
+            validate.chmod(0o755)
+            self.git_fixture(source)
+            home = root / "home"
+            home.mkdir()
+            uv_cache = os.environ.get("UV_CACHE_DIR") or subprocess.run(
+                ["uv", "cache", "dir"], text=True, capture_output=True, check=True,
+            ).stdout.strip()
+            result = subprocess.run(
+                ["bash", "scripts/sync-live.sh", "--check", "--zotero-source", str(zotero_source)],
+                cwd=source,
+                env={**os.environ, "HOME": str(home), "UV_CACHE_DIR": uv_cache},
+                text=True, capture_output=True, check=False,
+            )
+
+            self.assertEqual(0, result.returncode, result.stderr)
+            identity = json.loads(next(line for line in result.stdout.splitlines() if "pluginCommit" in line))
+            self.assertEqual(EXPECTED_ZOTERO_COMMIT, identity["zoteroCommit"])
+            self.assertIn("data-register/data-select/query lineage checks passed", identity["runtime"])
+            self.assertFalse((home / ".codex/plugins/cse").exists())
+            self.assertFalse((home / ".local/share/cse/zotero").exists())
 
 
 if __name__ == "__main__":

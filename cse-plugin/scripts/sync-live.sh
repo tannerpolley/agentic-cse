@@ -8,7 +8,7 @@ runtime_target="$HOME/.local/share/cse/zotero"
 runtime_bin_dir="$HOME/.local/bin"
 runtime_commands=(cse-zotero zotero-companion)
 legacy_names=(cse-sources cse-visualize scientific-codex)
-expected_zotero_commit="e82ebbee4b6896b0f513727cdbac2a18e31bbf24"
+expected_zotero_commit="853b0867b14500767713fe99926e40faaa4601ba"
 codex_bin="${CSE_CODEX_BIN:-codex}"
 
 usage() {
@@ -98,7 +98,43 @@ identity_json() {
   python3 -c 'import json,sys; print(json.dumps({"payloadSha256":sys.argv[1],"pluginCommit":sys.argv[2],"runtime":sys.argv[3],"zoteroCommit":sys.argv[4]}, sort_keys=True))' "$payload_sha256" "$plugin_commit" "$1" "$zotero_commit"
 }
 if [[ "$mode" == check ]]; then
-  identity_json "wheel and default/explicit schema checks passed"
+  registry_root="$transaction/data-registry/thermophysical/source/registry"
+  analysis_dir="$transaction/analysis"
+  mkdir -p "$registry_root"
+  registration_result="$("$runtime_venv/bin/cse-zotero" data-register "$runtime_source/examples/data-register/package" --registry-root "$registry_root" --apply --json)"
+  selection_result="$("$runtime_venv/bin/cse-zotero" data-select ds:registered-mea-density --resource observations.csv --analysis "$analysis_dir" --registry-root "$registry_root" --apply --json)"
+  query_result="$("$runtime_venv/bin/cse-zotero" data-query "$analysis_dir/inputs/observations.csv" --sql "SELECT value, value_unit FROM records" --json)"
+  python3 - "$registration_result" "$selection_result" "$query_result" "$analysis_dir" <<'PY'
+import hashlib
+import json
+from pathlib import Path
+import sys
+
+registration, selection, query = (json.loads(value) for value in sys.argv[1:4])
+analysis = Path(sys.argv[4])
+input_path = analysis / "inputs/observations.csv"
+lineage_path = analysis / "inputs/observations.csv.lineage.json"
+if registration.get("mode") != "apply" or registration.get("record_id") != "ds:registered-mea-density":
+    raise SystemExit("installed wheel did not register the repository fixture")
+if selection.get("ok") is not True or selection.get("record_id") != "ds:registered-mea-density":
+    raise SystemExit("installed wheel did not select the registered fixture")
+if selection.get("input_path") != str(input_path) or selection.get("lineage_path") != str(lineage_path):
+    raise SystemExit("installed wheel selected the fixture into an unexpected analysis path")
+if query.get("table") != str(input_path) or query.get("rows") != [{"value": 1010.2, "value_unit": "kg/m3"}]:
+    raise SystemExit("installed wheel query did not return the known fixture value")
+if not input_path.is_file() or not lineage_path.is_file():
+    raise SystemExit("installed wheel did not retain the selected input and lineage")
+lineage = json.loads(lineage_path.read_text(encoding="utf-8"))
+if lineage.get("record_id") != "ds:registered-mea-density":
+    raise SystemExit("selected lineage has the wrong registered record")
+if lineage.get("source", {}).get("locator") != {"kind": "table", "value": "Table 2, row 1"}:
+    raise SystemExit("selected lineage lost the source table locator")
+if lineage.get("composition_basis") != "pure component":
+    raise SystemExit("selected lineage lost the composition basis")
+if lineage.get("resource", {}).get("sha256") != hashlib.sha256(input_path.read_bytes()).hexdigest():
+    raise SystemExit("selected lineage hash does not match the analysis input")
+PY
+  identity_json "installed wheel schema and data-register/data-select/query lineage checks passed"
   exit 0
 fi
 
