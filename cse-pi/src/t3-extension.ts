@@ -4,6 +4,7 @@ import { runPhase3, type Phase3Session } from "./phase3.js";
 
 export const T3_BUILD_USAGE = "Usage: /cse-build /absolute/work-order.json /absolute/new-result-directory";
 const WORKER_SYSTEM_PROMPT = "CSE-Pi bounded worker.";
+const WORKER_TOOLS = new Set(["cse_run_command", "cse_write_candidate", "cse_delete_candidate", "cse_submit_result"]);
 type Listener = (event: Record<string, unknown>) => void;
 
 /**
@@ -14,9 +15,12 @@ type Listener = (event: Record<string, unknown>) => void;
  *
  * Pi starts a message sent from a command only after the command returns, so the command
  * returns as soon as the worker prompt is sent. The worker tools and system prompt stay in
- * force until that run ends; runPhase3 then finalizes and writes `result.json` last, which
- * is the parent's completion signal. Nothing is posted after the run, because hosts end the
- * child when it settles.
+ * force until that run settles, after any automatic retry or compaction; runPhase3 then
+ * finalizes and writes `result.json` last, which is the parent's completion signal. Nothing is
+ * posted after the run, because hosts end the child when it settles.
+ *
+ * Load this extension only in a Pi instance dedicated to CSE-Pi: it blocks every tool except
+ * the worker's own, so a prompt that is not a well-formed `/cse-build` gets no tools at all.
  */
 export default function cseT3Worker(pi: ExtensionAPI): void {
   const listeners = new Set<Listener>();
@@ -27,7 +31,10 @@ export default function cseT3Worker(pi: ExtensionAPI): void {
   pi.on("turn_start", (event, ctx) => { hostContext = ctx; forward({ ...event }); });
   pi.on("message_end", event => forward({ ...event }));
   pi.on("tool_execution_end", event => forward({ ...event }));
-  pi.on("agent_end", () => { const end = endRun; endRun = undefined; end?.(); });
+  pi.on("agent_settled", () => { const end = endRun; endRun = undefined; end?.(); });
+  pi.on("tool_call", event =>
+    WORKER_TOOLS.has(event.toolName) ? undefined : { block: true, reason: "This CSE-Pi session only runs CSE-Pi worker tools." },
+  );
   // Match the headless worker: no user skills, context files or host guidance in the prompt.
   pi.on("before_agent_start", () => (active ? { systemPrompt: WORKER_SYSTEM_PROMPT } : undefined));
 
@@ -76,7 +83,7 @@ export default function cseT3Worker(pi: ExtensionAPI): void {
             abort() {
               const host = hostContext ?? ctx;
               host.abort();
-              // A run that never started has no agent_end to wait for.
+              // A run that never started has no agent_settled to wait for.
               if (host.isIdle()) { const end = endRun; endRun = undefined; end?.(); }
             },
             subscribe(listener) {

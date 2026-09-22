@@ -13,11 +13,11 @@ const SUBMIT = { outcome: "accepted", facts: ["changed candidate"], assumptions:
  * A Pi host whose agent run executes `agent` against the tools active when it starts. Like Pi,
  * a message sent from a command runs only after the command handler returns.
  */
-function fakeHost(options: { model?: { provider: string; id: string }; thinking?: string; agent: (tools: Map<string, Tool>) => Promise<string | undefined> }) {
+function fakeHost(options: { model?: { provider: string; id: string }; thinking?: string; retries?: number; agent: (tools: Map<string, Tool>, attempt: number) => Promise<string | undefined> }) {
   const handlers = new Map<string, Handler[]>();
   const tools = new Map<string, Tool>();
   const notes: string[] = [];
-  const seen = { systemPrompt: undefined as string | undefined, activeDuringRun: [] as string[], ran: false };
+  const seen = { systemPrompt: undefined as string | undefined, activeDuringRun: [] as string[], activePerAttempt: [] as string[][], ran: false };
   let active = ["read", "bash", "t3_thread_list"];
   let queued: (() => Promise<void>) | undefined;
   let command: ((args: string, ctx: any) => Promise<void>) | undefined;
@@ -34,10 +34,16 @@ function fakeHost(options: { model?: { provider: string; id: string }; thinking?
         seen.ran = true;
         seen.systemPrompt = (emit("before_agent_start", { systemPrompt: "host prompt" })?.[0] as { systemPrompt?: string } | undefined)?.systemPrompt;
         seen.activeDuringRun = [...active];
-        emit("turn_start", { turnIndex: 0 });
-        const stopReason = await options.agent(new Map([...tools].filter(([name]) => active.includes(name))));
-        emit("message_end", { message: { role: "assistant", content: [{ type: "toolCall" }], stopReason: stopReason ?? "toolUse" } });
-        emit("agent_end", {});
+        // Like Pi, an automatic retry continues after agent_end; agent_settled comes last.
+        for (let attempt = 0; attempt <= (options.retries ?? 0); attempt += 1) {
+          seen.activePerAttempt.push([...active]);
+          emit("turn_start", { turnIndex: attempt });
+          const stopReason = await options.agent(new Map([...tools].filter(([name]) => active.includes(name))), attempt);
+          emit("message_end", { message: { role: "assistant", content: [{ type: "toolCall" }], stopReason: stopReason ?? "toolUse" } });
+          emit("agent_end", {});
+          await new Promise(resolve => setTimeout(resolve, 20));
+        }
+        emit("agent_settled", {});
       };
     },
   };
@@ -49,7 +55,8 @@ function fakeHost(options: { model?: { provider: string; id: string }; thinking?
     queued = undefined;
     await run?.();
   };
-  return { runCommand, notes, seen, activeTools: () => active };
+  const toolCall = (toolName: string) => (handlers.get("tool_call") ?? []).map(handler => handler({ type: "tool_call", toolCallId: "1", toolName, input: {} }))[0];
+  return { runCommand, notes, seen, activeTools: () => active, toolCall };
 }
 
 /** result.json is written last, after the worker run; it is the parent's completion signal. */
@@ -60,10 +67,11 @@ async function resultOf(resultDir: string): Promise<any> {
   throw new Error("result.json was not written");
 }
 
-async function orderFile(): Promise<{ data: Awaited<ReturnType<typeof fixture>>; path: string; resultDir: string }> {
+async function orderFile(modelTurnLimit?: number): Promise<{ data: Awaited<ReturnType<typeof fixture>>; path: string; resultDir: string }> {
   const data = await fixture();
   const path = join(data.base, "order.json");
-  await writeFile(path, JSON.stringify(data.order));
+  const budget = modelTurnLimit === undefined ? data.order.budget : { ...data.order.budget, model_turn_limit: modelTurnLimit };
+  await writeFile(path, JSON.stringify({ ...data.order, budget }));
   return { data, path, resultDir: join(data.base, "run") };
 }
 
@@ -128,4 +136,33 @@ test("/cse-build rejects relative paths without creating a result", async () => 
   } finally {
     await rm(data.base, { recursive: true, force: true });
   }
+});
+
+test("/cse-build keeps the worker tools through Pi's automatic retry", async () => {
+  const { data, path, resultDir } = await orderFile(5);
+  const host = fakeHost({
+    retries: 1,
+    async agent(tools, attempt) {
+      if (attempt === 0) return "error";
+      await tools.get("cse_write_candidate")!.execute("write", { path: "model.txt", content: "after\n" });
+      await tools.get("cse_submit_result")!.execute("submit", SUBMIT);
+      return undefined;
+    },
+  });
+  try {
+    await host.runCommand(`${path} ${resultDir}`);
+    const body = await resultOf(resultDir);
+    assert.equal(body.status, "completed");
+    for (const active of host.seen.activePerAttempt) assert.ok(!active.includes("bash"), `host tools active during an attempt: ${active}`);
+    assert.equal(await readFile(join(data.source, "model.txt"), "utf8"), "before\n");
+  } finally {
+    await rm(data.base, { recursive: true, force: true });
+  }
+});
+
+test("a CSE-Pi session blocks every tool except the worker tools", () => {
+  const host = fakeHost({ async agent() { return undefined; } });
+  assert.deepEqual(host.toolCall("bash"), { block: true, reason: "This CSE-Pi session only runs CSE-Pi worker tools." });
+  assert.equal(host.toolCall("t3_thread_list")?.block, true);
+  assert.equal(host.toolCall("cse_run_command"), undefined);
 });
