@@ -1,0 +1,110 @@
+import { readFile } from "node:fs/promises";
+import type { ExtensionAPI, ExtensionCommandContext, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { runPhase3, type Phase3Session } from "./phase3.js";
+
+export const T3_BUILD_USAGE = "Usage: /cse-build /absolute/work-order.json /absolute/new-result-directory";
+const WORKER_SYSTEM_PROMPT = "CSE-Pi bounded worker.";
+type Listener = (event: Record<string, unknown>) => void;
+
+/**
+ * Pi extension for hosts that run Pi as a visible subagent (T3 Code). `/cse-build` runs the
+ * same Build worker as `cse-pi run`, but the current Pi session is the worker session: its
+ * turns and tool calls appear in the host while the worker tools, frozen snapshot, candidate
+ * copy, Bubblewrap commands and retained evidence stay unchanged.
+ *
+ * Pi starts a message sent from a command only after the command returns, so the command
+ * returns as soon as the worker prompt is sent. The worker tools and system prompt stay in
+ * force until that run ends; runPhase3 then finalizes and writes `result.json` last, which
+ * is the parent's completion signal. Nothing is posted after the run, because hosts end the
+ * child when it settles.
+ */
+export default function cseT3Worker(pi: ExtensionAPI): void {
+  const listeners = new Set<Listener>();
+  let active = false;
+  let hostContext: ExtensionContext | undefined;
+  let endRun: (() => void) | undefined;
+  const forward = (event: Record<string, unknown>) => { for (const listener of listeners) listener(event); };
+  pi.on("turn_start", (event, ctx) => { hostContext = ctx; forward({ ...event }); });
+  pi.on("message_end", event => forward({ ...event }));
+  pi.on("tool_execution_end", event => forward({ ...event }));
+  pi.on("agent_end", () => { const end = endRun; endRun = undefined; end?.(); });
+  // Match the headless worker: no user skills, context files or host guidance in the prompt.
+  pi.on("before_agent_start", () => (active ? { systemPrompt: WORKER_SYSTEM_PROMPT } : undefined));
+
+  pi.registerCommand("cse-build", {
+    description: "Run a CSE-Pi Build work order as this session: /cse-build <work-order.json> <result-dir>",
+    handler: async (args: string, ctx: ExtensionCommandContext) => {
+      const [taskPath, resultDir, ...rest] = args.trim().split(/\s+/u);
+      if (!taskPath?.startsWith("/") || !resultDir?.startsWith("/") || rest.length > 0) {
+        ctx.ui.notify(T3_BUILD_USAGE, "error");
+        return;
+      }
+      if (active) {
+        ctx.ui.notify("A CSE-Pi work order is already running in this session.", "error");
+        return;
+      }
+      let order: unknown;
+      try {
+        order = JSON.parse(await readFile(taskPath, "utf8"));
+      } catch (error) {
+        ctx.ui.notify(`Cannot read work order: ${error instanceof Error ? error.message : String(error)}`, "error");
+        return;
+      }
+      const previousTools = pi.getActiveTools();
+      const cancel = new AbortController();
+      let promptSent!: () => void;
+      const sent = new Promise<void>(resolve => { promptSent = resolve; });
+      active = true;
+      void runPhase3(order, resultDir, false, cancel.signal, {
+        createSession: async ({ model, tools }) => {
+          const observed = ctx.model;
+          if (observed?.provider !== model.provider || observed.id !== model.model) {
+            throw new Error(`T3 child runs ${observed?.provider ?? "no provider"}/${observed?.id ?? "no model"}; the work order requires ${model.provider}/${model.model}. Delegate with that model.`);
+          }
+          for (const tool of tools) pi.registerTool(tool as Parameters<ExtensionAPI["registerTool"]>[0]);
+          let runEnded: Promise<void> = Promise.resolve();
+          const session: Phase3Session = {
+            setActiveToolsByName: names => pi.setActiveTools(names),
+            getActiveToolNames: () => pi.getActiveTools(),
+            thinkingLevel: pi.getThinkingLevel(),
+            async prompt(text) {
+              runEnded = new Promise<void>(resolve => { endRun = resolve; });
+              pi.sendUserMessage(text);
+              promptSent();
+            },
+            waitForIdle: () => runEnded,
+            abort() {
+              const host = hostContext ?? ctx;
+              host.abort();
+              // A run that never started has no agent_end to wait for.
+              if (host.isIdle()) { const end = endRun; endRun = undefined; end?.(); }
+            },
+            subscribe(listener) {
+              // A host Stop aborts the run; report it as cancellation rather than a missing submission.
+              const wrapped: Listener = event => {
+                const message = event.message as { stopReason?: string } | undefined;
+                if (event.type === "message_end" && message?.stopReason === "aborted") cancel.abort();
+                listener(event);
+              };
+              listeners.add(wrapped);
+              return () => listeners.delete(wrapped);
+            },
+            dispose: () => pi.setActiveTools(previousTools),
+          };
+          return session;
+        },
+      })
+        .catch(error => {
+          // Only failures before the result directory exists land here; later ones are in result.json.
+          ctx.ui.notify(`CSE-Pi work order failed: ${error instanceof Error ? error.message : String(error)}`, "error");
+        })
+        .finally(() => {
+          active = false;
+          pi.setActiveTools(previousTools);
+          promptSent();
+        });
+      // Return so Pi can start the worker run; the restrictions above outlive this handler.
+      await sent;
+    },
+  });
+}
