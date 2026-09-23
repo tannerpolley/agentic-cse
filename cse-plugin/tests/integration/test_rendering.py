@@ -1,16 +1,27 @@
 from __future__ import annotations
 
+import importlib.util
 import json
 import os
 from pathlib import Path
 import shutil
+import signal
+import socket
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
+import urllib.request
 
 
 ROOT = Path(__file__).resolve().parents[2]
+EXAMPLE = ROOT / "plugin/assets/workflow/analysis/example"
+MANUSCRIPT = ROOT / "plugin/assets/visualize/project/quarto/manuscript.py"
+_FIXTURE_SPEC = importlib.util.spec_from_file_location("cse_snakemake_fixture", ROOT / "tests/test_snakemake_template.py")
+assert _FIXTURE_SPEC and _FIXTURE_SPEC.loader
+FIXTURE = importlib.util.module_from_spec(_FIXTURE_SPEC)
+_FIXTURE_SPEC.loader.exec_module(FIXTURE)
 
 
 class RenderingBehaviorTests(unittest.TestCase):
@@ -97,6 +108,80 @@ class RenderingBehaviorTests(unittest.TestCase):
                 self.assertIn(str(config_path), result.stderr)
                 self.assertEqual(before, snapshot())
                 self.assertFalse(sentinel.exists())
+
+    def test_example_analysis_renders_and_preview_shows_changed_retained_value(self):
+        if shutil.which("quarto") is None or shutil.which("snakemake") is None:
+            self.skipTest("quarto and snakemake are required for the example manuscript render")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "analyses"
+            analysis = root / "cooling-fit"
+            shutil.copytree(EXAMPLE, analysis, ignore=shutil.ignore_patterns(
+                "results", "figures", ".snakemake", "__pycache__"))
+            # Retained outputs are written directly; the test never runs calculate.
+            FIXTURE.write_retained_set(analysis, rate=0.005, keep_inputs=True)
+
+            def run(command: list[str], cwd: Path) -> subprocess.CompletedProcess:
+                result = subprocess.run(command, cwd=cwd, text=True, capture_output=True, check=False)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                return result
+
+            run(["snakemake", "--cores", "1", "present"], analysis)
+            run([sys.executable, str(MANUSCRIPT), "init", str(root), "--article-source", str(EXAMPLE / "article.qmd"),
+                 "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64], root.parent)
+            run([sys.executable, "manuscript.py", "include", ".", "cooling-fit/notebook.qmd",
+                 "--title", "Cooling-rate fit"], root)
+            rendered = run(["bash", "render.sh"], root)
+            self.assertNotIn("not found in resource path", rendered.stdout + rendered.stderr)
+
+            article = (root / "_site/index.html").read_text(encoding="utf-8")
+            for label in ("fig-cooling-fit", "fig-cooling-residuals", "tbl-cooling-parameters", "eq-cooling-model"):
+                self.assertIn(f'id="{label}"', article)
+            for reference in ("Equation", "Figure", "Table"):
+                self.assertRegex(article, rf'class="quarto-xref">{reference}(&nbsp;|\s)1<')
+            notebook = (root / "_site/cooling-fit/notebook-preview.html").read_text(encoding="utf-8")
+            self.assertIn(r"5.000 \times 10^{-3}", notebook)
+            self.assertTrue((root / "_site/cooling-fit/results/fit_curve.csv").is_file())
+
+            with socket.socket() as probe:
+                probe.bind(("127.0.0.1", 0))
+                port = probe.getsockname()[1]
+            log = (root.parent / "preview.log").open("w")
+            preview = subprocess.Popen(
+                [sys.executable, "manuscript.py", "preview", ".", "--port", str(port)],
+                cwd=root, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
+            )
+            url = f"http://127.0.0.1:{port}/cooling-fit/notebook-preview.html"
+
+            def page() -> str:
+                try:
+                    with urllib.request.urlopen(url, timeout=5) as response:
+                        return response.read().decode()
+                except OSError:
+                    return ""
+
+            def wait_for(text: str, seconds: float) -> bool:
+                deadline = time.monotonic() + seconds
+                while time.monotonic() < deadline:
+                    if preview.poll() is not None:
+                        return False
+                    if text in page():
+                        return True
+                    time.sleep(1)
+                return False
+
+            try:
+                self.assertTrue(wait_for(r"5.000 \times 10^{-3}", 120), (root.parent / "preview.log").read_text())
+                FIXTURE.write_retained_set(analysis, rate=0.0071, keep_inputs=True)
+                self.assertTrue(wait_for(r"7.100 \times 10^{-3}", 60), (root.parent / "preview.log").read_text())
+            finally:
+                if preview.poll() is None:
+                    os.killpg(preview.pid, signal.SIGTERM)
+                    try:
+                        preview.wait(timeout=15)
+                    except subprocess.TimeoutExpired:
+                        os.killpg(preview.pid, signal.SIGKILL)
+                        preview.wait()
+                log.close()
 
 
 if __name__ == "__main__":

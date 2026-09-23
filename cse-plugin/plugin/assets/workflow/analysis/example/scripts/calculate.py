@@ -65,9 +65,9 @@ def read_observations(path: Path) -> tuple[np.ndarray, np.ndarray]:
 def write_curve(path: Path, time_s: np.ndarray, observed: np.ndarray, fitted: np.ndarray) -> None:
     with path.open("w", newline="", encoding="utf-8") as stream:
         writer = csv.writer(stream, lineterminator="\n")
-        writer.writerow(["time_s", "observed_temperature_degC", "fitted_temperature_degC"])
+        writer.writerow(["time_s", "observed_temperature_degC", "fitted_temperature_degC", "residual_degC"])
         writer.writerows(
-            [f"{time:.12g}", f"{value:.12g}", f"{fit:.12g}"]
+            [f"{time:.12g}", f"{value:.12g}", f"{fit:.12g}", f"{value - fit:.12g}"]
             for time, value, fit in zip(time_s, observed, fitted)
         )
 
@@ -83,8 +83,19 @@ def write_figure(path: Path, time_s: np.ndarray, observed: np.ndarray, *, rate: 
         label="positive one-parameter fit",
     )
     axis.set_xlabel("time (s)")
-    axis.set_ylabel("temperature (degC)")
+    axis.set_ylabel(r"temperature ($^{\circ}$C)")
     axis.legend()
+    figure.tight_layout()
+    figure.savefig(path, dpi=120, metadata={"Software": "CSE cooling-fit example"})
+    plt.close(figure)
+
+
+def write_residual_figure(path: Path, time_s: np.ndarray, observed: np.ndarray, fitted: np.ndarray) -> None:
+    figure, axis = plt.subplots(figsize=(6.0, 3.0))
+    axis.axhline(0.0, color="#7f7f7f", linewidth=1.0)
+    axis.scatter(time_s, observed - fitted, color="#1f77b4")
+    axis.set_xlabel("time (s)")
+    axis.set_ylabel(r"$T_\mathrm{obs} - T_\mathrm{fit}$ ($^{\circ}$C)")
     figure.tight_layout()
     figure.savefig(path, dpi=120, metadata={"Software": "CSE cooling-fit example"})
     plt.close(figure)
@@ -99,6 +110,7 @@ def calculate(args: argparse.Namespace) -> None:
     summary_path = Path(args.summary)
     curve_path = Path(args.curve)
     figure_path = Path(args.figure)
+    residual_figure_path = Path(args.residual_figure)
 
     time_s, observed = read_observations(observations_path)
     parameters = json.loads(parameters_path.read_text(encoding="utf-8"))
@@ -120,13 +132,14 @@ def calculate(args: argparse.Namespace) -> None:
     if not isinstance(fitted, np.ndarray):
         raise TypeError("fit owner did not return fitted temperatures")
 
-    for path in (summary_path, curve_path, figure_path):
+    for path in (summary_path, curve_path, figure_path, residual_figure_path):
         path.parent.mkdir(parents=True, exist_ok=True)
 
     with tempfile.TemporaryDirectory(prefix=".cooling-fit-", dir=summary_path.parent) as directory:
         staging = Path(directory)
         staged_curve = staging / curve_path.name
         staged_figure = staging / figure_path.name
+        staged_residual_figure = staging / residual_figure_path.name
         staged_summary = staging / summary_path.name
         write_curve(staged_curve, time_s, observed, fitted)
         write_figure(
@@ -137,6 +150,7 @@ def calculate(args: argparse.Namespace) -> None:
             ambient=ambient,
             initial=initial,
         )
+        write_residual_figure(staged_residual_figure, time_s, observed, fitted)
         summary = {
             "complete": True,
             "model": "T(t) = T_ambient + (T_initial - T_ambient) exp(-k t)",
@@ -170,6 +184,10 @@ def calculate(args: argparse.Namespace) -> None:
                     "path": figure_path.as_posix(),
                     "sha256": sha256(staged_figure),
                 },
+                "residual_figure": {
+                    "path": residual_figure_path.as_posix(),
+                    "sha256": sha256(staged_residual_figure),
+                },
             },
         }
         staged_summary.write_text(json.dumps(summary, indent=2, sort_keys=True) + "\n", encoding="utf-8")
@@ -177,7 +195,7 @@ def calculate(args: argparse.Namespace) -> None:
         # The summary is promoted last and records hashes for the other files.
         # Keep a disposable copy of the previous set so a failed replacement
         # restores the last usable set instead of leaving mixed files behind.
-        targets = (curve_path, figure_path, summary_path)
+        targets = (curve_path, figure_path, residual_figure_path, summary_path)
         backups = {}
         try:
             for index, target in enumerate(targets):
@@ -189,6 +207,7 @@ def calculate(args: argparse.Namespace) -> None:
                     backups[target] = None
             os.replace(staged_curve, curve_path)
             os.replace(staged_figure, figure_path)
+            os.replace(staged_residual_figure, residual_figure_path)
             os.replace(staged_summary, summary_path)
         except Exception:
             for target, backup in backups.items():
@@ -209,6 +228,7 @@ def main() -> int:
     parser.add_argument("--summary", required=True)
     parser.add_argument("--curve", required=True)
     parser.add_argument("--figure", required=True)
+    parser.add_argument("--residual-figure", required=True)
     calculate(parser.parse_args())
     return 0
 

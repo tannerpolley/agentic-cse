@@ -1,16 +1,19 @@
 from __future__ import annotations
 
+import contextlib
 import hashlib
 import importlib.util
 import json
 import os
 from pathlib import Path
 import re
+import struct
 import subprocess
 import sys
 import tempfile
 from types import SimpleNamespace
 import unittest
+import zlib
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -20,6 +23,81 @@ PRESENT_SPEC = importlib.util.spec_from_file_location("cse_present", EXAMPLE / "
 assert PRESENT_SPEC and PRESENT_SPEC.loader
 PRESENT = importlib.util.module_from_spec(PRESENT_SPEC)
 PRESENT_SPEC.loader.exec_module(PRESENT)
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def png(red: int) -> bytes:
+    """Return a valid one-pixel PNG so Quarto can render and embed it."""
+    def chunk(kind: bytes, data: bytes) -> bytes:
+        return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
+    header = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
+    return b"\x89PNG\r\n\x1a\n" + chunk(b"IHDR", header) + chunk(b"IDAT", zlib.compress(bytes([0, red, 0, 0]))) + chunk(b"IEND", b"")
+
+
+def write_retained_set(root: Path, *, rate: float = 0.005, keep_inputs: bool = False) -> SimpleNamespace:
+    """Write a hash-coherent retained set that present.py accepts, without running calculate.
+
+    ``keep_inputs`` hashes the inputs already in ``root`` (a copied example).
+    Each file is written to a temporary name and then replaced, with the summary
+    last, so a watcher never sees a partial set.
+    """
+    paths = {
+        "observations": "inputs/observations.csv", "parameters": "inputs/parameters.json",
+        "environment": "inputs/environment.json", "script": "scripts/calculate.py",
+        "helper": "scripts/cooling_fit.py", "summary": "results/fit_summary.json",
+        "curve": "results/fit_curve.csv", "figure": "figures/cooling_fit.png",
+        "residual_figure": "figures/cooling_residuals.png",
+    }
+
+    def write(relative: str, data: bytes) -> None:
+        target = root / relative
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary = target.with_name(f".{target.name}.tmp")
+        temporary.write_bytes(data)
+        os.replace(temporary, target)
+
+    if not keep_inputs:
+        for name, content in (("observations", "time_s,temperature_degC\n0,90\n60,72.5\n"),
+                              ("parameters", '{"ambient_temperature_degC": 22.0}\n'),
+                              ("environment", '{"python": "3.13.14"}\n'),
+                              ("script", "calculate\n"), ("helper", "helper\n")):
+            write(paths[name], content.encode())
+    write(paths["curve"], (
+        "time_s,observed_temperature_degC,fitted_temperature_degC,residual_degC\n"
+        "0,90,90,0\n60,72.5,72.4,0.1\n"
+    ).encode())
+    write(paths["figure"], png(200))
+    write(paths["residual_figure"], png(100))
+    summary = {
+        "complete": True,
+        "checks": {"rmse_below_data_scaled_bound": True, "refit_consistent": True},
+        "environment": {"python": "3.13.14", "packages": {"numpy": "2.5.3"}},
+        "parameters": {"ambient_temperature_degC": 22.0, "initial_temperature_degC": 90.0},
+        "inputs": {f"{name}_sha256": sha256(root / paths[name])
+                   for name in ("observations", "parameters", "environment", "script", "helper")},
+        "fit": {
+            "cooling_rate_per_s": rate, "cooling_rate_standard_error_per_s": rate / 100,
+            "cooling_rate_ci95_per_s": [rate * 0.98, rate * 1.02], "time_constant_s": 1 / rate,
+            "residual_rmse_degC": 0.1, "rmse_bound_degC": 3.4, "refit_difference_per_s": 1e-16,
+            "refit_tolerance_per_s": 1e-12, "observation_count": 2, "degrees_of_freedom": 1,
+        },
+        "generated_files": {name: {"path": paths[name], "sha256": sha256(root / paths[name])}
+                            for name in ("curve", "figure", "residual_figure")},
+    }
+    write(paths["summary"], (json.dumps(summary, indent=2) + "\n").encode())
+    # Paths are relative to ``root``, as Snakemake passes them; run present from there.
+    return SimpleNamespace(
+        **paths, output="results/cooling_fit_include.qmd", values="results/cooling_fit_values.qmd",
+        provenance="results/cooling_fit_provenance.qmd", views="results/cooling_fit_views.ipynb",
+    )
+
+
+def present_command(arguments: SimpleNamespace) -> list[str]:
+    return [item for name, value in vars(arguments).items()
+            for item in (f"--{name.replace('_', '-')}", value)]
 
 
 def branch(text: str, mode: str) -> str:
@@ -71,137 +149,32 @@ class SnakemakeTemplateTests(unittest.TestCase):
             self.assertTrue((EXAMPLE / relative).is_file(), relative)
 
     def test_presentation_refuses_calculation_script_changed_after_calculation(self):
-        def sha256(path: Path) -> str:
-            return hashlib.sha256(path.read_bytes()).hexdigest()
-
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            inputs = root / "inputs"
-            results = root / "results"
-            figures = root / "figures"
-            inputs.mkdir()
-            results.mkdir()
-            figures.mkdir()
-            observations = inputs / "observations.csv"
-            parameters = inputs / "parameters.json"
-            environment = inputs / "environment.json"
-            scripts = root / "scripts"
-            scripts.mkdir()
-            script = scripts / "calculate.py"
-            helper = scripts / "cooling_fit.py"
-            observations.write_text("time,temperature\n0,90\n")
-            parameters.write_text('{"ambient": 22}\n')
-            environment.write_text('{"python": "3.13.14"}\n')
-            script.write_text("original\n")
-            helper.write_text("helper\n")
-            curve = results / "fit_curve.csv"
-            figure = figures / "cooling_fit.png"
-            curve.write_text("time,observed,fitted\n0,90,90\n")
-            figure.write_bytes(b"figure")
-            summary = results / "fit_summary.json"
-            summary.write_text(json.dumps({
-                "complete": True,
-                "checks": {"rmse": True},
-                "inputs": {
-                    "observations_sha256": sha256(observations),
-                    "parameters_sha256": sha256(parameters),
-                    "environment_sha256": sha256(environment),
-                    "script_sha256": sha256(script),
-                    "helper_sha256": sha256(helper),
-                },
-                "fit": {"cooling_rate_per_s": 0.005, "residual_rmse_degC": 0.1},
-                "generated_files": {
-                    "curve": {"path": curve.as_posix(), "sha256": sha256(curve)},
-                    "figure": {"path": figure.as_posix(), "sha256": sha256(figure)},
-                },
-            }))
-            script.write_text("changed\n")
+            arguments = write_retained_set(root)
+            (root / arguments.script).write_text("changed\n")
             result = subprocess.run(
-                [
-                    sys.executable,
-                    str(EXAMPLE / "scripts/present.py"),
-                    "--observations", str(observations),
-                    "--parameters", str(parameters),
-                    "--environment", str(environment),
-                    "--script", str(script),
-                    "--helper", str(helper),
-                    "--summary", str(summary),
-                    "--curve", str(curve),
-                    "--figure", str(figure),
-                    "--output", str(results / "cooling_fit_include.qmd"),
-                ],
+                [sys.executable, str(EXAMPLE / "scripts/present.py"), *present_command(arguments)],
+                cwd=root,
                 text=True,
                 capture_output=True,
                 check=False,
             )
             self.assertNotEqual(0, result.returncode)
             self.assertIn("changed after the retained calculation", result.stderr)
-            self.assertFalse((results / "cooling_fit_include.qmd").exists())
+            self.assertFalse((root / arguments.output).exists())
 
-    def test_presentation_does_not_rewrite_an_unchanged_include(self):
-        def sha256(path: Path) -> str:
-            return hashlib.sha256(path.read_bytes()).hexdigest()
-
+    def test_presentation_does_not_rewrite_unchanged_includes(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            inputs = root / "inputs"
-            results = root / "results"
-            figures = root / "figures"
-            scripts = root / "scripts"
-            for path in (inputs, results, figures, scripts):
-                path.mkdir()
-            observations = inputs / "observations.csv"
-            parameters = inputs / "parameters.json"
-            environment = inputs / "environment.json"
-            script = scripts / "calculate.py"
-            helper = scripts / "cooling_fit.py"
-            curve = results / "fit_curve.csv"
-            figure = figures / "cooling_fit.png"
-            summary = results / "fit_summary.json"
-            output = results / "cooling_fit_include.qmd"
-            for path, content in (
-                (observations, "time,temperature\n0,90\n"),
-                (parameters, '{"ambient": 22}\n'),
-                (environment, '{"python": "3.13.14"}\n'),
-                (script, "calculate\n"),
-                (helper, "helper\n"),
-                (curve, "curve\n"),
-            ):
-                path.write_text(content)
-            figure.write_bytes(b"figure")
-            summary.write_text(json.dumps({
-                "complete": True,
-                "checks": {"rmse": True},
-                "inputs": {
-                    "observations_sha256": sha256(observations),
-                    "parameters_sha256": sha256(parameters),
-                    "environment_sha256": sha256(environment),
-                    "script_sha256": sha256(script),
-                    "helper_sha256": sha256(helper),
-                },
-                "fit": {"cooling_rate_per_s": 0.005, "residual_rmse_degC": 0.1},
-                "generated_files": {
-                    "curve": {"path": curve.as_posix(), "sha256": sha256(curve)},
-                    "figure": {"path": figure.as_posix(), "sha256": sha256(figure)},
-                },
-            }))
-            arguments = SimpleNamespace(
-                observations=observations,
-                parameters=parameters,
-                environment=environment,
-                script=script,
-                helper=helper,
-                summary=summary,
-                curve=curve,
-                figure=figure,
-                output=output,
-            )
-            PRESENT.present(arguments)
-            os.utime(output, ns=(1_000_000_000, 1_000_000_000))
-            before = output.stat().st_mtime_ns
-            PRESENT.present(arguments)
-            self.assertEqual(before, output.stat().st_mtime_ns)
-
+            arguments = write_retained_set(root)
+            outputs = [root / getattr(arguments, name) for name in ("output", "values", "provenance", "views")]
+            with contextlib.chdir(root):
+                PRESENT.present(arguments)
+                for output in outputs:
+                    os.utime(output, ns=(1_000_000_000, 1_000_000_000))
+                PRESENT.present(arguments)
+            self.assertEqual([1_000_000_000] * 4, [output.stat().st_mtime_ns for output in outputs])
 
 if __name__ == "__main__":
     unittest.main()
