@@ -42,7 +42,8 @@ presentation-only `present` target, then refreshes the included notebook and
 root article with the presentation cache invalidated. Use `manuscript.py preview` to let
 native Quarto serve and reload the local HTML without opening an external
 browser; its small bridge watches retained and presentation sources that native
-preview misses and touches only the affected registered sources. The
+preview misses and asks the running preview to re-render only the affected registered
+sources; pass a free `--port`. The
 presentation profile's sole pre-render hook runs presentation-only preparation
 and never calculation. Keep the full customizable LaTeX manuscript route
 separate.

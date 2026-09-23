@@ -175,19 +175,19 @@ class QuartoManagerTests(unittest.TestCase):
             self.assertIn("calculate", output.getvalue())
             self.assertIn("extra jobs refused", output.getvalue())
 
-    def test_preview_bridge_prepares_before_touching_and_keeps_stale_sources_on_failure(self):
+    def test_preview_bridge_prepares_before_rendering_and_keeps_stale_sources_on_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             output = io.StringIO()
             with (
                 patch.object(MANUSCRIPT, "prepare", return_value=7) as prepare,
-                patch.object(MANUSCRIPT, "touch_targets") as touch,
+                patch.object(MANUSCRIPT, "request_renders") as render,
                 contextlib.redirect_stderr(output),
             ):
-                self.assertEqual(7, MANUSCRIPT.prepare_and_touch(root, {}, {root / "case" / "results.json"}))
+                self.assertEqual(7, MANUSCRIPT.prepare_and_render(root, {}, {root / "case" / "results.json"}, "127.0.0.1", 8000))
 
             prepare.assert_called_once_with(root)
-            touch.assert_not_called()
+            render.assert_not_called()
             self.assertIn("retained pages remain stale", output.getvalue())
 
     def test_changed_retained_file_notifies_its_notebook_and_root(self):

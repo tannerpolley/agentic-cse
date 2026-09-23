@@ -34,6 +34,9 @@ WATCH_SETTLE_SECONDS = 0.25
 IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "_freeze", "__pycache__", ".ipynb_checkpoints"}
 IGNORED_WATCH_PARTS |= {".snakemake", ".cache", "tmp", "temp", "support"}
 IGNORED_WATCH_SUFFIXES = ("_files", "_support")
+# ponytail: Quarto's internal preview render-request path (the one IDE integrations use);
+# preview ignores mtime-only touches and include changes. Recheck on a Quarto upgrade.
+QUARTO_RENDER_REQUEST = "90B3C9E8-0DBC-4BC0-B164-AA2D5C031B28"
 INCLUDE_RE = re.compile(r"\{\{<\s*include\s+([^\s>]+)")
 SERVICE_MARKER = "# Managed by CSE manuscript.py service; do not edit.\n"
 SERVICE_PORT_RE = re.compile(r"--port (\d+)$", re.MULTILINE)
@@ -492,13 +495,17 @@ def presentation_targets(root: Path, state: dict, changed: set[Path]) -> set[Pat
     return targets
 
 
-def touch_targets(targets: set[Path]) -> None:
-    for path in targets:
+def request_renders(root: Path, targets: set[Path], host: str, port: int) -> None:
+    host = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host
+    for path in sorted(targets):
         if path.is_file():
-            os.utime(path, None)
+            url = f"http://{host}:{port}/{QUARTO_RENDER_REQUEST}/{path.relative_to(root).as_posix()}"
+            with urllib.request.urlopen(url, timeout=10) as response:
+                if response.read() != b"rendered":
+                    raise OSError(f"preview refused to render {path}")
 
 
-def prepare_and_touch(root: Path, state: dict, changed: set[Path]) -> int:
+def prepare_and_render(root: Path, state: dict, changed: set[Path], host: str, port: int) -> int:
     try:
         status = prepare(root)
     except (OSError, subprocess.SubprocessError) as exc:
@@ -507,7 +514,11 @@ def prepare_and_touch(root: Path, state: dict, changed: set[Path]) -> int:
     if status:
         print(f"presentation refresh failed in {root} (exit {status}); retained pages remain stale", file=sys.stderr)
         return status
-    touch_targets(presentation_targets(root, state, changed))
+    try:
+        request_renders(root, presentation_targets(root, state, changed), host, port)
+    except OSError as exc:
+        print(f"preview render request failed in {root}: {exc}; retained pages remain stale", file=sys.stderr)
+        return 1
     return 0
 
 
@@ -546,6 +557,10 @@ def preview(root: Path, host: str, port: int) -> int:
     root = root_path(root)
     state = validate_root(root)
     require(1 <= port <= 65535, root, "port must be between 1 and 65535")
+    # Quarto silently picks another port when this one is busy, so render requests would miss it.
+    with socket.socket() as probe:
+        require(probe.connect_ex((host if host not in {"0.0.0.0", "::", ""} else "127.0.0.1", port)) != 0,
+                root, f"port {port} is already in use; pass --port with a free port")
     command = ["quarto", "preview", "--profile", "presentation", "--no-browser",
                "--host", host, "--port", str(port)]
     process = subprocess.Popen(command, cwd=root, start_new_session=True)
@@ -572,7 +587,7 @@ def preview(root: Path, host: str, port: int) -> int:
                 if not new:
                     break
                 pending.update(new)
-            prepare_and_touch(root, state, pending)
+            prepare_and_render(root, state, pending, host, port)
             snapshot = watch_snapshot(root)
         return process.wait()
     except KeyboardInterrupt:

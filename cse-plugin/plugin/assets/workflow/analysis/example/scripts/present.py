@@ -82,7 +82,7 @@ def present(args: argparse.Namespace) -> None:
         f"| residual RMSE | {float(fit['residual_rmse_degC']):.12g} | degC |",
         f"| numerical checks | {checks_result} | -- |",
         "",
-        "![Cooling fit](../figures/cooling_fit.png)",
+        "![Cooling fit](figures/cooling_fit.png)",
         "",
     ]
     content = "\n".join(table).encode()

@@ -1,7 +1,5 @@
 ---
 title: "Cooling-rate fit"
-execute:
-  enabled: false
 ---
 
 # Cooling-rate fit

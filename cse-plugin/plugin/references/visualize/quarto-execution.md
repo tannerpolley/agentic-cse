@@ -78,8 +78,8 @@ When a document needs Python to format a retained table or draw a plot, use
 `present` entry, then native Quarto with `_quarto-presentation.yml`, invalidates
 the presentation cache, and updates the included notebook and root article.
 Quarto preview does not detect arbitrary external-data changes; the
-managed preview bridge touches only the affected registered source after the
-presentation hook has been allowed to validate retained inputs. The following
+managed preview bridge asks the running preview to re-render only the affected
+registered source (touching a file does not trigger it) after the presentation hook has been allowed to validate retained inputs. The following
 bare Quarto command shows the
 upstream syntax for the separately authorized presentation-only execution
 route; it is not a normal or release CSE render:
