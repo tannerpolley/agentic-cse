@@ -176,6 +176,12 @@ class InstallationBehaviorTests(unittest.TestCase):
             self.assertIn("remove it with `codex plugin marketplace remove cse`", refused.stderr)
             self.assertEqual(before, snapshot_preserved())
 
+            fake_state.write_text(json.dumps({"marketplaces": {}, "installed": [{"pluginId": "cse@personal", "installed": True}]}))
+            duplicate = sync_validate()
+            self.assertNotEqual(0, duplicate.returncode)
+            self.assertIn("cse@personal", duplicate.stderr)
+            self.assertEqual(before, snapshot_preserved())
+
             empty_state = {"marketplaces": {}, "installed": []}
             fake_state.write_text(json.dumps(empty_state))
             for failure in ("bin-backup:before:zotero-companion", "late:after-install"):

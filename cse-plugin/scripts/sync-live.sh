@@ -73,8 +73,12 @@ root = Path(sys.argv[1]).resolve()
 marketplaces = [item for item in json.loads(sys.argv[2]).get("marketplaces", []) if item.get("name") == "cse"]
 if marketplaces and Path(marketplaces[0].get("root", "")).resolve() != root:
     raise SystemExit(f"Codex marketplace 'cse' is rooted at {marketplaces[0].get('root')}, not {root}; remove it with `codex plugin marketplace remove cse` first.")
-installed = any(entry.get("pluginId") == "cse@cse" and entry.get("installed")
-                for entry in json.loads(sys.argv[3]).get("installed", []))
+entries = [entry for entry in json.loads(sys.argv[3]).get("installed", []) if entry.get("installed")]
+others = sorted({entry.get("pluginId") for entry in entries
+                 if str(entry.get("pluginId", "")).split("@", 1)[0] == "cse" and entry.get("pluginId") != "cse@cse"})
+if others:
+    raise SystemExit(f"Another cse install would duplicate every skill: {others}; remove each with `codex plugin remove <id>` first.")
+installed = any(entry.get("pluginId") == "cse@cse" for entry in entries)
 print(int(bool(marketplaces)), int(installed))
 PY
 )"
