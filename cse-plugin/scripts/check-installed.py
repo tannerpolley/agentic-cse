@@ -1,83 +1,41 @@
 #!/usr/bin/env python3
-"""Verify selected CSE marketplace installations against the committed payload."""
+"""Verify that Codex has cse@cse installed from this repository's marketplace."""
 
 from __future__ import annotations
 
-import argparse
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
 
-from package_inventory import (
-    LEGACY_NAME,
-    PACKAGES,
-    deploy_root,
-    package,
-    source_commit,
-    verify,
-)
+from package_inventory import ROOT, package, runtime_payload, source_root
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--all", action="store_true")
-    parser.add_argument("--packages", default="cse")
-    parser.add_argument("--deployed-only", action="store_true")
-    parser.add_argument("--home", type=Path, default=Path.home())
-    args = parser.parse_args()
+    codex = os.environ.get("CSE_CODEX_BIN", "codex")
+    cache = Path(os.environ.get("CODEX_HOME") or Path.home() / ".codex") / "plugins/cache/cse/cse/local"
     try:
-        selected = list(PACKAGES) if args.all else [package(name) for name in args.packages.split(",")]
-    except ValueError as exc:
-        parser.error(str(exc))
-    selected_names = {item["name"] for item in selected}
-    if len(selected_names) != len(selected):
-        parser.error("duplicate selected package")
-    if selected_names != {"cse"}:
-        parser.error("the unified CSE payload is selected as cse only")
-    home = args.home.resolve()
-    try:
-        commit = source_commit()
-        listed = [] if args.deployed_only else json.loads(subprocess.run(["codex", "plugin", "list", "--json"], text=True, capture_output=True, check=True).stdout).get("installed", [])
-        family = [
-            entry for entry in listed
-            if str(entry.get("pluginId", "")).split("@", 1)[0] in {item["name"] for item in PACKAGES}
-        ]
-        unexpected = [
-            str(entry.get("pluginId", "")) for entry in listed
-            if (name := str(entry.get("pluginId", "")).split("@", 1)[0])
-            and (name.startswith("cse-") or name == LEGACY_NAME)
-            and name not in {item["name"] for item in PACKAGES}
-        ]
-        if unexpected:
-            raise RuntimeError(f"unexpected CSE-family packages: {', '.join(unexpected)}")
-        if not args.deployed_only:
-            expected_ids = {f"{name}@personal" for name in selected_names}
-            actual_ids = [str(entry.get("pluginId", "")) for entry in family]
-            if {plugin_id.split("@", 1)[0] for plugin_id in actual_ids} != selected_names or any(
-                plugin_id not in expected_ids for plugin_id in actual_ids
-            ):
-                raise RuntimeError("installed CSE-family packages do not match the selected configuration")
-        verified = []
-        for item in selected:
-            root = deploy_root(item, home)
-            if not args.deployed_only:
-                matches = [entry for entry in family if entry.get("pluginId") == f"{item['name']}@personal"]
-                if len(matches) != 1:
-                    raise RuntimeError(f"{item['name']} is missing or duplicated in Codex plugin list")
-                entry = matches[0]
-                if not entry.get("installed") or not entry.get("enabled"):
-                    raise RuntimeError(f"{item['name']} is not enabled")
-                source = (entry.get("source") or {}).get("path")
-                if not isinstance(source, str) or Path(source).resolve() != root:
-                    raise RuntimeError(f"{item['name']} has an unexpected deployment root")
-            verified.append(verify(item, root, commit, home))
+        listed = json.loads(subprocess.run(
+            [codex, "plugin", "list", "--json"], text=True, capture_output=True, check=True,
+        ).stdout).get("installed", [])
+        ids = [str(entry.get("pluginId", "")) for entry in listed]
+        cse_ids = [plugin_id for plugin_id in ids if plugin_id.split("@", 1)[0] == "cse"]
+        if cse_ids != ["cse@cse"]:
+            raise RuntimeError(f"expected only cse@cse installed, found {cse_ids or 'none'}")
+        entry = listed[ids.index("cse@cse")]
+        if not entry.get("installed") or not entry.get("enabled"):
+            raise RuntimeError("cse@cse is not installed and enabled")
+        marketplace = (entry.get("marketplaceSource") or {}).get("source")
+        if not marketplace or Path(marketplace).resolve() != ROOT:
+            raise RuntimeError(f"cse@cse comes from {marketplace}, not {ROOT}")
+        if runtime_payload(cache) != runtime_payload(source_root(package("cse"))):
+            raise RuntimeError(f"{cache} differs from the source payload; run `codex plugin add cse@cse`")
     except (OSError, RuntimeError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
         print(f"CSE installed check failed: {exc}", file=sys.stderr)
         return 1
-    print(json.dumps({"verified": verified, "sourceCommit": commit,
-                      "activation": "unverified" if args.deployed_only else "installed and enabled in CLI plugin list",
-                      "active_task_loaded_state": "unverified"}, sort_keys=True))
+    print(json.dumps({"pluginId": "cse@cse", "marketplaceRoot": str(ROOT), "cache": str(cache),
+                      "activeTaskLoadedState": "unverified"}, sort_keys=True))
     return 0
 
 

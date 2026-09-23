@@ -2,12 +2,9 @@
 set -euo pipefail
 
 repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-deploy_parent="$HOME/.codex/plugins"
-marketplace="$HOME/.agents/plugins/marketplace.json"
 runtime_target="$HOME/.local/share/cse/zotero"
 runtime_bin_dir="$HOME/.local/bin"
 runtime_commands=(cse-zotero zotero-companion)
-legacy_names=(cse-sources cse-visualize scientific-codex)
 expected_zotero_commit="853b0867b14500767713fe99926e40faaa4601ba"
 codex_bin="${CSE_CODEX_BIN:-codex}"
 
@@ -66,6 +63,24 @@ if [[ "$mode" == validate && -n "$(git -C "$repository_root" status --porcelain)
   exit 1
 fi
 
+if [[ "$mode" == validate ]]; then
+  command -v "$codex_bin" >/dev/null || { echo "Codex plugin capability unavailable: supported codex CLI is missing." >&2; exit 1; }
+  # Read-only preflight: the `cse` marketplace must be absent or already rooted at this checkout.
+  codex_state="$(python3 - "$repository_root" "$("$codex_bin" plugin marketplace list --json)" "$("$codex_bin" plugin list --json)" <<'PY'
+import json, sys
+from pathlib import Path
+root = Path(sys.argv[1]).resolve()
+marketplaces = [item for item in json.loads(sys.argv[2]).get("marketplaces", []) if item.get("name") == "cse"]
+if marketplaces and Path(marketplaces[0].get("root", "")).resolve() != root:
+    raise SystemExit(f"Codex marketplace 'cse' is rooted at {marketplaces[0].get('root')}, not {root}; remove it with `codex plugin marketplace remove cse` first.")
+installed = any(entry.get("pluginId") == "cse@cse" and entry.get("installed")
+                for entry in json.loads(sys.argv[3]).get("installed", []))
+print(int(bool(marketplaces)), int(installed))
+PY
+)"
+  read -r marketplace_was_present cse_was_installed <<<"$codex_state"
+fi
+
 python3 "$repository_root/scripts/package_inventory.py" check cse
 "$repository_root/scripts/validate.sh"
 
@@ -92,7 +107,7 @@ explicit_result="$(cd "$unrelated" && "$runtime_venv/bin/cse-zotero" schema-vali
 python3 -c 'import json,sys; value=json.load(sys.stdin); raise SystemExit(0 if value.get("ok") is True else 1)' <<<"$explicit_result"
 
 plugin_commit="$(git -C "$repository_root" rev-parse HEAD)"
-plugin_identity="$(python3 "$repository_root/scripts/package_inventory.py" stage cse "$transaction/cse" --commit "$plugin_commit" --home "$HOME")"
+plugin_identity="$(python3 "$repository_root/scripts/package_inventory.py" stage cse "$transaction/cse" --commit "$plugin_commit")"
 payload_sha256="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["runtimeTreeSha256"])' <<<"$plugin_identity")"
 identity_json() {
   python3 -c 'import json,sys; print(json.dumps({"payloadSha256":sys.argv[1],"pluginCommit":sys.argv[2],"runtime":sys.argv[3],"zoteroCommit":sys.argv[4]}, sort_keys=True))' "$payload_sha256" "$plugin_commit" "$1" "$zotero_commit"
@@ -138,61 +153,20 @@ PY
   exit 0
 fi
 
-if ! command -v "$codex_bin" >/dev/null; then
-  echo "Codex plugin capability unavailable: supported codex CLI is missing." >&2
-  exit 1
-fi
-mkdir -p "$deploy_parent" "$(dirname "$runtime_target")"
+mkdir -p "$(dirname "$runtime_target")"
 previous="$transaction/previous"
 mkdir -p "$previous"
 committed=0
-source_swap_started=0
-candidate_installed=0
 runtime_swap_started=0
 runtime_installed=0
 acquired_bin_commands=()
-marketplace_changed=0
-personal_marketplace_added=0
-if [[ -f "$marketplace" ]]; then cp -- "$marketplace" "$previous/marketplace"; else touch "$previous/marketplace.absent"; fi
-while IFS= read -r name; do
-  target="$deploy_parent/$name"
-  if [[ -e "$target" || -L "$target" ]]; then
-    installed_name="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["name"])' "$target/.codex-plugin/plugin.json" 2>/dev/null || true)"
-    if [[ "$installed_name" != "$name" ]]; then
-      echo "Refusing unexpected directory at $target" >&2
-      exit 1
-    fi
-  fi
-done < <(printf '%s\n' cse "${legacy_names[@]}")
-codex_before="$previous/codex-list.json"
-"$codex_bin" plugin list --json > "$codex_before"
-marketplaces_before="$previous/codex-marketplaces.json"
-"$codex_bin" plugin marketplace list --json > "$marketplaces_before"
-family_names() {
-  python3 - "$1" <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1]))
-family = {"cse", "cse-sources", "cse-visualize", "scientific-codex"}
-seen = set()
-for entry in data.get("installed", []):
-    name = str(entry.get("pluginId", "")).split("@", 1)[0]
-    if name in family:
-        if entry.get("pluginId") != f"{name}@personal" or name in seen:
-            raise SystemExit(f"unexpected duplicate or marketplace for {name}")
-        seen.add(name)
-        print(name)
-PY
-}
-family_file="$previous/family-names"
-family_names "$codex_before" > "$family_file"
-personal_was_configured="$(python3 - "$marketplaces_before" <<'PY'
-import json, sys
-data = json.load(open(sys.argv[1]))
-print(int(any(item.get("name") == "personal" and item.get("marketplaceSource")
-             for item in data.get("marketplaces", []))))
-PY
-)"
+marketplace_added=0
+plugin_added=0
 
+# Rollback restores the Zotero runtime and command entries, and undoes the
+# Codex marketplace and cse@cse install only when this run created them. A local
+# marketplace keeps no prior plugin snapshot, so a cse@cse that was already
+# installed keeps the refreshed cache of this validated commit.
 rollback() {
   local exit_status=$?
   if [[ "$committed" -eq 1 ]]; then
@@ -201,36 +175,6 @@ rollback() {
   fi
 
   local rollback_failed=0
-  local failed_roots="$transaction/failed-roots"
-  mkdir -p "$failed_roots"
-
-  if [[ "$candidate_installed" -eq 1 && ( -e "$deploy_parent/cse" || -L "$deploy_parent/cse" ) ]]; then
-    if ! mv -- "$deploy_parent/cse" "$failed_roots/cse"; then
-      echo "Rollback failed while preserving the candidate CSE source." >&2
-      rollback_failed=1
-    fi
-  fi
-  if [[ "$source_swap_started" -eq 1 ]]; then
-    while IFS= read -r name; do
-      [[ -z "$name" ]] && continue
-      backup="$previous/plugin-roots/$name"
-      if [[ -e "$backup" || -L "$backup" ]]; then
-        current="$deploy_parent/$name"
-        if [[ -e "$current" || -L "$current" ]]; then
-          if ! mv -- "$current" "$failed_roots/$name-current"; then
-            echo "Rollback failed while preserving the current $name source." >&2
-            rollback_failed=1
-            continue
-          fi
-        fi
-        if ! mv -- "$backup" "$current"; then
-          echo "Rollback failed while restoring the $name source." >&2
-          rollback_failed=1
-        fi
-      fi
-    done < <(printf '%s\n' cse "${legacy_names[@]}")
-  fi
-
   if [[ "$runtime_installed" -eq 1 && ( -e "$runtime_target" || -L "$runtime_target" ) ]]; then
     if ! mv -- "$runtime_target" "$transaction/failed-runtime"; then
       echo "Rollback failed while preserving the installed Zotero runtime." >&2
@@ -265,47 +209,17 @@ rollback() {
     done
   fi
 
-  if [[ "$marketplace_changed" -eq 1 ]]; then
-    mkdir -p "$(dirname "$marketplace")"
-    if [[ -e "$previous/marketplace" ]]; then
-      if ! cp -- "$previous/marketplace" "$marketplace"; then
-        echo "Rollback failed while restoring the personal marketplace manifest." >&2
-        rollback_failed=1
-      fi
-    elif ! rm -f -- "$marketplace"; then
-      echo "Rollback failed while removing the transaction marketplace manifest." >&2
+  if [[ "$plugin_added" -eq 1 && "$cse_was_installed" -eq 0 ]]; then
+    if ! "$codex_bin" plugin remove cse@cse --json >/dev/null; then
+      echo "Rollback failed while removing cse@cse." >&2
       rollback_failed=1
     fi
+  elif [[ "$plugin_added" -eq 1 ]]; then
+    echo "cse@cse was already installed; it stays installed with this commit's refreshed cache." >&2
   fi
-
-  current_codex="$transaction/rollback-codex-list.json"
-  current_family="$transaction/rollback-family-names"
-  if ! "$codex_bin" plugin list --json > "$current_codex"; then
-    echo "Rollback failed while reading the current Codex plugin state." >&2
-    rollback_failed=1
-  elif ! family_names "$current_codex" > "$current_family"; then
-    echo "Rollback failed because the current Codex plugin state is invalid." >&2
-    rollback_failed=1
-  else
-    while IFS= read -r name; do
-      [[ -z "$name" ]] && continue
-      if ! "$codex_bin" plugin remove "$name@personal" --json >/dev/null; then
-        echo "Rollback failed while removing $name@personal." >&2
-        rollback_failed=1
-      fi
-    done < "$current_family"
-    while IFS= read -r name; do
-      [[ -z "$name" ]] && continue
-      if ! "$codex_bin" plugin add "$name@personal" --json >/dev/null; then
-        echo "Rollback failed while re-adding $name@personal; transaction preserved at $transaction." >&2
-        rollback_failed=1
-      fi
-    done < "$family_file"
-  fi
-
-  if [[ "$personal_marketplace_added" -eq 1 ]]; then
-    if ! "$codex_bin" plugin marketplace remove personal --json >/dev/null; then
-      echo "Rollback failed while removing the transaction marketplace registration; transaction preserved at $transaction." >&2
+  if [[ "$marketplace_added" -eq 1 ]]; then
+    if ! "$codex_bin" plugin marketplace remove cse --json >/dev/null; then
+      echo "Rollback failed while removing the cse marketplace registration." >&2
       rollback_failed=1
     fi
   fi
@@ -319,15 +233,6 @@ rollback() {
 }
 trap rollback EXIT
 
-mkdir -p "$previous/plugin-roots"
-source_swap_started=1
-while IFS= read -r name; do
-  if [[ -e "$deploy_parent/$name" || -L "$deploy_parent/$name" ]]; then
-    mv -- "$deploy_parent/$name" "$previous/plugin-roots/$name"
-  else
-    touch "$previous/plugin-roots/$name.absent"
-  fi
-done < <(printf '%s\n' cse "${legacy_names[@]}")
 runtime_swap_started=1
 if [[ -e "$runtime_target" || -L "$runtime_target" ]]; then
   mv -- "$runtime_target" "$previous/runtime"
@@ -347,39 +252,7 @@ for command in "${runtime_commands[@]}"; do
   fi
   acquired_bin_commands+=("$command")
 done
-mv -- "$transaction/cse" "$deploy_parent/cse"
-candidate_installed=1
 
-marketplace_changed=1
-python3 "$repository_root/scripts/register_marketplace.py" --marketplace "$marketplace"
-marketplace_add_result="$("$codex_bin" plugin marketplace add "$HOME" --json)"
-if [[ "$personal_was_configured" -eq 0 ]]; then
-  already_added="$(python3 -c 'import json,sys; print(int(json.load(sys.stdin).get("alreadyAdded", False)))' <<<"$marketplace_add_result")"
-  if [[ "$already_added" -eq 0 ]]; then
-    personal_marketplace_added=1
-  fi
-fi
-marketplaces_after="$transaction/codex-marketplaces-after.json"
-"$codex_bin" plugin marketplace list --json > "$marketplaces_after"
-python3 - "$marketplaces_after" "$HOME" <<'PY'
-import json, sys
-from pathlib import Path
-data = json.load(open(sys.argv[1]))
-home = Path(sys.argv[2]).resolve()
-if not any(item.get("name") == "personal" and Path(item.get("root", "")).resolve() == home
-           for item in data.get("marketplaces", [])):
-    raise SystemExit("personal marketplace is not registered at the home root")
-PY
-
-while IFS= read -r name; do
-  [[ -z "$name" ]] || "$codex_bin" plugin remove "$name@personal" --json >/dev/null
-done < "$family_file"
-"$codex_bin" plugin add cse@personal --json >/dev/null
-
-if [[ "${CSE_FAIL_AT:-}" == "runtime:before-install" ]]; then
-  echo "Injected failure at runtime:before-install" >&2
-  exit 1
-fi
 runtime_installed=1
 uv venv "$runtime_target" >/dev/null
 uv pip install --python "$runtime_target/bin/python" "$runtime_wheels"/*.whl >/dev/null
@@ -398,12 +271,19 @@ installed_result="$(cd "$unrelated" && "$runtime_bin_dir/cse-zotero" schema-vali
 python3 -c 'import json,sys; value=json.load(sys.stdin); raise SystemExit(0 if value.get("ok") is True else 1)' <<<"$installed_result"
 installed_alias_result="$(cd "$unrelated" && "$runtime_bin_dir/zotero-companion" schema-validate "$runtime_source/examples/core-records.yaml" --json)"
 python3 -c 'import json,sys; value=json.load(sys.stdin); raise SystemExit(0 if value.get("ok") is True else 1)' <<<"$installed_alias_result"
-if [[ "${CSE_FAIL_AT:-}" == "late:after-runtime" ]]; then
-  echo "Injected failure at late:after-runtime" >&2
+
+# Codex reads this repository's marketplace; `plugin add` recopies the local
+# `./plugin` source into the Codex cache, so it both installs and refreshes.
+[[ "$marketplace_was_present" -eq 1 ]] || marketplace_added=1
+"$codex_bin" plugin marketplace add "$repository_root" --json >/dev/null
+plugin_added=1
+"$codex_bin" plugin add cse@cse --json >/dev/null
+if [[ "${CSE_FAIL_AT:-}" == "late:after-install" ]]; then
+  echo "Injected failure at late:after-install" >&2
   exit 1
 fi
 
-python3 "$repository_root/scripts/check-installed.py" --all --home "$HOME"
+python3 "$repository_root/scripts/check-installed.py"
 committed=1
 identity_json "installed wheel and schema checks passed"
-echo "Deployed unified CSE plugin through the supported Codex CLI."
+echo "Installed cse@cse from the repository marketplace and the Zotero runtime."

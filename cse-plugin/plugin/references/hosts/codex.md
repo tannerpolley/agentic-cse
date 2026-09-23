@@ -35,19 +35,38 @@ has loaded it or that hooks are trusted and active.
 
 ## Install and update
 
-The Codex adapter is the existing sync/check path, run from the root of a
-cse-plugin source checkout (not from the installed plugin):
+Codex reads the same native local marketplace catalog at the repository root as
+Claude Code. Install CSE as `cse@cse` with the checkout's absolute path:
+
+```bash
+codex plugin marketplace add <absolute-repository>
+codex plugin add cse@cse
+codex plugin list --json
+codex plugin marketplace list --json
+```
+
+The catalog's only entry is the local `./plugin` source. Codex copies it into
+its plugin cache, so rerun `codex plugin add cse@cse` to refresh the cache
+after the source changes. Do not install a second copy through another
+marketplace.
+
+From the root of a cse-plugin source checkout (not from the installed plugin),
+`sync-live.sh` wraps that install with the Zotero runtime and checks:
 
 ```bash
 ./scripts/sync-live.sh --check --zotero-source <absolute-zotero-checkout>
 ./scripts/sync-live.sh --validate --zotero-source <absolute-zotero-checkout>
 ```
 
-`--check` is the runtime check; `--validate` is the explicit
-installation transaction and requires the source tree to be committed. These
-commands also use the package inventory and source-commit/payload hash for
-content identity. They are not the ordinary offline source check and do not
-install hooks automatically.
+`--check` builds and checks the Zotero runtime without changing host state.
+`--validate` requires a committed source tree, installs the Zotero runtime,
+runs the two commands above, and verifies that `cse@cse` is enabled from this
+checkout with a current cache. On failure it restores the prior Zotero runtime
+and removes a marketplace or `cse@cse` install it created; an existing
+`cse@cse` keeps the refreshed cache because a local marketplace keeps no prior
+copy. Both modes report the source commit and payload hash for content
+identity. They are not the ordinary offline source check and do not install
+hooks automatically.
 
 ## Opt-in hooks and diagnostics
 
