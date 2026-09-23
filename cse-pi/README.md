@@ -11,3 +11,9 @@ The provisional, benchmark-independent build default is openai-codex/gpt-5.6-lun
 Work orders provide an explicit model-turn budget. Results retain the exact termination reason and normalized token usage.
 
 \`--no-inference\` is the deterministic validation path: it validates, snapshots, runs declared checks, and exits nonzero with \`preflight\`. Omit it only with an authorized supported Pi subscription. The runtime never resumes sessions, starts a daemon, applies candidate changes to the source, or claims parent acceptance.
+
+## T3 Code subagent route
+
+Inside T3 Code the same worker can run as a visible Pi subagent instead of a headless process. Build `dist/`, then add a Pi provider instance in T3 (Settings → Providers → Add provider instance → Pi) with instance id `cse-pi` and launch arguments `--extension /absolute/path/to/cse-pi/dist/t3-extension.js`. A parent delegates with `delegate_task` to that instance, using the work order's worker model and effort, `mode: "async"`, and the task `/cse-build /absolute/work-order.json /absolute/new-run-directory`.
+
+The extension runs the unchanged Build worker in that session: only the CSE-Pi worker tools are active, commands still run in Bubblewrap, and the host's skills, context files and other tools are out of the prompt until the run settles. Load it only in the dedicated instance: it blocks every other tool call in that Pi session, so a prompt that is not a well-formed `/cse-build` gets no tools. A child whose model differs from the work order records a failed result instead of running. `result.json` is written last and marks completion; the parent inspects the evidence exactly as after `cse-pi run`.
