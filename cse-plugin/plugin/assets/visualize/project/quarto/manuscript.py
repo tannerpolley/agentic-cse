@@ -21,7 +21,7 @@ ASSET_ROOT = Path(__file__).resolve().parent
 CONFIG_FILES = ("_quarto.yml", "_cse-manuscript.json", "_quarto-presentation.yml")
 REQUIRED_FILES = (*CONFIG_FILES, "index.qmd", ".cse-quarto-source.json",
                   ".gitignore", "render.sh", "manuscript.py")
-REQUIRED_IGNORES = ("/.quarto/", "/_site/", "/_freeze/", "/notebook.tex")
+REQUIRED_IGNORES = ("/.quarto/", "/_site/", "/site_libs/", "/_freeze/", "/notebook.tex")
 MANUSCRIPT_CONFIG = {
     "project": {"type": "manuscript", "output-dir": "_site"},
     "metadata-files": ["_cse-manuscript.json"], "manuscript": {"article": "index.qmd"},
@@ -31,7 +31,7 @@ MANUSCRIPT_CONFIG = {
 PRESENTATION_PRE_RENDER = "python3 manuscript.py prepare"
 WATCH_INTERVAL_SECONDS = 0.25
 WATCH_SETTLE_SECONDS = 0.25
-IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "_freeze", "__pycache__", ".ipynb_checkpoints"}
+IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "site_libs", "_freeze", "__pycache__", ".ipynb_checkpoints"}
 IGNORED_WATCH_PARTS |= {".snakemake", ".cache", "tmp", "temp", "support"}
 IGNORED_WATCH_SUFFIXES = ("_files", "_support")
 # ponytail: Quarto's internal preview render-request path (the one IDE integrations use);
@@ -209,7 +209,7 @@ def inspect_config(root: Path, files: dict[str, bytes], state: dict) -> None:
                         and manuscript["article"] == "index.qmd" and sorted(project["render"]) == sorted(paths)
                         and sorted(manuscript["notebooks"], key=lambda n: n["notebook"])
                         == sorted(state["manuscript"]["notebooks"], key=lambda n: n["notebook"]), root, "native publication contract differs")
-                require(execution["enabled"] is presentation and config["format"]["html"]["embed-resources"] is True
+                require(execution["enabled"] is presentation and config["format"]["html"]["embed-resources"] is not presentation
                         and (not presentation or (execution.get("cache") is True and execution.get("daemon") is False)), root, "native execution contract differs")
                 for name, info in report["fileInformation"].items():
                     require(name in paths, root / name, "unsupported source include")
@@ -522,6 +522,21 @@ def prepare_and_render(root: Path, state: dict, changed: set[Path], host: str, p
     return 0
 
 
+def workflows_running(root: Path) -> bool:
+    # Snakemake removes a rule's outputs before running it, so never present mid-calculation.
+    return any(any((workflow / ".snakemake" / "locks").glob("*"))
+               for workflow in presentation_workflows(root))
+
+
+def wait_for_server(process: subprocess.Popen, host: str, port: int) -> None:
+    host = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host
+    while process.poll() is None:
+        with socket.socket() as probe:
+            if probe.connect_ex((host, port)) == 0:
+                return
+        time.sleep(WATCH_INTERVAL_SECONDS)
+
+
 def stop_process(process: subprocess.Popen) -> None:
     if process.poll() is not None:
         return
@@ -571,6 +586,7 @@ def preview(root: Path, host: str, port: int) -> int:
     try:
         if not presentation_workflows(root):
             return process.wait()
+        wait_for_server(process, host, port)
         snapshot = watch_snapshot(root)
         while process.poll() is None:
             time.sleep(WATCH_INTERVAL_SECONDS)
@@ -584,7 +600,7 @@ def preview(root: Path, host: str, port: int) -> int:
                 current = watch_snapshot(root)
                 new = changed_paths(snapshot, current)
                 snapshot = current
-                if not new:
+                if not new and not workflows_running(root):
                     break
                 pending.update(new)
             prepare_and_render(root, state, pending, host, port)
