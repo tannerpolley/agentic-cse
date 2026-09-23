@@ -44,8 +44,10 @@ performing a Git or GitHub action owns its authority and records the resulting
 state in its handoff.
 
 Activate [cse-pi-worker](../../references/workflow/cse-pi-worker.md) only when a bounded Build worker adds value. Freeze the
-accepted specification and permitted paths; inspect the retained candidate
-diff and rerun important validation before any separate source application.
+accepted specification and permitted paths. Inside T3 Code with a CSE-Pi
+provider instance, launch it as a visible subagent; otherwise use the CLI, as
+that reference describes. Inspect the retained candidate diff and rerun
+important validation before any separate source application.
 Worker output is evidence, never parent acceptance.
 
 If the correction boundary is not established, return to `cse:diagnose` before
