@@ -70,6 +70,8 @@ export default function cseT3Worker(pi: ExtensionAPI): void {
           }
           for (const tool of tools) pi.registerTool(tool as Parameters<ExtensionAPI["registerTool"]>[0]);
           let runEnded: Promise<void> = Promise.resolve();
+          // Set when the worker aborts itself (turn limit, timeout, cancellation) so that abort keeps its own status.
+          let selfAborted = false;
           const session: Phase3Session = {
             setActiveToolsByName: names => pi.setActiveTools(names),
             getActiveToolNames: () => pi.getActiveTools(),
@@ -81,6 +83,7 @@ export default function cseT3Worker(pi: ExtensionAPI): void {
             },
             waitForIdle: () => runEnded,
             abort() {
+              selfAborted = true;
               const host = hostContext ?? ctx;
               host.abort();
               // A run that never started has no agent_settled to wait for.
@@ -88,9 +91,10 @@ export default function cseT3Worker(pi: ExtensionAPI): void {
             },
             subscribe(listener) {
               // A host Stop aborts the run; report it as cancellation rather than a missing submission.
+              // An abort the worker requested keeps the status the lifecycle already recorded.
               const wrapped: Listener = event => {
                 const message = event.message as { stopReason?: string } | undefined;
-                if (event.type === "message_end" && message?.stopReason === "aborted") cancel.abort();
+                if (event.type === "message_end" && message?.stopReason === "aborted" && !selfAborted) cancel.abort();
                 listener(event);
               };
               listeners.add(wrapped);

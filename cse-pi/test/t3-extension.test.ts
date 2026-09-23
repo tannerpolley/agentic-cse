@@ -13,7 +13,7 @@ const SUBMIT = { outcome: "accepted", facts: ["changed candidate"], assumptions:
  * A Pi host whose agent run executes `agent` against the tools active when it starts. Like Pi,
  * a message sent from a command runs only after the command handler returns.
  */
-function fakeHost(options: { model?: { provider: string; id: string }; thinking?: string; retries?: number; agent: (tools: Map<string, Tool>, attempt: number) => Promise<string | undefined> }) {
+function fakeHost(options: { busy?: boolean; model?: { provider: string; id: string }; thinking?: string; retries?: number; agent: (tools: Map<string, Tool>, attempt: number) => Promise<string | undefined> }) {
   const handlers = new Map<string, Handler[]>();
   const tools = new Map<string, Tool>();
   const notes: string[] = [];
@@ -48,7 +48,7 @@ function fakeHost(options: { model?: { provider: string; id: string }; thinking?
     },
   };
   cseT3Worker(pi as never);
-  const ctx = { model: options.model ?? { provider: "openai-codex", id: "gpt-5.6-luna" }, ui: { notify: (message: string) => notes.push(message) }, isIdle: () => true, abort() {} };
+  const ctx = { model: options.model ?? { provider: "openai-codex", id: "gpt-5.6-luna" }, ui: { notify: (message: string) => notes.push(message) }, isIdle: () => !options.busy, abort() {} };
   const runCommand = async (args: string) => {
     await command!(args, ctx);
     const run = queued;
@@ -121,6 +121,21 @@ test("/cse-build reports a host stop as cancellation", async () => {
     const body = await resultOf(resultDir);
     assert.equal(body.status, "cancelled");
     assert.equal(await readFile(join(data.source, "model.txt"), "utf8"), "before\n");
+  } finally {
+    await rm(data.base, { recursive: true, force: true });
+  }
+});
+
+test("/cse-build keeps a turn-limit abort distinct from a host stop", async () => {
+  const { path, resultDir, data } = await orderFile(1);
+  // The second turn exceeds the limit; the worker's own abort ends it with stopReason "aborted".
+  // busy: Pi is mid-run when the worker aborts, so the run ends only at agent_settled.
+  const host = fakeHost({ busy: true, retries: 1, async agent(_tools, attempt) { return attempt === 1 ? "aborted" : undefined; } });
+  try {
+    await host.runCommand(`${path} ${resultDir}`);
+    const body = await resultOf(resultDir);
+    assert.equal(body.termination, "turn_limit_exceeded");
+    await lstat(join(resultDir, "candidate.diff"));
   } finally {
     await rm(data.base, { recursive: true, force: true });
   }
