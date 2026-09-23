@@ -1,6 +1,6 @@
 ---
 name: prose
-description: "CSE Supporting Prose — Inspect scientific writing, semantic fidelity, and final manuscript cohesion without editing."
+description: "Inspect scientific writing read-only: exact-span findings on clarity, banned language, semantic fidelity, and final manuscript cohesion. Use when asked to \"check my writing\", \"does this revision change the meaning\", or for a final manuscript check. Edits go to write; claim support to review."
 metadata:
   cse-kind: "supporting"
   cse-family: "supporting"
@@ -12,8 +12,10 @@ metadata:
 
 # Inspect scientific prose
 
+Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-projects](../../references/workflow/scientific-projects.md), [BANNED](../../BANNED.md).
+
 Identify the exact paragraph, section, manuscript, report, reviewer response, or
-original-and-revision pair and apply the shared rules in `scientific-projects`.
+original-and-revision pair and apply the shared rules in [scientific-projects](../../references/workflow/scientific-projects.md).
 Default to inspection only. For file-backed input, run the existing deterministic
 prose check with available repository and personal authorities before semantic
 inspection. For pasted text without a declared repository-relative path, state
@@ -33,6 +35,6 @@ request one verification inspection after its minimum effective change.
 For an explicit final manuscript check, inspect the authoritative assembled
 source and use the source-identity, complete identifier coverage,
 sentence-to-paragraph-to-section judgments, and argument-spine checkpoint in
-`scientific-projects`. Return **Revise** with exact identifiers for stale
+[scientific-projects](../../references/workflow/scientific-projects.md). Return **Revise** with exact identifiers for stale
 identity, missing coverage, or unresolved weak or broken relationships. The
 routine clear message is not a final-check result.

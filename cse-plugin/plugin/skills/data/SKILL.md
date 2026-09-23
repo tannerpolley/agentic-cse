@@ -1,6 +1,6 @@
 ---
 name: data
-description: "CSE — Discover, query, validate, and trace retained scientific data when authority or lineage is unresolved."
+description: "Query, validate, and trace the lineage of retained scientific datasets when authority or lineage is unresolved. Use when asked \"where did this table come from\", \"check this dataset's units\", or to query project data. Paper citations go to zotero; figure images to digitize."
 metadata:
   cse-kind: "tool"
   cse-family: "sources"
@@ -12,8 +12,10 @@ metadata:
 
 # Scientific data tool
 
+Read first: [source-operations](../../references/sources/source-operations.md).
+
 Inherit core scientific, project, and
-language decisions. Activate `zotero-companion` only for Companion authority.
+language decisions. Activate [zotero-companion](../../references/sources/zotero-companion.md) only for Companion authority.
 
 Use this tool only for a bounded data need. A repository-owned file with a
 matching retained snapshot and provenance hash needs no Companion probe.

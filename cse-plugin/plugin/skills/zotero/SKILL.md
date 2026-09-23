@@ -1,6 +1,6 @@
 ---
 name: zotero
-description: "CSE — Find, acquire, inspect, and cite source evidence through Zotero and Zotero Companion."
+description: "Find, acquire, inspect, and cite sources in Zotero through Zotero Companion, previewing and approving every library write. Use when asked to \"add this paper to Zotero\", \"cite this\", \"sync the bibliography\", or search the library. Judging which source applies goes to research."
 metadata:
   cse-kind: "tool"
   cse-family: "sources"
@@ -12,11 +12,13 @@ metadata:
 
 # Zotero source tool
 
+Read first: [source-operations](../../references/sources/source-operations.md), [zotero-companion](../../references/sources/zotero-companion.md).
+
 Inherit core scientific, project, and
 language decisions.
 
 Inspect inherited decisions and required Companion capabilities, then perform
-one bounded operation from the `zotero-companion` reference: incorporate
+one bounded operation from the [zotero-companion](../../references/sources/zotero-companion.md) reference: incorporate
 selected sources into the existing project view, query retained knowledge
 read-only, or check and maintain corpus health. Search the configured corpus
 before the live library, and use source, evidence, typed-record, lineage, and

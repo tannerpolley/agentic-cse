@@ -1,6 +1,6 @@
 ---
 name: audit
-description: "CSE Supporting Audit — Produce an evidence-driven, read-only deletion and ownership report when software ceremony, duplicated values, or misplaced records displace scientific work."
+description: "Report read-only where software ceremony, duplicated scientific values, misplaced records, or unsourced names displace scientific work, with delete, dedupe, and move findings. Use when asked \"what can I delete\" or \"audit this repo\". Scientific support goes to review; writing to prose."
 metadata:
   cse-kind: "supporting"
   cse-family: "supporting"
@@ -11,6 +11,8 @@ metadata:
 ---
 
 # Audit CSE practice
+
+Read first: [operating-model](../../references/workflow/operating-model.md), [BANNED](../../BANNED.md).
 
 Inspect the requested repository or folder read-only. This is a CSE-practice
 audit, not scientific Review: judge whether the work stays centered on the

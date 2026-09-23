@@ -1,6 +1,6 @@
 ---
 name: research
-description: "CSE Research and design — Find and assess sources, equations, data, and methods when authority or applicability remains uncertain."
+description: "Find and assess sources, equations, correlations, data, and methods when authority or applicability is uncertain. Use when asked \"find the paper for this correlation\" or \"is this equation valid here\". Zotero library work goes to zotero; datasets to data; figure values to digitize."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -13,13 +13,15 @@ metadata:
 
 # Research sources
 
+Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
+
 Use `cse:zotero`, `cse:mathpix`,
 `cse:data`, or `cse:digitize` after checking the requested external capability
 owns the unresolved source operation.
 
 ## Investigate
 
-Apply the shared decision-frontier rule after inspection to source applicability
+Apply the shared [decision-frontier rule](../../references/workflow/operating-model.md#decision-frontier-handoff-and-reference-reuse) after inspection to source applicability
 and any unresolved evidence choice.
 
 Confirm the claim or decision, intended use, source standard, domain limits,

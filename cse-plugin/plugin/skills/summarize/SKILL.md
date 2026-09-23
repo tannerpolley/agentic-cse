@@ -1,6 +1,6 @@
 ---
 name: summarize
-description: "CSE Execute and deliver — Create the working analysis research notebook and chat summary from retained results."
+description: "Create or refresh the analysis research notebook (Quarto .qmd) and a chat summary from retained results, before review. Use when asked to \"summarize the results\", \"write up the notebook\", or \"what did we find\" after analyze. Papers and reports go to write."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -13,7 +13,9 @@ metadata:
 
 # Summarize results
 
-Activate `scientific-method` for interpretation, verification, validation, or
+Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-projects](../../references/workflow/scientific-projects.md).
+
+Activate [scientific-method](../../references/workflow/scientific-method.md) for interpretation, verification, validation, or
 uncertainty. Return a chat summary of the main points and research
 notebook. For a retained relationship or comparison, use
 `cse:plot` after checking the renderer capability, providing retained values, intended use,
@@ -28,7 +30,7 @@ diagnostics, and existing notebook. A poor result may continue when values and
 diagnostics answer or bound the question. The notebook preserves provenance,
 units, uncertainty, limitations, and point-versus-line meaning, and must not
 rerun the model. Reject empty displays, unsupported curves, unsupported
-statistics, and unexplained failures. Follow `scientific-projects` for the
+statistics, and unexplained failures. Follow [scientific-projects](../../references/workflow/scientific-projects.md) for the
 claim-led figure requirement and its table-only exceptions.
 
 The chat summary states the outcome, basis and conditions, supported quantities

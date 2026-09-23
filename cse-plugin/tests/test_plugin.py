@@ -44,11 +44,18 @@ class PluginBehaviorTests(unittest.TestCase):
         for skill in SKILLS:
             frontmatter = yaml.safe_load((PLUGIN / "skills" / skill / "SKILL.md").read_text().split("---", 2)[1])
             self.assertEqual(skill, frontmatter["name"])
+            self.assertIn("Use when", frontmatter["description"])
+            self.assertLessEqual(len(frontmatter["description"]), 300)
             routing = frontmatter["metadata"]["cse-routing"]
             self.assertTrue(routing["direct"])
             for kind in ("direct", "conditional"):
                 self.assertLessEqual(set(routing[kind]), references)
-            interface = yaml.safe_load((PLUGIN / "skills" / skill / "agents/openai.yaml").read_text())["interface"]
+            codex = yaml.safe_load((PLUGIN / "skills" / skill / "agents/openai.yaml").read_text())
+            self.assertEqual(
+                not codex.get("policy", {}).get("allow_implicit_invocation", True),
+                frontmatter.get("disable-model-invocation", False),
+            )
+            interface = codex["interface"]
             self.assertTrue(interface["display_name"])
             self.assertTrue(interface["short_description"])
             self.assertTrue(interface["default_prompt"].startswith("Use $cse:"))
@@ -72,13 +79,9 @@ class PluginBehaviorTests(unittest.TestCase):
             "summarize": "Execute and deliver", "write": "Execute and deliver",
         }
         for skill, phase in phase_descriptions.items():
-            frontmatter = yaml.safe_load((PLUGIN / "skills" / skill / "SKILL.md").read_text().split("---", 2)[1])
-            self.assertTrue(frontmatter["description"].startswith(f"CSE {phase} —"))
             interface = yaml.safe_load((PLUGIN / "skills" / skill / "agents/openai.yaml").read_text())["interface"]
             self.assertNotIn("Workflow", interface["display_name"])
             self.assertIn(phase.replace(" or ", " / "), interface["display_name"])
-        review = yaml.safe_load((PLUGIN / "skills/review/SKILL.md").read_text().split("---", 2)[1])
-        self.assertTrue(review["description"].startswith("CSE Review —"))
         prose = yaml.safe_load((PLUGIN / "skills/prose/SKILL.md").read_text().split("---", 2)[1])
         self.assertEqual("supporting", prose["metadata"]["cse-kind"])
         workflow = (PLUGIN / "skills/workflow/SKILL.md").read_text()
