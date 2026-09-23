@@ -35,7 +35,8 @@ has loaded it or that hooks are trusted and active.
 
 ## Install and update
 
-The repository's Codex adapter is the existing sync/check path:
+The Codex adapter is the existing sync/check path, run from the root of a
+cse-plugin source checkout (not from the installed plugin):
 
 ```bash
 ./scripts/sync-live.sh --check --zotero-source <absolute-zotero-checkout>
@@ -51,14 +52,16 @@ install hooks automatically.
 ## Opt-in hooks and diagnostics
 
 Hooks are separate user-owned runtime files and must be opted in for each CSE
-repository:
+repository. Run the installer from the installed plugin root (the directory
+containing `skills/`); from a cse-plugin source checkout, prefix the path with
+`plugin/`:
 
 ```bash
-python3 plugin/scripts/workflow/install_cse_hooks.py \
+python3 scripts/workflow/install_cse_hooks.py \
   --agent codex --repo <absolute-repository>
-python3 plugin/scripts/workflow/install_cse_hooks.py \
+python3 scripts/workflow/install_cse_hooks.py \
   --agent codex --diagnose --repo <absolute-repository>
-python3 plugin/scripts/workflow/install_cse_hooks.py --check
+python3 scripts/workflow/install_cse_hooks.py --check
 ```
 
 The installer writes the stable runtime under

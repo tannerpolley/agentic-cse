@@ -33,7 +33,8 @@ That import is required before claiming automatic loading of the shared
 `AGENTS.md` guidance. A plugin listing does not by itself prove that the
 current task loaded the plugin, trusted the repository, or activated hooks.
 
-For disposable local development, load the source directory in place:
+For disposable local development, load the source directory in place from
+the root of a cse-plugin source checkout:
 
 ```bash
 claude --plugin-dir <absolute-repository>/plugin
@@ -63,27 +64,30 @@ claude plugin marketplace list --json
 The catalog's only entry is the local `./plugin` source. A local source can be
 observed in place during development without reinstalling; an installed
 marketplace copy still needs the host's update command when that is how it is
-loaded. `claude plugin validate plugin --json` is a native metadata check;
+loaded. `claude plugin validate plugin --json`, run from the source checkout
+root, is a native metadata check;
 version or author warnings do not authorize adding release numbers to the CSE
 manifests.
 
 ## Opt-in hooks and diagnostics
 
 Hooks are separate user-owned runtime files and must be opted in for each CSE
-repository:
+repository. Run the installer from the installed plugin root (the directory
+containing `skills/`); from a cse-plugin source checkout, prefix the path with
+`plugin/`:
 
 ```bash
-python3 plugin/scripts/workflow/install_cse_hooks.py \
+python3 scripts/workflow/install_cse_hooks.py \
   --agent claude --repo <absolute-repository>
-python3 plugin/scripts/workflow/install_cse_hooks.py \
+python3 scripts/workflow/install_cse_hooks.py \
   --agent claude --diagnose --repo <absolute-repository>
-python3 plugin/scripts/workflow/install_cse_hooks.py --check
+python3 scripts/workflow/install_cse_hooks.py --check
 ```
 
 The installer writes the stable runtime under
 `$HOME/.local/share/cse/hooks` and the repository registration under
 `.claude/settings.json`. It preserves unrelated configuration, removes only
-recognized CSE registrations, omits Codex-only `statusMessage` fields, remains
+recognized CSE registrations, keeps each handler's `statusMessage`, remains
 safe to repeat, and keeps the four `SessionStart`, `SubagentStart`,
 `UserPromptSubmit`, and `Stop` events. A changed installed runtime requires
 the explicit `--replace-runtime` guard. Plugin discovery, native registration,

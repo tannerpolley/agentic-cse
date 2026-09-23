@@ -129,19 +129,19 @@ def project_root(path: Path) -> Path:
 
 def configuration(agent: str) -> dict:
     config = json.loads(CONFIG_SOURCE.read_text(encoding="utf-8"))
-    if agent == "claude":
-        config = {"hooks": config["hooks"]}
-        for groups in config["hooks"].values():
-            for group in groups:
-                for handler in group["hooks"]:
-                    handler.pop("statusMessage", None)
-    return config
+    return {"hooks": config["hooks"]} if agent == "claude" else config
 
 
 def owned_commands(event: str) -> dict[str, Path]:
-    return {f'{python} "$HOME/{directory}/cse-test-gate.py" {event}': Path(directory) / "cse-test-gate.py"
-            for python in ("python3", "/usr/bin/python3")
-            for directory in (".codex/hooks", str(RUNTIME_DIRECTORY))}
+    """Current guarded command plus earlier unguarded forms, so reinstalls replace them."""
+    owned = {}
+    for directory in (".codex/hooks", str(RUNTIME_DIRECTORY)):
+        script = f'"$HOME/{directory}/cse-test-gate.py"'
+        relative = Path(directory) / "cse-test-gate.py"
+        for python in ("python3", "/usr/bin/python3"):
+            owned[f"{python} {script} {event}"] = relative
+        owned[f"[ ! -f {script} ] || python3 {script} {event}"] = relative
+    return owned
 
 
 def merged_configuration(target: Path, agent: str) -> dict:
