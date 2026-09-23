@@ -1,6 +1,6 @@
 ---
 name: quarto
-description: "CSE — Render one scientific Quarto source to project-selected PDF, presentation, or HTML views without rerunning the model."
+description: "Render one Quarto (.qmd) source to project-selected HTML, PDF, or presentation views without rerunning the model. Use when asked to \"render the notebook\", \"preview the manuscript\", or when quarto render fails. Raw LaTeX documents go to latex; Beamer slides to beamer."
 metadata:
   cse-kind: "tool"
   cse-family: "visualize"
@@ -12,11 +12,13 @@ metadata:
 
 # Quarto document manager
 
+Read first: [rendering-guide](../../references/visualize/rendering-guide.md), [quarto-execution](../../references/visualize/quarto-execution.md).
+
 Inherit core scientific, project, and
 language decisions.
 
-Activate `latex-packages` and `latex-article-profiles` for promoted PDF or
-article outputs, and `latex-figures` for shared figures.
+Activate [latex-packages](../../references/visualize/latex-packages.md) and [latex-article-profiles](../../references/visualize/latex-article-profiles.md) for promoted PDF or
+article outputs, and [latex-figures](../../references/visualize/latex-figures.md) for shared figures.
 
 Inspect the existing project, profiles, source, includes, filters, output
 paths, and render command. Keep shared scientific content in one source.
@@ -35,7 +37,7 @@ For a selected HTML endpoint, completion requires the populated `index.qmd`,
 registered report sources, and their rendered HTML. Select an optional native
 PDF view with `render.sh --to pdf`; the standalone example retains its separate
 `promoted-pdf` profile and header. After an adopted analysis completes, use
-`python3 manuscript.py refresh <root> <notebook.qmd>`; it runs the
+`python3 analyses/manuscript.py refresh analyses analyses/<id>/notebook.qmd`; it runs the
 presentation-only `present` target, then refreshes the included notebook and
 root article with the presentation cache invalidated. Use `manuscript.py preview` to let
 native Quarto serve and reload the local HTML without opening an external
@@ -44,7 +46,7 @@ preview misses and touches only the affected registered sources. The
 presentation profile's sole pre-render hook runs presentation-only preparation
 and never calculation. Keep the full customizable LaTeX manuscript route
 separate.
-Follow `quarto-execution` for JSON-compatible configuration adoption.
+Follow [quarto-execution](../../references/visualize/quarto-execution.md) for JSON-compatible configuration adoption.
 
 Render each selected format from the same source revision and compare values,
 conditions, uncertainty, interpretation, limitations, citations, and figure

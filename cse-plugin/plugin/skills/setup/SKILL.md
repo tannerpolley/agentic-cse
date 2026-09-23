@@ -1,6 +1,6 @@
 ---
 name: setup
-description: "CSE Research and design — Establish or revise a repository's scientific records, vocabulary, retained-data ownership, and available routes."
+description: "Prepare or reconcile a repository's scientific records, vocabulary, analysis or tool role, retained-data owners, and optional CSE hooks. Use when starting CSE in a repo (\"set up this project\"), installing CSE hooks, or migrating scientific records and ownership."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -13,16 +13,18 @@ metadata:
 
 # Establish or revise repository setup
 
+Read first: [operating-model](../../references/workflow/operating-model.md).
+
 Inspect repository guidance, existing scientific records, terminology, inputs,
 analyses, documents, Git state, and available commands. Activate
-`scientific-projects` for record ownership or migration and `github-and-git`
+[scientific-projects](../../references/workflow/scientific-projects.md) for record ownership or migration and [github-and-git](../../references/workflow/github-and-git.md)
 for issue and integration rules. Use `cse:zotero` or
 `cse:data` after checking the requested external capability when source authority
 or lineage is unresolved. Use CSE rendering only for a selected render output or
 the root Quarto Manuscript assets for a confirmed analysis; `tool` gets no
 Quarto Manuscript by default. If the renderer is absent, finish independent
 setup and report the exact missing capability; never silently install one.
-Apply the shared decision-frontier rule to role, purpose, and owner choices
+Apply the shared [decision-frontier rule](../../references/workflow/operating-model.md#decision-frontier-handoff-and-reference-reuse) to role, purpose, and owner choices
 after inspection; confirm the investigator's `analysis` or `tool` role on
 every Setup run; continuing handoffs inherit an answer.
 When root `AGENTS.md` has no project execution preference, offer `direct` or
@@ -71,8 +73,7 @@ Offer the explicit source/data adoption choice `none`, `zotero`, or
 regenerate the managed protocol pointer from that record. An omitted choice
 preserves an existing adoption decision and adds no pointer to an existing
 repository.
-`python3 scripts/workflow/setup_scientific_project.py --repo <root> --check-routing`
-reports a missing, stale, or malformed block, a missing agent role, and the exact
+The same `--check-routing` plan also reports a missing, stale, or malformed block, a missing agent role, and the exact
 proposed repair; approved application replaces the legacy pointer paragraph and
 preserves all other guidance. Duplicate or unmatched markers require manual
 reconciliation, never a guessed overwrite. A drifted block is shown as a diff;
@@ -110,9 +111,7 @@ after the choice is settled unless host state materially changes. Setup prepares
 guidance; existing hook configuration stays untouched otherwise. For host invocation, structured questions, native
 subagents, instruction discovery, installation, and diagnostics, read the applicable
 [`Codex host reference`](../../references/hosts/codex.md) or
-[`Claude Code host reference`](../../references/hosts/claude.md). Hooks require a
-separate explicit opt-in through `scripts/workflow/install_cse_hooks.py --agent
-<host> --repo <root>`. Use its `--diagnose` option for read-only inspection. In Claude Code,
+[`Claude Code host reference`](../../references/hosts/claude.md). In Claude Code,
 ensure root `CLAUDE.md` imports `@AGENTS.md`, preserving existing guidance,
 before claiming automatic project-guidance loading. Write personal terminology,
 Companion state, or remote records only after their required approval. Verify

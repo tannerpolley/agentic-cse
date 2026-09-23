@@ -1,6 +1,6 @@
 ---
 name: write
-description: "CSE Execute and deliver — Turn accepted scientific evidence into a manuscript, report, appendix, caption, or equation narrative."
+description: "Turn accepted scientific evidence into manuscript, report, appendix, caption, or equation prose, changing only diagnosed spans. Use when asked to \"draft the paper\", \"write the methods section\", or \"fix this paragraph\". Read-only critique goes to prose; compiling to latex or quarto."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -13,7 +13,9 @@ metadata:
 
 # Write papers
 
-Activate `scientific-projects` for project writing rules and retained paths.
+Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
+
+Activate [scientific-projects](../../references/workflow/scientific-projects.md) for project writing rules and retained paths.
 Use the committed bibliography snapshot read-only; an approved refresh belongs
 to CSE source after the Zotero capability is checked.
 
@@ -26,7 +28,7 @@ prose. Check terminology and banned language on every durable edit.
 
 Routine wording, citations, formatting, and local clarity edits remain here;
 rendering does not require a Prose cohesion inspection. Apply the
-minimal-intervention and fidelity rules in `scientific-projects`: change only
+minimal-intervention and fidelity rules in [scientific-projects](../../references/workflow/scientific-projects.md): change only
 diagnosed spans, leave clear prose unchanged, invent no specificity, preserve
 supported content, and perform one verification read. Route explicit wording,
 AI-pattern, comparison, or final manuscript checks to `cse:prose`. A material

@@ -1,6 +1,6 @@
 ---
 name: build
-description: "CSE Execute and deliver — Implement an agreed scientific model, method, data transformation, or document correction."
+description: "Implement an agreed scientific model, method, data transformation, or document correction from an accepted issue. Use when asked to \"implement issue #N\", \"code this model\", or fix a cause diagnose already established. An unexplained failure goes to diagnose first."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -13,10 +13,12 @@ metadata:
 
 # Build methods
 
-Activate `scientific-method` for equations, conventions, or validity;
-`numerical-testing` for the result-level reference or invariant; and
-`failure-triage` when failures or incomplete cases are in scope. Activate
-`github-and-git` for
+Read first: [operating-model](../../references/workflow/operating-model.md), [code-surface-review](../../references/workflow/code-surface-review.md).
+
+Activate [scientific-method](../../references/workflow/scientific-method.md) for equations, conventions, or validity;
+[numerical-testing](../../references/workflow/numerical-testing.md) for the result-level reference or invariant; and
+[failure-triage](../../references/workflow/failure-triage.md) when failures or incomplete cases are in scope. Activate
+[github-and-git](../../references/workflow/github-and-git.md) for
 the issue, branch, or integration authority.
 
 Inspect the complete current issue body, relevant comments and amendments,
@@ -41,7 +43,7 @@ and one change-accounting run against the final tree and active base. The stage
 performing a Git or GitHub action owns its authority and records the resulting
 state in its handoff.
 
-Activate `cse-pi-worker` only when a bounded Build worker adds value. Freeze the
+Activate [cse-pi-worker](../../references/workflow/cse-pi-worker.md) only when a bounded Build worker adds value. Freeze the
 accepted specification and permitted paths; inspect the retained candidate
 diff and rerun important validation before any separate source application.
 Worker output is evidence, never parent acceptance.

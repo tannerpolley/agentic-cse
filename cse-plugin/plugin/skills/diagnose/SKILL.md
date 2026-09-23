@@ -1,6 +1,6 @@
 ---
 name: diagnose
-description: "CSE Research and design — Establish the cause of an unexplained numerical result or failure before implementation changes."
+description: "Establish the cause of an unexpected numerical result or failure through reproduction and bounded probes, before any code change. Use when asked \"why does my solver diverge\", \"why doesn't this match the reference\", or about NaNs, non-convergence, or a result that looks wrong."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -13,11 +13,13 @@ metadata:
 
 # Diagnose numerical behavior
 
-Apply the shared decision-frontier rule after inspection to an unresolved causal
+Read first: [operating-model](../../references/workflow/operating-model.md), [failure-triage](../../references/workflow/failure-triage.md).
+
+Apply the shared [decision-frontier rule](../../references/workflow/operating-model.md#decision-frontier-handoff-and-reference-reuse) after inspection to an unresolved causal
 distinction or the smallest bounded next probe.
 
-Activate `scientific-method` when equations, units, basis, validity, or claim
-limits are in dispute. Activate `numerical-testing` when a reference case,
+Activate [scientific-method](../../references/workflow/scientific-method.md) when equations, units, basis, validity, or claim
+limits are in dispute. Activate [numerical-testing](../../references/workflow/numerical-testing.md) when a reference case,
 invariant, tolerance, or convergence check is needed.
 Record the exact case, inputs, units, basis, model and method versions,
 expected behavior, metric, tolerance, observed result, solver termination reason,
@@ -26,7 +28,7 @@ the narrowest runnable command. A skipped case, timeout, subprocess failure,
 missing value, or solver message is not evidence that the physical model or
 formulation is wrong.
 
-Use `failure-triage` to decide whether the method returned a useful numerical
+Use [failure-triage](../../references/workflow/failure-triage.md) to decide whether the method returned a useful numerical
 result and to bound what an incomplete case can establish. Rank a small set of
 falsifiable explanations, test them with bounded probes, and preserve the exact
 stopping point and diagnostics without imposing a fixed record template.

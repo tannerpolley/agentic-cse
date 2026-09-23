@@ -1,6 +1,6 @@
 ---
 name: analyze
-description: "CSE Execute and deliver — Run and interpret an accepted numerical study, preserving failures, uncertainty, and claim limits."
+description: "Run an accepted numerical study and interpret it, checking balances, residuals, convergence, and failed cases while keeping uncertainty and claim limits. Use when asked to \"run the study\", \"run the sweep\", or \"what do these results show\". The notebook write-up goes to summarize."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -13,9 +13,11 @@ metadata:
 
 # Analyze results
 
-Activate `numerical-testing` for reference, invariant, convergence, or
-tolerance checks; `failure-triage` for incomplete or failed cases; and
-`scientific-projects` for retained analysis ownership.
+Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
+
+Activate [numerical-testing](../../references/workflow/numerical-testing.md) for reference, invariant, convergence, or
+tolerance checks; [failure-triage](../../references/workflow/failure-triage.md) for incomplete or failed cases; and
+[scientific-projects](../../references/workflow/scientific-projects.md) for retained analysis ownership.
 Use
 `cse:plot` when an installed rendering capability is required and
 `cse:data` after checking the data capability and retained-input authority, columns,
@@ -45,7 +47,7 @@ rendering, retain exact plotted values, run only analyses needed by the
 question, and distinguish numerical error, source uncertainty, model
 discrepancy, and named limits for the intended use.
 
-Apply the claim-led figure rule in `scientific-projects` to retained comparisons.
+Apply the claim-led figure rule in [scientific-projects](../../references/workflow/scientific-projects.md) to retained comparisons.
 
 Project-selected output formats are sufficient; do not require PDF, PNG, and
 SVG together. Without CSE rendering, retain the numerical values and
@@ -53,7 +55,7 @@ interpretation and report the missing Plot capability when the central result
 is plottable.
 
 Require a useful, method-specific numerical result as defined by
-`failure-triage`. Reported success, an exit code, completed preflight, placeholder,
+[failure-triage](../../references/workflow/failure-triage.md). Reported success, an exit code, completed preflight, placeholder,
 empty result file, or empty plot is not a result. If no useful result exists,
 state that plainly, preserve the exact stopping point and diagnostic, and
 route the cause to `cse:diagnose`; do not report completion or create a

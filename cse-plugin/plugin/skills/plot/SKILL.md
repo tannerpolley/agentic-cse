@@ -1,6 +1,6 @@
 ---
 name: plot
-description: "CSE — Create or review claim-led figures from retained scientific values."
+description: "Create or review claim-led Python figures from retained scientific values, with lines for continuous relations and points for observations. Use when asked to \"plot this CSV\" or \"make a model-vs-data figure\". LaTeX-native plots go to pgfplots; diagrams to tikz."
 metadata:
   cse-kind: "tool"
   cse-family: "visualize"
@@ -12,8 +12,10 @@ metadata:
 
 # Plotting tool
 
+Read first: [rendering-guide](../../references/visualize/rendering-guide.md), [plotting](../../references/visualize/plotting.md).
+
 Inherit core scientific, numerical,
-project, and language decisions. Activate `latex-figures` only for a
+project, and language decisions. Activate [latex-figures](../../references/visualize/latex-figures.md) only for a
 document-native backend.
 
 Name the question, intended use, units, data authority, and series roles. Add a

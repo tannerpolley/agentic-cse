@@ -1,6 +1,6 @@
 ---
 name: design
-description: "CSE Research and design — Decide whether scientific work is a result or capability, define its bounded issue, and publish it before implementation when required."
+description: "Define and publish the bounded issue for scientific work: question, model, method, reference case, tolerance, falsifier, and claim limits. Use when planning a study, model change, or tool fix before implementation (\"plan this study\", \"write the issue for this\")."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -13,10 +13,12 @@ metadata:
 
 # Design work
 
-Activate `code-surface-review` for executable changes, replacement, or
-deletion; establish its task budget before Build. Activate `decision-records` for
-a consequential alternative and `dependent-scientific-changes` for real leaf
-dependencies. Activate `github-and-git` when issue or Git state is part of the
+Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
+
+Activate [code-surface-review](../../references/workflow/code-surface-review.md) for executable changes, replacement, or
+deletion; establish its task budget before Build. Activate [decision-records](../../references/workflow/decision-records.md) for
+a consequential alternative and [dependent-scientific-changes](../../references/workflow/dependent-scientific-changes.md) for real leaf
+dependencies. Activate [github-and-git](../../references/workflow/github-and-git.md) when issue or Git state is part of the
 endpoint.
 
 Define the question, model, assumptions, inputs, domain, method, sources,
@@ -25,7 +27,7 @@ a supported negative result. Trace each changed responsibility from public input
 through mapping, numerical owner, result, failure, and output; restore accepted
 ownership and failure meaning in the same issue.
 
-Apply the shared decision-frontier rule to question, method, scope, and
+Apply the shared [decision-frontier rule](../../references/workflow/operating-model.md#decision-frontier-handoff-and-reference-reuse) to question, method, scope, and
 falsifier before Build; settled Design proceeds under authority without ritual
 gate.
 
@@ -59,7 +61,7 @@ proposed issue. Review owns the readiness criteria and returns **Ready**,
 concise disposition; only **Ready** permits Build. Reuse still-valid evidence
 and refresh only conclusions affected by a material correction.
 
-When the repository uses GitHub issues, activate `github-and-git`, publish the
+When the repository uses GitHub issues, activate [github-and-git](../../references/workflow/github-and-git.md), publish the
 complete accepted plan, and read it back before Build. In baton mode, the
 Architect supplies the issue-ready specification and the Manager performs the
 authorized publication. A draft, chat summary, or reviewer opinion is not the

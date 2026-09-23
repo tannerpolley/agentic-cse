@@ -1,6 +1,6 @@
 ---
 name: tikz
-description: "CSE — Create document-native diagrams, geometry, meshes, and annotations with TikZ when paths and relationships carry the meaning."
+description: "Draw document-native TikZ diagrams, geometry, meshes, schematics, and annotations where paths and relationships carry the meaning. Use when asked to \"draw a schematic\", \"make a TikZ diagram\", or \"draw the mesh\". Data-driven plots go to pgfplots or plot."
 metadata:
   cse-kind: "tool"
   cse-family: "visualize"
@@ -12,9 +12,11 @@ metadata:
 
 # TikZ diagram tool
 
+Read first: [rendering-guide](../../references/visualize/rendering-guide.md), [latex-figures](../../references/visualize/latex-figures.md).
+
 Inherit core project and language
-decisions. Activate `latex-packages` for package or engine choices and
-`latex-layout-and-qa` for placement or collision review.
+decisions. Activate [latex-packages](../../references/visualize/latex-packages.md) for package or engine choices and
+[latex-layout-and-qa](../../references/visualize/latex-layout-and-qa.md) for placement or collision review.
 
 Use TikZ for paths, nodes, arrows, shapes, labels, and geometric relations;
 use `cse:pgfplots` for table-driven quantitative plots. Put source under the

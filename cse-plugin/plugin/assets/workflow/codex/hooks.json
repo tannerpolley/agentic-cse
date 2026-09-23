@@ -7,7 +7,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" SessionStart",
+            "command": "[ ! -f \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" ] || python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" SessionStart",
             "timeout": 10,
             "statusMessage": "Loading the CSE scientific stance..."
           }
@@ -19,7 +19,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" SubagentStart",
+            "command": "[ ! -f \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" ] || python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" SubagentStart",
             "timeout": 5,
             "statusMessage": "Loading the CSE scientific stance..."
           }
@@ -31,7 +31,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" UserPromptSubmit",
+            "command": "[ ! -f \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" ] || python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" UserPromptSubmit",
             "timeout": 5,
             "statusMessage": "Loading the CSE scientific stance..."
           }
@@ -43,7 +43,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" Stop",
+            "command": "[ ! -f \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" ] || python3 \"$HOME/.local/share/cse/hooks/cse-test-gate.py\" Stop",
             "timeout": 10,
             "statusMessage": "Reviewing CSE completion and checking prose/test changes..."
           }
