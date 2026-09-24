@@ -100,6 +100,39 @@ class ScriptBehaviorTests(unittest.TestCase):
             self.assertIn("notes.md", live["reason"])
             self.assertNotIn("merged.md", live["reason"])
 
+    def test_prose_check_attributes_committed_lane_edits_but_not_existing_branches(self):
+        git = ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com"]
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory) / "main"
+            project.mkdir()
+            self.hook_fixture(project, "tool")  # local-only: no origin, no upstream
+            subprocess.run([*git, "switch", "-q", "-c", "other"], cwd=project, check=True)
+            (project / "other.md").write_text("The schema is older work.\n", encoding="utf-8")
+            subprocess.run([*git, "add", "other.md"], cwd=project, check=True)
+            subprocess.run([*git, "commit", "-qm", "other"], cwd=project, check=True)
+            subprocess.run([*git, "switch", "-q", "main"], cwd=project, check=True)
+            broken = Path(directory) / "broken"
+            subprocess.run(["git", "worktree", "add", "-q", "--detach", str(broken)], cwd=project, check=True)
+            (broken / ".git").unlink()
+            self.run_hook(project, "SessionStart", source="startup")
+
+            # Reviewing an existing branch in a new worktree does not attribute its prose to the session.
+            review = Path(directory) / "review"
+            subprocess.run(["git", "worktree", "add", "-q", str(review), "other"], cwd=project, check=True)
+            checked_out = self.run_hook(project, "Stop", stop_hook_active=True, last_assistant_message="Done.")
+            self.assertNotIn("other.md", json.dumps(checked_out))
+
+            # A lane's committed edit is still this session's writing, and a broken checkout is skipped.
+            lane = Path(directory) / "lane"
+            subprocess.run(["git", "worktree", "add", "-q", "-b", "lane", str(lane)], cwd=project, check=True)
+            (lane / "notes.md").write_text("The schema changed.\n", encoding="utf-8")
+            subprocess.run([*git, "add", "notes.md"], cwd=lane, check=True)
+            subprocess.run([*git, "commit", "-qm", "lane"], cwd=lane, check=True)
+            committed = self.run_hook(project, "Stop", stop_hook_active=True, last_assistant_message="Done.")
+            self.assertEqual("block", committed.get("decision"))
+            self.assertIn("notes.md", committed["reason"])
+            self.assertNotIn("unavailable", json.dumps(committed))
+
     def test_stop_review_does_not_resend_answer_text(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)

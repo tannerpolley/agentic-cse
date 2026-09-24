@@ -18,7 +18,7 @@ SOURCE_STANCE = Path(__file__).resolve().parents[2] / "assets/workflow/scientifi
 STANCE = SOURCE_STANCE if SOURCE_STANCE.is_file() else Path(__file__).with_name("cse-scientific-stance.txt")
 TEST_PARTS = {"test", "tests", "testing"}
 MAX_INPUT_BYTES = 1024 * 1024
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 OPTIONAL_START = "[["
 OPTIONAL_END = "]]"
 ROLE_SLOT = "{repository_role}"
@@ -178,39 +178,83 @@ def inventory(repository: Path, project: Path) -> dict[str, str]:
     return dict(sorted(records.items()))
 
 
+def checkouts(repository: Path) -> list[tuple[Path, str | None]]:
+    """Usable checkouts of the repository with their branch; bare and prunable entries are skipped."""
+    blocks = git(repository, "worktree", "list", "--porcelain").decode(errors="surrogateescape").split("\n\n")
+    found = []
+    for block in blocks:
+        fields = dict(line.partition(" ")[::2] for line in block.splitlines() if line)
+        path = Path(fields.get("worktree", ""))
+        if "worktree" in fields and "bare" not in fields and "prunable" not in fields and path.is_dir():
+            found.append((path.resolve(), fields.get("branch")))
+    return found
+
+
 def worktrees(repository: Path) -> list[Path]:
-    """Every checkout of the repository, so prose written in a lane's worktree is seen."""
-    lines = git(repository, "worktree", "list", "--porcelain").decode(errors="surrogateescape").splitlines()
-    found = [Path(line[len("worktree "):]) for line in lines if line.startswith("worktree ")]
-    return [path.resolve() for path in found if path.is_dir()]
+    return [path for path, _ in checkouts(repository)]
 
 
-def branch_base(worktree: Path) -> str:
-    """The upstream point this checkout's own work starts from; merged work lies behind it."""
-    for reference in ("refs/remotes/origin/HEAD", "@{upstream}"):
-        try:
-            return git(worktree, "merge-base", "HEAD", reference).decode().strip()
-        except HookError:
-            continue
-    return "HEAD"
+def commit(worktree: Path, reference: str) -> str | None:
+    try:
+        return git(worktree, "rev-parse", "--verify", "-q", f"{reference}^{{commit}}").decode().strip() or None
+    except HookError:
+        return None
 
 
-def authored_prose(repository: Path, project: Path) -> dict[str, str]:
-    """Prose each checkout changed relative to its upstream base, keyed by checkout and path.
+def integrated_line(worktree: Path, branch: str | None) -> str | None:
+    """The reviewed line work merges into: the upstream, origin's default, or the local default branch."""
+    for reference in ("@{upstream}", "refs/remotes/origin/HEAD", "refs/heads/main", "refs/heads/master"):
+        if reference != branch and (found := commit(worktree, reference)):
+            return found
+    return None
 
-    Text that reached a checkout by merging or pulling reviewed work sits behind the base and is
-    not attributed to this session; edits in any worktree, committed or not, are.
+
+def session_refs(repository: Path) -> dict[str, str]:
+    """Branch tips and checkout HEADs when the session starts."""
+    refs = {}
+    for line in git(repository, "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads").decode().splitlines():
+        name, _, sha = line.partition(" ")
+        refs[name] = sha
+    for path, _ in checkouts(repository):
+        if head := commit(path, "HEAD"):
+            refs[f"checkout:{path}"] = head
+    return refs
+
+
+def blob(worktree: Path, reference: str, relative: str) -> str | None:
+    try:
+        return git(worktree, "rev-parse", "--verify", "-q", f"{reference}:{relative}").decode().strip()
+    except HookError:
+        return None
+
+
+def written_prose(repository: Path, project: Path, refs: dict[str, str]) -> list[Path]:
+    """Prose this session wrote in any checkout, committed or not.
+
+    A file counts when its content differs both from the integrated line (so text that arrived by
+    merging or pulling reviewed work is excluded) and from what the checkout's branch held when the
+    session started (so an existing branch checked out mid-session is not attributed to it).
     """
-    prefix = project.relative_to(repository)
-    records = {}
-    for worktree in worktrees(repository):
-        changed = git(worktree, "diff", "--name-only", "-z", branch_base(worktree), "--", prefix.as_posix() or ".")
-        untracked = git(worktree, "ls-files", "--others", "--exclude-standard", "-z", "--", prefix.as_posix() or ".")
-        for item in {*changed.split(b"\0"), *untracked.split(b"\0")} - {b""}:
-            path = worktree / item.decode(errors="surrogateescape")
-            if path.suffix.lower() in {".md", ".qmd", ".tex"} and path.is_file() and not path.is_symlink():
-                records[str(path)] = file_record(path)
-    return dict(sorted(records.items()))
+    scope = project.relative_to(repository).as_posix() or "."
+    written = []
+    for worktree, branch in checkouts(repository):
+        try:
+            start = refs.get(branch or "") or refs.get(f"checkout:{worktree}")
+            anchors = [a for a in (integrated_line(worktree, branch), start) if a] or ["HEAD"]
+            names = set(git(worktree, "ls-files", "--others", "--exclude-standard", "-z", "--", scope).split(b"\0"))
+            for anchor in anchors:
+                names |= set(git(worktree, "diff", "--name-only", "-z", anchor, "--", scope).split(b"\0"))
+            for item in sorted(names - {b""}):
+                relative = item.decode(errors="surrogateescape")
+                path = worktree / relative
+                if path.suffix.lower() not in {".md", ".qmd", ".tex"} or not path.is_file() or path.is_symlink():
+                    continue
+                content = git(worktree, "hash-object", "--", relative).decode().strip()
+                if all(blob(worktree, anchor, relative) != content for anchor in anchors):
+                    written.append(path)
+        except (HookError, subprocess.TimeoutExpired):
+            continue  # an unreadable checkout is skipped rather than disabling the check for all
+    return written
 
 
 def save(path: Path, value: dict[str, object]) -> None:
@@ -222,21 +266,24 @@ def save(path: Path, value: dict[str, object]) -> None:
 
 def start(event: dict[str, object], repository: Path, project: Path) -> None:
     path = state_path(event, repository, project)
-    if str(event.get("source") or "startup") in {"startup", "clear"} or not path.is_file():
+    try:
+        current = json.loads(path.read_text(encoding="utf-8")).get("schema_version") if path.is_file() else None
+    except (OSError, ValueError, AttributeError):
+        current = None
+    if str(event.get("source") or "startup") in {"startup", "clear"} or current != SCHEMA_VERSION:
         save(path, {
             "schema_version": SCHEMA_VERSION,
             "project": str(project),
             "baseline": inventory(repository, project),
-            "prose": authored_prose(repository, project),
+            "refs": session_refs(repository),
         })
 
 
 def prose_changes(event: dict[str, object], repository: Path, project: Path) -> list[Path]:
     state = json.loads(state_path(event, repository, project).read_text(encoding="utf-8"))
-    if not isinstance(state, dict) or state.get("schema_version") != SCHEMA_VERSION or state.get("project") != str(project) or not isinstance(state.get("prose"), dict):
+    if not isinstance(state, dict) or state.get("schema_version") != SCHEMA_VERSION or state.get("project") != str(project) or not isinstance(state.get("refs"), dict):
         raise HookError("session prose baseline is unavailable; start a new session")
-    current = authored_prose(repository, project)
-    return [Path(path) for path, digest in current.items() if state["prose"].get(path) != digest]
+    return written_prose(repository, project, state["refs"])
 
 
 def changes(event: dict[str, object], repository: Path, project: Path) -> list[str]:
@@ -270,8 +317,12 @@ def main() -> int:
         repository, project, scientific_context = found
         role = repository_role(scientific_context)
         if event_name == "SessionStart":
-            start(event, repository, project)
-            emit(context(event_name, render_stance(scientific_context)))
+            stance = render_stance(scientific_context)
+            try:
+                start(event, repository, project)
+            except (HookError, OSError, subprocess.TimeoutExpired) as exc:
+                stance += f" CSE prose baseline unavailable: {exc}."
+            emit(context(event_name, stance))
         elif event_name == "Stop":
             warnings = []
             if role is None:
