@@ -42,7 +42,13 @@ notebook is a collapsed section titled by `include --title`. A section title onl
 expands it; its children are an Overview link and one link per
 level-2 heading outside code and `:::` blocks. `include` records those links, and
 `validate` refuses them once the headings change until `include` runs again.
-There is no page table of contents or margin column, so keep side notes inline. The root
+There is no page table of contents or margin column, so keep side notes inline.
+`include --group <name>` nests a notebook under a collapsed group heading; the
+last notebook leaving a group removes it. There is no top bar: the site title,
+search, and reader-mode toggle sit in the sidebar. Pages load math with the page
+(`self-contained-math`) and share the installed `site.css` (publication-style
+tables with aligned digits, full-width figures, small captions, 16 px text); the
+project owns `site.css` after `init`. The root
 sets `notebook-links: false`, so an article that embeds a labeled cell from a
 retained notebook with `{{< embed >}}` shows the cell without a link to a
 separate notebook page.

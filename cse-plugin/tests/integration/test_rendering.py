@@ -130,7 +130,7 @@ class RenderingBehaviorTests(unittest.TestCase):
             run([sys.executable, str(MANUSCRIPT), "init", str(root), "--article-source", str(EXAMPLE / "article.qmd"),
                  "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64], root.parent)
             run([sys.executable, "manuscript.py", "include", ".", "cooling-fit/notebook.qmd",
-                 "--title", "Cooling-rate fit"], root)
+                 "--title", "Cooling-rate fit", "--group", "Cooling studies"], root)
             rendered = run(["bash", "render.sh"], root)
             self.assertNotIn("not found in resource path", rendered.stdout + rendered.stderr)
 
@@ -146,6 +146,12 @@ class RenderingBehaviorTests(unittest.TestCase):
                 self.assertIn('id="quarto-sidebar"', page)
                 self.assertIn('menu-text">Home<', page)
                 self.assertIn('menu-text">Cooling-rate fit<', page)
+                self.assertIn('menu-text">Cooling studies<', page)
+                # No top bar: title, search, and reader mode live in the sidebar; math ships with the page.
+                self.assertNotIn('class="navbar', page)
+                self.assertIn("quarto-reader-toggle", page)
+                self.assertIn("tabular-nums", page)
+                self.assertNotIn("cdn.jsdelivr.net/npm/mathjax", page)
                 self.assertNotIn("Back to Article", page)
                 # The notebook is a collapsible sidebar section (caret) whose children are its headings;
                 # no page table of contents or margin column takes width on the right.

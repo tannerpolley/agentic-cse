@@ -19,14 +19,17 @@ import urllib.request
 
 ASSET_ROOT = Path(__file__).resolve().parent
 CONFIG_FILES = ("_quarto.yml", "_cse-manuscript.json", "_quarto-presentation.yml")
+# The shared stylesheet is installed once and then owned by the project, like the configuration.
+SITE_CSS = "site.css"
 REQUIRED_FILES = (*CONFIG_FILES, "index.qmd", ".cse-quarto-source.json",
-                  ".gitignore", "render.sh", "manuscript.py")
+                  ".gitignore", "render.sh", "manuscript.py", SITE_CSS)
 REQUIRED_IGNORES = ("/.quarto/", "/_site/", "/site_libs/", "/_freeze/", "/notebook.tex")
 SITE_CONFIG = {
     "project": {"type": "website", "output-dir": "_site"},
-    "metadata-files": ["_cse-manuscript.json"], "website": {"title": "Analyses", "navbar": {}},
-    "format": {"html": {"embed-resources": True, "page-layout": "full", "theme": "cosmo", "toc": False,
-                        "notebook-links": False}},
+    "metadata-files": ["_cse-manuscript.json"], "website": {"title": "Analyses", "search": True, "reader-mode": True, "page-navigation": False},
+    "format": {"html": {"embed-resources": True, "page-layout": "full", "theme": "cosmo", "css": SITE_CSS,
+                        "fontsize": "16px", "toc": False, "notebook-links": False,
+                        "html-math-method": "mathjax", "self-contained-math": True}},
     "execute": {"enabled": False},
 }
 PRESENTATION_PRE_RENDER = "python3 manuscript.py prepare"
@@ -102,10 +105,23 @@ def read_json(data: bytes, path: Path) -> dict:
 HEADING_RE = re.compile(r"^##\s+(.+?)\s*(?:\{([^}]*)\})?\s*$")
 
 
+def is_group(entry: dict) -> bool:
+    """A group section holds page sections; a page section holds links."""
+    return "section" in entry["contents"][0]
+
+
+def page_sections(state: dict) -> list[dict]:
+    """Home and notebook sections in sidebar order, with groups flattened."""
+    pages = []
+    for entry in state["website"]["sidebar"]["contents"]:
+        pages.extend(entry["contents"] if is_group(entry) else [entry])
+    return pages
+
+
 def notebooks(state: dict) -> list[dict]:
     """Included notebooks in sidebar order, each ``{"text": title, "href": notebook}``."""
     return [{"text": entry["section"], "href": entry["contents"][0]["href"].split("#")[0]}
-            for entry in state["website"]["sidebar"]["contents"][1:]]
+            for entry in page_sections(state)[1:]]
 
 
 def heading_id(text: str) -> str:
@@ -156,7 +172,17 @@ def metadata(data: bytes, path: Path) -> dict:
             and sidebar["style"] == "docked" and sidebar["collapse-level"] == 1
             and isinstance(sidebar["contents"], list) and sidebar["contents"],
             path, "sidebar must be docked and start with the home page")
+    def section(entry) -> bool:
+        return (isinstance(entry, dict) and set(entry) == {"section", "contents"}
+                and isinstance(entry["section"], str) and entry["section"].strip()
+                and isinstance(entry["contents"], list) and bool(entry["contents"]))
+
     for entry in sidebar["contents"]:
+        require(section(entry), path, "invalid sidebar section")
+        if is_group(entry):
+            require(entry is not sidebar["contents"][0] and all(section(c) and not is_group(c) for c in entry["contents"]),
+                    path, "a group holds only notebook sections")
+    for entry in page_sections(state):
         require(isinstance(entry, dict) and set(entry) == {"section", "contents"}
                 and isinstance(entry["section"], str) and entry["section"].strip()
                 and isinstance(entry["contents"], list) and entry["contents"]
@@ -323,7 +349,7 @@ def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
         require(relative == name and name.endswith(".qmd") and not any(c in name for c in "*?[]!"), root / name, "expected literal relative QMD path")
         files[name] = pending[name] if name in pending else read_file(root / name)
         require(files[name].strip(), root / name, "empty publication source")
-    for entry in state["website"]["sidebar"]["contents"]:
+    for entry in page_sections(state):
         page = entry["contents"][0]["href"]
         require(entry["contents"] == sections(files[page].decode(), page), root / page,
                 "sidebar sections no longer match the page headings; rerun include")
@@ -349,7 +375,7 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
     require(not (root / ".cse-quarto-source.json").exists() or (root / "_cse-manuscript.json").is_file(),
             root / "_cse-manuscript.json", "cannot reconstruct missing managed membership")
     require(article.suffix == ".qmd", article, "article must be a populated QMD")
-    files = {name: read_file(ASSET_ROOT / name) for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py")}
+    files = {name: read_file(ASSET_ROOT / name) for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py", SITE_CSS)}
     files.update({"_quarto.yml": json_bytes(SITE_CONFIG), "index.qmd": read_file(article.absolute()),
                   "_cse-manuscript.json": json_bytes({"project": {"render": ["index.qmd"]},
                                                            "website": {"sidebar": {"style": "docked", "collapse-level": 1,
@@ -368,7 +394,7 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
         else:
             if name == ".cse-quarto-source.json":
                 require(read_json(existing, target) == read_json(data, target), target, "conflicting source identity")
-            elif name not in CONFIG_FILES:
+            elif name not in (*CONFIG_FILES, SITE_CSS):
                 require(existing == data, target, "refusing to overwrite existing file")
             files[name] = existing
     validate_root(root, files)
@@ -406,28 +432,37 @@ def notebook_argument(root: Path, value: Path) -> str:
     return relative
 
 
-def include(root: Path, notebook: Path, title: str) -> Path:
+def include(root: Path, notebook: Path, title: str, group: str | None = None) -> Path:
     root = root_path(root)
-    require(title.strip(), notebook, "empty notebook title")
+    require(title.strip() and (group is None or group.strip()), notebook, "empty notebook title or group")
     relative = notebook_argument(root, notebook)
     # Read the membership directly: include is what repairs stale sidebar sections.
     state = metadata(read_file(root / "_cse-manuscript.json"), root / "_cse-manuscript.json")
     entry = {"section": title, "contents": sections(read_file(root / relative).decode(), relative)}
-    home = home_section(read_file(root / "index.qmd").decode())
     contents = state["website"]["sidebar"]["contents"]
-    index = next((i for i, n in enumerate(notebooks(state), 1) if n["href"] == relative), None)
-    if index and contents[index] == entry and contents[0] == home:
-        validate_root(root)
-        return root / relative
-    contents[0] = home
-    if index:
-        contents[index] = entry
+    contents[0] = home_section(read_file(root / "index.qmd").decode())
+    containers = [contents, *[e["contents"] for e in contents[1:] if is_group(e)]]
+    current = next(((c, i) for c in containers for i, e in enumerate(c)
+                    if not is_group(e) and e["contents"][0]["href"] == relative), None)
+    target = contents
+    if group is not None:
+        found = next((e for e in contents[1:] if e["section"] == group and is_group(e)), None)
+        if found is None:
+            found = {"section": group, "contents": []}
+            contents.append(found)
+        target = found["contents"]
+    if current and current[0] is target:
+        target[current[1]] = entry
     else:
-        contents.append(entry)
-        state["project"]["render"].append(relative)
+        if current:
+            del current[0][current[1]]
+        target.append(entry)
+    contents[:] = [e for e in contents if e["contents"]]
+    state["project"]["render"] = ["index.qmd", *[n["href"] for n in notebooks(state)]]
     data = json_bytes(state)
     validate_root(root, {"_cse-manuscript.json": data})
-    atomic_write(root / "_cse-manuscript.json", data)
+    if data != read_file(root / "_cse-manuscript.json"):
+        atomic_write(root / "_cse-manuscript.json", data)
     return root / relative
 
 
@@ -799,6 +834,7 @@ def main() -> int:
             command.add_argument("notebook", type=Path)
         if name == "include":
             command.add_argument("--title", required=True)
+            command.add_argument("--group", help="optional sidebar group heading for the notebook")
         if name == "preview":
             command.add_argument("--host", default="127.0.0.1")
             command.add_argument("--port", type=int, default=8000)
@@ -811,7 +847,7 @@ def main() -> int:
         if args.command == "init":
             print(init(args.root, args.article_source, args.source_commit, args.runtime_tree_sha256))
         elif args.command == "include":
-            print(include(args.root, args.notebook, args.title))
+            print(include(args.root, args.notebook, args.title, args.group))
         elif args.command == "validate":
             validate_root(root_path(args.root))
             print("valid")

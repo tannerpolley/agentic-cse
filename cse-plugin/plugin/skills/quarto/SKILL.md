@@ -29,7 +29,7 @@ theme, and page layout. For a confirmed analysis repository, initialize it with
 `python3 assets/visualize/project/quarto/manuscript.py init analyses/ --article-source
 <populated.qmd> --source-commit <SHA> --runtime-tree-sha256 <SHA256>`, then include
 each substantive report with `manuscript.py include analyses/ <report.qmd>
---title <title>`. The command records the sole ordered `project.render` and
+--title <title> [--group <heading>]`. The command records the sole ordered `project.render` and
 `website.sidebar` memberships, with the title as the sidebar entry, refuses
 unsafe adoption, and leaves unregistered `.qmd` files out of the render. The normal render uses `execute.enabled: false` and
 `--no-execute`; Quarto never runs the scientific model or mutates retained

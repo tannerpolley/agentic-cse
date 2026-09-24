@@ -1,0 +1,36 @@
+/* Shared presentation for every page of a CSE analysis site. Installed once by
+   manuscript.py init; the project owns it afterward. */
+
+/* Publication-style tables: heavy top and bottom rules, light row rules,
+   compact text, aligned digits, and centered headers. */
+main table.table,
+main table {
+  width: 100%;
+  margin: 0;
+  border-top: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  border-collapse: collapse;
+  font-size: .85rem;
+}
+main table.table th,
+main table.table td {
+  padding: .45rem .55rem;
+  border-bottom: 1px solid var(--bs-border-color);
+  vertical-align: middle;
+}
+main table.table td p,
+main table.table th p { margin: 0; }
+main table.table thead th {
+  text-align: center;
+  font-weight: 600;
+  white-space: nowrap;
+}
+main table.table tbody td { font-variant-numeric: tabular-nums; }
+main .table-responsive,
+main .cell-output-display:has(> table) { overflow-x: auto; }
+
+/* Figures fill the text width; captions stay small. */
+main figure img { width: 100%; height: auto; max-height: none; object-fit: contain; }
+main figcaption,
+main .figure-caption,
+main caption { font-size: .85rem; }
