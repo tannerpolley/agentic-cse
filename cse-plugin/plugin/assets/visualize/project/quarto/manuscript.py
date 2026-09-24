@@ -333,6 +333,8 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
 def notebook_argument(root: Path, value: Path) -> str:
     relative = inside(root, value)
     require(relative.endswith(".qmd") and relative != "index.qmd", value, "expected analysis QMD notebook")
+    # Quarto's preview render request cannot address a path containing whitespace.
+    require(not re.search(r"\s", relative), value, "notebook path must not contain whitespace")
     require(read_file(root / relative).strip(), value, "empty notebook")
     return relative
 
@@ -449,7 +451,8 @@ def is_watchable(path: Path, root: Path) -> bool:
     except ValueError:
         return False
     return not any(ignored_watch_part(part) for part in relative.parts) and not (
-        path.name.startswith(".") or path.name.endswith(".html.md")
+        # Quarto writes these render byproducts beside sources; watching them re-triggers renders.
+        path.name.startswith(".") or path.name.endswith((".html", ".html.md", ".embed.ipynb", ".out.ipynb"))
         or path.name in {"manuscript.py", "render.sh"}
     )
 

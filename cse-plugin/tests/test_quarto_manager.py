@@ -213,6 +213,7 @@ class QuartoManagerTests(unittest.TestCase):
                 ".snakemake/log.txt", ".cache/state", "tmp/file", "temp/file",
                 "index.html.md", "index_files/image.png", "_site/page.html",
                 "_freeze/page.json", "support/asset.bin", "site_libs/bootstrap/theme.css",
+                "case/notebook-preview.html", "case/notebook.embed.ipynb",
             )
             for relative in ignored:
                 with self.subTest(relative=relative):

@@ -173,6 +173,11 @@ class RenderingBehaviorTests(unittest.TestCase):
                 self.assertTrue(wait_for(r"5.000 \times 10^{-3}", 120), (root.parent / "preview.log").read_text())
                 FIXTURE.write_retained_set(analysis, rate=0.0071, keep_inputs=True)
                 self.assertTrue(wait_for(r"7.100 \times 10^{-3}", 60), (root.parent / "preview.log").read_text())
+                # One change must settle: render byproducts must not re-trigger the bridge.
+                time.sleep(15)
+                settled = (root.parent / "preview.log").read_text().count("Output created")
+                time.sleep(20)
+                self.assertEqual(settled, (root.parent / "preview.log").read_text().count("Output created"))
             finally:
                 if preview.poll() is None:
                     os.killpg(preview.pid, signal.SIGTERM)

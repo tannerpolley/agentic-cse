@@ -17,8 +17,8 @@ import zlib
 
 
 ROOT = Path(__file__).resolve().parents[1]
-TEMPLATE = ROOT / "plugin/assets/workflow/analysis/Snakefile"
 EXAMPLE = ROOT / "plugin/assets/workflow/analysis/example"
+TEMPLATE = EXAMPLE / "Snakefile"
 PRESENT_SPEC = importlib.util.spec_from_file_location("cse_present", EXAMPLE / "scripts/present.py")
 assert PRESENT_SPEC and PRESENT_SPEC.loader
 PRESENT = importlib.util.module_from_spec(PRESENT_SPEC)
