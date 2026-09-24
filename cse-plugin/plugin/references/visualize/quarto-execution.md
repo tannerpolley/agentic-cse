@@ -37,8 +37,9 @@ The root is a Quarto website (`project.type: website`). The article is the
 home page `_site/index.html`; a registered `case/result.qmd` is the ordinary
 page `_site/case/result.html`. Every page shares one docked sidebar, navigation
 bar, theme, and full page layout, so numbered equations and cross-references
-work on every page. Each included notebook is a collapsed sidebar section whose
-title only expands it; its children are an Overview link and one link per
+work on every page. The home page is the sidebar section "Home", and each included
+notebook is a collapsed section titled by `include --title`. A section title only
+expands it; its children are an Overview link and one link per
 level-2 heading outside code and `:::` blocks. `include` records those links, and
 `validate` refuses them once the headings change until `include` runs again.
 There is no page table of contents or margin column, so keep side notes inline. The root

@@ -117,11 +117,16 @@ def heading_id(text: str) -> str:
     return text or "section"
 
 
-def sections(root: Path, notebook: str, title: str) -> list[dict]:
-    """Sidebar children of a notebook: the page itself (so Quarto opens its section there), then each level-2 heading."""
+def home_section(text: str) -> dict:
+    # A fixed, content-neutral name: the home page's own title stays on the page.
+    return {"section": "Home", "contents": sections(text, "index.qmd")}
+
+
+def sections(text: str, page: str) -> list[dict]:
+    """Sidebar children of a page: the page itself (so Quarto opens its section there), then each level-2 heading."""
     # Only headings outside code and ::: blocks are page sections (callout and tab titles are not).
     items, seen, fenced, depth = [], {}, False, 0
-    for line in read_file(root / notebook).decode().splitlines():
+    for line in text.splitlines():
         if line.lstrip().startswith(("```", "~~~")):
             fenced = not fenced
         elif not fenced and re.match(r"^\s*:{3,}\s*$", line):
@@ -134,8 +139,8 @@ def sections(root: Path, notebook: str, title: str) -> list[dict]:
             ident = explicit.group(1) if explicit else heading_id(match.group(1))
             count = seen.get(ident, 0)
             seen[ident] = count + 1
-            items.append({"text": match.group(1).strip(), "href": f"{notebook}#{ident}{f'-{count}' if count else ''}"})
-    return [{"text": "Overview", "href": notebook}, *items]
+            items.append({"text": match.group(1).strip(), "href": f"{page}#{ident}{f'-{count}' if count else ''}"})
+    return [{"text": "Overview", "href": page}, *items]
 
 
 def metadata(data: bytes, path: Path) -> dict:
@@ -149,16 +154,17 @@ def metadata(data: bytes, path: Path) -> dict:
             and len(render) == len(set(render)), path, "render membership must be unique")
     require(isinstance(sidebar, dict) and set(sidebar) == {"style", "collapse-level", "contents"}
             and sidebar["style"] == "docked" and sidebar["collapse-level"] == 1
-            and isinstance(sidebar["contents"], list) and sidebar["contents"][:1] == ["index.qmd"],
+            and isinstance(sidebar["contents"], list) and sidebar["contents"],
             path, "sidebar must be docked and start with the home page")
-    for entry in sidebar["contents"][1:]:
+    for entry in sidebar["contents"]:
         require(isinstance(entry, dict) and set(entry) == {"section", "contents"}
                 and isinstance(entry["section"], str) and entry["section"].strip()
                 and isinstance(entry["contents"], list) and entry["contents"]
                 and all(isinstance(c, dict) and set(c) == {"text", "href"}
                         and all(isinstance(v, str) and v.strip() for v in c.values()) for c in entry["contents"])
                 and len({c["href"].split("#")[0] for c in entry["contents"]}) == 1,
-                path, "invalid notebook section")
+                path, "invalid page section")
+    require(sidebar["contents"][0]["contents"][0]["href"] == "index.qmd", path, "sidebar must start with the home page")
     require(render == ["index.qmd", *[n["href"] for n in notebooks(state)]], path, "ordered memberships disagree")
     return state
 
@@ -317,9 +323,10 @@ def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
         require(relative == name and name.endswith(".qmd") and not any(c in name for c in "*?[]!"), root / name, "expected literal relative QMD path")
         files[name] = pending[name] if name in pending else read_file(root / name)
         require(files[name].strip(), root / name, "empty publication source")
-    for entry, notebook in zip(state["website"]["sidebar"]["contents"][1:], notebooks(state)):
-        require(entry["contents"] == sections(root, notebook["href"], notebook["text"]), root / notebook["href"],
-                "sidebar sections no longer match the notebook headings; rerun include")
+    for entry in state["website"]["sidebar"]["contents"]:
+        page = entry["contents"][0]["href"]
+        require(entry["contents"] == sections(files[page].decode(), page), root / page,
+                "sidebar sections no longer match the page headings; rerun include")
     inspect_config(root, files, state)
     return state
 
@@ -346,7 +353,7 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
     files.update({"_quarto.yml": json_bytes(SITE_CONFIG), "index.qmd": read_file(article.absolute()),
                   "_cse-manuscript.json": json_bytes({"project": {"render": ["index.qmd"]},
                                                            "website": {"sidebar": {"style": "docked", "collapse-level": 1,
-                                                                                   "contents": ["index.qmd"]}}}),
+                                                                                   "contents": [home_section(read_file(article.absolute()).decode())]}}}),
                   ".cse-quarto-source.json": json_bytes({"sourceCommit": source_commit, "runtimeTreeSha256": runtime_tree_sha256}),
                   ".gitignore": ("\n".join(REQUIRED_IGNORES) + "\n").encode()})
     for name, data in files.items():
@@ -405,12 +412,14 @@ def include(root: Path, notebook: Path, title: str) -> Path:
     relative = notebook_argument(root, notebook)
     # Read the membership directly: include is what repairs stale sidebar sections.
     state = metadata(read_file(root / "_cse-manuscript.json"), root / "_cse-manuscript.json")
-    entry = {"section": title, "contents": sections(root, relative, title)}
+    entry = {"section": title, "contents": sections(read_file(root / relative).decode(), relative)}
+    home = home_section(read_file(root / "index.qmd").decode())
     contents = state["website"]["sidebar"]["contents"]
     index = next((i for i, n in enumerate(notebooks(state), 1) if n["href"] == relative), None)
-    if index and contents[index] == entry:
+    if index and contents[index] == entry and contents[0] == home:
         validate_root(root)
         return root / relative
+    contents[0] = home
     if index:
         contents[index] = entry
     else:

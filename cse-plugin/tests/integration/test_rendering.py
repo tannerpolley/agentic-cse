@@ -144,7 +144,7 @@ class RenderingBehaviorTests(unittest.TestCase):
                     self.assertRegex(page, rf'class="quarto-xref">{reference}(&nbsp;|\s)1<')
                 # One shared sidebar lists the home page and the notebook on every page.
                 self.assertIn('id="quarto-sidebar"', page)
-                self.assertIn('menu-text">Cooling-rate synthesis<', page)
+                self.assertIn('menu-text">Home<', page)
                 self.assertIn('menu-text">Cooling-rate fit<', page)
                 self.assertNotIn("Back to Article", page)
                 # The notebook is a collapsible sidebar section (caret) whose children are its headings;
