@@ -70,6 +70,36 @@ class ScriptBehaviorTests(unittest.TestCase):
                 later = self.run_hook(project, "Stop", last_assistant_message="A later turn.")
                 self.assertIn(review, later["reason"])
 
+    def test_prose_check_follows_worktree_edits_not_merged_text(self):
+        git = ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com"]
+        with tempfile.TemporaryDirectory() as directory:
+            origin, project = Path(directory) / "origin.git", Path(directory) / "main"
+            project.mkdir()
+            self.hook_fixture(project, "tool")
+            subprocess.run(["git", "init", "-q", "--bare", str(origin)], check=True)
+            subprocess.run(["git", "remote", "add", "origin", str(origin)], cwd=project, check=True)
+            subprocess.run(["git", "push", "-q", "origin", "main"], cwd=project, check=True)
+            subprocess.run(["git", "remote", "set-head", "origin", "main"], cwd=project, check=True)
+            self.run_hook(project, "SessionStart", source="startup")
+
+            # Reviewed text merged upstream and pulled into the main checkout is not this session's writing.
+            (project / "merged.md").write_text("The schema is fixed.\n", encoding="utf-8")
+            subprocess.run([*git, "add", "merged.md"], cwd=project, check=True)
+            subprocess.run([*git, "commit", "-qm", "merged"], cwd=project, check=True)
+            subprocess.run(["git", "push", "-q", "origin", "main"], cwd=project, check=True)
+            subprocess.run(["git", "fetch", "-q", "origin"], cwd=project, check=True)
+            merged = self.run_hook(project, "Stop", stop_hook_active=True, last_assistant_message="Done.")
+            self.assertNotIn("merged.md", json.dumps(merged))
+
+            # The same wording written in a lane's worktree is the live edit and is checked there.
+            lane = Path(directory) / "lane"
+            subprocess.run(["git", "worktree", "add", "-q", "-b", "lane", str(lane)], cwd=project, check=True)
+            (lane / "notes.md").write_text("The schema changed.\n", encoding="utf-8")
+            live = self.run_hook(project, "Stop", stop_hook_active=True, last_assistant_message="Done.")
+            self.assertEqual("block", live.get("decision"))
+            self.assertIn("notes.md", live["reason"])
+            self.assertNotIn("merged.md", live["reason"])
+
     def test_stop_review_does_not_resend_answer_text(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
