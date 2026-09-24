@@ -3,12 +3,14 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import signal
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
@@ -32,6 +34,9 @@ IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "_freeze", "__pycache__", ".i
 IGNORED_WATCH_PARTS |= {".snakemake", ".cache", "tmp", "temp", "support"}
 IGNORED_WATCH_SUFFIXES = ("_files", "_support")
 INCLUDE_RE = re.compile(r"\{\{<\s*include\s+([^\s>]+)")
+SERVICE_MARKER = "# Managed by CSE manuscript.py service; do not edit.\n"
+SERVICE_PORT_RE = re.compile(r"--port (\d+)$", re.MULTILINE)
+SERVICE_PORT_BASE, SERVICE_PORT_SPAN = 8800, 1000
 
 
 class ManuscriptError(Exception):
@@ -573,10 +578,79 @@ def preview(root: Path, host: str, port: int) -> int:
         stop_process(process)
 
 
+def git_path(root: Path, *arguments: str) -> Path:
+    result = subprocess.run(["git", "-C", str(root), "rev-parse", "--path-format=absolute", *arguments],
+                            check=False, text=True, capture_output=True)
+    require(not result.returncode, root, f"not a Git checkout: {result.stderr.strip()}")
+    return Path(result.stdout.strip()).resolve()
+
+
+def service_port(unit: Path) -> int | None:
+    match = SERVICE_PORT_RE.search(unit.read_text()) if unit.is_file() else None
+    return int(match.group(1)) if match else None
+
+
+def port_free(port: int) -> bool:
+    with socket.socket() as probe:
+        try:
+            probe.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
+
+
+def service(root: Path, port: int | None, dry_run: bool) -> int:
+    root = root_path(root)
+    validate_root(root)
+    require(shutil.which("quarto"), root, "quarto renderer unavailable on PATH")
+    repository = git_path(root, "--show-toplevel")
+    require(repository == git_path(root, "--git-common-dir").parent, root,
+            "the preview service serves the main checkout; run it there, not in a worktree")
+    manuscript = root.relative_to(repository).as_posix()
+    require(not re.search(r'[\s"\'\\%]', str(repository)), repository, "unsupported characters for a systemd unit path")
+    units = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
+    unit = units / f"cse-preview-{re.sub(r'[^A-Za-z0-9_.-]', '-', repository.name)}.service"
+    existing = unit.read_text() if unit.is_file() else None
+    require(existing is None or (existing.startswith(SERVICE_MARKER)
+                                 and f"\nWorkingDirectory={repository}\n" in existing),
+            unit, "refusing to overwrite a unit this command did not write for this repository")
+    current = service_port(unit)
+    claimed = {service_port(other) for other in units.glob("cse-preview-*.service") if other != unit}
+    if port is None:
+        port = current
+    if port is None:
+        start = int(hashlib.sha256(str(repository).encode()).hexdigest(), 16)
+        candidates = (SERVICE_PORT_BASE + (start + step) % SERVICE_PORT_SPAN for step in range(SERVICE_PORT_SPAN))
+        port = next((value for value in candidates if value not in claimed and port_free(value)), None)
+        require(port, unit, "no free preview port")
+    require(1 <= port <= 65535 and port not in claimed and (port == current or port_free(port)),
+            unit, f"port {port} is in use or claimed by another preview unit")
+    tools = [shutil.which(name) for name in ("quarto", "python3", "snakemake")]
+    path = dict.fromkeys([*(str(Path(tool).parent) for tool in tools if tool), "/usr/local/bin", "/usr/bin", "/bin"])
+    text = read_file(ASSET_ROOT / "preview.service").decode().format(
+        repository=repository, manuscript=manuscript, port=port, path=":".join(path).replace("%", "%%"))
+    url = f"http://127.0.0.1:{port}/"
+    if dry_run:
+        print(f"{unit}\n{text}{url}")
+        return 0
+    try:
+        subprocess.run(["systemctl", "--user", "show-environment"], check=True, capture_output=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ManuscriptError(f"systemd user manager unavailable (systemctl --user show-environment failed: {exc})")
+    if text != existing:
+        unit.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write(unit, text.encode())
+        subprocess.run(["systemctl", "--user", "daemon-reload"], check=True)
+    subprocess.run(["systemctl", "--user", "enable", unit.name], check=True)
+    subprocess.run(["systemctl", "--user", "restart" if text != existing else "start", unit.name], check=True)
+    print(f"{unit.name} serving {url}")
+    return 0
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="manuscript.py")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "include", "validate", "refresh", "preview", "prepare"):
+    for name in ("init", "include", "validate", "refresh", "preview", "prepare", "service"):
         command = commands.add_parser(name)
         if name == "prepare":
             command.add_argument("root", type=Path, nargs="?", default=Path("."))
@@ -593,6 +667,9 @@ def main() -> int:
         if name == "preview":
             command.add_argument("--host", default="127.0.0.1")
             command.add_argument("--port", type=int, default=8000)
+        if name == "service":
+            command.add_argument("--port", type=int)
+            command.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
     try:
         if args.command == "init":
@@ -606,6 +683,8 @@ def main() -> int:
             return prepare(args.root)
         elif args.command == "refresh":
             return refresh(args.root, args.notebook)
+        elif args.command == "service":
+            return service(args.root, args.port, args.dry_run)
         else:
             return preview(args.root, args.host, args.port)
         return 0

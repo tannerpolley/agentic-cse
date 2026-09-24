@@ -79,7 +79,19 @@ When a document needs Python to format a retained table or draw a plot, use
 the presentation cache, and updates the included notebook and root article.
 Quarto preview does not detect arbitrary external-data changes; the
 managed preview bridge touches only the affected registered source after the
-presentation hook has been allowed to validate retained inputs. The following
+presentation hook has been allowed to validate retained inputs.
+
+`manuscript.py service <root>` installs a systemd user unit
+`cse-preview-<repository>.service` that keeps `manuscript.py preview` running
+on `127.0.0.1` from the main checkout, restarting it on failure. The port is
+chosen once from the repository path, skipping ports that are bound or claimed
+by another preview unit, unless `--port` is given; reruns keep the port and
+refuse a unit the command did not write for that repository. `--dry-run` prints
+the unit without writing or enabling it. Without `systemctl --user`, the command
+reports that missing capability and writes nothing. The service URL is the
+main-checkout view: agents do not start or stop it. An unmerged worktree branch
+is previewed by a task-owned `manuscript.py preview <root> --port <free port>`
+that the agent stops at cleanup. The following
 bare Quarto command shows the
 upstream syntax for the separately authorized presentation-only execution
 route; it is not a normal or release CSE render:

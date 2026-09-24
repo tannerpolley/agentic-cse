@@ -289,6 +289,60 @@ class QuartoManagerTests(unittest.TestCase):
             with self.assertRaises(MANUSCRIPT.ManuscriptError):
                 MANUSCRIPT.included_files(root, {"case/notebook.qmd": source.read_bytes()}, ["case/notebook.qmd"])
 
+    def test_preview_service_keeps_its_port_skips_claimed_ports_and_refuses_foreign_units(self):
+        real_run = subprocess.run
+        with tempfile.TemporaryDirectory() as directory:
+            repository = (Path(directory) / "repo").resolve()
+            (repository / "analyses").mkdir(parents=True)
+            real_run(["git", "init", "-q", str(repository)], check=True)
+            units = Path(directory) / "config" / "systemd" / "user"
+            systemctl = []
+
+            def run(command, *args, **kwargs):
+                if command[0] == "systemctl":
+                    systemctl.append(command[2])
+                    return subprocess.CompletedProcess(command, 0)
+                return real_run(command, *args, **kwargs)
+
+            def install(port=None):
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    self.assertEqual(0, MANUSCRIPT.service(repository / "analyses", port, False))
+                return output.getvalue()
+
+            with (
+                patch.dict(os.environ, {"XDG_CONFIG_HOME": str(Path(directory) / "config")}),
+                patch.object(MANUSCRIPT, "validate_root"),
+                patch.object(MANUSCRIPT.shutil, "which", return_value="/usr/bin/quarto"),
+                patch.object(MANUSCRIPT.subprocess, "run", side_effect=run),
+                patch.object(MANUSCRIPT, "port_free", return_value=True),
+            ):
+                install()
+                unit = units / "cse-preview-repo.service"
+                text = unit.read_text()
+                port = MANUSCRIPT.service_port(unit)
+                self.assertIn(f"\nWorkingDirectory={repository}\n", text)
+                self.assertIn("ExecStart=/usr/bin/env python3 analyses/manuscript.py preview analyses "
+                              f"--host 127.0.0.1 --port {port}\n", text)
+                self.assertEqual(["show-environment", "daemon-reload", "enable", "restart"], systemctl)
+
+                systemctl.clear()
+                install()
+                self.assertEqual((text, ["show-environment", "enable", "start"]), (unit.read_text(), systemctl))
+
+                other = units / "cse-preview-other.service"
+                other.write_text(text.replace(str(repository), "/elsewhere"))
+                unit.unlink()
+                install()
+                self.assertNotEqual(port, MANUSCRIPT.service_port(unit))
+                with self.assertRaises(MANUSCRIPT.ManuscriptError):
+                    install(port)
+
+                unit.write_text("[Service]\nExecStart=/bin/true\n")
+                with self.assertRaises(MANUSCRIPT.ManuscriptError):
+                    install()
+                self.assertEqual("[Service]\nExecStart=/bin/true\n", unit.read_text())
+
 
 if __name__ == "__main__":
     unittest.main()

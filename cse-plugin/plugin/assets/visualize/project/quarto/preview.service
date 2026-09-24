@@ -1,0 +1,14 @@
+# Managed by CSE manuscript.py service; do not edit.
+[Unit]
+Description=CSE manuscript preview for {repository}
+
+[Service]
+Type=simple
+WorkingDirectory={repository}
+Environment=PATH={path}
+ExecStart=/usr/bin/env python3 {manuscript}/manuscript.py preview {manuscript} --host 127.0.0.1 --port {port}
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target
