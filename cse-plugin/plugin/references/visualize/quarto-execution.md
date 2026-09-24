@@ -35,14 +35,16 @@ Initialize a confirmed analysis repository's root Quarto analysis site at
 
 The root is a Quarto website (`project.type: website`). The article is the
 home page `_site/index.html`; a registered `case/result.qmd` is the ordinary
-page `_site/case/result.html`. Every page shares one docked sidebar, navigation
-bar, theme, and full page layout, so numbered equations and cross-references
+page `_site/case/result.html`. Every page shares one docked sidebar, theme,
+and full page layout, so numbered equations and cross-references
 work on every page. The home page is the sidebar section "Home", and each included
 notebook is a collapsed section titled by `include --title`. A section title only
-expands it; its children are an Overview link and one link per
-top-level heading (`#` when the page uses it, otherwise `##`) outside code and
-`:::` blocks. `include` records those links, and
-`validate` refuses them once the headings change until `include` runs again.
+expands it; its children are an Overview link and one link per heading at the
+page's highest level outside `:::` blocks, with the anchors Pandoc assigns.
+`manuscript.py sync <root>` recomputes those links from the current headings while
+keeping titles and groups; `include`, `refresh`, `preview`, the service, and
+`render.sh` run it first, and `validate` reports stale links. Notebook paths may
+use only letters, digits, `.`, `_`, `-`, and `/`.
 There is no page table of contents or margin column, so keep side notes inline.
 `include --group <name>` nests a notebook under a collapsed group heading
 (`A/B` nests groups); the
@@ -56,10 +58,10 @@ retained notebook with `{{< embed >}}` shows the cell without a link to a
 separate notebook page.
 
 A root created before the website layout (`project.type: manuscript`) is
-refused with the rebuild steps: remove `_quarto.yml`, `_cse-manuscript.json`,
-`.cse-quarto-source.json`, `manuscript.py`, and `render.sh`, rerun `init` with
-`--article-source index.qmd`, and include each report again. Sources, retained
-results, and the presentation profile stay in place.
+refused with the rebuild steps: remove `_quarto.yml`, `_quarto-presentation.yml`,
+`_cse-manuscript.json`, `.cse-quarto-source.json`, `manuscript.py`, and
+`render.sh`, rerun `init` with `--article-source index.qmd`, and include each
+report again. Sources and retained results stay in place.
 
 Initialize with `manuscript.py init`, include substantive report `.qmd` files
 with `manuscript.py include`, and use `manuscript.py validate` before a render.

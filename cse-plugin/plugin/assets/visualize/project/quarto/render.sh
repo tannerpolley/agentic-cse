@@ -2,7 +2,7 @@
 set -euo pipefail
 
 if [[ -f manuscript.py || -f _cse-manuscript.json ]]; then
-  python3 ./manuscript.py validate .
+  python3 ./manuscript.py sync .
 fi
 
 runtime_root="$(mktemp -d "${TMPDIR:-/tmp}/cse-quarto.XXXXXX")"

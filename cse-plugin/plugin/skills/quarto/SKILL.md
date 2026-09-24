@@ -24,7 +24,7 @@ Inspect the existing project, profiles, source, includes, filters, output
 paths, and render command. Keep shared scientific content in one source.
 Ordinary Quarto HTML is the default living view of one root Quarto analysis
 site: a Quarto website whose home page is the synthesis article and whose other
-pages are the included reports, all sharing one docked sidebar, navigation bar,
+pages are the included reports, all sharing one docked sidebar,
 theme, and page layout. For a confirmed analysis repository, initialize it with
 `python3 assets/visualize/project/quarto/manuscript.py init analyses/ --article-source
 <populated.qmd> --source-commit <SHA> --runtime-tree-sha256 <SHA256>`, then include

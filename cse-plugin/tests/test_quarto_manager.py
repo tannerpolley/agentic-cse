@@ -65,7 +65,7 @@ class QuartoManagerTests(unittest.TestCase):
                 return completed
 
             with (
-                patch.object(MANUSCRIPT, "validate_root", return_value=state),
+                patch.object(MANUSCRIPT, "sync", return_value=state),
                 patch.object(MANUSCRIPT, "notebook_argument", return_value="case/notebook.qmd"),
                 patch.object(MANUSCRIPT, "prepare", side_effect=prepared),
                 patch.object(MANUSCRIPT.subprocess, "run", side_effect=rendered) as run,
@@ -254,7 +254,7 @@ class QuartoManagerTests(unittest.TestCase):
                 f"spec = importlib.util.spec_from_file_location('manuscript', {str(SCRIPT)!r})\n"
                 "module = importlib.util.module_from_spec(spec)\n"
                 "spec.loader.exec_module(module)\n"
-                "module.validate_root = lambda root: {}\n"
+                "module.validate_root = module.sync = lambda root: {}\n"
                 "module.presentation_workflows = lambda root: []\n"
                 "raise SystemExit(module.preview(Path(sys.argv[1]), '127.0.0.1', 8000))\n"
             )
@@ -329,7 +329,7 @@ class QuartoManagerTests(unittest.TestCase):
             state["install"] = install
             with (
                 patch.dict(os.environ, {"XDG_CONFIG_HOME": str(base / "config")}),
-                patch.object(MANUSCRIPT, "validate_root"),
+                patch.object(MANUSCRIPT, "sync"),
                 patch.object(MANUSCRIPT.shutil, "which", return_value="/opt/quarto/bin/quarto"),
                 patch.object(MANUSCRIPT.subprocess, "run", side_effect=run),
                 patch.object(MANUSCRIPT, "port_free", side_effect=lambda port: port not in state["busy"]),

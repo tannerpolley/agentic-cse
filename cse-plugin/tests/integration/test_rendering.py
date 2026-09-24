@@ -80,7 +80,7 @@ class RenderingBehaviorTests(unittest.TestCase):
             proxy = proxy_dir / "quarto"
             proxy.write_text(
                 "#!/usr/bin/env python3\nimport os, pathlib, sys\n"
-                "if sys.argv[1] == 'inspect':\n"
+                "if sys.argv[1] in {'inspect', 'pandoc'}:\n"
                 "    os.execv(os.environ['CSE_REAL_QUARTO'], [os.environ['CSE_REAL_QUARTO'], *sys.argv[1:]])\n"
                 "pathlib.Path(os.environ['CSE_RENDER_SENTINEL']).write_text('executed')\n"
             )
@@ -131,6 +131,24 @@ class RenderingBehaviorTests(unittest.TestCase):
                  "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64], root.parent)
             run([sys.executable, "manuscript.py", "include", ".", "cooling-fit/notebook.qmd",
                  "--title", "Cooling-rate fit", "--group", "Cooling studies/Exponential fits"], root)
+            # Headings whose Pandoc anchors a text heuristic gets wrong; re-including must not duplicate.
+            edge = root / "edge" / "notebook.qmd"
+            edge.parent.mkdir()
+            edge.write_text("---\ntitle: Edge\n# a yaml comment\n---\n\n::: {.callout-note}\n## Summary\nx\n:::\n\n"
+                            "## Summary\n\n### Results\n\n## Results\n\n## The _cooling_ fit\n\n"
+                            "## See [Smith](https://example.org)\n")
+            for _ in range(2):
+                run([sys.executable, "manuscript.py", "include", ".", "edge/notebook.qmd", "--title", "Edge"], root)
+            edge.write_text(edge.read_text() + "\n## Added later\n")
+            stale = subprocess.run([sys.executable, "manuscript.py", "validate", "."], cwd=root,
+                                   text=True, capture_output=True, check=False)
+            self.assertNotEqual(0, stale.returncode)
+            self.assertIn("manuscript.py sync", stale.stderr)
+            run([sys.executable, "manuscript.py", "sync", "."], root)
+            membership = json.loads((root / "_cse-manuscript.json").read_text())
+            self.assertEqual(1, membership["project"]["render"].count("edge/notebook.qmd"))
+            edge_links = [c["text"] for c in membership["website"]["sidebar"]["contents"][-1]["contents"]]
+            self.assertEqual(["Overview", "Summary", "Results", "The cooling fit", "See Smith", "Added later"], edge_links)
             rendered = run(["bash", "render.sh"], root)
             self.assertNotIn("not found in resource path", rendered.stdout + rendered.stderr)
 
@@ -163,6 +181,11 @@ class RenderingBehaviorTests(unittest.TestCase):
             self.assertIn("results", anchors)
             for anchor in anchors:
                 self.assertIn(f'id="{anchor}"', notebook)
+            edge_page = (root / "_site/edge/notebook.html").read_text(encoding="utf-8")
+            edge_anchors = re.findall(r'href="\./edge/notebook\.html#([^"]+)"', article)
+            self.assertEqual(["summary-1", "results-1", "the-cooling-fit", "see-smith", "added-later"], edge_anchors)
+            for anchor in edge_anchors:
+                self.assertIn(f'id="{anchor}"', edge_page)
             self.assertIn(r"5.000 \times 10^{-3}", notebook)
             self.assertEqual([], [p.name for p in (root / "_site").rglob("*preview*")])
             self.assertTrue((root / "_site/cooling-fit/results/fit_curve.csv").is_file())

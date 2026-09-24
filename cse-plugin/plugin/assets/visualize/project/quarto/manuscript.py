@@ -102,7 +102,6 @@ def read_json(data: bytes, path: Path) -> dict:
     return value
 
 
-HEADING_RE = re.compile(r"^(#{1,2})\s+(.+?)\s*(?:\{([^}]*)\})?\s*$")
 
 
 def is_group(entry: dict) -> bool:
@@ -126,45 +125,50 @@ def notebooks(state: dict) -> list[dict]:
             for entry in page_sections(state)[1:]]
 
 
-def heading_id(text: str) -> str:
-    """Pandoc's automatic identifier for a heading's text."""
-    text = re.sub(r"[`*$\\]", "", text).lower()
-    text = re.sub(r"\s+", "-", re.sub(r"[^\w\s.-]", "", text).strip())
-    while text and not text[0].isalpha():
-        text = text[1:]
-    return text or "section"
+def plain(inlines: list) -> str:
+    """Text of Pandoc inline elements, keeping inline math as TeX."""
+    text = []
+    for item in inlines:
+        kind, content = item["t"], item.get("c")
+        if kind == "Str":
+            text.append(content)
+        elif kind in {"Space", "SoftBreak", "LineBreak"}:
+            text.append(" ")
+        elif kind == "Math":
+            text.append(f"${content[1]}$")
+        elif kind == "Code":
+            text.append(content[1])
+        elif kind in {"Emph", "Strong", "Strikeout", "Superscript", "Subscript", "SmallCaps", "Underline"}:
+            text.append(plain(content))
+        elif kind in {"Link", "Span", "Quoted", "Cite"}:
+            text.append(plain(content[1]))
+    return "".join(text).strip()
 
 
-def home_section(text: str) -> dict:
-    # A fixed, content-neutral name: the home page's own title stays on the page.
-    return {"section": "Home", "contents": sections(text, "index.qmd")}
-
-
-def sections(text: str, page: str) -> list[dict]:
+def sections(root: Path, page: str, text: bytes | None = None) -> list[dict]:
     """Sidebar children of a page: the page itself (so Quarto opens its section there), then each
-    heading at the page's top level (``#`` when the page uses it, otherwise ``##``)."""
-    # Only headings outside code and ::: blocks are page sections (callout and tab titles are not).
-    found, fenced, depth = [], False, 0
-    for line in text.splitlines():
-        if line.lstrip().startswith(("```", "~~~")):
-            fenced = not fenced
-        elif not fenced and re.match(r"^\s*:{3,}\s*$", line):
-            depth = max(depth - 1, 0)
-        elif not fenced and re.match(r"^\s*:{3,}\s*\S", line):
-            depth += 1
-        match = None if fenced or depth else HEADING_RE.match(line)
-        if match:
-            found.append((len(match.group(1)), match.group(2).strip(), match.group(3) or ""))
-    items, seen = [], {}
-    # Pandoc numbers repeated identifiers across all heading levels, so count every heading.
-    for level, text, attributes in found:
-        explicit = re.search(r"#([\w.-]+)", attributes)
-        ident = explicit.group(1) if explicit else heading_id(text)
-        count = seen.get(ident, 0)
-        seen[ident] = count + 1
-        if level == min(level for level, *_ in found):
-            items.append({"text": text, "href": f"{page}#{ident}{f'-{count}' if count else ''}"})
+    top-level heading outside ::: blocks at the page's highest heading level."""
+    # Pandoc assigns the identifiers, so the anchors match the rendered page exactly.
+    result = subprocess.run(["quarto", "pandoc", "--from", "markdown", "--to", "json"],
+                            input=read_file(root / page) if text is None else text, capture_output=True)
+    require(result.returncode == 0, root / page, f"heading inspection failed: {result.stderr.decode().strip()}")
+    headers = [block["c"] for block in json.loads(result.stdout)["blocks"] if block["t"] == "Header"]
+    top = min((level for level, *_ in headers), default=None)
+    items = [{"text": plain(inlines), "href": f"{page}#{attributes[0]}"}
+             for level, attributes, inlines in headers if level == top and attributes[0] and plain(inlines)]
     return [{"text": "Overview", "href": page}, *items]
+
+
+def home_section(root: Path, text: bytes | None = None) -> dict:
+    # A fixed, content-neutral name: the home page's own title stays on the page.
+    return {"section": "Home", "contents": sections(root, "index.qmd", text)}
+
+
+def refresh_sections(root: Path, state: dict, files: dict[str, bytes] | None = None) -> None:
+    """Recompute every page's sidebar links from its headings, keeping titles and groups."""
+    for entry in page_sections(state):
+        page = entry["contents"][0]["href"].split("#")[0]
+        entry["contents"] = sections(root, page, (files or {}).get(page))
 
 
 def metadata(data: bytes, path: Path) -> dict:
@@ -236,7 +240,8 @@ def check_boundary(root: Path) -> None:
         project = read_json(read_file(config), config).get("project")
         require(not (isinstance(project, dict) and project.get("type") == "manuscript"), config,
                 "earlier CSE Quarto Manuscript root; rebuild it as a website by removing _quarto.yml, "
-                "_cse-manuscript.json, .cse-quarto-source.json, manuscript.py, and render.sh, rerunning init "
+                "_quarto-presentation.yml, _cse-manuscript.json, .cse-quarto-source.json, manuscript.py, and "
+                "render.sh, rerunning init "
                 "with --article-source index.qmd, and including each notebook again")
     output = root / "_site"
     reject_symlink(output)
@@ -363,8 +368,8 @@ def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
         require(files[name].strip(), root / name, "empty publication source")
     for entry in page_sections(state):
         page = entry["contents"][0]["href"]
-        require(entry["contents"] == sections(files[page].decode(), page), root / page,
-                "sidebar sections no longer match the page headings; rerun include")
+        require(entry["contents"] == sections(root, page, files[page]), root / page,
+                "sidebar sections no longer match the page headings; run `python3 manuscript.py sync .`")
     inspect_config(root, files, state)
     return state
 
@@ -391,7 +396,7 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
     files.update({"_quarto.yml": json_bytes(SITE_CONFIG), "index.qmd": read_file(article.absolute()),
                   "_cse-manuscript.json": json_bytes({"project": {"render": ["index.qmd"]},
                                                            "website": {"sidebar": {"style": "docked", "collapse-level": 1,
-                                                                                   "contents": [home_section(read_file(article.absolute()).decode())]}}}),
+                                                                                   "contents": [home_section(root, read_file(article.absolute()))]}}}),
                   ".cse-quarto-source.json": json_bytes({"sourceCommit": source_commit, "runtimeTreeSha256": runtime_tree_sha256}),
                   ".gitignore": ("\n".join(REQUIRED_IGNORES) + "\n").encode()})
     for name, data in files.items():
@@ -438,8 +443,9 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
 def notebook_argument(root: Path, value: Path) -> str:
     relative = inside(root, value)
     require(relative.endswith(".qmd") and relative != "index.qmd", value, "expected analysis QMD notebook")
-    # Quarto's preview render request cannot address a path containing whitespace.
-    require(not re.search(r"\s", relative), value, "notebook path must not contain whitespace")
+    # Quarto's preview render request addresses the page by its raw path, so keep it URL-safe.
+    require(re.fullmatch(r"[A-Za-z0-9._/-]+", relative), value,
+            "notebook path may contain only letters, digits, '.', '_', '-', and '/'")
     require(read_file(root / relative).strip(), value, "empty notebook")
     return relative
 
@@ -450,9 +456,8 @@ def include(root: Path, notebook: Path, title: str, group: str | None = None) ->
     relative = notebook_argument(root, notebook)
     # Read the membership directly: include is what repairs stale sidebar sections.
     state = metadata(read_file(root / "_cse-manuscript.json"), root / "_cse-manuscript.json")
-    entry = {"section": title, "contents": sections(read_file(root / relative).decode(), relative)}
+    entry = {"section": title, "contents": [{"text": "Overview", "href": relative}]}
     contents = state["website"]["sidebar"]["contents"]
-    contents[0] = home_section(read_file(root / "index.qmd").decode())
     def locate(entries: list) -> tuple[list, int] | None:
         for i, e in enumerate(entries):
             hit = locate(e["contents"]) if is_group(e) else (entries, i) if e["contents"][0]["href"] == relative else None
@@ -469,7 +474,7 @@ def include(root: Path, notebook: Path, title: str, group: str | None = None) ->
                 kept.append(e)
         return kept
 
-    current = locate(contents[1:])
+    current = locate(contents)
     target = contents
     for name in [part.strip() for part in group.split("/")] if group is not None else []:
         require(name, notebook, "empty group name")
@@ -486,12 +491,25 @@ def include(root: Path, notebook: Path, title: str, group: str | None = None) ->
             del current[0][current[1]]
         target.append(entry)
     contents[1:] = prune(contents[1:])
+    refresh_sections(root, state)
     state["project"]["render"] = ["index.qmd", *[n["href"] for n in notebooks(state)]]
     data = json_bytes(state)
     validate_root(root, {"_cse-manuscript.json": data})
     if data != read_file(root / "_cse-manuscript.json"):
         atomic_write(root / "_cse-manuscript.json", data)
     return root / relative
+
+
+def sync(root: Path) -> dict:
+    """Bring every sidebar section up to date with its page headings, then validate."""
+    root = root_path(root)
+    state = metadata(read_file(root / "_cse-manuscript.json"), root / "_cse-manuscript.json")
+    refresh_sections(root, state)
+    data = json_bytes(state)
+    validate_root(root, {"_cse-manuscript.json": data})
+    if data != read_file(root / "_cse-manuscript.json"):
+        atomic_write(root / "_cse-manuscript.json", data)
+    return state
 
 
 def presentation_workflows(root: Path) -> list[Path]:
@@ -689,7 +707,7 @@ def stop_process(process: subprocess.Popen) -> None:
 
 def refresh(root: Path, notebook: Path) -> int:
     root = root_path(root)
-    state = validate_root(root)
+    state = sync(root)
     relative = notebook_argument(root, notebook)
     require(relative in state["project"]["render"], notebook, "not an included notebook")
     status = prepare(root)
@@ -706,7 +724,7 @@ def refresh(root: Path, notebook: Path) -> int:
 
 def preview(root: Path, host: str, port: int) -> int:
     root = root_path(root)
-    state = validate_root(root)
+    state = sync(root)
     require(1 <= port <= 65535, root, "port must be between 1 and 65535")
     # Quarto silently picks another port when this one is busy, so render requests would miss it.
     with socket.socket() as probe:
@@ -731,14 +749,25 @@ def preview(root: Path, host: str, port: int) -> int:
             snapshot = current
             if not pending:
                 continue
+            waiting = False
             while process.poll() is None:
                 time.sleep(WATCH_SETTLE_SECONDS)
                 current = watch_snapshot(root)
                 new = changed_paths(snapshot, current)
                 snapshot = current
-                if not new and not workflows_running(root):
+                running = workflows_running(root)
+                if running and not new and not waiting:
+                    waiting = True
+                    print(f"preview waiting for a Snakemake lock under {root}; if no run is active, "
+                          "run `snakemake --unlock` in that analysis", file=sys.stderr)
+                if not new and not running:
                     break
                 pending.update(new)
+            if any(path.suffix == ".qmd" for path in pending):
+                try:
+                    state = sync(root)
+                except ManuscriptError as exc:
+                    print(f"sidebar sync failed: {exc}", file=sys.stderr)
             prepare_and_render(root, state, pending, host, port)
             snapshot = watch_snapshot(root)
         return process.wait()
@@ -789,7 +818,7 @@ def answering(url: str) -> bool:
 
 def service(root: Path, port: int | None, dry_run: bool, python: Path = Path(sys.executable)) -> int:
     root = root_path(root)
-    validate_root(root)
+    sync(root)
     quarto = shutil.which("quarto")
     require(quarto, root, "quarto renderer unavailable on PATH")
     repository = git_path(root, "--show-toplevel")
@@ -848,7 +877,7 @@ def service(root: Path, port: int | None, dry_run: bool, python: Path = Path(sys
 def main() -> int:
     parser = argparse.ArgumentParser(prog="manuscript.py")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "include", "validate", "refresh", "preview", "prepare", "service"):
+    for name in ("init", "include", "validate", "sync", "refresh", "preview", "prepare", "service"):
         command = commands.add_parser(name)
         if name == "prepare":
             command.add_argument("root", type=Path, nargs="?", default=Path("."))
@@ -876,6 +905,9 @@ def main() -> int:
             print(init(args.root, args.article_source, args.source_commit, args.runtime_tree_sha256))
         elif args.command == "include":
             print(include(args.root, args.notebook, args.title, args.group))
+        elif args.command == "sync":
+            sync(args.root)
+            print("synced")
         elif args.command == "validate":
             validate_root(root_path(args.root))
             print("valid")
