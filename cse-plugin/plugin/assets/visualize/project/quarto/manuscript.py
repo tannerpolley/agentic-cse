@@ -3,16 +3,19 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 import os
 from pathlib import Path
 import re
 import signal
 import shutil
+import socket
 import subprocess
 import sys
 import tempfile
 import time
+import urllib.request
 
 ASSET_ROOT = Path(__file__).resolve().parent
 CONFIG_FILES = ("_quarto.yml", "_cse-manuscript.json", "_quarto-presentation.yml")
@@ -32,6 +35,12 @@ IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "_freeze", "__pycache__", ".i
 IGNORED_WATCH_PARTS |= {".snakemake", ".cache", "tmp", "temp", "support"}
 IGNORED_WATCH_SUFFIXES = ("_files", "_support")
 INCLUDE_RE = re.compile(r"\{\{<\s*include\s+([^\s>]+)")
+SERVICE_MARKER = "# Managed by CSE manuscript.py service; do not edit.\n"
+SERVICE_PORT_RE = re.compile(r"--port (\d+)$", re.MULTILINE)
+SERVICE_PORT_BASE, SERVICE_PORT_SPAN = 8800, 1000
+SERVICE_READY_SECONDS = 20
+UNIT_UNSAFE_RE = re.compile(r"[\s\"'\\%$]")
+PREVIEW_IMPORTS = "jupyter_core, nbformat, nbclient, ipykernel, jupyter_client, jupyter_cache, yaml"
 
 
 class ManuscriptError(Exception):
@@ -573,10 +582,106 @@ def preview(root: Path, host: str, port: int) -> int:
         stop_process(process)
 
 
+def git_path(root: Path, *arguments: str) -> Path:
+    result = subprocess.run(["git", "-C", str(root), "rev-parse", "--path-format=absolute", *arguments],
+                            check=False, text=True, capture_output=True)
+    require(not result.returncode, root, f"not a Git checkout: {result.stderr.strip()}")
+    return Path(result.stdout.strip()).resolve()
+
+
+def service_port(unit: Path) -> int | None:
+    match = SERVICE_PORT_RE.search(unit.read_text()) if unit.is_file() else None
+    return int(match.group(1)) if match else None
+
+
+def port_free(port: int) -> bool:
+    with socket.socket() as probe:
+        try:
+            probe.bind(("127.0.0.1", port))
+        except OSError:
+            return False
+    return True
+
+
+def unit_value(value: str, what: str) -> str:
+    require(not UNIT_UNSAFE_RE.search(value), Path(value), f"{what} has characters unsafe in a systemd unit")
+    return value
+
+
+def answering(url: str) -> bool:
+    deadline = time.monotonic() + SERVICE_READY_SECONDS
+    while True:
+        try:
+            with urllib.request.urlopen(url, timeout=1):
+                return True
+        except OSError:
+            if time.monotonic() >= deadline:
+                return False
+            time.sleep(0.5)
+
+
+def service(root: Path, port: int | None, dry_run: bool, python: Path = Path(sys.executable)) -> int:
+    root = root_path(root)
+    validate_root(root)
+    quarto = shutil.which("quarto")
+    require(quarto, root, "quarto renderer unavailable on PATH")
+    repository = git_path(root, "--show-toplevel")
+    require(git_path(root, "--git-dir") == git_path(root, "--git-common-dir"), root,
+            "the preview service serves the main checkout; run it there, not in a worktree")
+    python = python.absolute()
+    path = list(dict.fromkeys([str(python.parent), str(Path(quarto).parent), "/usr/local/bin", "/usr/bin", "/bin"]))
+    for value, what in ((str(repository), "repository path"), (root.relative_to(repository).as_posix(), "manuscript path"),
+                        (str(python), "interpreter path"), *((entry, "PATH entry") for entry in path)):
+        unit_value(value, what)
+    require(python.is_file() and os.access(python, os.X_OK), python, "interpreter is not an executable file")
+    imports = subprocess.run([str(python), "-c", f"import {PREVIEW_IMPORTS}"], check=False, capture_output=True, text=True)
+    require(not imports.returncode, python, f"interpreter cannot import {PREVIEW_IMPORTS} for the presentation profile")
+    require(not presentation_workflows(root) or shutil.which("snakemake", path=":".join(path)), python.parent,
+            "snakemake is required by a presentation workflow but absent from the unit PATH")
+    digest = hashlib.sha256(str(repository).encode()).hexdigest()
+    units = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
+    unit = units / f"cse-preview-{re.sub(r'[^A-Za-z0-9_.-]', '-', repository.name)}-{digest[:8]}.service"
+    existing = unit.read_text() if unit.is_file() else None
+    require(existing is None or (existing.startswith(SERVICE_MARKER)
+                                 and f"\nWorkingDirectory={repository}\n" in existing),
+            unit, "refusing to overwrite a unit this command did not write for this repository")
+    current = service_port(unit)
+    claimed = {service_port(other) for other in units.glob("cse-preview-*.service") if other != unit}
+    if port is None:
+        port = current
+    if port is None:
+        candidates = (SERVICE_PORT_BASE + (int(digest, 16) + step) % SERVICE_PORT_SPAN for step in range(SERVICE_PORT_SPAN))
+        port = next((value for value in candidates if value not in claimed and port_free(value)), None)
+        require(port, unit, "no free preview port")
+    require(1 <= port <= 65535 and port not in claimed and (port == current or port_free(port)),
+            unit, f"port {port} is in use or claimed by another preview unit")
+    text = read_file(ASSET_ROOT / "preview.service").decode().format(
+        repository=repository, manuscript=root.relative_to(repository).as_posix(), port=port,
+        python=python, path=":".join(path))
+    url = f"http://127.0.0.1:{port}/"
+    if dry_run:
+        print(f"{unit}\n{text}{url}")
+        return 0
+    try:
+        subprocess.run(["systemctl", "--user", "show-environment"], check=True, capture_output=True)
+    except (OSError, subprocess.CalledProcessError) as exc:
+        raise ManuscriptError(f"systemd user manager unavailable (systemctl --user show-environment failed: {exc})")
+    if text != existing:
+        unit.parent.mkdir(parents=True, exist_ok=True)
+        atomic_write(unit, text.encode())
+    for action in ("daemon-reload", "enable", "restart" if text != existing else "start"):
+        subprocess.run(["systemctl", "--user", action, *([] if action == "daemon-reload" else [unit.name])], check=True)
+    if answering(url):
+        print(f"{unit.name} serving {url}")
+        return 0
+    print(f"{unit.name} started, not answering at {url}; see `journalctl --user -u {unit.name}`")
+    return 1
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(prog="manuscript.py")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "include", "validate", "refresh", "preview", "prepare"):
+    for name in ("init", "include", "validate", "refresh", "preview", "prepare", "service"):
         command = commands.add_parser(name)
         if name == "prepare":
             command.add_argument("root", type=Path, nargs="?", default=Path("."))
@@ -593,6 +698,10 @@ def main() -> int:
         if name == "preview":
             command.add_argument("--host", default="127.0.0.1")
             command.add_argument("--port", type=int, default=8000)
+        if name == "service":
+            command.add_argument("--port", type=int)
+            command.add_argument("--dry-run", action="store_true")
+            command.add_argument("--python", type=Path, default=Path(sys.executable))
     args = parser.parse_args()
     try:
         if args.command == "init":
@@ -606,6 +715,8 @@ def main() -> int:
             return prepare(args.root)
         elif args.command == "refresh":
             return refresh(args.root, args.notebook)
+        elif args.command == "service":
+            return service(args.root, args.port, args.dry_run, args.python)
         else:
             return preview(args.root, args.host, args.port)
         return 0

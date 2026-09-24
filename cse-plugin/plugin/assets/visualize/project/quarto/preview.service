@@ -1,0 +1,18 @@
+# Managed by CSE manuscript.py service; do not edit.
+[Unit]
+Description=CSE manuscript preview for {repository}
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+[Service]
+Type=simple
+WorkingDirectory={repository}
+Environment=PATH={path}
+Environment=QUARTO_PYTHON={python}
+ExecStart={python} {manuscript}/manuscript.py preview {manuscript} --host 127.0.0.1 --port {port}
+SuccessExitStatus=130
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=default.target

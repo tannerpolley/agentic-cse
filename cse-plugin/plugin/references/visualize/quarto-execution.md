@@ -124,6 +124,30 @@ execution-security boundaries: cached output can become stale, and an explicit
 execution command can rerun cells. Environment and filesystem isolation provide
 the stronger boundary when executable presentation cells are enabled.
 
+## Main-checkout preview service
+
+`python3 analyses/manuscript.py service analyses/` installs a systemd user unit
+`cse-preview-<repository>-<path hash>.service` that keeps `manuscript.py preview`
+running on `127.0.0.1` from the main checkout, restarting it on failure within a
+bounded start limit. The unit records the interpreter absolutely (`--python`,
+default the interpreter running the command) and puts its directory first on
+`PATH`; the command refuses an interpreter that cannot import the Jupyter
+packages the presentation profile executes with (including `jupyter-cache`,
+which its `execute.cache: true` requires), or a presentation workflow whose
+`snakemake` is absent from that `PATH`. It also refuses any path containing
+whitespace, quotes, backslash, `%`, or `$`. The port is chosen once from the
+repository path, skipping ports that are bound or claimed by another preview unit,
+unless `--port` is given; reruns keep the port and refuse a unit the command did
+not write for that repository. `--dry-run` prints the unit without writing or
+enabling it. Without `systemctl --user`, the command reports that missing
+capability and writes nothing. It reports `serving <url>` only after the URL
+answers, otherwise the unit's journal command. User services stop at logout unless
+lingering is enabled (`loginctl enable-linger`).
+
+The service URL is the main-checkout view: agents do not start or stop it. An
+unmerged worktree branch is previewed by a task-owned
+`manuscript.py preview <root> --port <free port>` that the agent stops at cleanup.
+
 ## HTML
 
 Ordinary Quarto HTML is the default Quarto Manuscript output. It reads the retained
