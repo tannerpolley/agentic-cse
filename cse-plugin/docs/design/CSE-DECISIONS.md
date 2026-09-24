@@ -182,7 +182,13 @@ the agent presents the complete scientific-risk, oracle, metric, tolerance,
 failure, replacement, and runtime proposal and obtains explicit user approval.
 Optional lifecycle hooks compare test contents with the session-start inventory
 and report changes as advisories. They do not enforce test approval or judge
-whether the proposal or science is correct. Prose violations remain blocking.
+whether the proposal or science is correct. Prose violations remain blocking
+for the prose this session writes in any checkout of the repository, including
+lane worktrees, committed or not: files whose content differs both from the
+integrated line (upstream, origin's default, or the local default branch) and
+from what that checkout's branch held when the session started. Text that
+arrived by merging or pulling reviewed work, and existing branches checked out
+for review, are not attributed to the session.
 
 Durable equations and correlations receive stable identifiers, exact source
 locators, symbols, units or basis, assumptions, validity domain, and links to

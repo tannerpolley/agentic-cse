@@ -18,7 +18,7 @@ SOURCE_STANCE = Path(__file__).resolve().parents[2] / "assets/workflow/scientifi
 STANCE = SOURCE_STANCE if SOURCE_STANCE.is_file() else Path(__file__).with_name("cse-scientific-stance.txt")
 TEST_PARTS = {"test", "tests", "testing"}
 MAX_INPUT_BYTES = 1024 * 1024
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 3
 OPTIONAL_START = "[["
 OPTIONAL_END = "]]"
 ROLE_SLOT = "{repository_role}"
@@ -160,7 +160,7 @@ def file_record(path: Path) -> str:
     return hashlib.sha256(raw).hexdigest()
 
 
-def inventory(repository: Path, project: Path, *, prose: bool = False) -> dict[str, str]:
+def inventory(repository: Path, project: Path) -> dict[str, str]:
     raw = git(repository, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
     prefix = project.relative_to(repository)
     records = {}
@@ -173,12 +173,88 @@ def inventory(repository: Path, project: Path, *, prose: bool = False) -> dict[s
             project_relative = path.relative_to(project).as_posix()
         except ValueError:
             continue
-        selected = path.suffix.lower() in {".md", ".qmd", ".tex"} if prose else is_test_path(project_relative)
-        if prose and path.is_symlink():
-            continue
-        if selected and (path.exists() or path.is_symlink()):
+        if is_test_path(project_relative) and (path.exists() or path.is_symlink()):
             records[(prefix / project_relative).as_posix()] = file_record(path)
     return dict(sorted(records.items()))
+
+
+def checkouts(repository: Path) -> list[tuple[Path, str | None]]:
+    """Usable checkouts of the repository with their branch; bare and prunable entries are skipped."""
+    blocks = git(repository, "worktree", "list", "--porcelain").decode(errors="surrogateescape").split("\n\n")
+    found = []
+    for block in blocks:
+        fields = dict(line.partition(" ")[::2] for line in block.splitlines() if line)
+        path = Path(fields.get("worktree", ""))
+        if "worktree" in fields and "bare" not in fields and "prunable" not in fields and path.is_dir():
+            found.append((path.resolve(), fields.get("branch")))
+    return found
+
+
+def worktrees(repository: Path) -> list[Path]:
+    return [path for path, _ in checkouts(repository)]
+
+
+def commit(worktree: Path, reference: str) -> str | None:
+    try:
+        return git(worktree, "rev-parse", "--verify", "-q", f"{reference}^{{commit}}").decode().strip() or None
+    except HookError:
+        return None
+
+
+def integrated_line(worktree: Path, branch: str | None) -> str | None:
+    """The reviewed line work merges into: the upstream, origin's default, or the local default branch."""
+    for reference in ("@{upstream}", "refs/remotes/origin/HEAD", "refs/heads/main", "refs/heads/master"):
+        if reference != branch and (found := commit(worktree, reference)):
+            return found
+    return None
+
+
+def session_refs(repository: Path) -> dict[str, str]:
+    """Branch tips and checkout HEADs when the session starts."""
+    refs = {}
+    for line in git(repository, "for-each-ref", "--format=%(refname) %(objectname)", "refs/heads").decode().splitlines():
+        name, _, sha = line.partition(" ")
+        refs[name] = sha
+    for path, _ in checkouts(repository):
+        if head := commit(path, "HEAD"):
+            refs[f"checkout:{path}"] = head
+    return refs
+
+
+def blob(worktree: Path, reference: str, relative: str) -> str | None:
+    try:
+        return git(worktree, "rev-parse", "--verify", "-q", f"{reference}:{relative}").decode().strip()
+    except HookError:
+        return None
+
+
+def written_prose(repository: Path, project: Path, refs: dict[str, str]) -> list[Path]:
+    """Prose this session wrote in any checkout, committed or not.
+
+    A file counts when its content differs both from the integrated line (so text that arrived by
+    merging or pulling reviewed work is excluded) and from what the checkout's branch held when the
+    session started (so an existing branch checked out mid-session is not attributed to it).
+    """
+    scope = project.relative_to(repository).as_posix() or "."
+    written = []
+    for worktree, branch in checkouts(repository):
+        try:
+            start = refs.get(branch or "") or refs.get(f"checkout:{worktree}")
+            anchors = [a for a in (integrated_line(worktree, branch), start) if a] or ["HEAD"]
+            names = set(git(worktree, "ls-files", "--others", "--exclude-standard", "-z", "--", scope).split(b"\0"))
+            for anchor in anchors:
+                names |= set(git(worktree, "diff", "--name-only", "-z", anchor, "--", scope).split(b"\0"))
+            for item in sorted(names - {b""}):
+                relative = item.decode(errors="surrogateescape")
+                path = worktree / relative
+                if path.suffix.lower() not in {".md", ".qmd", ".tex"} or not path.is_file() or path.is_symlink():
+                    continue
+                content = git(worktree, "hash-object", "--", relative).decode().strip()
+                if all(blob(worktree, anchor, relative) != content for anchor in anchors):
+                    written.append(path)
+        except (HookError, subprocess.TimeoutExpired):
+            continue  # an unreadable checkout is skipped rather than disabling the check for all
+    return written
 
 
 def save(path: Path, value: dict[str, object]) -> None:
@@ -190,21 +266,24 @@ def save(path: Path, value: dict[str, object]) -> None:
 
 def start(event: dict[str, object], repository: Path, project: Path) -> None:
     path = state_path(event, repository, project)
-    if str(event.get("source") or "startup") in {"startup", "clear"} or not path.is_file():
+    try:
+        current = json.loads(path.read_text(encoding="utf-8")).get("schema_version") if path.is_file() else None
+    except (OSError, ValueError, AttributeError):
+        current = None
+    if str(event.get("source") or "startup") in {"startup", "clear"} or current != SCHEMA_VERSION:
         save(path, {
             "schema_version": SCHEMA_VERSION,
             "project": str(project),
             "baseline": inventory(repository, project),
-            "prose": inventory(repository, project, prose=True),
+            "refs": session_refs(repository),
         })
 
 
 def prose_changes(event: dict[str, object], repository: Path, project: Path) -> list[Path]:
     state = json.loads(state_path(event, repository, project).read_text(encoding="utf-8"))
-    if not isinstance(state, dict) or state.get("schema_version") != SCHEMA_VERSION or state.get("project") != str(project) or not isinstance(state.get("prose"), dict):
+    if not isinstance(state, dict) or state.get("schema_version") != SCHEMA_VERSION or state.get("project") != str(project) or not isinstance(state.get("refs"), dict):
         raise HookError("session prose baseline is unavailable; start a new session")
-    current = inventory(repository, project, prose=True)
-    return [repository / path for path, digest in current.items() if state["prose"].get(path) != digest]
+    return written_prose(repository, project, state["refs"])
 
 
 def changes(event: dict[str, object], repository: Path, project: Path) -> list[str]:
@@ -238,15 +317,28 @@ def main() -> int:
         repository, project, scientific_context = found
         role = repository_role(scientific_context)
         if event_name == "SessionStart":
-            start(event, repository, project)
-            emit(context(event_name, render_stance(scientific_context)))
+            stance = render_stance(scientific_context)
+            try:
+                start(event, repository, project)
+            except (HookError, OSError, subprocess.TimeoutExpired) as exc:
+                stance += f" CSE prose baseline unavailable: {exc}."
+            emit(context(event_name, stance))
         elif event_name == "Stop":
             warnings = []
             if role is None:
                 warnings.append(ROLE_CORRECTION)
             try:
-                failures = violations(prose_changes(event, repository, project),
-                                      context=scientific_context, root=project)
+                failures = []
+                prefix = project.relative_to(repository)
+                checkouts = worktrees(repository)
+                groups: dict[Path, list[Path]] = {}
+                for path in prose_changes(event, repository, project):
+                    # A worktree may sit inside another checkout; the deepest one owns the file.
+                    owner = max((w for w in checkouts if path.is_relative_to(w)), key=lambda w: len(w.parts))
+                    groups.setdefault(owner, []).append(path)
+                for owner, paths in groups.items():
+                    root = owner / prefix
+                    failures += violations(paths, context=nearest_context(root, owner) or scientific_context, root=root)
             except (OSError, UnicodeError, ValueError, HookError, subprocess.TimeoutExpired) as exc:
                 failures = []
                 warnings.append(f"CSE prose check unavailable (not a pass): {exc}. Restart after checking installation; do not recreate prior evidence.")
