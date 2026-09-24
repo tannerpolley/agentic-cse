@@ -102,7 +102,7 @@ def read_json(data: bytes, path: Path) -> dict:
     return value
 
 
-HEADING_RE = re.compile(r"^##\s+(.+?)\s*(?:\{([^}]*)\})?\s*$")
+HEADING_RE = re.compile(r"^(#{1,2})\s+(.+?)\s*(?:\{([^}]*)\})?\s*$")
 
 
 def is_group(entry: dict) -> bool:
@@ -110,12 +110,14 @@ def is_group(entry: dict) -> bool:
     return "section" in entry["contents"][0]
 
 
+def flatten(entries: list[dict]) -> list[dict]:
+    """Page sections in sidebar order, descending through (possibly nested) groups."""
+    return [page for entry in entries for page in (flatten(entry["contents"]) if is_group(entry) else [entry])]
+
+
 def page_sections(state: dict) -> list[dict]:
     """Home and notebook sections in sidebar order, with groups flattened."""
-    pages = []
-    for entry in state["website"]["sidebar"]["contents"]:
-        pages.extend(entry["contents"] if is_group(entry) else [entry])
-    return pages
+    return flatten(state["website"]["sidebar"]["contents"])
 
 
 def notebooks(state: dict) -> list[dict]:
@@ -139,9 +141,10 @@ def home_section(text: str) -> dict:
 
 
 def sections(text: str, page: str) -> list[dict]:
-    """Sidebar children of a page: the page itself (so Quarto opens its section there), then each level-2 heading."""
+    """Sidebar children of a page: the page itself (so Quarto opens its section there), then each
+    heading at the page's top level (``#`` when the page uses it, otherwise ``##``)."""
     # Only headings outside code and ::: blocks are page sections (callout and tab titles are not).
-    items, seen, fenced, depth = [], {}, False, 0
+    found, fenced, depth = [], False, 0
     for line in text.splitlines():
         if line.lstrip().startswith(("```", "~~~")):
             fenced = not fenced
@@ -151,11 +154,16 @@ def sections(text: str, page: str) -> list[dict]:
             depth += 1
         match = None if fenced or depth else HEADING_RE.match(line)
         if match:
-            explicit = re.search(r"#([\w.-]+)", match.group(2) or "")
-            ident = explicit.group(1) if explicit else heading_id(match.group(1))
-            count = seen.get(ident, 0)
-            seen[ident] = count + 1
-            items.append({"text": match.group(1).strip(), "href": f"{page}#{ident}{f'-{count}' if count else ''}"})
+            found.append((len(match.group(1)), match.group(2).strip(), match.group(3) or ""))
+    items, seen = [], {}
+    # Pandoc numbers repeated identifiers across all heading levels, so count every heading.
+    for level, text, attributes in found:
+        explicit = re.search(r"#([\w.-]+)", attributes)
+        ident = explicit.group(1) if explicit else heading_id(text)
+        count = seen.get(ident, 0)
+        seen[ident] = count + 1
+        if level == min(level for level, *_ in found):
+            items.append({"text": text, "href": f"{page}#{ident}{f'-{count}' if count else ''}"})
     return [{"text": "Overview", "href": page}, *items]
 
 
@@ -177,11 +185,15 @@ def metadata(data: bytes, path: Path) -> dict:
                 and isinstance(entry["section"], str) and entry["section"].strip()
                 and isinstance(entry["contents"], list) and bool(entry["contents"]))
 
-    for entry in sidebar["contents"]:
-        require(section(entry), path, "invalid sidebar section")
-        if is_group(entry):
-            require(entry is not sidebar["contents"][0] and all(section(c) and not is_group(c) for c in entry["contents"]),
-                    path, "a group holds only notebook sections")
+    def check(entries: list) -> None:
+        for entry in entries:
+            require(section(entry), path, "invalid sidebar section")
+            if is_group(entry):
+                require(all(section(c) for c in entry["contents"]), path, "a group holds only sections")
+                check(entry["contents"])
+
+    check(sidebar["contents"])
+    require(not is_group(sidebar["contents"][0]), path, "sidebar must start with the home page")
     for entry in page_sections(state):
         require(isinstance(entry, dict) and set(entry) == {"section", "contents"}
                 and isinstance(entry["section"], str) and entry["section"].strip()
@@ -441,15 +453,31 @@ def include(root: Path, notebook: Path, title: str, group: str | None = None) ->
     entry = {"section": title, "contents": sections(read_file(root / relative).decode(), relative)}
     contents = state["website"]["sidebar"]["contents"]
     contents[0] = home_section(read_file(root / "index.qmd").decode())
-    containers = [contents, *[e["contents"] for e in contents[1:] if is_group(e)]]
-    current = next(((c, i) for c in containers for i, e in enumerate(c)
-                    if not is_group(e) and e["contents"][0]["href"] == relative), None)
+    def locate(entries: list) -> tuple[list, int] | None:
+        for i, e in enumerate(entries):
+            hit = locate(e["contents"]) if is_group(e) else (entries, i) if e["contents"][0]["href"] == relative else None
+            if hit:
+                return hit
+        return None
+
+    def prune(entries: list) -> list:
+        kept = []
+        for e in entries:
+            if not e["contents"] or is_group(e):
+                e["contents"] = prune(e["contents"])
+            if e["contents"]:
+                kept.append(e)
+        return kept
+
+    current = locate(contents[1:])
     target = contents
-    if group is not None:
-        found = next((e for e in contents[1:] if e["section"] == group and is_group(e)), None)
+    for name in [part.strip() for part in group.split("/")] if group is not None else []:
+        require(name, notebook, "empty group name")
+        found = next((e for e in target[1 if target is contents else 0:] if e["section"] == name and e["contents"]
+                      and is_group(e)), None)
         if found is None:
-            found = {"section": group, "contents": []}
-            contents.append(found)
+            found = {"section": name, "contents": []}
+            target.append(found)
         target = found["contents"]
     if current and current[0] is target:
         target[current[1]] = entry
@@ -457,7 +485,7 @@ def include(root: Path, notebook: Path, title: str, group: str | None = None) ->
         if current:
             del current[0][current[1]]
         target.append(entry)
-    contents[:] = [e for e in contents if e["contents"]]
+    contents[1:] = prune(contents[1:])
     state["project"]["render"] = ["index.qmd", *[n["href"] for n in notebooks(state)]]
     data = json_bytes(state)
     validate_root(root, {"_cse-manuscript.json": data})
@@ -834,7 +862,7 @@ def main() -> int:
             command.add_argument("notebook", type=Path)
         if name == "include":
             command.add_argument("--title", required=True)
-            command.add_argument("--group", help="optional sidebar group heading for the notebook")
+            command.add_argument("--group", help="optional sidebar group; nest with '/', e.g. 'Bundle/Active formulation'")
         if name == "preview":
             command.add_argument("--host", default="127.0.0.1")
             command.add_argument("--port", type=int, default=8000)

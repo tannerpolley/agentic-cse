@@ -40,10 +40,12 @@ bar, theme, and full page layout, so numbered equations and cross-references
 work on every page. The home page is the sidebar section "Home", and each included
 notebook is a collapsed section titled by `include --title`. A section title only
 expands it; its children are an Overview link and one link per
-level-2 heading outside code and `:::` blocks. `include` records those links, and
+top-level heading (`#` when the page uses it, otherwise `##`) outside code and
+`:::` blocks. `include` records those links, and
 `validate` refuses them once the headings change until `include` runs again.
 There is no page table of contents or margin column, so keep side notes inline.
-`include --group <name>` nests a notebook under a collapsed group heading; the
+`include --group <name>` nests a notebook under a collapsed group heading
+(`A/B` nests groups); the
 last notebook leaving a group removes it. There is no top bar: the site title,
 search, and reader-mode toggle sit in the sidebar. Pages load math with the page
 (`self-contained-math`) and share the installed `site.css` (publication-style

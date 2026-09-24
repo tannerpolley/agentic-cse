@@ -130,7 +130,7 @@ class RenderingBehaviorTests(unittest.TestCase):
             run([sys.executable, str(MANUSCRIPT), "init", str(root), "--article-source", str(EXAMPLE / "article.qmd"),
                  "--source-commit", "a" * 40, "--runtime-tree-sha256", "b" * 64], root.parent)
             run([sys.executable, "manuscript.py", "include", ".", "cooling-fit/notebook.qmd",
-                 "--title", "Cooling-rate fit", "--group", "Cooling studies"], root)
+                 "--title", "Cooling-rate fit", "--group", "Cooling studies/Exponential fits"], root)
             rendered = run(["bash", "render.sh"], root)
             self.assertNotIn("not found in resource path", rendered.stdout + rendered.stderr)
 
@@ -147,6 +147,7 @@ class RenderingBehaviorTests(unittest.TestCase):
                 self.assertIn('menu-text">Home<', page)
                 self.assertIn('menu-text">Cooling-rate fit<', page)
                 self.assertIn('menu-text">Cooling studies<', page)
+                self.assertIn('menu-text">Exponential fits<', page)
                 # No top bar: title, search, and reader mode live in the sidebar; math ships with the page.
                 self.assertNotIn('class="navbar', page)
                 self.assertIn("quarto-reader-toggle", page)
