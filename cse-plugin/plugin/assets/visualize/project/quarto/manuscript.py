@@ -25,7 +25,7 @@ REQUIRED_IGNORES = ("/.quarto/", "/_site/", "/site_libs/", "/_freeze/", "/notebo
 SITE_CONFIG = {
     "project": {"type": "website", "output-dir": "_site"},
     "metadata-files": ["_cse-manuscript.json"], "website": {"title": "Analyses", "navbar": {}},
-    "format": {"html": {"embed-resources": True, "page-layout": "full", "theme": "cosmo", "toc": True,
+    "format": {"html": {"embed-resources": True, "page-layout": "full", "theme": "cosmo", "toc": False,
                         "notebook-links": False}},
     "execute": {"enabled": False},
 }
@@ -99,9 +99,43 @@ def read_json(data: bytes, path: Path) -> dict:
     return value
 
 
+HEADING_RE = re.compile(r"^##\s+(.+?)\s*(?:\{([^}]*)\})?\s*$")
+
+
 def notebooks(state: dict) -> list[dict]:
-    """Sidebar entries after the home page, each ``{"text": title, "href": notebook}``."""
-    return state["website"]["sidebar"]["contents"][1:]
+    """Included notebooks in sidebar order, each ``{"text": title, "href": notebook}``."""
+    return [{"text": entry["section"], "href": entry["contents"][0]["href"].split("#")[0]}
+            for entry in state["website"]["sidebar"]["contents"][1:]]
+
+
+def heading_id(text: str) -> str:
+    """Pandoc's automatic identifier for a heading's text."""
+    text = re.sub(r"[`*$\\]", "", text).lower()
+    text = re.sub(r"\s+", "-", re.sub(r"[^\w\s.-]", "", text).strip())
+    while text and not text[0].isalpha():
+        text = text[1:]
+    return text or "section"
+
+
+def sections(root: Path, notebook: str, title: str) -> list[dict]:
+    """Sidebar children of a notebook: the page itself (so Quarto opens its section there), then each level-2 heading."""
+    # Only headings outside code and ::: blocks are page sections (callout and tab titles are not).
+    items, seen, fenced, depth = [], {}, False, 0
+    for line in read_file(root / notebook).decode().splitlines():
+        if line.lstrip().startswith(("```", "~~~")):
+            fenced = not fenced
+        elif not fenced and re.match(r"^\s*:{3,}\s*$", line):
+            depth = max(depth - 1, 0)
+        elif not fenced and re.match(r"^\s*:{3,}\s*\S", line):
+            depth += 1
+        match = None if fenced or depth else HEADING_RE.match(line)
+        if match:
+            explicit = re.search(r"#([\w.-]+)", match.group(2) or "")
+            ident = explicit.group(1) if explicit else heading_id(match.group(1))
+            count = seen.get(ident, 0)
+            seen[ident] = count + 1
+            items.append({"text": match.group(1).strip(), "href": f"{notebook}#{ident}{f'-{count}' if count else ''}"})
+    return [{"text": "Overview", "href": notebook}, *items]
 
 
 def metadata(data: bytes, path: Path) -> dict:
@@ -113,12 +147,18 @@ def metadata(data: bytes, path: Path) -> dict:
     render, sidebar = project["render"], website["sidebar"]
     require(isinstance(render, list) and all(isinstance(p, str) for p in render)
             and len(render) == len(set(render)), path, "render membership must be unique")
-    require(isinstance(sidebar, dict) and set(sidebar) == {"style", "contents"} and sidebar["style"] == "docked"
+    require(isinstance(sidebar, dict) and set(sidebar) == {"style", "collapse-level", "contents"}
+            and sidebar["style"] == "docked" and sidebar["collapse-level"] == 1
             and isinstance(sidebar["contents"], list) and sidebar["contents"][:1] == ["index.qmd"],
             path, "sidebar must be docked and start with the home page")
-    for entry in notebooks(state):
-        require(isinstance(entry, dict) and set(entry) == {"text", "href"}
-                and all(isinstance(v, str) and v.strip() for v in entry.values()), path, "invalid notebook path/title")
+    for entry in sidebar["contents"][1:]:
+        require(isinstance(entry, dict) and set(entry) == {"section", "contents"}
+                and isinstance(entry["section"], str) and entry["section"].strip()
+                and isinstance(entry["contents"], list) and entry["contents"]
+                and all(isinstance(c, dict) and set(c) == {"text", "href"}
+                        and all(isinstance(v, str) and v.strip() for v in c.values()) for c in entry["contents"])
+                and len({c["href"].split("#")[0] for c in entry["contents"]}) == 1,
+                path, "invalid notebook section")
     require(render == ["index.qmd", *[n["href"] for n in notebooks(state)]], path, "ordered memberships disagree")
     return state
 
@@ -277,6 +317,9 @@ def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
         require(relative == name and name.endswith(".qmd") and not any(c in name for c in "*?[]!"), root / name, "expected literal relative QMD path")
         files[name] = pending[name] if name in pending else read_file(root / name)
         require(files[name].strip(), root / name, "empty publication source")
+    for entry, notebook in zip(state["website"]["sidebar"]["contents"][1:], notebooks(state)):
+        require(entry["contents"] == sections(root, notebook["href"], notebook["text"]), root / notebook["href"],
+                "sidebar sections no longer match the notebook headings; rerun include")
     inspect_config(root, files, state)
     return state
 
@@ -302,7 +345,8 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
     files = {name: read_file(ASSET_ROOT / name) for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py")}
     files.update({"_quarto.yml": json_bytes(SITE_CONFIG), "index.qmd": read_file(article.absolute()),
                   "_cse-manuscript.json": json_bytes({"project": {"render": ["index.qmd"]},
-                                                           "website": {"sidebar": {"style": "docked", "contents": ["index.qmd"]}}}),
+                                                           "website": {"sidebar": {"style": "docked", "collapse-level": 1,
+                                                                                   "contents": ["index.qmd"]}}}),
                   ".cse-quarto-source.json": json_bytes({"sourceCommit": source_commit, "runtimeTreeSha256": runtime_tree_sha256}),
                   ".gitignore": ("\n".join(REQUIRED_IGNORES) + "\n").encode()})
     for name, data in files.items():
@@ -359,14 +403,18 @@ def include(root: Path, notebook: Path, title: str) -> Path:
     root = root_path(root)
     require(title.strip(), notebook, "empty notebook title")
     relative = notebook_argument(root, notebook)
-    state = validate_root(root)
-    found = next((n for n in notebooks(state) if n["href"] == relative), None)
-    if found and found["text"] == title:
+    # Read the membership directly: include is what repairs stale sidebar sections.
+    state = metadata(read_file(root / "_cse-manuscript.json"), root / "_cse-manuscript.json")
+    entry = {"section": title, "contents": sections(root, relative, title)}
+    contents = state["website"]["sidebar"]["contents"]
+    index = next((i for i, n in enumerate(notebooks(state), 1) if n["href"] == relative), None)
+    if index and contents[index] == entry:
+        validate_root(root)
         return root / relative
-    if found:
-        found["text"] = title
+    if index:
+        contents[index] = entry
     else:
-        state["website"]["sidebar"]["contents"].append({"text": title, "href": relative})
+        contents.append(entry)
         state["project"]["render"].append(relative)
     data = json_bytes(state)
     validate_root(root, {"_cse-manuscript.json": data})

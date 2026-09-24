@@ -200,7 +200,7 @@ class QuartoManagerTests(unittest.TestCase):
     def test_changed_retained_file_notifies_its_notebook_and_root(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            state = {"website": {"sidebar": {"contents": ["index.qmd", {"href": "case/notebook.qmd"}]}}}
+            state = {"website": {"sidebar": {"contents": ["index.qmd", {"section": "Case", "contents": [{"text": "Results", "href": "case/notebook.qmd#results"}]}]}}}
             changed = {root / "case" / "results" / "fit_summary.json"}
             self.assertEqual(
                 {root / "index.qmd", root / "case" / "notebook.qmd"},

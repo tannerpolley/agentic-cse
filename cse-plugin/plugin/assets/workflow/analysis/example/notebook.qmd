@@ -56,7 +56,7 @@ using @eq-cooling-model for $T(t_i; k)$, solved with the SciPy
 [@virtanen2020] trust-region reflective least-squares method [@branch1999]
 from two initial guesses.
 
-::: {.column-margin}
+::: {.callout-tip appearance="simple"}
 The time constant $1/k$ is the time for the temperature excess $T - T_a$ to
 fall by a factor of $e$.
 :::

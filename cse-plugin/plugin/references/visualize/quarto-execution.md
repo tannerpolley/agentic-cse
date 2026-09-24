@@ -36,8 +36,12 @@ Initialize a confirmed analysis repository's root Quarto analysis site at
 The root is a Quarto website (`project.type: website`). The article is the
 home page `_site/index.html`; a registered `case/result.qmd` is the ordinary
 page `_site/case/result.html`. Every page shares one docked sidebar, navigation
-bar, theme, full page layout, and page table of contents, so numbered
-equations, cross-references, and margin content work on every page. The root
+bar, theme, and full page layout, so numbered equations and cross-references
+work on every page. Each included notebook is a collapsed sidebar section whose
+title only expands it; its children are an Overview link and one link per
+level-2 heading outside code and `:::` blocks. `include` records those links, and
+`validate` refuses them once the headings change until `include` runs again.
+There is no page table of contents or margin column, so keep side notes inline. The root
 sets `notebook-links: false`, so an article that embeds a labeled cell from a
 retained notebook with `{{< embed >}}` shows the cell without a link to a
 separate notebook page.

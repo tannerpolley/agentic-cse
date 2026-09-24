@@ -3,6 +3,7 @@ from __future__ import annotations
 import importlib.util
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import signal
@@ -146,7 +147,15 @@ class RenderingBehaviorTests(unittest.TestCase):
                 self.assertIn('menu-text">Cooling-rate synthesis<', page)
                 self.assertIn('menu-text">Cooling-rate fit<', page)
                 self.assertNotIn("Back to Article", page)
-            self.assertIn("column-margin", notebook)
+                # The notebook is a collapsible sidebar section (caret) whose children are its headings;
+                # no page table of contents or margin column takes width on the right.
+                self.assertIn("sidebar-item-toggle", page)
+                self.assertNotIn('id="TOC"', page)
+                self.assertNotIn("column-margin", page)
+            anchors = re.findall(r'href="\./cooling-fit/notebook\.html#([^"]+)"', article)
+            self.assertIn("results", anchors)
+            for anchor in anchors:
+                self.assertIn(f'id="{anchor}"', notebook)
             self.assertIn(r"5.000 \times 10^{-3}", notebook)
             self.assertEqual([], [p.name for p in (root / "_site").rglob("*preview*")])
             self.assertTrue((root / "_site/cooling-fit/results/fit_curve.csv").is_file())
