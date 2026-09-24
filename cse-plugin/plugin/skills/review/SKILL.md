@@ -58,7 +58,13 @@ and direct callers and callees using [code-surface-review](../../references/work
 that calculations stay with the accepted numerical owner; each result field
 has a named meaning, producer, unit or basis, and availability rule; distinct fields do not reuse one value without identity evidence; missing inputs and silent exits preserve causes and valid outputs; and repeated constants,
 limits, defaults, and tolerances use their existing scientific owner. Confirm
-the accepted falsifier fails without the fix. Passing tests or line accounting
+the accepted falsifier fails without the fix.
+
+For any refused, failed, unavailable, unresolved, tolerance-gated, or negative
+disposition in either lens, ask whether it could be fixed: return **Not
+supported** unless the retained evidence shows the diagnosis and attempted
+root-cause fix required by
+[failure-triage](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition). Passing tests or line accounting
 cannot replace these checks.
 
 Review advises on the stated use; it does not promote a notebook to manuscript

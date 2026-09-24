@@ -228,8 +228,11 @@ milestones, Projects, relationships, issue types, and Actions are optional
 context and are used only when the science or user chooses them. Substantive
 construction records the question, equations or model, assumptions, inputs,
 references, reference cases, metrics and tolerances, analyses, outputs, claim
-limits, limitations, unresolved questions, and required result checks. A supported
-negative result is a valid outcome.
+limits, limitations, unresolved questions, and required result checks. A physical
+finding that the model does not reproduce data is a valid outcome only after
+diagnosis and attempted root-cause fixes; numerical non-results are fixed, and
+typed refusals stay only for singular or undefined mathematics. The runtime rule is
+[fix before a negative disposition](../../plugin/references/workflow/failure-triage.md#fix-before-a-negative-disposition).
 
 Before mutation, the route discovers the default branch and remotes, fetches and
 prunes, requires a clean canonical checkout, fast-forwards it, and isolates

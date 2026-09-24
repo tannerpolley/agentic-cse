@@ -18,8 +18,9 @@ result set, verifies its completion identity and file hashes, and writes the
 table or include fragment. Missing, incomplete, or mismatched retained results
 fail with a diagnostic; presentation never manufactures a result or runs a
 model. A converged result with poor physical agreement remains retained with
-the false quantity-specific check and is presented as supported negative
-evidence.
+the false quantity-specific check, its diagnosis, and the fixes tried, as a
+physical finding under
+[failure-triage](failure-triage.md#fix-before-a-negative-disposition).
 
 Calculation writes to a temporary staging location and promotes the validated
 named result set and its selection identity only after all required files are

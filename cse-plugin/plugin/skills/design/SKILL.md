@@ -23,7 +23,7 @@ endpoint.
 
 Define the question, model, assumptions, inputs, domain, method, sources,
 reference cases, tolerances, outputs, claims, limitations, and checks. Preserve
-a supported negative result. Trace each changed responsibility from public input
+a physical finding that meets the [fix-before-negative rule](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition). Trace each changed responsibility from public input
 through mapping, numerical owner, result, failure, and output; restore accepted
 ownership and failure meaning in the same issue.
 

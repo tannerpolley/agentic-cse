@@ -23,6 +23,27 @@ exists, say so, identify the exact stopping point and diagnostic, route the
 cause to `cse:diagnose`, and continue with the smallest evidence-driven probe.
 Do not report the analysis complete or create a notebook or empty figure.
 
+## Fix before a negative disposition
+
+A result may not close as refused, failed, unavailable, reference unresolved,
+tolerance gated, or a supported negative result until its cause is diagnosed
+and a root-cause fix has been attempted and shown impossible, or the case is
+shown to lie outside the stated physical domain, with retained evidence. Never
+invent a value to avoid a negative outcome.
+
+- **Physical finding.** A model that, after diagnosis and fix attempts, still
+  does not reproduce data is a legitimate scientific result. It carries the
+  diagnosis and the fixes tried.
+- **Numerical non-result.** A conditioning, precision, solver, or
+  reference-resolution failure is a defect to fix, for example by scaling or
+  equilibrating the system, raising working precision, iterative refinement, or
+  a better-resolved reference. A typed refusal remains only for genuinely
+  singular or undefined mathematics, such as zero-support insertion or a
+  Jacobian that stays singular after scaling, and states why.
+
+Review asks whether the outcome could be fixed, not only whether its label is
+honest.
+
 An input-readiness question may end with a supported input rejection. That
 answers only the readiness question: it establishes no model behavior and
 does not justify a results notebook.

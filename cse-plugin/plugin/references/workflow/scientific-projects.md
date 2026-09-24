@@ -106,8 +106,9 @@ and selected render exist before Review so the reviewer sees the same
 scientific presentation as the investigator. The report reads retained outputs and
 must not rerun the scientific model. It presents the current coherent question,
 necessary method and conditions, warranted results and displays, pragmatic
-conclusions, limitations, next steps, and exact retained paths. A diagnosed
-negative result need not invent a table or figure.
+conclusions, limitations, next steps, and exact retained paths. A negative result
+that meets [failure-triage](failure-triage.md#fix-before-a-negative-disposition)
+need not invent a table or figure.
 
 A central numerical relationship or comparison backed by retained row-level
 values has one claim-led figure that directly answers the scientific question.
