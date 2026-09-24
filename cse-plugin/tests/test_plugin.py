@@ -35,13 +35,14 @@ class PluginBehaviorTests(unittest.TestCase):
         allowed = [
             "The joint regression fixes the MEA parameters.",
             "A parameter\nregression follows.",
+            "The regression\nparameters are fixed.",
             "Weighted least-squares regression converged.",
             "The regression parameters and regression residuals are retained.",
             "The regressed parameters differ from the coupled-regression designs.",
             "Regression-based estimation uses the regression objective.",
             "The MEA–water interaction regressed against Cai data.",
             "See [the fitted table](results/regression_manifest-receipt.json).",
-            "[ref]: docs/scientific/artifact_manifest.csv",
+            "[ref]: docs/manifest.csv",
         ]
         flagged = [
             "The regression test passed.",
@@ -52,6 +53,7 @@ class PluginBehaviorTests(unittest.TestCase):
             "The solver regressed.",
             "The linear regression tests failed.",
             "See [the manifest](results/table.csv).",
+            "[^1]: The regression test failed.",
         ]
         with tempfile.TemporaryDirectory() as directory:
             for index, text in enumerate(allowed + flagged):

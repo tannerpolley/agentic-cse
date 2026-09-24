@@ -200,7 +200,7 @@ def prose_lines(text: str):
         # Preserve positions so diagnostics refer to the original line.
         # Link targets are filenames or URLs; the link text stays checked.
         line = re.sub(r"(\]\()([^)]*)", lambda m: m[1] + " " * len(m[2]), line)
-        line = re.sub(r"^(\s{0,3}\[[^\]]+\]:)(.*)", lambda m: m[1] + " " * len(m[2]), line)
+        line = re.sub(r"^(\s{0,3}\[(?!\^)[^\]]+\]:)(.*)", lambda m: m[1] + " " * len(m[2]), line)
         line = re.sub(r'"[^"\n]*"|“[^”\n]*”', lambda m: " " * len(m[0]), line)
         line = re.sub(r"(?<!\w)'[^'\n]+'(?!\w)|‘[^’\n]*’", lambda m: " " * len(m[0]), line)
         line = re.sub(r"`([^`]+)`", lambda m: " " * len(m[0])
