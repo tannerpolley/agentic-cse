@@ -38,15 +38,16 @@ invent a value to avoid a negative outcome.
   reference-resolution failure is a defect to fix, for example by scaling or
   equilibrating the system, raising working precision, iterative refinement, or
   a better-resolved reference. A typed refusal remains only for genuinely
-  singular or undefined mathematics, such as zero-support insertion or a
+  singular or undefined mathematics, such as a phase or species inserted with
+  zero amount, where the logarithm of composition is undefined, or a
   Jacobian that stays singular after scaling, and states why.
 
 Review asks whether the outcome could be fixed, not only whether its label is
 honest.
 
 An input-readiness question may end with a supported input rejection. That
-answers only the readiness question: it establishes no model behavior and
-does not justify a results notebook.
+answers only the readiness question and is not a numerical disposition: it
+establishes no model behavior and does not justify a results notebook.
 
 ## Bound the claim
 

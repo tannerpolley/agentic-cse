@@ -117,7 +117,8 @@ formulations, parameter or sensitivity sweeps, trajectories, refinement or
 convergence, and uncertainty distributions. The retained CSV owns the exact
 values; a compact table may support the figure but neither a CSV link nor a
 table replaces it. A table-only result is appropriate for a few scalar or
-categorical values, an exact lookup, or a diagnosed negative result when the
+categorical values, an exact lookup, or a negative result meeting
+[failure-triage](failure-triage.md#fix-before-a-negative-disposition) when the
 notebook states why plotting would not clarify the claim. Preserve discrete
 predictions as points unless retained continuous evaluations support a line.
 

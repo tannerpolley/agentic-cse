@@ -59,7 +59,6 @@ Require a useful, method-specific numerical result as defined by
 empty result file, or empty plot is not a result. If no useful result exists,
 state that plainly, preserve the exact stopping point and diagnostic, and
 route the cause to `cse:diagnose`; do not report completion or create a
-notebook. A numerical non-result returns through Diagnose to an attempted fix,
-never to a refused or unavailable label; see
+notebook. A numerical non-result returns through Diagnose to an attempted fix; see
 [failure-triage](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition). Otherwise send the retained results to `cse:summarize` so Review can
 inspect the complete notebook and selected render.
