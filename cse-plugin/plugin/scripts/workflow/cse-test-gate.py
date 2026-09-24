@@ -7,6 +7,7 @@ import hashlib
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 import subprocess
 import sys
 
@@ -26,6 +27,8 @@ AGENT_ROLE_CLAUSE = "{agent_role_clause}"
 PROMPT_REMINDER = "Answer the scientific question: outcome, evidence, physical meaning, limits, and unresolved decisions. For analysis work, distinguish prediction, numerical verification, and physical validation; software status is provenance."
 ROLE_CORRECTION = "Setup must confirm repository role as analysis or tool before routing."
 AGENT_ROLE_CORRECTION = "Setup diagnostic: agent role not confirmed; run Setup."
+CLAUDE_WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
+PATCH_TARGET = re.compile(r"\*\*\* (?:Add File|Update File|Move to): (.+?)(?:\\n|\n|$)")
 
 
 class HookError(RuntimeError):
@@ -257,6 +260,57 @@ def written_prose(repository: Path, project: Path, refs: dict[str, str]) -> list
     return written
 
 
+def session_writes(event: dict[str, object]) -> set[Path] | None:
+    """Files this session's own write-tool calls named, or None without a readable transcript.
+
+    Claude Code records Edit, Write, MultiEdit, and NotebookEdit inputs (subagent transcripts sit
+    beside the session's); Codex records apply_patch headers in tool-call inputs, resolved against
+    the call's workdir or the turn's cwd.
+    """
+    # ponytail: shell writes (redirection, sed -i, scripts) are not attributed and escape the check.
+    transcript = event.get("transcript_path")
+    if not isinstance(transcript, str) or not transcript or not Path(transcript).is_file():
+        return None
+    main = Path(transcript)
+    written: set[Path] = set()
+    cwd = str(event.get("cwd") or "")
+    try:
+        for source in (main, *sorted(main.with_suffix("").glob("subagents/*.jsonl"))):
+            with source.open(encoding="utf-8", errors="replace") as lines:
+                for line in lines:
+                    if not any(marker in line for marker in ('"tool_use"', "*** ", '"turn_context"', '"session_meta"')):
+                        continue
+                    try:
+                        record = json.loads(line)
+                    except json.JSONDecodeError:
+                        continue
+                    if not isinstance(record, dict):
+                        continue
+                    message, payload = record.get("message"), record.get("payload")
+                    if record.get("type") == "assistant" and isinstance(message, dict) and isinstance(message.get("content"), list):
+                        for item in message["content"]:
+                            if isinstance(item, dict) and item.get("type") == "tool_use" and item.get("name") in CLAUDE_WRITE_TOOLS:
+                                tool_input = item.get("input") if isinstance(item.get("input"), dict) else {}
+                                for key in ("file_path", "notebook_path"):
+                                    if isinstance(tool_input.get(key), str):
+                                        written.add(Path(record.get("cwd") or cwd, tool_input[key]).resolve())
+                    elif not isinstance(payload, dict):
+                        continue
+                    elif record.get("type") in {"session_meta", "turn_context"}:
+                        cwd = str(payload.get("cwd") or cwd)
+                    elif payload.get("type") in {"custom_tool_call", "function_call"}:
+                        call = str(payload.get("input") or payload.get("arguments") or "")
+                        try:
+                            workdir = json.loads(call).get("workdir") or cwd
+                        except (ValueError, AttributeError):
+                            workdir = cwd
+                        for target in PATCH_TARGET.findall(call):
+                            written.add(Path(workdir, target.strip().rstrip("\\\"'")).resolve())
+    except OSError:
+        return None
+    return written
+
+
 def save(path: Path, value: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     temporary = path.with_suffix(".tmp")
@@ -329,10 +383,15 @@ def main() -> int:
                 warnings.append(ROLE_CORRECTION)
             try:
                 failures = []
+                written = session_writes(event)
+                if written is None:
+                    warnings.append("CSE prose attribution fell back to Git state: no readable session transcript, so prose other sessions changed since this one started is also checked.")
                 prefix = project.relative_to(repository)
                 checkouts = worktrees(repository)
                 groups: dict[Path, list[Path]] = {}
                 for path in prose_changes(event, repository, project):
+                    if written is not None and path.resolve() not in written:
+                        continue
                     # A worktree may sit inside another checkout; the deepest one owns the file.
                     owner = max((w for w in checkouts if path.is_relative_to(w)), key=lambda w: len(w.parts))
                     groups.setdefault(owner, []).append(path)
