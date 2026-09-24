@@ -95,6 +95,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             lane = Path(directory) / "lane"
             subprocess.run(["git", "worktree", "add", "-q", "-b", "lane", str(lane)], cwd=project, check=True)
             (lane / "notes.md").write_text("The schema changed.\n", encoding="utf-8")
+            (lane / "shell.md").write_text("The schema moved.\n", encoding="utf-8")
             live = self.run_hook(project, "Stop", stop_hook_active=True, last_assistant_message="Done.")
             self.assertEqual("block", live.get("decision"))
             self.assertIn("notes.md", live["reason"])
@@ -126,6 +127,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             lane = Path(directory) / "lane"
             subprocess.run(["git", "worktree", "add", "-q", "-b", "lane", str(lane)], cwd=project, check=True)
             (lane / "notes.md").write_text("The schema changed.\n", encoding="utf-8")
+            (lane / "shell.md").write_text("The schema moved.\n", encoding="utf-8")
             subprocess.run([*git, "add", "notes.md"], cwd=lane, check=True)
             subprocess.run([*git, "commit", "-qm", "lane"], cwd=lane, check=True)
             committed = self.run_hook(project, "Stop", stop_hook_active=True, last_assistant_message="Done.")
@@ -144,6 +146,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             for checkout in (lane, other):
                 subprocess.run(["git", "worktree", "add", "-q", "-b", checkout.name, str(checkout)], cwd=project, check=True)
             (lane / "notes.md").write_text("The schema changed.\n", encoding="utf-8")
+            (lane / "shell.md").write_text("The schema moved.\n", encoding="utf-8")
             # Another session commits prose in a sibling worktree after this session started.
             (other / "other.md").write_text("The schema is another session's.\n", encoding="utf-8")
             subprocess.run([*git, "add", "other.md"], cwd=other, check=True)
@@ -155,6 +158,8 @@ class ScriptBehaviorTests(unittest.TestCase):
                     {"type": "tool_use", "name": "Write", "input": {"file_path": str(lane / "notes.md"), "content": "The schema changed.\n"}}]}},
                 {"type": "assistant", "cwd": str(project), "message": {"content": [
                     {"type": "tool_use", "name": "Bash", "input": {"command": f"python3 check_prose.py {other / 'other.md'}"}}]}},
+                {"type": "assistant", "cwd": str(lane), "message": {"content": [
+                    {"type": "tool_use", "name": "Bash", "input": {"command": "cat > shell.md <<'EOF'\nThe schema moved.\nEOF"}}]}},
             )) + "\n", encoding="utf-8")
             codex = root / "rollout.jsonl"
             codex.write_text("\n".join(json.dumps(record) for record in (
@@ -163,6 +168,9 @@ class ScriptBehaviorTests(unittest.TestCase):
                     'text(await tools.apply_patch("*** Begin Patch\\n*** Add File: notes.md\\n+The schema changed.\\n*** End Patch"))'}},
                 {"type": "response_item", "payload": {"type": "message", "role": "user", "content": [
                     {"type": "input_text", "text": f"*** Begin Patch\n*** Update File: {other / 'other.md'}\n"}]}},
+                {"type": "turn_context", "payload": {"cwd": str(project)}},
+                {"type": "response_item", "payload": {"type": "custom_tool_call", "name": "exec", "input":
+                    f'text(await tools.exec_command({{cmd: "cat > shell.md <<\'EOF\'\\nThe schema moved.\\nEOF", workdir: "{lane}"}}))'}},
             )) + "\n", encoding="utf-8")
 
             for host, transcript in (("claude", claude), ("codex", codex)):
@@ -171,6 +179,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                                            transcript_path=str(transcript))
                     self.assertEqual("block", result.get("decision"))
                     self.assertIn("notes.md", result["reason"])
+                    self.assertIn("shell.md", result["reason"])
                     self.assertNotIn("other.md", json.dumps(result))
                     self.assertNotIn("fell back", json.dumps(result))
 

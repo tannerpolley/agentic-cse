@@ -29,6 +29,10 @@ ROLE_CORRECTION = "Setup must confirm repository role as analysis or tool before
 AGENT_ROLE_CORRECTION = "Setup diagnostic: agent role not confirmed; run Setup."
 CLAUDE_WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 PATCH_TARGET = re.compile(r"\*\*\* (?:Add File|Update File|Move to): (.+?)(?:\\n|\n|$)")
+PROSE_PATH = r"([^\s'\"\\<>|;&()]+\.(?:md|qmd|tex))\b"
+SHELL_TARGET = re.compile(r"(?:>>?|\btee(?:\s+-a)?)\s*['\"]?" + PROSE_PATH)
+IN_PLACE = re.compile(r"\b(?:sed|perl)\s+(?:-\S+\s+)*-\w*i")
+WORKDIR = re.compile(r"['\"]?workdir['\"]?\s*:\s*['\"]([^'\"]+)")
 
 
 class HookError(RuntimeError):
@@ -260,14 +264,23 @@ def written_prose(repository: Path, project: Path, refs: dict[str, str]) -> list
     return written
 
 
+def shell_writes(command: str, workdir: str) -> set[Path]:
+    """Prose paths a shell command writes: redirection or tee targets, or any path an in-place sed or perl edits."""
+    targets = set(SHELL_TARGET.findall(command))
+    if IN_PLACE.search(command):
+        targets |= set(re.findall(PROSE_PATH, command))
+    return {Path(workdir, target).resolve() for target in targets}
+
+
 def session_writes(event: dict[str, object]) -> set[Path] | None:
     """Files this session's own write-tool calls named, or None without a readable transcript.
 
     Claude Code records Edit, Write, MultiEdit, and NotebookEdit inputs (subagent transcripts sit
-    beside the session's); Codex records apply_patch headers in tool-call inputs, resolved against
-    the call's workdir or the turn's cwd.
+    beside the session's); Codex records apply_patch headers in tool-call inputs. Shell commands
+    in either host contribute redirection and tee targets and every prose path an in-place sed or
+    perl edits. Relative paths resolve against the call's workdir or the turn's cwd.
     """
-    # ponytail: shell writes (redirection, sed -i, scripts) are not attributed and escape the check.
+    # ponytail: prose written by scripts, cp, or mv is not attributed and escapes the check.
     transcript = event.get("transcript_path")
     if not isinstance(transcript, str) or not transcript or not Path(transcript).is_file():
         return None
@@ -278,7 +291,7 @@ def session_writes(event: dict[str, object]) -> set[Path] | None:
         for source in (main, *sorted(main.with_suffix("").glob("subagents/*.jsonl"))):
             with source.open(encoding="utf-8", errors="replace") as lines:
                 for line in lines:
-                    if not any(marker in line for marker in ('"tool_use"', "*** ", '"turn_context"', '"session_meta"')):
+                    if not any(marker in line for marker in ('"tool_use"', '_call"', '"turn_context"', '"session_meta"')):
                         continue
                     try:
                         record = json.loads(line)
@@ -289,23 +302,26 @@ def session_writes(event: dict[str, object]) -> set[Path] | None:
                     message, payload = record.get("message"), record.get("payload")
                     if record.get("type") == "assistant" and isinstance(message, dict) and isinstance(message.get("content"), list):
                         for item in message["content"]:
-                            if isinstance(item, dict) and item.get("type") == "tool_use" and item.get("name") in CLAUDE_WRITE_TOOLS:
-                                tool_input = item.get("input") if isinstance(item.get("input"), dict) else {}
+                            if not isinstance(item, dict) or item.get("type") != "tool_use":
+                                continue
+                            tool_input = item.get("input") if isinstance(item.get("input"), dict) else {}
+                            base = record.get("cwd") or cwd
+                            if item.get("name") in CLAUDE_WRITE_TOOLS:
                                 for key in ("file_path", "notebook_path"):
                                     if isinstance(tool_input.get(key), str):
-                                        written.add(Path(record.get("cwd") or cwd, tool_input[key]).resolve())
+                                        written.add(Path(base, tool_input[key]).resolve())
+                            elif item.get("name") == "Bash" and isinstance(tool_input.get("command"), str):
+                                written |= shell_writes(tool_input["command"], base)
                     elif not isinstance(payload, dict):
                         continue
                     elif record.get("type") in {"session_meta", "turn_context"}:
                         cwd = str(payload.get("cwd") or cwd)
                     elif payload.get("type") in {"custom_tool_call", "function_call"}:
                         call = str(payload.get("input") or payload.get("arguments") or "")
-                        try:
-                            workdir = json.loads(call).get("workdir") or cwd
-                        except (ValueError, AttributeError):
-                            workdir = cwd
+                        workdir = match[1] if (match := WORKDIR.search(call)) else cwd
                         for target in PATCH_TARGET.findall(call):
                             written.add(Path(workdir, target.strip().rstrip("\\\"'")).resolve())
+                        written |= shell_writes(call, workdir)
     except OSError:
         return None
     return written
