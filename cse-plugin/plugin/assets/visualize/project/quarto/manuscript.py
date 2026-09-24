@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Manage one native Quarto Manuscript with explicit publication membership."""
+"""Manage one native Quarto website of analysis pages with explicit publication membership."""
 from __future__ import annotations
 
 import argparse
@@ -19,22 +19,30 @@ import urllib.request
 
 ASSET_ROOT = Path(__file__).resolve().parent
 CONFIG_FILES = ("_quarto.yml", "_cse-manuscript.json", "_quarto-presentation.yml")
+# The shared stylesheet is installed once and then owned by the project, like the configuration.
+SITE_CSS = "site.css"
 REQUIRED_FILES = (*CONFIG_FILES, "index.qmd", ".cse-quarto-source.json",
-                  ".gitignore", "render.sh", "manuscript.py")
-REQUIRED_IGNORES = ("/.quarto/", "/_site/", "/_freeze/", "/notebook.tex")
-MANUSCRIPT_CONFIG = {
-    "project": {"type": "manuscript", "output-dir": "_site"},
-    "metadata-files": ["_cse-manuscript.json"], "manuscript": {"article": "index.qmd"},
-    "format": {"html": {"embed-resources": True}}, "execute": {"enabled": False},
-    "keep-md": True,
+                  ".gitignore", "render.sh", "manuscript.py", SITE_CSS)
+REQUIRED_IGNORES = ("/.quarto/", "/_site/", "/site_libs/", "/_freeze/", "/notebook.tex")
+SITE_CONFIG = {
+    "project": {"type": "website", "output-dir": "_site"},
+    "metadata-files": ["_cse-manuscript.json"], "website": {"title": "Analyses", "search": True, "reader-mode": True, "page-navigation": False},
+    "format": {"html": {"embed-resources": True, "page-layout": "full", "theme": "cosmo", "css": SITE_CSS,
+                        "fontsize": "16px", "toc": False, "notebook-links": False,
+                        "html-math-method": "mathjax", "self-contained-math": True}},
+    "execute": {"enabled": False},
 }
 PRESENTATION_PRE_RENDER = "python3 manuscript.py prepare"
 WATCH_INTERVAL_SECONDS = 0.25
 WATCH_SETTLE_SECONDS = 0.25
-IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "_freeze", "__pycache__", ".ipynb_checkpoints"}
+IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "site_libs", "_freeze", "__pycache__", ".ipynb_checkpoints"}
 IGNORED_WATCH_PARTS |= {".snakemake", ".cache", "tmp", "temp", "support"}
 IGNORED_WATCH_SUFFIXES = ("_files", "_support")
+# ponytail: Quarto's internal preview render-request path (the one IDE integrations use);
+# preview ignores mtime-only touches and include changes. Recheck on a Quarto upgrade.
+QUARTO_RENDER_REQUEST = "90B3C9E8-0DBC-4BC0-B164-AA2D5C031B28"
 INCLUDE_RE = re.compile(r"\{\{<\s*include\s+([^\s>]+)")
+INCLUDE_SHORTCODE_RE = re.compile(r"\{\{<\s*include\s+([^\s>]+)\s*>\}\}")
 SERVICE_MARKER = "# Managed by CSE manuscript.py service; do not edit.\n"
 SERVICE_PORT_RE = re.compile(r"--port (\d+)$", re.MULTILINE)
 SERVICE_PORT_BASE, SERVICE_PORT_SPAN = 8800, 1000
@@ -95,20 +103,124 @@ def read_json(data: bytes, path: Path) -> dict:
     return value
 
 
+
+
+def is_group(entry: dict) -> bool:
+    """A group section holds page sections; a page section holds links."""
+    return "section" in entry["contents"][0]
+
+
+def flatten(entries: list[dict]) -> list[dict]:
+    """Page sections in sidebar order, descending through (possibly nested) groups."""
+    return [page for entry in entries for page in (flatten(entry["contents"]) if is_group(entry) else [entry])]
+
+
+def page_sections(state: dict) -> list[dict]:
+    """Home and notebook sections in sidebar order, with groups flattened."""
+    return flatten(state["website"]["sidebar"]["contents"])
+
+
+def notebooks(state: dict) -> list[dict]:
+    """Included notebooks in sidebar order, each ``{"text": title, "href": notebook}``."""
+    return [{"text": entry["section"], "href": entry["contents"][0]["href"].split("#")[0]}
+            for entry in page_sections(state)[1:]]
+
+
+def plain(inlines: list) -> str:
+    """Text of Pandoc inline elements, keeping inline math as TeX."""
+    text = []
+    for item in inlines:
+        kind, content = item["t"], item.get("c")
+        if kind == "Str":
+            text.append(content)
+        elif kind in {"Space", "SoftBreak", "LineBreak"}:
+            text.append(" ")
+        elif kind == "Math":
+            text.append(f"${content[1]}$")
+        elif kind == "Code":
+            text.append(content[1])
+        elif kind in {"Emph", "Strong", "Strikeout", "Superscript", "Subscript", "SmallCaps", "Underline"}:
+            text.append(plain(content))
+        elif kind in {"Link", "Span", "Quoted", "Cite"}:
+            text.append(plain(content[1]))
+    return "".join(text).strip()
+
+
+def sections(root: Path, page: str, text: bytes | None = None) -> list[dict]:
+    """Sidebar children of a page: the page itself (so Quarto opens its section there), then each
+    top-level heading outside ::: blocks at the page's highest heading level."""
+    # Quarto expands includes before Pandoc assigns identifiers, so expand them the same way.
+    def expand(source: str, directory: Path, depth: int = 0) -> str:
+        require(depth < 10, root / page, "include nesting is too deep")
+        return INCLUDE_SHORTCODE_RE.sub(
+            lambda m: expand(read_file(directory / m.group(1)).decode(), (directory / m.group(1)).parent, depth + 1),
+            source)
+
+    source = expand((read_file(root / page) if text is None else text).decode(), (root / page).parent)
+    # Pandoc assigns the identifiers, so the anchors match the rendered page exactly.
+    result = subprocess.run(["quarto", "pandoc", "--from", "markdown", "--to", "json"],
+                            input=source.encode(), capture_output=True)
+    require(result.returncode == 0, root / page, f"heading inspection failed: {result.stderr.decode().strip()}")
+    headers = [block["c"] for block in json.loads(result.stdout)["blocks"] if block["t"] == "Header"]
+    top = min((level for level, *_ in headers), default=None)
+    for level, _, inlines in headers:
+        # Other shortcodes are expanded only at render time, so their heading anchors are unknown here.
+        require(level != top or "{{<" not in plain(inlines), root / page,
+                f"top-level heading {plain(inlines)!r} contains a shortcode; move it into the section body")
+    items = [{"text": plain(inlines), "href": f"{page}#{attributes[0]}"}
+             for level, attributes, inlines in headers if level == top and attributes[0] and plain(inlines)]
+    return [{"text": "Overview", "href": page}, *items]
+
+
+def home_section(root: Path, text: bytes | None = None) -> dict:
+    # A fixed, content-neutral name: the home page's own title stays on the page.
+    return {"section": "Home", "contents": sections(root, "index.qmd", text)}
+
+
+def refresh_sections(root: Path, state: dict, files: dict[str, bytes] | None = None) -> None:
+    """Recompute every page's sidebar links from its headings, keeping titles and groups."""
+    for entry in page_sections(state):
+        page = entry["contents"][0]["href"].split("#")[0]
+        entry["contents"] = sections(root, page, (files or {}).get(page))
+
+
 def metadata(data: bytes, path: Path) -> dict:
     state = read_json(data, path)
-    require(set(state) == {"project", "manuscript"}, path, "unsupported membership fields")
-    project, manuscript = state["project"], state["manuscript"]
+    require(set(state) == {"project", "website"}, path, "unsupported membership fields")
+    project, website = state["project"], state["website"]
     require(isinstance(project, dict) and set(project) == {"render"}
-            and isinstance(manuscript, dict) and set(manuscript) == {"notebooks"}, path, "invalid membership owners")
-    render, notebooks = project["render"], manuscript["notebooks"]
+            and isinstance(website, dict) and set(website) == {"sidebar"}, path, "invalid membership owners")
+    render, sidebar = project["render"], website["sidebar"]
     require(isinstance(render, list) and all(isinstance(p, str) for p in render)
             and len(render) == len(set(render)), path, "render membership must be unique")
-    require(isinstance(notebooks, list), path, "notebooks must be a list")
-    for entry in notebooks:
-        require(isinstance(entry, dict) and set(entry) == {"notebook", "title"}
-                and all(isinstance(v, str) and v.strip() for v in entry.values()), path, "invalid notebook path/title")
-    require(render == ["index.qmd", *[n["notebook"] for n in notebooks]], path, "ordered memberships disagree")
+    require(isinstance(sidebar, dict) and set(sidebar) == {"style", "collapse-level", "contents"}
+            and sidebar["style"] == "docked" and sidebar["collapse-level"] == 1
+            and isinstance(sidebar["contents"], list) and sidebar["contents"],
+            path, "sidebar must be docked and start with the home page")
+    def section(entry) -> bool:
+        return (isinstance(entry, dict) and set(entry) == {"section", "contents"}
+                and isinstance(entry["section"], str) and entry["section"].strip()
+                and isinstance(entry["contents"], list) and bool(entry["contents"]))
+
+    def check(entries: list) -> None:
+        for entry in entries:
+            require(section(entry), path, "invalid sidebar section")
+            if is_group(entry):
+                require(all(section(c) for c in entry["contents"]), path, "a group holds only sections")
+                check(entry["contents"])
+
+    check(sidebar["contents"])
+    require(not is_group(sidebar["contents"][0]), path, "sidebar must start with the home page")
+    for entry in page_sections(state):
+        require(isinstance(entry, dict) and set(entry) == {"section", "contents"}
+                and isinstance(entry["section"], str) and entry["section"].strip()
+                and isinstance(entry["contents"], list) and entry["contents"]
+                and all(isinstance(c, dict) and set(c) == {"text", "href"}
+                        and all(isinstance(v, str) and v.strip() for v in c.values()) for c in entry["contents"])
+                and len({c["href"].split("#")[0] for c in entry["contents"]}) == 1,
+                path, "invalid page section")
+    require(sidebar["contents"][0]["contents"][0]["href"] == "index.qmd", path, "sidebar must start with the home page")
+    require(render == ["index.qmd", *[n["href"] for n in notebooks(state)]], path, "ordered memberships disagree")
     return state
 
 
@@ -136,6 +248,14 @@ def check_owners(value, path: Path, *, allow_presentation_hook: bool = False) ->
 
 
 def check_boundary(root: Path) -> None:
+    config = root / "_quarto.yml"
+    if config.is_file():
+        project = read_json(read_file(config), config).get("project")
+        require(not (isinstance(project, dict) and project.get("type") == "manuscript"), config,
+                "earlier CSE Quarto Manuscript root; rebuild it as a website by removing _quarto.yml, "
+                "_quarto-presentation.yml, _cse-manuscript.json, .cse-quarto-source.json, manuscript.py, and "
+                "render.sh, rerunning init "
+                "with --article-source index.qmd, and including each notebook again")
     output = root / "_site"
     reject_symlink(output)
     require(not output.exists() or output.is_dir(), output, "output is not a directory")
@@ -201,12 +321,11 @@ def inspect_config(root: Path, files: dict[str, bytes], state: dict) -> None:
                 require(owners == expected_owners, root, f"unexpected configuration paths: {owners}")
                 require(sorted(inputs) == sorted(paths), root, f"unexpected native input paths: {inputs}")
                 config = report["config"]
-                project, manuscript, execution = config["project"], config["manuscript"], config["execute"]
-                require(project["type"] == "manuscript" and project["output-dir"] == "_site"
-                        and manuscript["article"] == "index.qmd" and sorted(project["render"]) == sorted(paths)
-                        and sorted(manuscript["notebooks"], key=lambda n: n["notebook"])
-                        == sorted(state["manuscript"]["notebooks"], key=lambda n: n["notebook"]), root, "native publication contract differs")
-                require(execution["enabled"] is presentation and config["format"]["html"]["embed-resources"] is True
+                project, execution = config["project"], config["execute"]
+                require(project["type"] == "website" and project["output-dir"] == "_site"
+                        and project["render"] == paths and config["website"]["sidebar"] == state["website"]["sidebar"],
+                        root, "native publication contract differs")
+                require(execution["enabled"] is presentation and config["format"]["html"]["embed-resources"] is not presentation
                         and (not presentation or (execution.get("cache") is True and execution.get("daemon") is False)), root, "native execution contract differs")
                 for name, info in report["fileInformation"].items():
                     require(name in paths, root / name, "unsupported source include")
@@ -242,11 +361,12 @@ def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
                 and execution.get("error", False) is False
                 and (not profile or (execution.get("daemon") is False and execution.get("cache") is True)), root / name, "unsupported execution settings")
         if not profile:
-            require(config.pop("keep-md", None) is True, root / name,
-                    "keep-md must preserve native embedded notebook outputs")
             require(config.pop("metadata-files", None) == ["_cse-manuscript.json"], root / name, "expected sole metadata include")
-            project, manuscript = config.pop("project", {}), config.pop("manuscript", {})
-            require(project == MANUSCRIPT_CONFIG["project"] and manuscript == MANUSCRIPT_CONFIG["manuscript"], root / name, "competing publication owner")
+            project, website = config.pop("project", {}), config.pop("website", {})
+            require(project == SITE_CONFIG["project"], root / name, "competing publication owner")
+            require(isinstance(website, dict) and "sidebar" not in website, root / name,
+                    "the sidebar is owned by _cse-manuscript.json")
+            check_owners(website, root / name)
             formats = config.get("format", {})
             require(isinstance(formats, dict) and next(iter(formats), None) == "html"
                     and isinstance(formats["html"], dict) and formats["html"].get("embed-resources") is True,
@@ -259,6 +379,12 @@ def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
         require(relative == name and name.endswith(".qmd") and not any(c in name for c in "*?[]!"), root / name, "expected literal relative QMD path")
         files[name] = pending[name] if name in pending else read_file(root / name)
         require(files[name].strip(), root / name, "empty publication source")
+    for entry in page_sections(state):
+        page = entry["contents"][0]["href"]
+        require(re.fullmatch(r"[A-Za-z0-9._/-]+", page), root / page,
+                "page path may contain only letters, digits, '.', '_', '-', and '/'")
+        require(entry["contents"] == sections(root, page, files[page]), root / page,
+                "sidebar sections no longer match the page headings; run `python3 manuscript.py sync .`")
     inspect_config(root, files, state)
     return state
 
@@ -281,9 +407,11 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
     require(not (root / ".cse-quarto-source.json").exists() or (root / "_cse-manuscript.json").is_file(),
             root / "_cse-manuscript.json", "cannot reconstruct missing managed membership")
     require(article.suffix == ".qmd", article, "article must be a populated QMD")
-    files = {name: read_file(ASSET_ROOT / name) for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py")}
-    files.update({"_quarto.yml": json_bytes(MANUSCRIPT_CONFIG), "index.qmd": read_file(article.absolute()),
-                  "_cse-manuscript.json": json_bytes({"project": {"render": ["index.qmd"]}, "manuscript": {"notebooks": []}}),
+    files = {name: read_file(ASSET_ROOT / name) for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py", SITE_CSS)}
+    files.update({"_quarto.yml": json_bytes(SITE_CONFIG), "index.qmd": read_file(article.absolute()),
+                  "_cse-manuscript.json": json_bytes({"project": {"render": ["index.qmd"]},
+                                                           "website": {"sidebar": {"style": "docked", "collapse-level": 1,
+                                                                                   "contents": [home_section(root, read_file(article.absolute()))]}}}),
                   ".cse-quarto-source.json": json_bytes({"sourceCommit": source_commit, "runtimeTreeSha256": runtime_tree_sha256}),
                   ".gitignore": ("\n".join(REQUIRED_IGNORES) + "\n").encode()})
     for name, data in files.items():
@@ -298,7 +426,7 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
         else:
             if name == ".cse-quarto-source.json":
                 require(read_json(existing, target) == read_json(data, target), target, "conflicting source identity")
-            elif name not in CONFIG_FILES:
+            elif name not in (*CONFIG_FILES, SITE_CSS):
                 require(existing == data, target, "refusing to overwrite existing file")
             files[name] = existing
     validate_root(root, files)
@@ -330,28 +458,73 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
 def notebook_argument(root: Path, value: Path) -> str:
     relative = inside(root, value)
     require(relative.endswith(".qmd") and relative != "index.qmd", value, "expected analysis QMD notebook")
+    # Quarto's preview render request addresses the page by its raw path, so keep it URL-safe.
+    require(re.fullmatch(r"[A-Za-z0-9._/-]+", relative), value,
+            "notebook path may contain only letters, digits, '.', '_', '-', and '/'")
     require(read_file(root / relative).strip(), value, "empty notebook")
     return relative
 
 
-def include(root: Path, notebook: Path, title: str) -> Path:
+def include(root: Path, notebook: Path, title: str, group: str | None = None) -> Path:
     root = root_path(root)
-    require(title.strip(), notebook, "empty notebook title")
+    require(title.strip() and (group is None or group.strip()), notebook, "empty notebook title or group")
     relative = notebook_argument(root, notebook)
-    state = validate_root(root)
-    entries = state["manuscript"]["notebooks"]
-    found = next((n for n in entries if n["notebook"] == relative), None)
-    if found and found["title"] == title:
-        return root / relative
-    if found:
-        found["title"] = title
+    # Read the membership directly: include is what repairs stale sidebar sections.
+    state = metadata(read_file(root / "_cse-manuscript.json"), root / "_cse-manuscript.json")
+    entry = {"section": title, "contents": [{"text": "Overview", "href": relative}]}
+    contents = state["website"]["sidebar"]["contents"]
+    def locate(entries: list) -> tuple[list, int] | None:
+        for i, e in enumerate(entries):
+            hit = locate(e["contents"]) if is_group(e) else (entries, i) if e["contents"][0]["href"] == relative else None
+            if hit:
+                return hit
+        return None
+
+    def prune(entries: list) -> list:
+        kept = []
+        for e in entries:
+            if not e["contents"] or is_group(e):
+                e["contents"] = prune(e["contents"])
+            if e["contents"]:
+                kept.append(e)
+        return kept
+
+    current = locate(contents)
+    target = contents
+    for name in [part.strip() for part in group.split("/")] if group is not None else []:
+        require(name, notebook, "empty group name")
+        found = next((e for e in target[1 if target is contents else 0:] if e["section"] == name and e["contents"]
+                      and is_group(e)), None)
+        if found is None:
+            found = {"section": name, "contents": []}
+            target.append(found)
+        target = found["contents"]
+    if current and current[0] is target:
+        target[current[1]] = entry
     else:
-        entries.append({"notebook": relative, "title": title})
-        state["project"]["render"].append(relative)
+        if current:
+            del current[0][current[1]]
+        target.append(entry)
+    contents[1:] = prune(contents[1:])
+    refresh_sections(root, state)
+    state["project"]["render"] = ["index.qmd", *[n["href"] for n in notebooks(state)]]
     data = json_bytes(state)
     validate_root(root, {"_cse-manuscript.json": data})
-    atomic_write(root / "_cse-manuscript.json", data)
+    if data != read_file(root / "_cse-manuscript.json"):
+        atomic_write(root / "_cse-manuscript.json", data)
     return root / relative
+
+
+def sync(root: Path) -> dict:
+    """Bring every sidebar section up to date with its page headings, then validate."""
+    root = root_path(root)
+    state = metadata(read_file(root / "_cse-manuscript.json"), root / "_cse-manuscript.json")
+    refresh_sections(root, state)
+    data = json_bytes(state)
+    validate_root(root, {"_cse-manuscript.json": data})
+    if data != read_file(root / "_cse-manuscript.json"):
+        atomic_write(root / "_cse-manuscript.json", data)
+    return state
 
 
 def presentation_workflows(root: Path) -> list[Path]:
@@ -446,7 +619,8 @@ def is_watchable(path: Path, root: Path) -> bool:
     except ValueError:
         return False
     return not any(ignored_watch_part(part) for part in relative.parts) and not (
-        path.name.startswith(".") or path.name.endswith(".html.md")
+        # Quarto writes these render byproducts beside sources; watching them re-triggers renders.
+        path.name.startswith(".") or path.name.endswith(".html")
         or path.name in {"manuscript.py", "render.sh"}
     )
 
@@ -474,31 +648,33 @@ def changed_paths(before: dict[Path, tuple[int, int]], after: dict[Path, tuple[i
 
 def presentation_targets(root: Path, state: dict, changed: set[Path]) -> set[Path]:
     article = root / "index.qmd"
-    notebooks = [root / entry["notebook"] for entry in state["manuscript"]["notebooks"]]
+    pages = [root / entry["href"] for entry in notebooks(state)]
     targets = set()
     for path in changed:
-        if not is_watchable(path, root) or path == article:
+        # Native preview already re-renders an edited page source.
+        if not is_watchable(path, root) or path == article or path in pages:
             continue
-        if path in notebooks:
-            targets.add(article)
-            continue
-        matched = [notebook for notebook in notebooks if path.is_relative_to(notebook.parent)]
+        matched = [page for page in pages if path.is_relative_to(page.parent)]
         if matched:
             targets.update(matched)
             targets.add(article)
         elif len(path.relative_to(root).parts) == 1:
-            targets.update(notebooks)
+            targets.update(pages)
             targets.add(article)
     return targets
 
 
-def touch_targets(targets: set[Path]) -> None:
-    for path in targets:
+def request_renders(root: Path, targets: set[Path], host: str, port: int) -> None:
+    host = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host
+    for path in sorted(targets):
         if path.is_file():
-            os.utime(path, None)
+            url = f"http://{host}:{port}/{QUARTO_RENDER_REQUEST}/{path.relative_to(root).as_posix()}"
+            with urllib.request.urlopen(url, timeout=10) as response:
+                if response.read() != b"rendered":
+                    raise OSError(f"preview refused to render {path}")
 
 
-def prepare_and_touch(root: Path, state: dict, changed: set[Path]) -> int:
+def prepare_and_render(root: Path, state: dict, changed: set[Path], host: str, port: int) -> int:
     try:
         status = prepare(root)
     except (OSError, subprocess.SubprocessError) as exc:
@@ -507,8 +683,27 @@ def prepare_and_touch(root: Path, state: dict, changed: set[Path]) -> int:
     if status:
         print(f"presentation refresh failed in {root} (exit {status}); retained pages remain stale", file=sys.stderr)
         return status
-    touch_targets(presentation_targets(root, state, changed))
+    try:
+        request_renders(root, presentation_targets(root, state, changed), host, port)
+    except OSError as exc:
+        print(f"preview render request failed in {root}: {exc}; retained pages remain stale", file=sys.stderr)
+        return 1
     return 0
+
+
+def workflows_running(root: Path) -> bool:
+    # Snakemake removes a rule's outputs before running it, so never present mid-calculation.
+    return any(any((workflow / ".snakemake" / "locks").glob("*"))
+               for workflow in presentation_workflows(root))
+
+
+def wait_for_server(process: subprocess.Popen, host: str, port: int) -> None:
+    host = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host
+    while process.poll() is None:
+        with socket.socket() as probe:
+            if probe.connect_ex((host, port)) == 0:
+                return
+        time.sleep(WATCH_INTERVAL_SECONDS)
 
 
 def stop_process(process: subprocess.Popen) -> None:
@@ -527,7 +722,7 @@ def stop_process(process: subprocess.Popen) -> None:
 
 def refresh(root: Path, notebook: Path) -> int:
     root = root_path(root)
-    state = validate_root(root)
+    state = sync(root)
     relative = notebook_argument(root, notebook)
     require(relative in state["project"]["render"], notebook, "not an included notebook")
     status = prepare(root)
@@ -544,8 +739,12 @@ def refresh(root: Path, notebook: Path) -> int:
 
 def preview(root: Path, host: str, port: int) -> int:
     root = root_path(root)
-    state = validate_root(root)
+    state = sync(root)
     require(1 <= port <= 65535, root, "port must be between 1 and 65535")
+    # Quarto silently picks another port when this one is busy, so render requests would miss it.
+    with socket.socket() as probe:
+        require(probe.connect_ex((host if host not in {"0.0.0.0", "::", ""} else "127.0.0.1", port)) != 0,
+                root, f"port {port} is already in use; pass --port with a free port")
     command = ["quarto", "preview", "--profile", "presentation", "--no-browser",
                "--host", host, "--port", str(port)]
     process = subprocess.Popen(command, cwd=root, start_new_session=True)
@@ -556,6 +755,7 @@ def preview(root: Path, host: str, port: int) -> int:
     try:
         if not presentation_workflows(root):
             return process.wait()
+        wait_for_server(process, host, port)
         snapshot = watch_snapshot(root)
         while process.poll() is None:
             time.sleep(WATCH_INTERVAL_SECONDS)
@@ -564,15 +764,26 @@ def preview(root: Path, host: str, port: int) -> int:
             snapshot = current
             if not pending:
                 continue
+            waiting = False
             while process.poll() is None:
                 time.sleep(WATCH_SETTLE_SECONDS)
                 current = watch_snapshot(root)
                 new = changed_paths(snapshot, current)
                 snapshot = current
-                if not new:
+                running = workflows_running(root)
+                if running and not new and not waiting:
+                    waiting = True
+                    print(f"preview waiting for a Snakemake lock under {root}; if no run is active, "
+                          "run `snakemake --unlock` in that analysis", file=sys.stderr)
+                if not new and not running:
                     break
                 pending.update(new)
-            prepare_and_touch(root, state, pending)
+            if any(path.suffix == ".qmd" for path in pending):
+                try:
+                    state = sync(root)
+                except ManuscriptError as exc:
+                    print(f"sidebar sync failed: {exc}", file=sys.stderr)
+            prepare_and_render(root, state, pending, host, port)
             snapshot = watch_snapshot(root)
         return process.wait()
     except KeyboardInterrupt:
@@ -622,7 +833,7 @@ def answering(url: str) -> bool:
 
 def service(root: Path, port: int | None, dry_run: bool, python: Path = Path(sys.executable)) -> int:
     root = root_path(root)
-    validate_root(root)
+    sync(root)
     quarto = shutil.which("quarto")
     require(quarto, root, "quarto renderer unavailable on PATH")
     repository = git_path(root, "--show-toplevel")
@@ -681,7 +892,7 @@ def service(root: Path, port: int | None, dry_run: bool, python: Path = Path(sys
 def main() -> int:
     parser = argparse.ArgumentParser(prog="manuscript.py")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "include", "validate", "refresh", "preview", "prepare", "service"):
+    for name in ("init", "include", "validate", "sync", "refresh", "preview", "prepare", "service"):
         command = commands.add_parser(name)
         if name == "prepare":
             command.add_argument("root", type=Path, nargs="?", default=Path("."))
@@ -695,6 +906,7 @@ def main() -> int:
             command.add_argument("notebook", type=Path)
         if name == "include":
             command.add_argument("--title", required=True)
+            command.add_argument("--group", help="optional sidebar group; nest with '/', e.g. 'Bundle/Active formulation'")
         if name == "preview":
             command.add_argument("--host", default="127.0.0.1")
             command.add_argument("--port", type=int, default=8000)
@@ -707,7 +919,10 @@ def main() -> int:
         if args.command == "init":
             print(init(args.root, args.article_source, args.source_commit, args.runtime_tree_sha256))
         elif args.command == "include":
-            print(include(args.root, args.notebook, args.title))
+            print(include(args.root, args.notebook, args.title, args.group))
+        elif args.command == "sync":
+            sync(args.root)
+            print("synced")
         elif args.command == "validate":
             validate_root(root_path(args.root))
             print("valid")

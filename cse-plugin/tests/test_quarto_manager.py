@@ -39,6 +39,13 @@ class QuartoManagerTests(unittest.TestCase):
                 with self.assertRaises(MANUSCRIPT.ManuscriptError):
                     MANUSCRIPT.check_owners(value, path, allow_presentation_hook=value is allowed)
 
+    def test_earlier_manuscript_root_is_refused_with_rebuild_steps(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "_quarto.yml").write_text('{"project": {"type": "manuscript", "output-dir": "_site"}}\n')
+            with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "rerunning init"):
+                MANUSCRIPT.check_boundary(root)
+
     def test_refresh_renders_notebook_then_root_with_presentation_cache_refresh(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -58,7 +65,7 @@ class QuartoManagerTests(unittest.TestCase):
                 return completed
 
             with (
-                patch.object(MANUSCRIPT, "validate_root", return_value=state),
+                patch.object(MANUSCRIPT, "sync", return_value=state),
                 patch.object(MANUSCRIPT, "notebook_argument", return_value="case/notebook.qmd"),
                 patch.object(MANUSCRIPT, "prepare", side_effect=prepared),
                 patch.object(MANUSCRIPT.subprocess, "run", side_effect=rendered) as run,
@@ -175,25 +182,25 @@ class QuartoManagerTests(unittest.TestCase):
             self.assertIn("calculate", output.getvalue())
             self.assertIn("extra jobs refused", output.getvalue())
 
-    def test_preview_bridge_prepares_before_touching_and_keeps_stale_sources_on_failure(self):
+    def test_preview_bridge_prepares_before_rendering_and_keeps_stale_sources_on_failure(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             output = io.StringIO()
             with (
                 patch.object(MANUSCRIPT, "prepare", return_value=7) as prepare,
-                patch.object(MANUSCRIPT, "touch_targets") as touch,
+                patch.object(MANUSCRIPT, "request_renders") as render,
                 contextlib.redirect_stderr(output),
             ):
-                self.assertEqual(7, MANUSCRIPT.prepare_and_touch(root, {}, {root / "case" / "results.json"}))
+                self.assertEqual(7, MANUSCRIPT.prepare_and_render(root, {}, {root / "case" / "results.json"}, "127.0.0.1", 8000))
 
             prepare.assert_called_once_with(root)
-            touch.assert_not_called()
+            render.assert_not_called()
             self.assertIn("retained pages remain stale", output.getvalue())
 
     def test_changed_retained_file_notifies_its_notebook_and_root(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            state = {"manuscript": {"notebooks": [{"notebook": "case/notebook.qmd"}]}}
+            state = {"website": {"sidebar": {"contents": [{"section": "Home", "contents": [{"text": "Overview", "href": "index.qmd"}]}, {"section": "Case", "contents": [{"text": "Results", "href": "case/notebook.qmd#results"}]}]}}}
             changed = {root / "case" / "results" / "fit_summary.json"}
             self.assertEqual(
                 {root / "index.qmd", root / "case" / "notebook.qmd"},
@@ -211,8 +218,9 @@ class QuartoManagerTests(unittest.TestCase):
             root = Path(directory)
             ignored = (
                 ".snakemake/log.txt", ".cache/state", "tmp/file", "temp/file",
-                "index.html.md", "index_files/image.png", "_site/page.html",
-                "_freeze/page.json", "support/asset.bin",
+                "index_files/image.png", "_site/page.html",
+                "_freeze/page.json", "support/asset.bin", "site_libs/bootstrap/theme.css",
+                "case/notebook.html",
             )
             for relative in ignored:
                 with self.subTest(relative=relative):
@@ -246,7 +254,7 @@ class QuartoManagerTests(unittest.TestCase):
                 f"spec = importlib.util.spec_from_file_location('manuscript', {str(SCRIPT)!r})\n"
                 "module = importlib.util.module_from_spec(spec)\n"
                 "spec.loader.exec_module(module)\n"
-                "module.validate_root = lambda root: {'manuscript': {'notebooks': []}}\n"
+                "module.validate_root = module.sync = lambda root: {}\n"
                 "module.presentation_workflows = lambda root: []\n"
                 "raise SystemExit(module.preview(Path(sys.argv[1]), '127.0.0.1', 8000))\n"
             )
@@ -321,7 +329,7 @@ class QuartoManagerTests(unittest.TestCase):
             state["install"] = install
             with (
                 patch.dict(os.environ, {"XDG_CONFIG_HOME": str(base / "config")}),
-                patch.object(MANUSCRIPT, "validate_root"),
+                patch.object(MANUSCRIPT, "sync"),
                 patch.object(MANUSCRIPT.shutil, "which", return_value="/opt/quarto/bin/quarto"),
                 patch.object(MANUSCRIPT.subprocess, "run", side_effect=run),
                 patch.object(MANUSCRIPT, "port_free", side_effect=lambda port: port not in state["busy"]),

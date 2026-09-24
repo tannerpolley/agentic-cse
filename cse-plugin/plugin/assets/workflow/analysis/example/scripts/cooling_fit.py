@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import numpy as np
 from scipy.optimize import least_squares
+from scipy.stats import t as student_t
 
 
 def temperature(time_s: np.ndarray, cooling_rate_per_s: float, ambient: float, initial: float) -> np.ndarray:
@@ -17,7 +18,7 @@ def fit_rate(
     ambient: float,
     initial: float,
     initial_guesses: tuple[float, float],
-) -> dict[str, float | bool]:
+) -> dict[str, object]:
     def residual(parameter: np.ndarray) -> np.ndarray:
         return temperature(time_s, float(parameter[0]), ambient, initial) - observed_temperature
 
@@ -32,7 +33,19 @@ def fit_rate(
     cooling_rate = float(fits[0].x[0])
     refit_rate = float(fits[1].x[0])
     fitted_temperature = temperature(time_s, cooling_rate, ambient, initial)
-    rmse = float(np.sqrt(np.mean((fitted_temperature - observed_temperature) ** 2)))
+    residual_temperature = observed_temperature - fitted_temperature
+    rmse = float(np.sqrt(np.mean(residual_temperature ** 2)))
+
+    # Linearized standard error from the Jacobian at the optimum. It assumes
+    # independent, equal-variance temperature errors and treats the ambient and
+    # initial temperatures as exact, so it omits their contribution.
+    degrees_of_freedom = time_s.size - 1
+    if degrees_of_freedom < 1:
+        raise ValueError("the standard error needs at least two observations")
+    jacobian = fits[0].jac[:, 0]
+    residual_variance = float(np.sum(residual_temperature ** 2)) / degrees_of_freedom
+    standard_error = float(np.sqrt(residual_variance / np.dot(jacobian, jacobian)))
+    half_width = float(student_t.ppf(0.975, degrees_of_freedom)) * standard_error
 
     # Both checks scale from this data set and fitted quantity; no external
     # benchmark value or solver tolerance is an acceptance oracle.
@@ -50,6 +63,11 @@ def fit_rate(
     return {
         "cooling_rate_per_s": cooling_rate,
         "refit_rate_per_s": refit_rate,
+        "cooling_rate_standard_error_per_s": standard_error,
+        "cooling_rate_ci95_per_s": [cooling_rate - half_width, cooling_rate + half_width],
+        "time_constant_s": 1.0 / cooling_rate if cooling_rate > 0 else None,
+        "observation_count": int(time_s.size),
+        "degrees_of_freedom": degrees_of_freedom,
         "residual_rmse_degC": rmse,
         "rmse_bound_degC": rmse_bound,
         "refit_difference_per_s": refit_difference,

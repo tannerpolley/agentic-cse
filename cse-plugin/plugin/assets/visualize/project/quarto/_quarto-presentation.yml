@@ -9,5 +9,10 @@
     "echo": false,
     "warning": false,
     "error": false
+  },
+  "format": {
+    "html": {
+      "embed-resources": false
+    }
   }
 }

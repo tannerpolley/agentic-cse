@@ -51,18 +51,19 @@ reusable data, and main model files remain in their natural repository owners.
 Do not turn an analysis-only repository into a package or require package and
 environment policy as part of CSE setup.
 
-## Analysis sets and the root Quarto Manuscript
+## Analysis sets and the root Quarto analysis site
 
-A confirmed `analysis` repository normally has one root Quarto Manuscript at
-`analyses/`. It contains a populated `index.qmd` synthesis article and only
-the substantive analysis `.qmd` reports explicitly included by Visualize.
-`project.render` and `manuscript.notebooks` are the sole ordered publication
+A confirmed `analysis` repository normally has one root Quarto analysis site at
+`analyses/`. Its home page is a populated `index.qmd` synthesis article; its
+other pages are only the substantive analysis `.qmd` reports explicitly
+included by Visualize.
+`project.render` and `website.sidebar` are the sole ordered publication
 memberships; every included report appears exactly once in both, and an
 unregistered `.qmd` is not rendered. A confirmed `tool` repository gets no
-Quarto Manuscript by default.
+Quarto analysis site by default.
 
 A new CSE-created side-study question defaults to the root-level
-`analyses/<short-id>/` set, which can be included in the root Quarto Manuscript:
+`analyses/<short-id>/` set, which can be included in the root Quarto analysis site:
 
 ```text
 analyses/<short-id>/
@@ -100,7 +101,7 @@ unexplained failure, or empty display cannot advance.
 
 After a useful method-specific result exists, Summarize alone creates or fully
 refreshes a substantive report `.qmd` in its analysis set, includes it in the
-root Quarto Manuscript, and explicitly refreshes its presentation view. The report
+root Quarto analysis site, and explicitly refreshes its presentation view. The report
 and selected render exist before Review so the reviewer sees the same
 scientific presentation as the investigator. The report reads retained outputs and
 must not rerun the scientific model. It presents the current coherent question,
@@ -128,11 +129,11 @@ limitations confirmed by the investigator.
 
 The report source is complete core output. When the endpoint selects rendering
 and its required renderer executable is available, hand the same `.qmd` and
-retained values to the root Quarto Manuscript for ordinary HTML and explicit
+retained values to the root Quarto analysis site for ordinary HTML and explicit
 presentation refresh. A promoted LuaLaTeX PDF is an optional second view from
 the same source. When a required renderer is unavailable, finish independent
 core setup/report work and report the exact missing executable and setup step;
-do not install it without authority. Keep generated outputs under the Quarto Manuscript output directory
+do not install it without authority. Keep generated outputs under the Quarto analysis site output directory
 for inspection and normally ignore them. The report is the durable
 user handoff for the analysis. The task response briefly states the interpreted
 result, evidence quality, limitations, and real question frontier and links the

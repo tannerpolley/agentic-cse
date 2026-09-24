@@ -26,18 +26,44 @@ benchmark, write retained results, or fetch uncontrolled remote data.
 
 ## Safe default and opt-in execution
 
-Initialize a confirmed analysis repository's root Quarto Manuscript at
+Initialize a confirmed analysis repository's root Quarto analysis site at
 `analyses/`. Its JSON-compatible YAML configuration defaults to:
 
 ```json
 {"execute": {"enabled": false}}
 ```
 
-The root also sets `keep-md: true`. Quarto 1.10.18 otherwise removes linked
-notebook views during embedded-HTML cleanup. This native setting retains
-generated Markdown and supporting files; they are presentation outputs,
-not retained scientific results. The article is `_site/index.html`; a
-registered `result.qmd` has the native view `_site/result-preview.html`.
+The root is a Quarto website (`project.type: website`). The article is the
+home page `_site/index.html`; a registered `case/result.qmd` is the ordinary
+page `_site/case/result.html`. Every page shares one docked sidebar, theme,
+and full page layout, so numbered equations and cross-references
+work on every page. The home page is the sidebar section "Home", and each included
+notebook is a collapsed section titled by `include --title`. A section title only
+expands it; its children are an Overview link and one link per heading at the
+page's highest level outside `:::` blocks, with the anchors Pandoc assigns.
+`manuscript.py sync <root>` recomputes those links from the current headings while
+keeping titles and groups; `include`, `refresh`, `preview`, the service, and
+`render.sh` run it first, and `validate` reports stale links. Included files count as part of the page;
+keep other shortcodes out of top-level headings. Re-running `include` for a grouped
+notebook must repeat its `--group`, or it moves to the top level. Notebook paths may
+use only letters, digits, `.`, `_`, `-`, and `/`.
+There is no page table of contents or margin column, so keep side notes inline.
+`include --group <name>` nests a notebook under a collapsed group heading
+(`A/B` nests groups); the
+last notebook leaving a group removes it. There is no top bar: the site title,
+search, and reader-mode toggle sit in the sidebar. Pages load math with the page
+(`self-contained-math`) and share the installed `site.css` (publication-style
+tables with aligned digits, full-width figures, small captions, 16 px text); the
+project owns `site.css` after `init`. The root
+sets `notebook-links: false`, so an article that embeds a labeled cell from a
+retained notebook with `{{< embed >}}` shows the cell without a link to a
+separate notebook page.
+
+A root created before the website layout (`project.type: manuscript`) is
+refused with the rebuild steps: remove `_quarto.yml`, `_quarto-presentation.yml`,
+`_cse-manuscript.json`, `.cse-quarto-source.json`, `manuscript.py`, and
+`render.sh`, rerun `init` with `--article-source index.qmd`, and include each
+report again. Sources and retained results stay in place.
 
 Initialize with `manuscript.py init`, include substantive report `.qmd` files
 with `manuscript.py include`, and use `manuscript.py validate` before a render.
@@ -49,8 +75,10 @@ Inspection leaves the original project and its cache unchanged. Unsupported
 profiles, includes, hooks, nested projects, or output paths require
 reconciliation before any write.
 The command owns only `_cse-manuscript.json`; `project.render` and
-`manuscript.notebooks` are the sole ordered memberships. An unregistered
-`.qmd` is not rendered. Use `assets/visualize/project/quarto/render.sh` for a release
+`website.sidebar` are the sole ordered memberships. Quarto merges both from that
+metadata file, and native inspection confirms the merged sidebar. The site
+title and other presentation settings remain in `_quarto.yml`, which must not
+define a sidebar. An unregistered `.qmd` is not rendered. Use `assets/visualize/project/quarto/render.sh` for a release
 render; it passes
 `--no-execute` at the command boundary and gives Quarto, Deno, and LuaLaTeX
 private writable runtime directories. TinyTeX is the TeX distribution,
@@ -59,14 +87,14 @@ LuaLaTeX (LuaHBTeX) is its compiler, Quarto is the document manager, and
 and configuration from TinyTeX without writing to that installation. Do not
 use bare `quarto render` as the supported CSE command.
 
-The ordinary HTML Quarto Manuscript project is the living synthesis and notebook
+The ordinary HTML Quarto analysis site is the living synthesis and notebook
 route. Select an optional native PDF view with `render.sh --to pdf` after
 configuring its reviewed format settings. The separate standalone example's
 `_quarto-promoted-pdf.yml` profile selects LuaLaTeX and includes
 `promoted-pdf-header.tex`; invoke it with `render.sh --profile promoted-pdf
 --to pdf`; the explicit format overrides the default HTML target.
 Keep the header limited to packages exercised by the source. The root Quarto
-Manuscript does not copy this standalone profile or header.
+analysis site does not copy this standalone profile or header.
 
 The guarded render command disables Quarto's automatic LaTeX package
 installation. Check required packages with `scripts/visualize/check-latex-toolchain.sh`;
@@ -76,10 +104,11 @@ operation.
 When a document needs Python to format a retained table or draw a plot, use
 `manuscript.py refresh <root> <included.qmd>`. It runs the presentation-only
 `present` entry, then native Quarto with `_quarto-presentation.yml`, invalidates
-the presentation cache, and updates the included notebook and root article.
+the presentation cache, and updates the included notebook page and the home
+page.
 Quarto preview does not detect arbitrary external-data changes; the
-managed preview bridge touches only the affected registered source after the
-presentation hook has been allowed to validate retained inputs. The following
+managed preview bridge asks the running preview to re-render only the affected
+registered source (touching a file does not trigger it) after the presentation hook has been allowed to validate retained inputs. The following
 bare Quarto command shows the
 upstream syntax for the separately authorized presentation-only execution
 route; it is not a normal or release CSE render:
@@ -150,7 +179,7 @@ unmerged worktree branch is previewed by a task-owned
 
 ## HTML
 
-Ordinary Quarto HTML is the default Quarto Manuscript output. It reads the retained
+Ordinary Quarto HTML is the default Quarto analysis site output. It reads the retained
 source, renders the selected Markdown and HTML, and leaves the scientific
 model outside the document build. A selected HTML completion needs `index.qmd`,
 registered report sources, and their nonempty rendered HTML. Browser-side behavior may

@@ -135,18 +135,18 @@ The retained inputs, scripts, results, figures, notebook, and interpretation
 for one coherent scientific question.
 
 **Analysis research notebook**:
-An explicitly included substantive `.qmd` report inside the root Quarto
-Manuscript. It reads retained values without rerunning the model and is
-rendered only when its path appears once in both `project.render` and
-`manuscript.notebooks`. It is not a chronology, raw evidence inventory, or
+An explicitly included substantive `.qmd` report, rendered as one page of the
+root Quarto analysis site. It reads retained values without rerunning the model
+and is rendered only when its path appears once in both `project.render` and
+`website.sidebar`. It is not a chronology, raw evidence inventory, or
 raw-LaTeX submission draft.
 
 **Manuscript**:
 An author-controlled raw-LaTeX article that selects supported results and
 presents one continuous scientific argument from abstract through conclusion.
 
-**Quarto Manuscript**:
-The root Quarto Manuscript project containing a populated synthesis article and
-explicitly included analysis reports. It is the living HTML synthesis/notebook
-route; Review owns scientific acceptance, while Write owns deliberate promotion
+**Quarto analysis site**:
+The root Quarto website project whose home page is a populated synthesis article
+and whose other pages are the explicitly included analysis reports, all sharing
+one sidebar. It is the living HTML synthesis/notebook route; Review owns scientific acceptance, while Write owns deliberate promotion
 to the separate raw-LaTeX Manuscript route.
