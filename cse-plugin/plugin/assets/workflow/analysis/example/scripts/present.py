@@ -98,7 +98,7 @@ def data_table(curve_path: Path) -> list[str]:
 
 def check_lines(summary: dict) -> tuple[str, list[str]]:
     fit, checks = summary["fit"], summary["checks"]
-    verdict = "passed" if all(checks.values()) else "not passed; retained as supported negative evidence"
+    verdict = "passed" if all(checks.values()) else "not passed; diagnose before any negative disposition (failure-triage)"
     lines = [
         f"- Residual RMSE {inline_math(tex_number(fit['residual_rmse_degC'], 3))} {DEGREE_CELSIUS} "
         f"against the data-scaled bound {inline_math(tex_number(fit['rmse_bound_degC'], 3))} {DEGREE_CELSIUS}: "

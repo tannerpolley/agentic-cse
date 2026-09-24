@@ -34,5 +34,9 @@ falsifiable explanations, test them with bounded probes, and preserve the exact
 stopping point and diagnostics without imposing a fixed record template.
 Do not change implementation, weaken a tolerance, or
 reinterpret a claim until the cause or accepted correction boundary is
-established. Route an established correction to `cse:design`; route an
+established. Test a candidate root-cause fix, such as scaling, higher
+precision, or a better-resolved reference, as a disposable bounded probe that
+leaves the retained implementation unchanged, before any negative disposition; a closing negative outcome must meet
+[failure-triage](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition).
+Route an established correction to `cse:design`; route an
 unresolved scientific disagreement to the smallest additional probe.

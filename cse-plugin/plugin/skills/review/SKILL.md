@@ -61,6 +61,12 @@ limits, defaults, and tolerances use their existing scientific owner. Confirm
 the accepted falsifier fails without the fix. Passing tests or line accounting
 cannot replace these checks.
 
+For any refused, failed, unavailable, unresolved, tolerance-gated, or negative
+disposition in either lens, ask whether it could be fixed: return **Not
+supported** unless the retained evidence shows the diagnosis and attempted
+root-cause fix required by
+[failure-triage](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition).
+
 Review advises on the stated use; it does not promote a notebook to manuscript
 use. Optional hardening does not expand accepted scope. A correction invalidates
 the affected final-tree conclusion and requires the complete applicable lens
