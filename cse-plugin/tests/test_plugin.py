@@ -28,6 +28,39 @@ class PluginBehaviorTests(unittest.TestCase):
         )
         self.assertEqual(0, result.returncode, result.stdout + result.stderr)
 
+    def test_prose_check_keeps_fitting_regression_and_ignores_link_targets(self):
+        sys.path.insert(0, str(PLUGIN / "scripts/workflow"))
+        from check_prose import violations
+
+        allowed = [
+            "The joint regression fixes the MEA parameters.",
+            "A parameter\nregression follows.",
+            "The regression\nparameters are fixed.",
+            "Weighted least-squares regression converged.",
+            "The regression parameters and regression residuals are retained.",
+            "The regressed parameters differ from the coupled-regression designs.",
+            "Regression-based estimation uses the regression objective.",
+            "The MEA–water interaction regressed against Cai data.",
+            "See [the fitted table](results/regression_manifest-receipt.json).",
+            "[ref]: docs/manifest.csv",
+        ]
+        flagged = [
+            "The regression test passed.",
+            "Run the regression suite.",
+            "There is no regression.",
+            "A regression in the solver output appeared.",
+            "Two regressions remain.",
+            "The solver regressed.",
+            "The linear regression tests failed.",
+            "See [the manifest](results/table.csv).",
+            "[^1]: The regression test failed.",
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            for index, text in enumerate(allowed + flagged):
+                path = Path(directory) / f"case{index}.md"
+                path.write_text(text + "\n", encoding="utf-8")
+                self.assertEqual(index >= len(allowed), bool(violations([path])), text)
+
     def test_one_manifest_and_all_skills_use_cse_namespace(self):
         manifest = json.loads((PLUGIN / ".codex-plugin/plugin.json").read_text())
         references = {path.stem for path in (PLUGIN / "references").rglob("*.md")} | {"BANNED"}
