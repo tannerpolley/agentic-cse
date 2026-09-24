@@ -280,7 +280,7 @@ def session_writes(event: dict[str, object]) -> set[Path] | None:
     in either host contribute redirection and tee targets and every prose path an in-place sed or
     perl edits. Relative paths resolve against the call's workdir or the turn's cwd.
     """
-    # ponytail: prose written by scripts, cp, or mv is not attributed and escapes the check.
+    # ponytail: prose written by scripts, cp, or mv, or through a relative path after cd, escapes the check.
     transcript = event.get("transcript_path")
     if not isinstance(transcript, str) or not transcript or not Path(transcript).is_file():
         return None
