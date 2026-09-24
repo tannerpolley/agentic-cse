@@ -16,6 +16,16 @@ BANNED = Path(__file__).resolve().parents[2] / "BANNED.md"
 if not BANNED.is_file():
     BANNED = Path(__file__).with_name("cse-BANNED.md")
 FIELDS = ("Avoid", "Prefer", "Meaning", "Scope", "Exceptions", "Evidence")
+# BANNED.md retains regression for fitting: a statistical qualifier before it or a
+# fitted quantity after it marks that sense, unless a software test noun follows.
+FITTING_BEFORE = re.compile(
+    r"(?:statistical|parameters?|joint|coupled|linear|nonlinear|non-linear|least-squares"
+    r"|weighted|orthogonal|ridge|bayesian|logistic|polynomial|multivariate|simultaneous)[\s-]+$", re.I)
+FITTING_AFTER = re.compile(
+    r"[\s-]+(?:parameters?|coefficients?|models?|fits?|analys[ie]s|estimation|estimates?|objectives?"
+    r"|targets?|weights?|residuals?|figures?|campaigns?|stud(?:y|ies)|designs?|coordinates?|data"
+    r"|observations?|based|against|onto)\b", re.I)
+SOFTWARE_AFTER = re.compile(r"[\s-]+(?:tests?|suites?|checks?)\b", re.I)
 
 
 def text_files(paths: list[Path]):
@@ -188,6 +198,9 @@ def prose_lines(text: str):
         if fence or line.lstrip().startswith((">", "%")):
             continue
         # Preserve positions so diagnostics refer to the original line.
+        # Link targets are filenames or URLs; the link text stays checked.
+        line = re.sub(r"(\]\()([^)]*)", lambda m: m[1] + " " * len(m[2]), line)
+        line = re.sub(r"^(\s{0,3}\[[^\]]+\]:)(.*)", lambda m: m[1] + " " * len(m[2]), line)
         line = re.sub(r'"[^"\n]*"|“[^”\n]*”', lambda m: " " * len(m[0]), line)
         line = re.sub(r"(?<!\w)'[^'\n]+'(?!\w)|‘[^’\n]*’", lambda m: " " * len(m[0]), line)
         line = re.sub(r"`([^`]+)`", lambda m: " " * len(m[0])
@@ -214,7 +227,8 @@ def violations(paths: list[Path], *, context: Path | None = None,
         active = [r for r in (rules or []) if any(fnmatch.fnmatchcase(relative, s) for s in r["Scope"])]
         text = path.read_text(encoding="utf-8")
         original_lines = text.splitlines()
-        for number, line in prose_lines(text):
+        lines = dict(prose_lines(text))
+        for number, line in lines.items():
             for rule in global_rules + active:
                 term = rule["Avoid"]
                 for match in phrase_pattern(term).finditer(line):
@@ -233,8 +247,13 @@ def violations(paths: list[Path], *, context: Path | None = None,
                         continue
                     if term == "pipeline" and re.search(r"data\s+$", line[:match.start()], re.I):
                         continue
-                    if term == "regression" and re.match(r"\s+(?:analysis|fit|model|coefficient|estimation)", tail, re.I):
-                        continue
+                    if term.startswith("regress"):
+                        before = lines.get(number - 1, "") + " " + line[:match.start()]
+                        after = tail + " " + lines.get(number + 1, "")
+                        if not SOFTWARE_AFTER.match(after) and (
+                            FITTING_BEFORE.search(before) or FITTING_AFTER.match(after)
+                        ):
+                            continue
                     failures.append(f"{path}:{number}: avoid {term!r} → {rule['Prefer']} ({rule['source']}): {original_lines[number - 1]}")
     return failures
 

@@ -9,8 +9,10 @@ claim instead.
 
 The list does not apply to exact code identifiers, official filenames, product
 names, quotations, source titles, genuine domain terms such as contact
-mechanics, or a defined project term in `CONTEXT.md`. When a listed word is
-necessary, state its concrete meaning.
+mechanics, or a defined project term in `CONTEXT.md`. A Markdown link target
+in `[text](target)` or `[id]: target` counts as a filename or URL; the link
+text is still prose. When a listed word is necessary, state its concrete
+meaning.
 
 ## Current entries
 
@@ -22,7 +24,7 @@ necessary, state its concrete meaning.
 | `schema` as a catch-all | The exact columns, fields, units, relationships, or file structure |
 | `manifest` as a catch-all | The exact inventory, index, provenance file, or official filename |
 | `API` as a catch-all | The exact callable, command, or input/output interface |
-| `regression` for a software check | `persistent behavior check` or `previous-failure check`; retain regression for statistical regression and fitting |
+| `regression`, `regressions`, or `regressed` for a software check | `persistent behavior check` or `previous-failure check`; retain regression for statistical regression and fitting, marked by a qualifier just before it (statistical, parameter, joint, coupled, linear, nonlinear, least-squares, weighted, orthogonal, ridge, Bayesian, logistic, polynomial, multivariate, simultaneous) or a fitted quantity just after it (parameters, coefficients, model, fit, analysis, estimation, objective, targets, weights, residuals, figures, campaign, study, designs, coordinates, data, observations, -based, against, onto); test, suite, or check after it keeps the software sense |
 | a `flag`, `status`, or `route` presented as a scientific result | The returned value, stopping point, diagnostic, numerical behavior, or unresolved question |
 | `orchestration` | The actual calls or sequence of operations |
 | `pipeline` as a catch-all | The named steps; retain `data pipeline` when it is the established scientific object |
