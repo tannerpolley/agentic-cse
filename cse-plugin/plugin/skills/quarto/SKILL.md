@@ -22,14 +22,16 @@ article outputs, and [latex-figures](../../references/visualize/latex-figures.md
 
 Inspect the existing project, profiles, source, includes, filters, output
 paths, and render command. Keep shared scientific content in one source.
-Ordinary Quarto HTML is the default living view of one root Quarto Manuscript. For a
-confirmed analysis repository, initialize it with
+Ordinary Quarto HTML is the default living view of one root Quarto analysis
+site: a Quarto website whose home page is the synthesis article and whose other
+pages are the included reports, all sharing one docked sidebar, navigation bar,
+theme, and page layout. For a confirmed analysis repository, initialize it with
 `python3 assets/visualize/project/quarto/manuscript.py init analyses/ --article-source
 <populated.qmd> --source-commit <SHA> --runtime-tree-sha256 <SHA256>`, then include
 each substantive report with `manuscript.py include analyses/ <report.qmd>
 --title <title>`. The command records the sole ordered `project.render` and
-`manuscript.notebooks` memberships, refuses unsafe adoption, and leaves unregistered `.qmd` files
-out of the render. The normal render uses `execute.enabled: false` and
+`website.sidebar` memberships, with the title as the sidebar entry, refuses
+unsafe adoption, and leaves unregistered `.qmd` files out of the render. The normal render uses `execute.enabled: false` and
 `--no-execute`; Quarto never runs the scientific model or mutates retained
 results.
 
@@ -38,8 +40,8 @@ registered report sources, and their rendered HTML. Select an optional native
 PDF view with `render.sh --to pdf`; the standalone example retains its separate
 `promoted-pdf` profile and header. After an adopted analysis completes, use
 `python3 analyses/manuscript.py refresh analyses analyses/<id>/notebook.qmd`; it runs the
-presentation-only `present` target, then refreshes the included notebook and
-root article with the presentation cache invalidated. Use `manuscript.py preview` to let
+presentation-only `present` target, then refreshes the included notebook page and
+home page with the presentation cache invalidated. Use `manuscript.py preview` to let
 native Quarto serve and reload the local HTML without opening an external
 browser; its small bridge watches retained and presentation sources that native
 preview misses and asks the running preview to re-render only the affected registered

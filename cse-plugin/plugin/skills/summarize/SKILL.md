@@ -41,10 +41,10 @@ scientific consequence or next decision; software status is provenance.
 
 Summarize alone creates or refreshes a substantive `.qmd` report from useful
 retained evidence before Review. A confirmed analysis repository normally
-publishes one root Quarto Manuscript under `analyses/`; include the report
+publishes one root Quarto analysis site under `analyses/`; include the report
 exactly once with its native management command, use
 `python3 analyses/manuscript.py refresh analyses analyses/<id>/notebook.qmd`
-for the notebook and root views. Refresh also performs presentation preparation
+for the notebook page and the home page. Refresh also performs presentation preparation
 when no preview is running. State that the report has not been independently reviewed
 or promoted for the separate raw-LaTeX submission route. If a renderer is absent, finish the report and core summary, then report the
 exact missing capability. Rendering never establishes a claim. Send the report,

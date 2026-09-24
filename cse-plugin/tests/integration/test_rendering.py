@@ -34,7 +34,7 @@ class RenderingBehaviorTests(unittest.TestCase):
     def test_quarto_preflight_preserves_original_and_rejects_competing_owner(self):
         real_quarto = shutil.which("quarto")
         if real_quarto is None:
-            self.skipTest("quarto is unavailable; skipped native manuscript preflight")
+            self.skipTest("quarto is unavailable; skipped native site preflight")
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
             root = parent / "analyses"
@@ -111,7 +111,7 @@ class RenderingBehaviorTests(unittest.TestCase):
 
     def test_example_analysis_renders_and_preview_shows_changed_retained_value(self):
         if shutil.which("quarto") is None or shutil.which("snakemake") is None:
-            self.skipTest("quarto and snakemake are required for the example manuscript render")
+            self.skipTest("quarto and snakemake are required for the example site render")
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / "analyses"
             analysis = root / "cooling-fit"
@@ -134,12 +134,21 @@ class RenderingBehaviorTests(unittest.TestCase):
             self.assertNotIn("not found in resource path", rendered.stdout + rendered.stderr)
 
             article = (root / "_site/index.html").read_text(encoding="utf-8")
-            for label in ("fig-cooling-fit", "fig-cooling-residuals", "tbl-cooling-parameters", "eq-cooling-model"):
-                self.assertIn(f'id="{label}"', article)
-            for reference in ("Equation", "Figure", "Table"):
-                self.assertRegex(article, rf'class="quarto-xref">{reference}(&nbsp;|\s)1<')
-            notebook = (root / "_site/cooling-fit/notebook-preview.html").read_text(encoding="utf-8")
+            notebook = (root / "_site/cooling-fit/notebook.html").read_text(encoding="utf-8")
+            # Both pages are ordinary website pages: labels and cross-references resolve on each.
+            for page in (article, notebook):
+                for label in ("fig-cooling-fit", "fig-cooling-residuals", "tbl-cooling-parameters", "eq-cooling-model"):
+                    self.assertIn(f'id="{label}"', page)
+                for reference in ("Equation", "Figure", "Table"):
+                    self.assertRegex(page, rf'class="quarto-xref">{reference}(&nbsp;|\s)1<')
+                # One shared sidebar lists the home page and the notebook on every page.
+                self.assertIn('id="quarto-sidebar"', page)
+                self.assertIn('menu-text">Cooling-rate synthesis<', page)
+                self.assertIn('menu-text">Cooling-rate fit<', page)
+                self.assertNotIn("Back to Article", page)
+            self.assertIn("column-margin", notebook)
             self.assertIn(r"5.000 \times 10^{-3}", notebook)
+            self.assertEqual([], [p.name for p in (root / "_site").rglob("*preview*")])
             self.assertTrue((root / "_site/cooling-fit/results/fit_curve.csv").is_file())
 
             with socket.socket() as probe:
@@ -150,7 +159,7 @@ class RenderingBehaviorTests(unittest.TestCase):
                 [sys.executable, "manuscript.py", "preview", ".", "--port", str(port)],
                 cwd=root, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
             )
-            url = f"http://127.0.0.1:{port}/cooling-fit/notebook-preview.html"
+            url = f"http://127.0.0.1:{port}/cooling-fit/notebook.html"
 
             def page() -> str:
                 try:

@@ -39,6 +39,13 @@ class QuartoManagerTests(unittest.TestCase):
                 with self.assertRaises(MANUSCRIPT.ManuscriptError):
                     MANUSCRIPT.check_owners(value, path, allow_presentation_hook=value is allowed)
 
+    def test_earlier_manuscript_root_is_refused_with_rebuild_steps(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "_quarto.yml").write_text('{"project": {"type": "manuscript", "output-dir": "_site"}}\n')
+            with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "rerunning init"):
+                MANUSCRIPT.check_boundary(root)
+
     def test_refresh_renders_notebook_then_root_with_presentation_cache_refresh(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -193,7 +200,7 @@ class QuartoManagerTests(unittest.TestCase):
     def test_changed_retained_file_notifies_its_notebook_and_root(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            state = {"manuscript": {"notebooks": [{"notebook": "case/notebook.qmd"}]}}
+            state = {"website": {"sidebar": {"contents": ["index.qmd", {"href": "case/notebook.qmd"}]}}}
             changed = {root / "case" / "results" / "fit_summary.json"}
             self.assertEqual(
                 {root / "index.qmd", root / "case" / "notebook.qmd"},
@@ -211,9 +218,9 @@ class QuartoManagerTests(unittest.TestCase):
             root = Path(directory)
             ignored = (
                 ".snakemake/log.txt", ".cache/state", "tmp/file", "temp/file",
-                "index.html.md", "index_files/image.png", "_site/page.html",
+                "index_files/image.png", "_site/page.html",
                 "_freeze/page.json", "support/asset.bin", "site_libs/bootstrap/theme.css",
-                "case/notebook-preview.html", "case/notebook.embed.ipynb",
+                "case/notebook.html",
             )
             for relative in ignored:
                 with self.subTest(relative=relative):
@@ -247,7 +254,7 @@ class QuartoManagerTests(unittest.TestCase):
                 f"spec = importlib.util.spec_from_file_location('manuscript', {str(SCRIPT)!r})\n"
                 "module = importlib.util.module_from_spec(spec)\n"
                 "spec.loader.exec_module(module)\n"
-                "module.validate_root = lambda root: {'manuscript': {'notebooks': []}}\n"
+                "module.validate_root = lambda root: {}\n"
                 "module.presentation_workflows = lambda root: []\n"
                 "raise SystemExit(module.preview(Path(sys.argv[1]), '127.0.0.1', 8000))\n"
             )
