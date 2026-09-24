@@ -49,23 +49,35 @@ def inline_math(value: str) -> str:
 def parameter_table(summary: dict) -> list[str]:
     fit, parameters = summary["fit"], summary["parameters"]
     low, high = fit["cooling_rate_ci95_per_s"]
-    rows = [
-        ("cooling rate $k$", "fitted", inline_math(tex_number(fit["cooling_rate_per_s"])), PER_SECOND),
-        ("standard error of $k$", "linearized", inline_math(tex_number(fit["cooling_rate_standard_error_per_s"], 2)), PER_SECOND),
-        ("95 % interval for $k$", "linearized, Student $t$",
-         inline_math(f"[{tex_number(low)},\\ {tex_number(high)}]"), PER_SECOND),
-        ("time constant $1/k$", "derived", inline_math(tex_number(fit["time_constant_s"])), SECOND),
-        ("residual RMSE", "fitted", inline_math(tex_number(fit["residual_rmse_degC"], 3)), DEGREE_CELSIUS),
-        ("ambient temperature $T_a$", "fixed input", inline_math(tex_number(parameters["ambient_temperature_degC"], 3)), DEGREE_CELSIUS),
-        ("initial temperature $T_0$", "fixed input", inline_math(tex_number(parameters["initial_temperature_degC"], 3)), DEGREE_CELSIUS),
-        ("observations / degrees of freedom", "count",
-         f"{fit['observation_count']} / {fit['degrees_of_freedom']}", "--"),
+    # Rate columns share one power of ten in the header so the cells stay plain numbers.
+    rate = fit["cooling_rate_per_s"]
+    power = math.floor(math.log10(abs(rate))) if rate else 0
+    scale = 10.0 ** -power
+    rate_unit = rf"10^{{{power}}}\,\mathrm{{s^{{-1}}}}" if power else r"\mathrm{s^{-1}}"
+    columns = [
+        (r"k", rate_unit, tex_number(rate * scale)),
+        (r"s_k", rate_unit, tex_number(fit["cooling_rate_standard_error_per_s"] * scale, 2)),
+        (r"\mathrm{CI}_{95}(k)", rate_unit, f"[{tex_number(low * scale)},\\ {tex_number(high * scale)}]"),
+        (r"1/k", r"\mathrm{s}", tex_number(fit["time_constant_s"])),
+        (r"\mathrm{RMSE}", r"^{\circ}\mathrm{C}", tex_number(fit["residual_rmse_degC"], 3)),
+        (r"T_a", r"^{\circ}\mathrm{C}", tex_number(parameters["ambient_temperature_degC"], 3)),
+        (r"T_0", r"^{\circ}\mathrm{C}", tex_number(parameters["initial_temperature_degC"], 3)),
+        (r"n\,/\,\nu", None, f"{fit['observation_count']}\\,/\\,{fit['degrees_of_freedom']}"),
     ]
+    # One math group per header keeps the symbol and unit on one line.
+    header = [f"${symbol}$" if unit is None else f"${symbol}\\ \\left({unit}\\right)$" for symbol, unit, _ in columns]
     return [
-        "| quantity | basis | value | unit |",
-        "| --- | --- | ---: | --- |",
-        *(f"| {name} | {basis} | {value} | {unit} |" for name, basis, value, unit in rows),
+        "| " + " | ".join(header) + " |",
+        "| " + " | ".join("---:" for _ in columns) + " |",
+        "| " + " | ".join(f"${value}$" for *_, value in columns) + " |",
     ]
+
+
+PARAMETER_CAPTION = (
+    "Fitted cooling rate $k$ with its linearized standard error $s_k$ and 95 % Student-$t$ interval "
+    "$\\mathrm{CI}_{95}(k)$; derived time constant $1/k$; residual RMSE; fixed ambient and initial temperatures "
+    "$T_a$ and $T_0$; $n$ observations and $\\nu$ residual degrees of freedom."
+)
 
 
 def data_table(curve_path: Path) -> list[str]:
@@ -106,7 +118,7 @@ def include_fragment(summary: dict, curve_path: Path, figure_path: Path, residua
         "",
         *parameter_table(summary),
         "",
-        ": Fitted and fixed parameters. The interval is the linearized estimate described under Uncertainty.",
+        f": {PARAMETER_CAPTION}",
         "",
         "::: {.panel-tabset}",
         "",
@@ -207,7 +219,7 @@ def views_notebook(summary: dict, figure_path: Path, residual_path: Path) -> str
         figure_cell("fig-cooling-residuals", "Residuals of the one-parameter fit at each observation time.", residual_path),
         {"cell_type": "code", "id": "tbl-cooling-parameters", "metadata": {}, "execution_count": None,
          "source": ["#| label: tbl-cooling-parameters\n",
-                    '#| tbl-cap: "Fitted and fixed cooling-model parameters."\n',
+                    f"#| tbl-cap: {json.dumps(PARAMETER_CAPTION)}\n",
                     "# Retained summary results/fit_summary.json"],
          "outputs": [{"output_type": "display_data", "metadata": {},
                       "data": {"text/markdown": table, "text/plain": [table]}}]},

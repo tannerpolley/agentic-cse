@@ -39,7 +39,7 @@ $$ {#eq-cooling-model}
 where $T$ and the fixed inputs $T_a$ and $T_0$ are in $^{\circ}\mathrm{C}$, $t$ is
 in $\mathrm{s}$, and $k$ is in $\mathrm{s^{-1}}$.
 
-::: {.column-margin}
+::: {.callout-tip appearance="simple"}
 The time constant $1/k$ is the time for the temperature excess $T - T_a$ to
 fall by a factor of $e$.
 :::
@@ -66,8 +66,8 @@ The residuals in @fig-cooling-residuals show the remaining misfit.
 
 {{< embed cooling-fit/results/cooling_fit_views.ipynb#fig-cooling-residuals >}}
 
-[The interval in @tbl-cooling-parameters linearizes the model and treats
-$T_a$ and $T_0$ as exact.]{.aside}
+The interval in @tbl-cooling-parameters linearizes the model and treats
+$T_a$ and $T_0$ as exact.
 
 {{< embed cooling-fit/results/cooling_fit_views.ipynb#tbl-cooling-parameters >}}
 

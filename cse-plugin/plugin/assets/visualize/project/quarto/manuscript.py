@@ -25,7 +25,7 @@ REQUIRED_IGNORES = ("/.quarto/", "/_site/", "/site_libs/", "/_freeze/", "/notebo
 MANUSCRIPT_CONFIG = {
     "project": {"type": "manuscript", "output-dir": "_site"},
     "metadata-files": ["_cse-manuscript.json"], "manuscript": {"article": "index.qmd"},
-    "format": {"html": {"embed-resources": True}}, "execute": {"enabled": False},
+    "format": {"html": {"embed-resources": True, "page-layout": "full"}}, "execute": {"enabled": False},
     "keep-md": True,
 }
 PRESENTATION_PRE_RENDER = "python3 manuscript.py prepare"
