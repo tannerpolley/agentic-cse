@@ -132,7 +132,8 @@ running on `127.0.0.1` from the main checkout, restarting it on failure within a
 bounded start limit. The unit records the interpreter absolutely (`--python`,
 default the interpreter running the command) and puts its directory first on
 `PATH`; the command refuses an interpreter that cannot import the Jupyter
-packages the presentation profile executes with, or a presentation workflow whose
+packages the presentation profile executes with (including `jupyter-cache`,
+which its `execute.cache: true` requires), or a presentation workflow whose
 `snakemake` is absent from that `PATH`. It also refuses any path containing
 whitespace, quotes, backslash, `%`, or `$`. The port is chosen once from the
 repository path, skipping ports that are bound or claimed by another preview unit,

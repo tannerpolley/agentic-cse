@@ -40,7 +40,7 @@ SERVICE_PORT_RE = re.compile(r"--port (\d+)$", re.MULTILINE)
 SERVICE_PORT_BASE, SERVICE_PORT_SPAN = 8800, 1000
 SERVICE_READY_SECONDS = 20
 UNIT_UNSAFE_RE = re.compile(r"[\s\"'\\%$]")
-PREVIEW_IMPORTS = "jupyter_core, nbformat, nbclient, ipykernel"
+PREVIEW_IMPORTS = "jupyter_core, nbformat, nbclient, ipykernel, jupyter_client, jupyter_cache, yaml"
 
 
 class ManuscriptError(Exception):
