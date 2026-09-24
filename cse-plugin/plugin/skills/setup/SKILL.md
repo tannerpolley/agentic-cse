@@ -86,10 +86,13 @@ populated analysis inputs, scripts, results, and figures; new sets use
 Setup confirms purpose, root/home content, and adoption, then invokes
 `manuscript.py init` when the renderer is available to initialize or safely adopt the
 populated root Quarto Manuscript; do not rename or migrate it solely to match the
-default. With the renderer available, Setup then runs `manuscript.py service analyses/`
-from the main checkout to keep the preview running as described in
-[quarto-execution](../../references/visualize/quarto-execution.md), and reports the
-URL or the exact missing capability.
+default. With the renderer available, Setup then runs
+`python3 analyses/manuscript.py service analyses/` from the main checkout with the
+project's presentation interpreter (`--python <path>` when it is not the one
+running the command), as described in
+[quarto-execution](../../references/visualize/quarto-execution.md#main-checkout-preview-service),
+and reports `serving <url>`, the not-answering journal command, or the exact
+missing capability.
 Setup does not create substantive per-analysis report; Summarize owns it.
 A confirmed `tool` gets no default Quarto Manuscript; without a renderer, report
 the exact missing capability.

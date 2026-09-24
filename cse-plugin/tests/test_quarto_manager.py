@@ -289,60 +289,98 @@ class QuartoManagerTests(unittest.TestCase):
             with self.assertRaises(MANUSCRIPT.ManuscriptError):
                 MANUSCRIPT.included_files(root, {"case/notebook.qmd": source.read_bytes()}, ["case/notebook.qmd"])
 
-    def test_preview_service_keeps_its_port_skips_claimed_ports_and_refuses_foreign_units(self):
+    @contextlib.contextmanager
+    def preview_service(self):
         real_run = subprocess.run
         with tempfile.TemporaryDirectory() as directory:
-            repository = (Path(directory) / "repo").resolve()
+            base = Path(directory).resolve()
+            repository = base / "repo"
             (repository / "analyses").mkdir(parents=True)
             real_run(["git", "init", "-q", str(repository)], check=True)
-            units = Path(directory) / "config" / "systemd" / "user"
-            systemctl = []
+            python = base / "venv" / "bin" / "python"
+            python.parent.mkdir(parents=True)
+            python.write_text("")
+            python.chmod(0o755)
+            state = {"base": base, "repository": repository, "python": python, "units": base / "config/systemd/user",
+                     "systemctl": [], "busy": set()}
 
             def run(command, *args, **kwargs):
                 if command[0] == "systemctl":
-                    systemctl.append(command[2])
+                    state["systemctl"].append(command[2])
+                    return subprocess.CompletedProcess(command, 0)
+                if command[0] == str(python):
                     return subprocess.CompletedProcess(command, 0)
                 return real_run(command, *args, **kwargs)
 
-            def install(port=None):
+            def install(root=repository / "analyses", port=None, interpreter=python):
                 output = io.StringIO()
                 with contextlib.redirect_stdout(output):
-                    self.assertEqual(0, MANUSCRIPT.service(repository / "analyses", port, False))
-                return output.getvalue()
+                    status = MANUSCRIPT.service(root, port, False, interpreter)
+                return status, output.getvalue()
 
+            state["install"] = install
             with (
-                patch.dict(os.environ, {"XDG_CONFIG_HOME": str(Path(directory) / "config")}),
+                patch.dict(os.environ, {"XDG_CONFIG_HOME": str(base / "config")}),
                 patch.object(MANUSCRIPT, "validate_root"),
-                patch.object(MANUSCRIPT.shutil, "which", return_value="/usr/bin/quarto"),
+                patch.object(MANUSCRIPT.shutil, "which", return_value="/opt/quarto/bin/quarto"),
                 patch.object(MANUSCRIPT.subprocess, "run", side_effect=run),
-                patch.object(MANUSCRIPT, "port_free", return_value=True),
+                patch.object(MANUSCRIPT, "port_free", side_effect=lambda port: port not in state["busy"]),
+                patch.object(MANUSCRIPT, "answering", return_value=True),
             ):
+                yield state
+
+    def test_preview_service_keeps_its_port_skips_claimed_ports_and_refuses_foreign_units(self):
+        with self.preview_service() as state:
+            repository, install, systemctl = state["repository"], state["install"], state["systemctl"]
+            self.assertEqual(0, install()[0])
+            unit = next(state["units"].glob("cse-preview-repo-*.service"))
+            text = unit.read_text()
+            port = MANUSCRIPT.service_port(unit)
+            self.assertIn(f"\nWorkingDirectory={repository}\n", text)
+            self.assertIn(f"\nExecStart={state['python']} analyses/manuscript.py preview analyses "
+                          f"--host 127.0.0.1 --port {port}\n", text)
+            self.assertIn(f"\nEnvironment=PATH={state['python'].parent}:/opt/quarto/bin:", text)
+            self.assertEqual(["show-environment", "daemon-reload", "enable", "restart"], systemctl)
+
+            systemctl.clear()
+            state["busy"].add(port)
+            self.assertEqual(0, install()[0])
+            self.assertEqual((text, ["show-environment", "daemon-reload", "enable", "start"]), (unit.read_text(), systemctl))
+
+            state["busy"].clear()
+            other = state["units"] / "cse-preview-other-00000000.service"
+            other.write_text(text.replace(str(repository), "/elsewhere"))
+            unit.unlink()
+            install()
+            self.assertNotEqual(port, MANUSCRIPT.service_port(unit))
+            with self.assertRaises(MANUSCRIPT.ManuscriptError):
+                install(port=port)
+
+            unit.write_text("[Service]\nExecStart=/bin/true\n")
+            with self.assertRaises(MANUSCRIPT.ManuscriptError):
                 install()
-                unit = units / "cse-preview-repo.service"
-                text = unit.read_text()
-                port = MANUSCRIPT.service_port(unit)
-                self.assertIn(f"\nWorkingDirectory={repository}\n", text)
-                self.assertIn("ExecStart=/usr/bin/env python3 analyses/manuscript.py preview analyses "
-                              f"--host 127.0.0.1 --port {port}\n", text)
-                self.assertEqual(["show-environment", "daemon-reload", "enable", "restart"], systemctl)
+            self.assertEqual("[Service]\nExecStart=/bin/true\n", unit.read_text())
 
-                systemctl.clear()
-                install()
-                self.assertEqual((text, ["show-environment", "enable", "start"]), (unit.read_text(), systemctl))
+    def test_preview_service_refuses_unit_unsafe_manuscript_and_path_values(self):
+        with self.preview_service() as state:
+            for character in (" ", "\t", '"', "'", "\\", "%", "$", "\n", "\r"):
+                with self.subTest(character=repr(character)):
+                    root = state["repository"] / f"an{character}x"
+                    root.mkdir()
+                    with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "manuscript path"):
+                        state["install"](root=root)
+                    quarto = f"/opt/q{character}x/quarto"
+                    with (patch.object(MANUSCRIPT.shutil, "which", return_value=quarto),
+                          self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "PATH entry")):
+                        state["install"]()
+            self.assertEqual([], list(state["units"].glob("*")) if state["units"].exists() else [])
 
-                other = units / "cse-preview-other.service"
-                other.write_text(text.replace(str(repository), "/elsewhere"))
-                unit.unlink()
-                install()
-                self.assertNotEqual(port, MANUSCRIPT.service_port(unit))
-                with self.assertRaises(MANUSCRIPT.ManuscriptError):
-                    install(port)
-
-                unit.write_text("[Service]\nExecStart=/bin/true\n")
-                with self.assertRaises(MANUSCRIPT.ManuscriptError):
-                    install()
-                self.assertEqual("[Service]\nExecStart=/bin/true\n", unit.read_text())
-
+    def test_preview_service_reports_a_started_unit_that_does_not_answer(self):
+        with self.preview_service() as state, patch.object(MANUSCRIPT, "answering", return_value=False):
+            status, output = state["install"]()
+            self.assertEqual(1, status)
+            self.assertIn("started, not answering at http://127.0.0.1:", output)
+            self.assertIn("journalctl --user -u cse-preview-repo-", output)
 
 if __name__ == "__main__":
     unittest.main()
