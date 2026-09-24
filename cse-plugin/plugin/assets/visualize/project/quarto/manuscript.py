@@ -42,6 +42,7 @@ IGNORED_WATCH_SUFFIXES = ("_files", "_support")
 # preview ignores mtime-only touches and include changes. Recheck on a Quarto upgrade.
 QUARTO_RENDER_REQUEST = "90B3C9E8-0DBC-4BC0-B164-AA2D5C031B28"
 INCLUDE_RE = re.compile(r"\{\{<\s*include\s+([^\s>]+)")
+INCLUDE_SHORTCODE_RE = re.compile(r"\{\{<\s*include\s+([^\s>]+)\s*>\}\}")
 SERVICE_MARKER = "# Managed by CSE manuscript.py service; do not edit.\n"
 SERVICE_PORT_RE = re.compile(r"--port (\d+)$", re.MULTILINE)
 SERVICE_PORT_BASE, SERVICE_PORT_SPAN = 8800, 1000
@@ -148,12 +149,24 @@ def plain(inlines: list) -> str:
 def sections(root: Path, page: str, text: bytes | None = None) -> list[dict]:
     """Sidebar children of a page: the page itself (so Quarto opens its section there), then each
     top-level heading outside ::: blocks at the page's highest heading level."""
+    # Quarto expands includes before Pandoc assigns identifiers, so expand them the same way.
+    def expand(source: str, directory: Path, depth: int = 0) -> str:
+        require(depth < 10, root / page, "include nesting is too deep")
+        return INCLUDE_SHORTCODE_RE.sub(
+            lambda m: expand(read_file(directory / m.group(1)).decode(), (directory / m.group(1)).parent, depth + 1),
+            source)
+
+    source = expand((read_file(root / page) if text is None else text).decode(), (root / page).parent)
     # Pandoc assigns the identifiers, so the anchors match the rendered page exactly.
     result = subprocess.run(["quarto", "pandoc", "--from", "markdown", "--to", "json"],
-                            input=read_file(root / page) if text is None else text, capture_output=True)
+                            input=source.encode(), capture_output=True)
     require(result.returncode == 0, root / page, f"heading inspection failed: {result.stderr.decode().strip()}")
     headers = [block["c"] for block in json.loads(result.stdout)["blocks"] if block["t"] == "Header"]
     top = min((level for level, *_ in headers), default=None)
+    for level, _, inlines in headers:
+        # Other shortcodes are expanded only at render time, so their heading anchors are unknown here.
+        require(level != top or "{{<" not in plain(inlines), root / page,
+                f"top-level heading {plain(inlines)!r} contains a shortcode; move it into the section body")
     items = [{"text": plain(inlines), "href": f"{page}#{attributes[0]}"}
              for level, attributes, inlines in headers if level == top and attributes[0] and plain(inlines)]
     return [{"text": "Overview", "href": page}, *items]
@@ -368,6 +381,8 @@ def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
         require(files[name].strip(), root / name, "empty publication source")
     for entry in page_sections(state):
         page = entry["contents"][0]["href"]
+        require(re.fullmatch(r"[A-Za-z0-9._/-]+", page), root / page,
+                "page path may contain only letters, digits, '.', '_', '-', and '/'")
         require(entry["contents"] == sections(root, page, files[page]), root / page,
                 "sidebar sections no longer match the page headings; run `python3 manuscript.py sync .`")
     inspect_config(root, files, state)

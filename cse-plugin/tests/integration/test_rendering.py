@@ -136,7 +136,9 @@ class RenderingBehaviorTests(unittest.TestCase):
             edge.parent.mkdir()
             edge.write_text("---\ntitle: Edge\n# a yaml comment\n---\n\n::: {.callout-note}\n## Summary\nx\n:::\n\n"
                             "## Summary\n\n### Results\n\n## Results\n\n## The _cooling_ fit\n\n"
-                            "## See [Smith](https://example.org)\n")
+                            "## See [Smith](https://example.org)\n\n{{< include results/part.qmd >}}\n\n## Data\n")
+            (edge.parent / "results").mkdir()
+            (edge.parent / "results" / "part.qmd").write_text("## Data\n\nIncluded section.\n")
             for _ in range(2):
                 run([sys.executable, "manuscript.py", "include", ".", "edge/notebook.qmd", "--title", "Edge"], root)
             edge.write_text(edge.read_text() + "\n## Added later\n")
@@ -148,7 +150,15 @@ class RenderingBehaviorTests(unittest.TestCase):
             membership = json.loads((root / "_cse-manuscript.json").read_text())
             self.assertEqual(1, membership["project"]["render"].count("edge/notebook.qmd"))
             edge_links = [c["text"] for c in membership["website"]["sidebar"]["contents"][-1]["contents"]]
-            self.assertEqual(["Overview", "Summary", "Results", "The cooling fit", "See Smith", "Added later"], edge_links)
+            self.assertEqual(["Overview", "Summary", "Results", "The cooling fit", "See Smith", "Data", "Data",
+                              "Added later"], edge_links)
+            shortcode = root / "edge" / "shortcode.qmd"
+            shortcode.write_text("---\ntitle: S\n---\n\n## Checks {{< meta title >}}\n")
+            refused = subprocess.run([sys.executable, "manuscript.py", "include", ".", "edge/shortcode.qmd", "--title", "S"],
+                                     cwd=root, text=True, capture_output=True, check=False)
+            self.assertNotEqual(0, refused.returncode)
+            self.assertIn("contains a shortcode", refused.stderr)
+            shortcode.unlink()
             rendered = run(["bash", "render.sh"], root)
             self.assertNotIn("not found in resource path", rendered.stdout + rendered.stderr)
 
@@ -183,7 +193,8 @@ class RenderingBehaviorTests(unittest.TestCase):
                 self.assertIn(f'id="{anchor}"', notebook)
             edge_page = (root / "_site/edge/notebook.html").read_text(encoding="utf-8")
             edge_anchors = re.findall(r'href="\./edge/notebook\.html#([^"]+)"', article)
-            self.assertEqual(["summary-1", "results-1", "the-cooling-fit", "see-smith", "added-later"], edge_anchors)
+            self.assertEqual(["summary-1", "results-1", "the-cooling-fit", "see-smith", "data", "data-1", "added-later"],
+                             edge_anchors)
             for anchor in edge_anchors:
                 self.assertIn(f'id="{anchor}"', edge_page)
             self.assertIn(r"5.000 \times 10^{-3}", notebook)

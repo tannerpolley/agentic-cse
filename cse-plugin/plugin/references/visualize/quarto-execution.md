@@ -43,7 +43,9 @@ expands it; its children are an Overview link and one link per heading at the
 page's highest level outside `:::` blocks, with the anchors Pandoc assigns.
 `manuscript.py sync <root>` recomputes those links from the current headings while
 keeping titles and groups; `include`, `refresh`, `preview`, the service, and
-`render.sh` run it first, and `validate` reports stale links. Notebook paths may
+`render.sh` run it first, and `validate` reports stale links. Included files count as part of the page;
+keep other shortcodes out of top-level headings. Re-running `include` for a grouped
+notebook must repeat its `--group`, or it moves to the top level. Notebook paths may
 use only letters, digits, `.`, `_`, `-`, and `/`.
 There is no page table of contents or margin column, so keep side notes inline.
 `include --group <name>` nests a notebook under a collapsed group heading
