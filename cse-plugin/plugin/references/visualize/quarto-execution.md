@@ -162,9 +162,10 @@ python3 assets/visualize/project/quarto/manuscript.py init analyses/ \
   --article-source analyses/index.qmd --source-commit <SHA> --runtime-tree-sha256 <SHA256>
 ```
 
-It replaces `manuscript.py`, `render.sh`, `_quarto-presentation.yml`, and the
-`.cse-quarto-source.json` source record with the current plugin versions and
-prints each replaced file. It keeps everything the project owns: `_quarto.yml`,
+It replaces `manuscript.py`, `render.sh`, `preview.service`,
+`_quarto-presentation.yml`, and the `.cse-quarto-source.json` source record
+with the current plugin versions, then prints each replaced file. It keeps
+everything the project owns: `_quarto.yml`,
 `_cse-manuscript.json` membership, `site.css`, `index.qmd`, `.gitignore`
 additions, and all sources and retained results. The replacement is validated
 before any write, so a failed validation leaves the root unchanged. `init` still
@@ -178,8 +179,9 @@ refused rather than rewritten. Migrate it once:
 2. Remove nested Quarto projects (`_quarto.yml` or `_metadata.yml` below the
    root) or move them out of the root.
 3. Remove `_quarto.yml`, `_quarto-presentation.yml`, `_cse-manuscript.json`,
-   `.cse-quarto-source.json`, `manuscript.py`, and `render.sh`, then rerun
-   `init` with that root's `index.qmd` as `--article-source`.
+   `.cse-quarto-source.json`, `manuscript.py`, `render.sh`, and
+   `preview.service`, then rerun `init` with that root's `index.qmd` as
+   `--article-source`.
 4. Include each report again with `include --title <title> [--group <heading>]`.
 5. Render with `render.sh`, then rerun `service` for the preview.
 
