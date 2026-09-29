@@ -249,6 +249,29 @@ def _project_views(config: CompanionConfig | None) -> dict[str, Any]:
     )
 
 
+def _project_libraries(observed: dict[str, Any]) -> dict[str, Any]:
+    registered = observed.get("registered", [])
+    stale = observed.get("stale", [])
+    sync = observed.get("addon_sync") or {}
+    if observed.get("error"):
+        reason = f"project registry is not usable: {observed['error']}"
+    elif not registered:
+        reason = "no project libraries are registered"
+    elif stale:
+        reason = f"project pages differ from Zotero; run project-sync --apply: {', '.join(stale)}"
+    elif not sync.get("observing"):
+        reason = "project pages are current, but the Zotero add-on is not refreshing them live"
+    else:
+        reason = "project pages match Zotero and the add-on refreshes them live"
+    return _status(
+        reason,
+        configured=bool(registered),
+        readable=not observed.get("error"),
+        ready=bool(registered) and not stale and not observed.get("error") and bool(sync.get("observing")),
+        **observed,
+    )
+
+
 def _hash_inventory_path(root: Path, inventory: Path, relative: str, expected: str) -> str | None:
     if not relative or not expected:
         return None
@@ -361,6 +384,7 @@ def doctor_payload(
     zotero: dict[str, Any],
     better_bibtex: dict[str, Any],
     mathpix: dict[str, Any],
+    project_libraries: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Build the read-only doctor payload without contacting external services."""
     config_file = Path(config_path)
@@ -399,6 +423,7 @@ def doctor_payload(
         "better_bibtex": better_bibtex_status,
         "retained_corpus": _offline_corpus(config),
         "project_views": _project_views(config),
+        "project_libraries": _project_libraries(project_libraries or {}),
         "data": _data_readiness(config),
         "bibliography_export": _bibliography_readiness(config),
         "mathpix": mathpix_status,

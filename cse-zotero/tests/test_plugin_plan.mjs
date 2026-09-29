@@ -27,3 +27,37 @@ test("configuration exposes explicit confirmation tokens", () => {
   assert.equal(config.searchToken, "ZOTERO-COMPANION-SEARCHES-v1");
   assert.equal(config.workflowSearches.length, 4);
 });
+
+test("project organize steps stay inside the registered project tree", async () => {
+  const { resolvePlan } = (await import("../zotero-plugin/organize-plan.js")).default;
+  const registry = {
+    root_collection: "ROOT0001",
+    projects: { mea: { collection: "PROJ0001" }, li: { collection: "PROJ0002" } }
+  };
+  const collections = [
+    { key: "ROOT0001", name: "Project Libraries", parent: "" },
+    { key: "PROJ0001", name: "MEA", parent: "ROOT0001" },
+    { key: "DATA0001", name: "Data", parent: "PROJ0001" },
+    { key: "PROJ0002", name: "Lithium", parent: "ROOT0001" }
+  ];
+  const ok = resolvePlan({ project: "mea", operations: [
+    { op: "create", id: "vle", name: "VLE", parent: "DATA0001" },
+    { op: "add", collection: "@vle", items: ["ITEM0001"] },
+    { op: "move", collection: "@vle", parent: "PROJ0001" }
+  ] }, registry, collections);
+  assert.deepEqual(ok.errors, []);
+  assert.deepEqual(ok.steps.map(step => step.path), ["MEA / Data / VLE", "MEA / Data / VLE", "MEA / VLE"]);
+
+  const outside = [
+    { project: "mea", operations: [{ op: "add", collection: "PROJ0002", items: ["ITEM0001"] }] },
+    { project: "mea", operations: [{ op: "move", collection: "DATA0001", parent: "ROOT0001" }] },
+    { project: "mea", operations: [{ op: "move", collection: "PROJ0001", parent: "DATA0001" }] },
+    { project: "nope", operations: [{ op: "rename", collection: "PROJ0001", name: "x" }] },
+    { operations: [{ op: "rename", collection: "PROJ0001", name: "x" }] },
+    { operations: [{ op: "create", name: "New", parent: "PROJ0001" }] }
+  ];
+  for (const request of outside) {
+    assert.notDeepEqual(resolvePlan(request, registry, collections).errors, [], JSON.stringify(request));
+  }
+  assert.deepEqual(resolvePlan({ operations: [{ op: "create", name: "New project" }] }, registry, collections).errors, []);
+});

@@ -27,7 +27,9 @@ class ZoteroPluginClient:
         try:
             with urlopen(request, timeout=self.timeout) as response:
                 raw = response.read().decode("utf-8")
-        except (HTTPError, URLError, TimeoutError) as exc:
+        except HTTPError as exc:
+            raise PluginClientError(f"{exc}: {exc.read().decode('utf-8', 'replace')}") from exc
+        except (URLError, TimeoutError) as exc:
             raise PluginClientError(str(exc)) from exc
         try:
             return json.loads(raw)
@@ -44,3 +46,9 @@ class ZoteroPluginClient:
     def saved_searches(self, *, apply: bool = False) -> dict:
         payload = {"mode": "apply", "confirm": "ZOTERO-COMPANION-SEARCHES-v1"} if apply else {}
         return self._request("/zotero-companion/saved-searches", method="POST", payload=payload)
+
+    def project_organize(self, plan: dict, *, apply: bool = False) -> dict:
+        payload = dict(plan)
+        if apply:
+            payload.update(mode="apply", confirm="ZOTERO-COMPANION-ORGANIZE-v1")
+        return self._request("/zotero-companion/project-organize", method="POST", payload=payload)

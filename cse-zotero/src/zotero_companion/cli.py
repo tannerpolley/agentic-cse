@@ -26,6 +26,15 @@ from .maintenance import maintain_wiki
 from .mathpix_ops import MathpixOperationError, mathpix_conversion
 from .manifests import ManifestError, lint_manifests, load_manifests, manifest_lookup
 from .plugin_client import PluginClientError, ZoteroPluginClient
+from .projects import (
+    ProjectError,
+    default_registry_path,
+    load_registry,
+    plan_registration,
+    project_collections,
+    sync_projects,
+    write_registry,
+)
 from .health import health_report
 from .records import (
     RecordError,
@@ -87,6 +96,104 @@ def add_wiki_options(command: argparse.ArgumentParser) -> None:
 
 def emit_json(payload: object) -> None:
     print(json.dumps(payload, indent=2, sort_keys=True))
+
+
+def _project_command(args: argparse.Namespace) -> dict:
+    registry_path = args.registry or default_registry_path()
+    registry = load_registry(registry_path)
+    if args.command == "project-list":
+        pages = args.wiki_root / "projects"
+        return {
+            "registry": str(registry_path),
+            "root_collection": registry["root_collection"],
+            "projects": {
+                slug: {**entry, "page": str(pages / f"{slug}.md")}
+                for slug, entry in sorted(registry["projects"].items())
+            },
+        }
+    api = ZoteroLocalAPI()
+    if args.command == "project-sync":
+        return sync_projects(
+            registry,
+            args.wiki_root,
+            collections=api.collections(),
+            items=api.items(top_level=True),
+            slug=args.slug,
+            apply=args.apply,
+        )
+    if args.command == "project-organize":
+        plan = json.loads(args.plan.read_text(encoding="utf-8"))
+        result = ZoteroPluginClient().project_organize(plan, apply=args.apply)
+        if args.apply and plan.get("project"):
+            result["sync"] = sync_projects(
+                registry,
+                args.wiki_root,
+                collections=api.collections(),
+                items=api.items(top_level=True),
+                slug=plan["project"],
+                apply=True,
+            )
+        return result
+    collection = args.collection
+    created = None
+    if args.create:
+        # The add-on reads the root from the registry file, so it must be recorded.
+        if not registry["root_collection"] or args.root not in (None, registry["root_collection"]):
+            raise ProjectError("--create needs an already registered root collection; register one with --root and --collection first")
+        plan = {"operations": [{"op": "create", "name": args.create}]}
+        created = ZoteroPluginClient().project_organize(plan, apply=args.apply)
+        if not args.apply:
+            return {"mode": "dry-run", "create": created, "slug": args.slug, "repository": args.repository}
+        collection = created["applied"][0]["key"]
+    proposed = plan_registration(
+        registry,
+        slug=args.slug,
+        collection=collection,
+        repository=args.repository,
+        collections=api.collections(),
+        root=args.root,
+    )
+    payload = {
+        "mode": "apply" if args.apply else "dry-run",
+        "registry": str(registry_path),
+        "current": registry["projects"].get(args.slug),
+        "proposed": proposed["projects"][args.slug],
+        "root_collection": proposed["root_collection"],
+    }
+    if created:
+        payload["created"] = created
+    if args.apply:
+        write_registry(proposed, registry_path)
+        payload["sync"] = sync_projects(
+            proposed,
+            args.wiki_root,
+            collections=api.collections(),
+            items=api.items(top_level=True),
+            slug=args.slug,
+            apply=True,
+        )
+    return payload
+
+
+def _project_doctor(config, zotero_ok: bool) -> dict:
+    try:
+        registry = load_registry()
+    except ProjectError as exc:
+        return {"error": str(exc)}
+    observed: dict = {"registered": sorted(registry["projects"]), "root_collection": registry["root_collection"]}
+    if zotero_ok and config is not None and registry["projects"]:
+        try:
+            api = ZoteroLocalAPI()
+            observed["stale"] = sync_projects(
+                registry, config.wiki_root, collections=api.collections(), items=api.items(top_level=True)
+            )["stale"]
+        except (ProjectError, LocalAPIError) as exc:
+            observed["error"] = str(exc)
+    try:
+        observed["addon_sync"] = ZoteroPluginClient().status().get("projectSync")
+    except PluginClientError:
+        observed["addon_sync"] = None
+    return observed
 
 
 def main() -> int:
@@ -476,6 +583,33 @@ def main() -> int:
     add_wiki_options(wiki_verify)
     wiki_stale = subparsers.add_parser("wiki-stale", help="compare the wiki with a fresh Zotero read")
     add_wiki_options(wiki_stale)
+    project_register = subparsers.add_parser(
+        "project-register",
+        help="bind a project slug to its Zotero collection under the project root collection",
+    )
+    project_register.add_argument("--slug", required=True, help="stable project slug, e.g. mea-thermodynamics")
+    target = project_register.add_mutually_exclusive_group(required=True)
+    target.add_argument("--collection", help="existing Zotero collection key inside the root collection")
+    target.add_argument("--create", metavar="NAME", help="create a new collection directly under the root")
+    project_register.add_argument("--repository", default="", help="absolute path of the project repository")
+    project_register.add_argument("--root", help="set the top-level project collection key")
+    project_register.add_argument("--apply", action="store_true", help="write the registry and sync the page")
+    project_list = subparsers.add_parser("project-list", help="list registered project libraries")
+    project_sync = subparsers.add_parser(
+        "project-sync",
+        help="render registered project pages from their live Zotero collection trees",
+    )
+    project_sync.add_argument("--slug", help="sync one project (default: all)")
+    project_sync.add_argument("--apply", action="store_true", help="write changed pages")
+    project_organize = subparsers.add_parser(
+        "project-organize",
+        help="preview or apply a collection reorganization inside one project's Zotero tree",
+    )
+    project_organize.add_argument("plan", type=Path, help='JSON: {"project": slug, "operations": [...]}')
+    project_organize.add_argument("--apply", action="store_true", help="apply through the Zotero add-on, then sync")
+    for command in (project_register, project_list, project_sync, project_organize):
+        add_wiki_options(command)
+        command.add_argument("--registry", type=Path, default=None, help="project registry path")
     args = parser.parse_args()
     if args.command in {
         "zotero-search",
@@ -585,6 +719,7 @@ def main() -> int:
                         bbt_error = str(exc)
                     payload = doctor_payload(
                         args.config,
+                        project_libraries=_project_doctor(config, zotero_ok),
                         config=config,
                         configuration_error=configuration_error,
                         zotero={"ok": zotero_ok, "error": zotero_error},
@@ -600,6 +735,13 @@ def main() -> int:
             args.wiki_root = load_config().wiki_root
         except ConfigError as exc:
             parser.error(str(exc))
+    if args.command.startswith("project-"):
+        try:
+            payload = _project_command(args)
+        except (ProjectError, LocalAPIError, PluginClientError, OSError, ValueError) as exc:
+            parser.error(str(exc))
+        emit_json(payload)
+        return 0 if payload.get("ok", True) else 1
     if args.command in {
         "schema-validate",
         "data-query",
@@ -732,7 +874,7 @@ def main() -> int:
     }:
         try:
             if args.command in {"wiki-sync", "wiki-refresh"}:
-                snapshot = WikiSnapshot.from_api(ZoteroLocalAPI())
+                snapshot = WikiSnapshot.from_api(ZoteroLocalAPI(), project_collections(load_registry()))
                 payload = materialize_snapshot(snapshot, args.wiki_root, apply=args.apply)
                 if args.command == "wiki-refresh":
                     payload["refresh_scope"] = "generated_source_layer_only"
@@ -742,6 +884,7 @@ def main() -> int:
                     args.wiki_root,
                     api=ZoteroLocalAPI(),
                     apply=args.apply,
+                    projects=project_collections(load_registry()),
                 )
             elif args.command == "wiki-index":
                 if args.apply:
@@ -890,6 +1033,7 @@ def main() -> int:
                 payload = stale_report(args.wiki_root, ZoteroLocalAPI())
         except (
             LocalAPIError,
+            ProjectError,
             WikiError,
             EvidenceSyncError,
             RecordError,

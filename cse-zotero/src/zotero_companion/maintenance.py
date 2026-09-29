@@ -49,8 +49,10 @@ def _overlap_lock(root: Path) -> Iterator[bool]:
         handle.close()
 
 
-def _run_locked(root: Path, *, api: Any, apply: bool) -> dict[str, Any]:
-    snapshot = WikiSnapshot.from_api(api)
+def _run_locked(
+    root: Path, *, api: Any, apply: bool, projects: Mapping[str, str] | None
+) -> dict[str, Any]:
+    snapshot = WikiSnapshot.from_api(api, projects)
     records = build_source_records(snapshot)
     refresh = materialize_snapshot(
         snapshot,
@@ -121,8 +123,12 @@ def maintain_wiki(
     *,
     api: Any | None = None,
     apply: bool = False,
+    projects: Mapping[str, str] | None = None,
 ) -> dict[str, Any]:
-    """Refresh sources, sync existing companions, and verify the repository."""
+    """Refresh sources, sync existing companions, and verify the repository.
+
+    ``projects`` maps registered slugs to collection keys for source membership.
+    """
 
     root = Path(root).expanduser().resolve()
     api = api if api is not None else ZoteroLocalAPI()
@@ -134,7 +140,7 @@ def maintain_wiki(
                     "status": "skipped_overlap",
                     "mode": "apply" if apply else "dry-run",
                 }
-            return _run_locked(root, api=api, apply=apply)
+            return _run_locked(root, api=api, apply=apply, projects=projects)
     except LocalAPIError as exc:
         return {
             "ok": False,
