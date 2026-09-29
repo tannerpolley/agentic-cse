@@ -5,7 +5,7 @@ repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 runtime_target="$HOME/.local/share/cse/zotero"
 runtime_bin_dir="$HOME/.local/bin"
 runtime_commands=(cse-zotero zotero-companion)
-expected_zotero_commit="853b0867b14500767713fe99926e40faaa4601ba"
+expected_zotero_commit="e6cfc2e4580560939ccfb5f61985cd54a6757afb"
 codex_bin="${CSE_CODEX_BIN:-codex}"
 
 usage() {
