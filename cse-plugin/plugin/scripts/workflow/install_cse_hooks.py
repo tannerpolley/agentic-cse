@@ -202,8 +202,8 @@ def install_repository(path: Path, agent: str = "codex", add: bool = True) -> tu
     return write_registration(project_root(path) / CONFIG_PATHS[agent], agent, add)
 
 
-def codex_cse_hooks(root: Path, trust: bool, source: Path | None = None) -> tuple[list[dict], list[str]]:
-    """List the CSE hooks Codex reads from the repository's .codex/hooks.json.
+def codex_cse_hooks(root: Path, trust: bool, source: Path | tuple[Path, ...] | None = None) -> tuple[list[dict], list[str]]:
+    """List CSE hooks from one registration source or a selected set of sources.
 
     With trust=True, persist trust for the ones not yet trusted and return the refreshed
     list plus the keys newly trusted. Talks to `codex app-server` (JSON-RPC over stdio).
@@ -212,7 +212,8 @@ def codex_cse_hooks(root: Path, trust: bool, source: Path | None = None) -> tupl
     codex = shutil.which(os.environ.get("CSE_CODEX_BIN", "codex"))
     if codex is None:
         raise InstallError("codex CLI not found")
-    target = (source or root / CONFIG_PATHS["codex"]).resolve()
+    sources = source if isinstance(source, tuple) else (source or root / CONFIG_PATHS["codex"],)
+    targets = {path.resolve() for path in sources}
     owned = {command for event in EVENTS for command in owned_commands(event)}
     deadline = time.monotonic() + CODEX_TIMEOUT
     try:
@@ -250,7 +251,7 @@ def codex_cse_hooks(root: Path, trust: bool, source: Path | None = None) -> tupl
 
     def listing() -> list[dict]:
         hooks = call("hooks/list", {"cwds": [str(root)]})["data"][0]["hooks"]
-        return [h for h in hooks if Path(h["sourcePath"]).resolve() == target and h["command"] in owned]
+        return [h for h in hooks if Path(h["sourcePath"]).resolve() in targets and h["command"] in owned]
 
     try:
         call("initialize", {"clientInfo": {"name": "cse-hooks", "version": "0"}})
@@ -271,19 +272,19 @@ def codex_cse_hooks(root: Path, trust: bool, source: Path | None = None) -> tupl
 
 
 def codex_trust_report(root: Path, home: Path) -> dict:
-    """Read-only trust status of the CSE hooks in the effective registration: the repository's
-    .codex/hooks.json when present, otherwise the user-level one under home."""
-    source = next((path for path in (root / CONFIG_PATHS["codex"], home / CONFIG_PATHS["codex"]) if path.is_file()), None)
-    if source is None:
-        return {"status": "unknown", "reason": "no repository or user hook registration"}
+    """Read-only trust status of CSE hooks registered at repository or user level."""
+    sources = tuple(path for path in (root / CONFIG_PATHS["codex"], home / CONFIG_PATHS["codex"]) if path.is_file())
+    if not sources:
+        return {"status": "unknown", "sources": [], "reason": "no repository or user hook registration"}
     try:
-        hooks, _ = codex_cse_hooks(root, trust=False, source=source)
+        hooks, _ = codex_cse_hooks(root, trust=False, source=sources)
     except InstallError as exc:
-        return {"status": "unknown", "source": str(source), "reason": str(exc)}
+        return {"status": "unknown", "sources": [str(path) for path in sources], "reason": str(exc)}
     if not hooks:
-        return {"status": "unknown", "source": str(source), "reason": NO_HOOKS_LISTED}
+        return {"status": "unknown", "sources": [str(path) for path in sources], "reason": NO_HOOKS_LISTED}
     status = "trusted" if all(h["trustStatus"] == "trusted" for h in hooks) else "untrusted"
-    return {"status": status, "source": str(source), "hooks": {h["key"]: h["trustStatus"] for h in hooks}}
+    sources = sorted({h["sourcePath"] for h in hooks})
+    return {"status": status, "sources": sources, "hooks": {h["key"]: h["trustStatus"] for h in hooks}}
 
 
 def diagnose_configuration(target: Path, home: Path) -> dict:

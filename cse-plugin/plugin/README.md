@@ -15,9 +15,9 @@ Independent `review` checks design readiness before execution and delivered
 results or capabilities afterward. Supporting `prose` inspects scientific
 writing and final manuscript cohesion; neither is an execution phase.
 
-Direct execution is the default when no project preference or task override
-exists. When baton mode is selected, the installed Baton Pass skill coordinates
-roles and handoffs; CSE still owns its scientific stages and acceptance.
+Direct execution is the default, with native host delegation for bounded
+independent work when useful. In T3 Code, use its delegated tasks and completion
+delivery. CSE owns its scientific stages and acceptance.
 
 Use source skills for bounded Zotero, lineage, data, and digitization work.
 Use rendering skills for retained values and selected document outputs. Missing

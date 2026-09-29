@@ -27,13 +27,12 @@ setup and report the exact missing capability; never silently install one.
 Apply the shared [decision-frontier rule](../../references/workflow/operating-model.md#decision-frontier-handoff-and-reference-reuse) to role, purpose, and owner choices
 after inspection; confirm the investigator's `analysis` or `tool` role on
 every Setup run; continuing handoffs inherit an answer.
-When root `AGENTS.md` has no project execution preference, offer `direct` or
-`baton` once and record the selection as a separate plain paragraph:
-`CSE execution mode: direct.` or `CSE execution mode: baton.` Direct is the
-default until a preference is recorded. Keep this independent of repository
-role, preserve unrelated guidance, and do not rewrite it for a task override.
-Workflow reads the paragraph directly; create no parser, configuration file,
-or duplicate preference in `CONTEXT.md`.
+Record the default execution preference in root `AGENTS.md` as a separate
+plain paragraph: `CSE execution mode: direct.` Reconcile a retired Baton
+preference to direct. Workflow uses direct work and native host delegation,
+including T3 Code delegated tasks when useful. Keep this independent of
+repository role and preserve unrelated guidance; create no parser,
+configuration file, or duplicate preference in `CONTEXT.md`.
 Use this workflow for both initial preparation and later reconciliation when
 the repository's scientific setup, ownership, vocabulary, or available routes
 need to change. Preserve accepted existing setup and revise only the unresolved
@@ -52,6 +51,8 @@ plan; add `--role analysis` or `--role tool` for a confirmed preview. They
 write nothing until the same plan is rerun with `--approve --role <role>`. Merge
 every root or nested `CONTEXT.md` into the one root `CONTEXT.md`, including
 its sourced glossary and avoid table, and mark missing sources as `sourceless`.
+Literal caller rewrites miss code-built paths and fixed parent-directory climbs;
+check those manually after approved moves.
 The scientific context owns the question, intended use, owners, one
 confirmed `repository role: analysis | tool` line consumed by Design and the
 stance hook, and one `agent role: <discipline and specialization>` line with

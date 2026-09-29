@@ -49,6 +49,7 @@ OPTIONAL = {
 SKIP_PARTS = {".git", ".venv", "__pycache__", ".pytest_cache", ".mypy_cache", ".ruff_cache"}
 UNSOURCED_TERMS = ("certificate", "fingerprint", "admission", "typed failure", "claim boundary")
 CALLER_SUFFIXES = {".md", ".qmd", ".tex", ".rst", ".yaml", ".yml", ".json", ".py", ".sh", ".cmake", ".cpp", ".h", ".hpp", ".js", ".toml"}
+DOCUMENT_CLASS_RE = re.compile(rb"(?m)^[ \t]*\\documentclass\b")
 # Exact unpopulated templates removed in #54; a modified template is a record.
 LEGACY_TEMPLATE_BLOBS = {
     "7f473a595e439c0c8b232e0f02567c31162ab2db",
@@ -413,17 +414,33 @@ def canonical_context(text: str, role: str, agent_role_value: str | None = None,
     return text.strip() + "\n"
 
 
-def context_sources(repo: Path) -> list[Path]:
-    return sorted(path for path in repository_files(repo) if path.name == "CONTEXT.md")
+def latex_document_roots(repo: Path, files: Iterable[Path]) -> tuple[Path, ...]:
+    scientific = repo / "docs/scientific"
+    candidates = set()
+    for path in files:
+        if path.suffix.lower() != ".tex" or path.is_symlink() or not path.is_relative_to(scientific):
+            continue
+        suffix = path.relative_to(scientific)
+        if len(suffix.parts) < 2 or suffix.parts[0] in {"latex", "adr"}:
+            continue
+        if path.name.casefold() == "main.tex" or DOCUMENT_CLASS_RE.search(path.read_bytes()):
+            candidates.add(path.parent)
+    roots = []
+    for candidate in sorted(candidates, key=lambda path: (len(path.parts), str(path))):
+        if not any(candidate.is_relative_to(root) for root in roots):
+            roots.append(candidate)
+    return tuple(roots)
 
 
-def record_target(path: Path, repo: Path) -> Path | None:
+def record_target(path: Path, repo: Path, document_roots: tuple[Path, ...] = ()) -> Path | None:
     rel = path.relative_to(repo)
     parts = rel.parts
     if parts in (("docs", "scientific", "README.md"), ("docs", "scientific", "CONTEXT.md")):
         return None
     if parts[-1] == "CONTEXT.md":
         return None
+    if any(path.is_relative_to(root) for root in document_roots):
+        return repo / "docs/scientific/latex" / path.relative_to(repo / "docs/scientific")
     if "docs" in parts and "scientific" in parts:
         index = max(i for i, part in enumerate(parts) if part == "scientific")
         suffix = parts[index + 1:]
@@ -454,13 +471,15 @@ def plan_reconciliation(repo: Path, role: str | None = None,
         validate_role(role)
     if source_data_adoption is not None:
         validate_source_data_adoption(source_data_adoption)
-    contexts = context_sources(repo)
+    files = list(repository_files(repo))
+    contexts = sorted(path for path in files if path.name == "CONTEXT.md")
+    document_roots = latex_document_roots(repo, files)
     target = repo / "docs/scientific/CONTEXT.md"
     all_context_text = "\n".join(path.read_text(encoding="utf-8", errors="replace") for path in contexts)
     selected_role = role or proposed_role(all_context_text)
     persisted_adoption = stored_source_data_adoption(all_context_text)
     searchable = all_context_text + "\n" + "\n".join(
-        relative(path, repo) for path in repository_files(repo)
+        relative(path, repo) for path in files
         if "docs" in path.relative_to(repo).parts
     )
     glossary: list[list[str]] = []
@@ -503,9 +522,9 @@ def plan_reconciliation(repo: Path, role: str | None = None,
     merges = []
     deletes = []
     links = {}
-    reserved = {relative(path, repo) for path in repository_files(repo)}
-    for path in repository_files(repo):
-        destination = record_target(path, repo)
+    reserved = {relative(path, repo) for path in files}
+    for path in files:
+        destination = record_target(path, repo, document_roots)
         if destination is None:
             continue
         old = relative(path, repo)
@@ -525,7 +544,7 @@ def plan_reconciliation(repo: Path, role: str | None = None,
         if path != target:
             merges.append({"source": relative(path, repo), "target": "docs/scientific/CONTEXT.md", "reason": "merge glossary and scientific context"})
             links[relative(path, repo)] = "docs/scientific/CONTEXT.md"
-    for path in repository_files(repo):
+    for path in files:
         rel = path.relative_to(repo).parts
         if obsolete_template(path):
             deletes.append({"path": relative(path, repo), "reason": "obsolete unpopulated decision template"})
@@ -535,7 +554,7 @@ def plan_reconciliation(repo: Path, role: str | None = None,
     if not readme.exists() and "docs/scientific/README.md" not in reserved:
         moves.append({"source": "(asset)", "target": "docs/scientific/README.md", "reason": "mandatory record"})
     updates = []
-    for path in repository_files(repo):
+    for path in files:
         if path == target or path.suffix.lower() not in CALLER_SUFFIXES:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
@@ -624,6 +643,9 @@ def remove_path(path: Path, repo: Path) -> None:
 
 
 def merge_file(source: Path, target: Path, repo: Path) -> None:
+    if target.exists() and source.suffix.lower() == target.suffix.lower() and digest(source) == digest(target):
+        remove_path(source, repo)
+        return
     source_text = source.read_text(encoding="utf-8")
     if source.suffix == ".tex" and target.suffix == ".md":
         source_text = markdown_record(source_text)
@@ -655,6 +677,10 @@ def validate_reconciliation_plan(repo: Path, plan: dict) -> None:
             raise SetupError(f"planned move source is missing: {source}")
         if target.exists():
             raise SetupError(f"planned move destination is occupied: {target}")
+    planned_targets = {
+        item["target"]: item["source"] for item in plan["moves"]
+        if not item["source"].startswith("(")
+    }
     for item in plan["merges"]:
         source = repo / item["source"]
         if not source.is_file():
@@ -662,8 +688,19 @@ def validate_reconciliation_plan(repo: Path, plan: dict) -> None:
         target = repo / item["target"]
         if target.exists() and not target.is_file():
             raise SetupError(f"planned merge destination is not a file: {target}")
-        if source.name != "CONTEXT.md" and (source.suffix.lower() not in CALLER_SUFFIXES or target.suffix.lower() not in CALLER_SUFFIXES):
-            raise SetupError(f"manual merge required for non-text records: {source} -> {target}")
+        if source.name != "CONTEXT.md":
+            comparison = item["target"] if target.exists() else planned_targets.get(item["target"])
+            identical = (comparison is not None and source.suffix.lower() == target.suffix.lower()
+                         and plan["source_hashes"][item["source"]] == plan["source_hashes"][comparison])
+            if identical:
+                continue
+            if source.suffix.lower() not in CALLER_SUFFIXES or target.suffix.lower() not in CALLER_SUFFIXES:
+                raise SetupError(f"manual merge required for non-text records: {source} -> {target}")
+            markdown_merge = target.suffix.lower() == ".md" and (
+                source.suffix.lower() == ".md" or item.get("conversion") == "Markdown record"
+            )
+            if comparison is not None and not markdown_merge:
+                raise SetupError(f"manual merge required for differing non-Markdown records: {source} -> {target}")
         source.read_text(encoding="utf-8")
         if target.exists():
             target.read_text(encoding="utf-8")

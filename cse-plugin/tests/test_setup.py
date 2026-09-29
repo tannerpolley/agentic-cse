@@ -317,6 +317,7 @@ class ManagedProtocolTests(unittest.TestCase):
             scientific = root / "docs/scientific"
             scientific.mkdir()
             (scientific / "formulation.tex").write_text("\\section{Formulation}\nRetained equation.\n")
+            (scientific / "formulation.md").write_text("# Existing formulation\nExisting note.\n")
             subprocess.run(["git", "add", "-A"], cwd=root, check=True)
             subprocess.run(["git", "commit", "-qm", "legacy scientific layout"], cwd=root, check=True)
             before = (root / "CONTEXT.md").read_text()
@@ -340,14 +341,113 @@ class ManagedProtocolTests(unittest.TestCase):
             self.assertFalse((root / "CONTEXT.md").exists())
             self.assertFalse((root / "docs/scientific/formulation.tex").exists())
             self.assertTrue((root / "docs/scientific/formulation.md").is_file())
+            formulation = (root / "docs/scientific/formulation.md").read_text()
+            self.assertIn("Existing note.", formulation)
+            self.assertIn("# Formulation", formulation)
+            self.assertIn("Retained equation.", formulation)
             self.assertIn("docs/scientific/formulation.md", (root / "docs/caller.md").read_text())
             self.assertTrue((root / "docs/scientific/README.md").is_file())
             self.assertFalse((root / ".codex/hooks.json").exists())
             self.assertFalse((root / ".claude/settings.json").exists())
 
+    def test_reconciliation_moves_nested_latex_document_trees_together(self):
+        root = self.repo
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+        (root / "AGENTS.md").write_text("# Project\n\nKeep this note.\n")
+        scientific = root / "docs/scientific"
+        scientific.mkdir(parents=True)
+        (scientific / "README.md").write_text("# Scientific records\n")
+        (scientific / "CONTEXT.md").write_text(
+            "# Scientific context\n\nrepository role: analysis\n\n## Question and intended use\n\nStudy.\n"
+        )
+
+        document = scientific / "cooling/manuscript"
+        (document / "figures").mkdir(parents=True)
+        (document / "scripts").mkdir()
+        (document / "main.tex").write_text("\\documentclass{article}\n\\begin{document}Result.\\end{document}\n")
+        (document / "figures/x.pdf").write_bytes(b"%PDF-1.4 retained figure\n")
+        (document / "scripts/y.py").write_text("print('retained analysis')\n")
+        (document / "CONTEXT.md").write_text("# Manuscript context\n\nRetain this research note.\n")
+
+        classed = scientific / "methods/source"
+        (classed / "styles").mkdir(parents=True)
+        (classed / "article.tex").write_text("\\documentclass{article}\n\\begin{document}Methods.\\end{document}\n")
+        (classed / "styles/paper.sty").write_text("\\ProvidesPackage{paper}\n")
+        duplicate = b'{"rate": 1}\n'
+        (document / "params.json").write_bytes(duplicate)
+        canonical = scientific / "latex/cooling/manuscript"
+        canonical.mkdir(parents=True)
+        (canonical / "params.json").write_bytes(duplicate)
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+
+        plan = setup.plan_reconciliation(root, role="analysis")
+        expected = {
+            "docs/scientific/cooling/manuscript/main.tex": "docs/scientific/latex/cooling/manuscript/main.tex",
+            "docs/scientific/cooling/manuscript/figures/x.pdf": "docs/scientific/latex/cooling/manuscript/figures/x.pdf",
+            "docs/scientific/cooling/manuscript/scripts/y.py": "docs/scientific/latex/cooling/manuscript/scripts/y.py",
+            "docs/scientific/methods/source/article.tex": "docs/scientific/latex/methods/source/article.tex",
+            "docs/scientific/methods/source/styles/paper.sty": "docs/scientific/latex/methods/source/styles/paper.sty",
+        }
+        planned = {item["source"]: item["target"] for item in plan["moves"] if item["source"] in expected}
+        self.assertEqual(expected, planned)
+        self.assertIn("docs/scientific/latex/cooling/manuscript/figures/x.pdf", setup.plan_text(plan))
+        self.assertTrue((document / "figures/x.pdf").is_file())
+
+        setup.apply_reconciliation(root, plan, "analysis", AGENT_ROLE)
+        for source, target in expected.items():
+            self.assertFalse((root / source).exists(), source)
+            self.assertTrue((root / target).is_file(), target)
+        self.assertEqual(b"%PDF-1.4 retained figure\n",
+                         (root / "docs/scientific/latex/cooling/manuscript/figures/x.pdf").read_bytes())
+        self.assertEqual("print('retained analysis')\n",
+                         (root / "docs/scientific/latex/cooling/manuscript/scripts/y.py").read_text())
+        self.assertFalse((document / "params.json").exists())
+        self.assertEqual(duplicate, (canonical / "params.json").read_bytes())
+        self.assertIn("Retain this research note.", (scientific / "CONTEXT.md").read_text())
+        self.assertFalse((root / "docs/scientific/latex/cooling/manuscript/CONTEXT.md").exists())
+
+    def test_reconciliation_refuses_differing_document_companion_before_writes(self):
+        root = self.repo
+        subprocess.run(["git", "init", "-q", "-b", "main"], cwd=root, check=True)
+        (root / "AGENTS.md").write_text("# Project\n\nKeep this note.\n")
+        scientific = root / "docs/scientific"
+        (scientific / "study/figures").mkdir(parents=True)
+        (scientific / "study/scripts").mkdir()
+        (scientific / "README.md").write_text("# Scientific records\n")
+        (scientific / "CONTEXT.md").write_text(
+            "# Scientific context\n\nrepository role: analysis\n\n## Question and intended use\n\nStudy.\n"
+        )
+        (scientific / "study/main.tex").write_text("\\documentclass{article}\n")
+        (scientific / "study/figures/x.pdf").write_bytes(b"%PDF-1.4 retained figure\n")
+        (scientific / "study/scripts/y.py").write_text("print('retained analysis')\n")
+        (scientific / "study/params.json").write_text('{"rate": 2}\n')
+        target = scientific / "latex/study/params.json"
+        target.parent.mkdir(parents=True)
+        target.write_text('{"rate": 1}\n')
+        subprocess.run(["git", "add", "-A"], cwd=root, check=True)
+
+        plan = setup.plan_reconciliation(root, role="analysis")
+        names = (
+            "AGENTS.md", "docs/scientific/README.md", "docs/scientific/CONTEXT.md",
+            "docs/scientific/study/main.tex", "docs/scientific/study/figures/x.pdf",
+            "docs/scientific/study/scripts/y.py", "docs/scientific/study/params.json",
+            "docs/scientific/latex/study/params.json",
+        )
+        before = {name: (root / name).read_bytes() for name in names}
+        status = subprocess.run(["git", "status", "--porcelain"], cwd=root, check=True,
+                                capture_output=True, text=True).stdout
+
+        with self.assertRaisesRegex(setup.SetupError, "manual merge required"):
+            setup.apply_reconciliation(root, plan, "analysis", AGENT_ROLE)
+
+        self.assertEqual(before, {name: (root / name).read_bytes() for name in names})
+        after_status = subprocess.run(["git", "status", "--porcelain"], cwd=root, check=True,
+                                      capture_output=True, text=True).stdout
+        self.assertEqual(status, after_status)
+
     def legacy_repository(self) -> None:
         (self.repo / "AGENTS.md").write_text(
-            f"# My project\n\nKeep the custom build notes.\n\n{LEGACY_POINTER}\n\nCSE execution mode: baton.\n",
+            f"# My project\n\nKeep the custom build notes.\n\n{LEGACY_POINTER}\n\nKeep this project-specific note.\n",
             encoding="utf-8",
         )
         scientific = self.repo / "docs/scientific"
@@ -493,7 +593,7 @@ class ManagedProtocolTests(unittest.TestCase):
         block = self.block(text)
         self.assertTrue(text.startswith("# My project\n\n" + BEGIN), text[:120])
         self.assertIn("Keep the custom build notes.", text)
-        self.assertIn("CSE execution mode: baton.", text)
+        self.assertIn("Keep this project-specific note.", text)
         self.assertNotIn(LEGACY_POINTER, text)
         self.assertIn("**Repository role:** analysis.", block)
         self.assertIn(f"agent role: {ROLE}", self.context())

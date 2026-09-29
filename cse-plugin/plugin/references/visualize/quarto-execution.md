@@ -58,6 +58,9 @@ project owns `site.css` after `init`. The root
 sets `notebook-links: false`, so an article that embeds a labeled cell from a
 retained notebook with `{{< embed >}}` shows the cell without a link to a
 separate notebook page.
+The HTML root sets `format-links: false` so optional, unbuilt PDF views do not
+produce download links. A page with PDF settings must also declare `html: {}`
+first in its `format` mapping so website navigation selects its HTML output.
 
 Initialize with `manuscript.py init`, include substantive report `.qmd` files
 with `manuscript.py include`, and use `manuscript.py validate` before a render.
@@ -73,7 +76,8 @@ The command owns only `_cse-manuscript.json`; `project.render` and
 metadata file, and native inspection confirms the merged sidebar. The site
 title and other presentation settings remain in `_quarto.yml`, which must not
 define a sidebar. An unregistered `.qmd` is not rendered. Use `assets/visualize/project/quarto/render.sh` for a release
-render; it passes
+render; it selects `--to html` unless the caller supplies `--to` or `-t`, so
+page-level PDF settings do not broaden an ordinary HTML render. It passes
 `--no-execute` at the command boundary and gives Quarto, Deno, and LuaLaTeX
 private writable runtime directories. TinyTeX is the TeX distribution,
 LuaLaTeX (LuaHBTeX) is its compiler, Quarto is the document manager, and
@@ -99,7 +103,8 @@ When a document needs Python to format a retained table or draw a plot, use
 `manuscript.py refresh <root> <included.qmd>`. It runs the presentation-only
 `present` entry, then native Quarto with `_quarto-presentation.yml`, invalidates
 the presentation cache, and updates the included notebook page and the home
-page.
+page. Refresh and preview select HTML explicitly, keeping a page's optional
+PDF settings out of the website update.
 Quarto preview does not detect arbitrary external-data changes; the
 managed preview bridge asks the running preview to re-render only the affected
 registered source (touching a file does not trigger it) after the presentation hook has been allowed to validate retained inputs. The following

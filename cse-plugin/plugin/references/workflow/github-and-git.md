@@ -23,9 +23,8 @@ only draft when publication fails, and remove it after successful publication
 and read-back. Record the captured body identity and implementation base in the
 ordinary handoff, not a new plan database.
 
-In direct mode, the current accountable task performs authorized issue writes.
-In baton mode, the Manager owns GitHub mutations; workers and reviewers may read
-the issue and return evidence. Keep the body current at meaningful start,
+The current accountable task performs authorized issue writes; workers and
+reviewers read the issue and return evidence. Keep the body current at meaningful start,
 amendment, handoff, review, and completion points without commenting on every
 tool call. Optional reviewer suggestions do not expand scope or acceptance until
 accepted through the existing authority.

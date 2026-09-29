@@ -96,8 +96,8 @@ class QuartoManagerTests(unittest.TestCase):
             self.assertEqual(["prepare", "render", "render"], events)
             self.assertEqual(
                 [
-                    ["quarto", "render", "case/notebook.qmd", "--profile", "presentation", "--cache-refresh"],
-                    ["quarto", "render", "index.qmd", "--profile", "presentation", "--cache-refresh"],
+                    ["quarto", "render", "case/notebook.qmd", "--to", "html", "--profile", "presentation", "--cache-refresh"],
+                    ["quarto", "render", "index.qmd", "--to", "html", "--profile", "presentation", "--cache-refresh"],
                 ],
                 [call.args[0] for call in run.call_args_list],
             )

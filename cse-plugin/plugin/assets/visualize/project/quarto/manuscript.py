@@ -30,7 +30,7 @@ SITE_CONFIG = {
     "project": {"type": "website", "output-dir": "_site"},
     "metadata-files": ["_cse-manuscript.json"], "website": {"title": "Analyses", "search": True, "reader-mode": True, "page-navigation": False},
     "format": {"html": {"embed-resources": True, "page-layout": "full", "theme": "cosmo", "css": SITE_CSS,
-                        "fontsize": "16px", "toc": False, "notebook-links": False,
+                        "fontsize": "16px", "toc": False, "notebook-links": False, "format-links": False,
                         "html-math-method": "mathjax", "self-contained-math": True}},
     "execute": {"enabled": False},
 }
@@ -741,7 +741,7 @@ def refresh(root: Path, notebook: Path) -> int:
         return status
     for target in (relative, "index.qmd"):
         result = subprocess.run(
-            ["quarto", "render", target, "--profile", "presentation", "--cache-refresh"], cwd=root
+            ["quarto", "render", target, "--to", "html", "--profile", "presentation", "--cache-refresh"], cwd=root
         )
         if result.returncode:
             return result.returncode
@@ -756,7 +756,7 @@ def preview(root: Path, host: str, port: int) -> int:
     with socket.socket() as probe:
         require(probe.connect_ex((host if host not in {"0.0.0.0", "::", ""} else "127.0.0.1", port)) != 0,
                 root, f"port {port} is already in use; pass --port with a free port")
-    command = ["quarto", "preview", "--profile", "presentation", "--no-browser",
+    command = ["quarto", "preview", "--to", "html", "--profile", "presentation", "--no-browser",
                "--host", host, "--port", str(port)]
     process = subprocess.Popen(command, cwd=root, start_new_session=True)
     def handle_sigterm(signum, frame):
