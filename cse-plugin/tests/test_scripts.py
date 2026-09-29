@@ -429,6 +429,39 @@ class ScriptBehaviorTests(unittest.TestCase):
             self.assertTrue((home / ".local/share/cse/hooks/cse-scientific-stance.txt").is_file())
             self.assertNotIn("plugins/cache", json.dumps(config))
 
+    def test_quarto_render_defaults_to_html_and_preserves_selected_formats(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            quarto = root / "quarto"
+            quarto.write_text(f"#!{sys.executable}\nimport json, sys\nprint(json.dumps(sys.argv[1:]))\n")
+            quarto.chmod(0o755)
+            environment = {**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"]}
+            for arguments in ((), ("--to", "pdf"), ("--to=pdf",), ("-t", "pdf")):
+                result = self.run_script("plugin/assets/visualize/project/quarto/render.sh",
+                                         *arguments, env=environment, cwd=root)
+                self.assertEqual(result.returncode, 0, result.stderr)
+                expected = list(arguments) if arguments else ["--to", "html"]
+                self.assertEqual(json.loads(result.stdout),
+                                 ["render", *expected, "-M", "latex-auto-install:false", "--no-execute"])
+
+    def test_quarto_render_finds_its_managed_root_from_another_directory(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "analyses"
+            project.mkdir()
+            wrapper = project / "render.sh"
+            shutil.copyfile(ROOT / "plugin/assets/visualize/project/quarto/render.sh", wrapper)
+            (project / "_cse-manuscript.json").write_text("{}\n")
+            (project / "manuscript.py").write_text("from pathlib import Path\nPath('synced').touch()\n")
+            quarto = root / "quarto"
+            quarto.write_text(f"#!{sys.executable}\nimport os\nprint(os.getcwd())\n")
+            quarto.chmod(0o755)
+            result = subprocess.run(["bash", str(wrapper)], cwd=root, capture_output=True, text=True,
+                                    env={**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"]})
+            self.assertEqual(result.returncode, 0, result.stderr)
+            self.assertEqual(result.stdout.strip(), str(project))
+            self.assertTrue((project / "synced").is_file())
+
     def test_visualization_and_source_helpers_have_single_payload_locations(self):
         for relative in (
             "plugin/scripts/sources/sync_bibliography.py",

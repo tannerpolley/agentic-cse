@@ -35,10 +35,10 @@ host-specific setup and diagnostics in
 
 The two execution phases are Research and design, then Execute and deliver.
 Independent Review checks design readiness before execution and delivered
-evidence afterward; it is not a third phase. Direct execution remains the
-default. An explicitly selected installed Baton Pass skill coordinates roles
-and handoffs; individual `cse:<skill>` requests keep CSE stages and acceptance
-in this plugin.
+evidence afterward; it is not a third phase. Direct execution is the default,
+with native host delegation for bounded independent work when useful. T3 Code
+supplies its delegated tasks and completion delivery; CSE owns scientific
+stages and acceptance.
 
 Live model-backed workflow and routing trials belong to
 [ScienceBench](https://github.com/agentic-cse/cse-sciencebench) and are never

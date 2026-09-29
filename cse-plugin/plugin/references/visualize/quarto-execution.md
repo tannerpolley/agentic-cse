@@ -58,12 +58,9 @@ project owns `site.css` after `init`. The root
 sets `notebook-links: false`, so an article that embeds a labeled cell from a
 retained notebook with `{{< embed >}}` shows the cell without a link to a
 separate notebook page.
-
-A root created before the website layout (`project.type: manuscript`) is
-refused with the rebuild steps: remove `_quarto.yml`, `_quarto-presentation.yml`,
-`_cse-manuscript.json`, `.cse-quarto-source.json`, `manuscript.py`, and
-`render.sh`, rerun `init` with `--article-source index.qmd`, and include each
-report again. Sources and retained results stay in place.
+The HTML root sets `format-links: false` so optional, unbuilt PDF views do not
+produce download links. A page with PDF settings must also declare `html: {}`
+first in its `format` mapping so website navigation selects its HTML output.
 
 Initialize with `manuscript.py init`, include substantive report `.qmd` files
 with `manuscript.py include`, and use `manuscript.py validate` before a render.
@@ -79,7 +76,8 @@ The command owns only `_cse-manuscript.json`; `project.render` and
 metadata file, and native inspection confirms the merged sidebar. The site
 title and other presentation settings remain in `_quarto.yml`, which must not
 define a sidebar. An unregistered `.qmd` is not rendered. Use `assets/visualize/project/quarto/render.sh` for a release
-render; it passes
+render; it selects `--to html` unless the caller supplies `--to` or `-t`, so
+page-level PDF settings do not broaden an ordinary HTML render. It passes
 `--no-execute` at the command boundary and gives Quarto, Deno, and LuaLaTeX
 private writable runtime directories. TinyTeX is the TeX distribution,
 LuaLaTeX (LuaHBTeX) is its compiler, Quarto is the document manager, and
@@ -105,7 +103,8 @@ When a document needs Python to format a retained table or draw a plot, use
 `manuscript.py refresh <root> <included.qmd>`. It runs the presentation-only
 `present` entry, then native Quarto with `_quarto-presentation.yml`, invalidates
 the presentation cache, and updates the included notebook page and the home
-page.
+page. Refresh and preview select HTML explicitly, keeping a page's optional
+PDF settings out of the website update.
 Quarto preview does not detect arbitrary external-data changes; the
 managed preview bridge asks the running preview to re-render only the affected
 registered source (touching a file does not trigger it) after the presentation hook has been allowed to validate retained inputs. The following
@@ -152,6 +151,39 @@ renders do not share hidden kernel state.
 execution-security boundaries: cached output can become stale, and an explicit
 execution command can rerun cells. Environment and filesystem isolation provide
 the stronger boundary when executable presentation cells are enabled.
+
+## Upgrading a managed root
+
+To give a managed root (one with `_cse-manuscript.json`) the current plugin
+tooling, rerun the plugin's `init` on it:
+
+```bash
+python3 assets/visualize/project/quarto/manuscript.py init analyses/ \
+  --article-source analyses/index.qmd --source-commit <SHA> --runtime-tree-sha256 <SHA256>
+```
+
+It replaces `manuscript.py`, `render.sh`, `_quarto-presentation.yml`, and the
+`.cse-quarto-source.json` source record with the current plugin versions and
+prints each replaced file. It keeps everything the project owns: `_quarto.yml`,
+`_cse-manuscript.json` membership, `site.css`, `index.qmd`, `.gitignore`
+additions, and all sources and retained results. The replacement is validated
+before any write, so a failed validation leaves the root unchanged. `init` still
+refuses to overwrite files in a root without `_cse-manuscript.json`.
+
+A root created before the website layout (`project.type: manuscript`) is
+refused rather than rewritten. Migrate it once:
+
+1. Remove page-level `execute:` settings from the pages; the root configuration
+   and presentation profile own execution.
+2. Remove nested Quarto projects (`_quarto.yml` or `_metadata.yml` below the
+   root) or move them out of the root.
+3. Remove `_quarto.yml`, `_quarto-presentation.yml`, `_cse-manuscript.json`,
+   `.cse-quarto-source.json`, `manuscript.py`, and `render.sh`, then rerun
+   `init` with that root's `index.qmd` as `--article-source`.
+4. Include each report again with `include --title <title> [--group <heading>]`.
+5. Render with `render.sh`, then rerun `service` for the preview.
+
+Sources and retained results stay in place.
 
 ## Main-checkout preview service
 

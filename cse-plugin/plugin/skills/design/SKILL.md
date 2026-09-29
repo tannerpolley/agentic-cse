@@ -62,7 +62,6 @@ concise disposition; only **Ready** permits Build. Reuse still-valid evidence
 and refresh only conclusions affected by a material correction.
 
 When the repository uses GitHub issues, activate [github-and-git](../../references/workflow/github-and-git.md), publish the
-complete accepted plan, and read it back before Build. In baton mode, the
-Architect supplies the issue-ready specification and the Manager performs the
-authorized publication. A draft, chat summary, or reviewer opinion is not the
-published handoff.
+complete accepted plan, and read it back before Build. The current accountable
+task performs authorized publication. A draft, chat summary, or reviewer
+opinion is not the published handoff.

@@ -14,8 +14,8 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 INSTALLER = ROOT / "plugin/scripts/workflow/install_cse_hooks.py"
 
-# Minimal stand-in for `codex app-server`: lists every hook in the repository's
-# .codex/hooks.json plus one user-level hook, and keeps trust in FAKE_CODEX_STATE.
+# Minimal stand-in for `codex app-server`: lists every hook in the repository's and the
+# user's .codex/hooks.json plus one unrelated user-level hook, and keeps trust in FAKE_CODEX_STATE.
 FAKE_CODEX = '''#!/usr/bin/env python3
 import hashlib, json, os, sys
 state = os.environ["FAKE_CODEX_STATE"]
@@ -30,11 +30,13 @@ for line in sys.stdin:
         continue
     params, result = message.get("params", {}), {}
     if message["method"] == "hooks/list":
+        with open(os.environ["FAKE_CODEX_LIST_CALLS"], "a") as calls:
+            calls.write("list\\n")
         cwd = params["cwds"][0]
-        path = os.path.join(cwd, ".codex/hooks.json")
         hooks = [entry("/user/hooks.json", "stop", 0, "user hook")]
-        for event, groups in json.load(open(path))["hooks"].items():
-            hooks += [entry(path, event.lower(), i, g["hooks"][0]["command"]) for i, g in enumerate(groups)]
+        for path in (os.path.join(cwd, ".codex/hooks.json"), os.environ["FAKE_CODEX_USER_HOOKS"]):
+            for event, groups in (json.load(open(path))["hooks"] if os.path.exists(path) else {}).items():
+                hooks += [entry(path, event.lower(), i, g["hooks"][0]["command"]) for i, g in enumerate(groups)]
         result = {"data": [{"cwd": cwd, "hooks": hooks}]}
     elif message["method"] == "config/value/write":
         assert params["keyPath"] == "hooks.state" and params["mergeStrategy"] == "upsert"
@@ -63,11 +65,15 @@ class CodexHookTrustTests(unittest.TestCase):
         (self.bin / "git").symlink_to(shutil.which("git"))
         self.state = self.root / "trust.json"
 
+    def invoke(self, *arguments: str):
+        env = {**os.environ, "PATH": str(self.bin), "FAKE_CODEX_STATE": str(self.state),
+               "FAKE_CODEX_USER_HOOKS": str(self.root / "home/.codex/hooks.json"),
+               "FAKE_CODEX_LIST_CALLS": str(self.root / "list-calls"), "CSE_CODEX_BIN": "codex"}
+        return subprocess.run([sys.executable, str(INSTALLER), "--home", str(self.root / "home"), *arguments],
+                              cwd=self.repo, env=env, text=True, capture_output=True, check=False)
+
     def install(self, *arguments: str):
-        env = {**os.environ, "PATH": str(self.bin), "FAKE_CODEX_STATE": str(self.state)}
-        return subprocess.run(
-            [sys.executable, str(INSTALLER), "--home", str(self.root / "home"), "--repo", str(self.repo), *arguments],
-            env=env, text=True, capture_output=True, check=False)
+        return self.invoke("--repo", str(self.repo), *arguments)
 
     def install_fake_codex(self):
         fake = self.bin / "codex"
@@ -94,6 +100,39 @@ class CodexHookTrustTests(unittest.TestCase):
         report = json.loads(self.install("--diagnose").stdout)[0]["codex_hook_trust"]
         self.assertEqual("trusted", report["status"])
         self.assertEqual(4, len(report["hooks"]))
+
+    def test_diagnose_reports_user_hooks_when_the_repository_file_has_no_cse_hooks(self):
+        self.install_fake_codex()
+        result = self.invoke("--user")
+        self.assertEqual(0, result.returncode, result.stderr)
+        user = str((self.root / "home/.codex/hooks.json").resolve())
+        for project_config in (
+            {"hooks": {}},
+            {"hooks": {"Stop": [{"hooks": [{"type": "command", "command": "other hook"}]}]}},
+        ):
+            with self.subTest(project_config=project_config):
+                (self.repo / ".codex/hooks.json").write_text(json.dumps(project_config))
+                report = json.loads(self.invoke("--diagnose").stdout)[0]["codex_hook_trust"]
+                self.assertEqual(("trusted", [user]), (report["status"], report["sources"]))
+                self.assertEqual(4, len(report["hooks"]))
+                self.assertTrue(all(key.startswith(f"{user}:") for key in report["hooks"]), report["hooks"])
+
+    def test_diagnose_aggregates_repo_and_user_sources_in_one_listing(self):
+        self.install_fake_codex()
+        result = self.install("--user")
+        self.assertEqual(0, result.returncode, result.stderr)
+        user = str((self.root / "home/.codex/hooks.json").resolve())
+        project = str((self.repo / ".codex/hooks.json").resolve())
+        calls = self.root / "list-calls"
+        calls.write_text("")
+
+        result = self.install("--diagnose")
+        self.assertEqual(0, result.returncode, result.stderr)
+        report = json.loads(result.stdout)[0]["codex_hook_trust"]
+        self.assertEqual("trusted", report["status"])
+        self.assertEqual(sorted([project, user]), report["sources"])
+        self.assertEqual(8, len(report["hooks"]))
+        self.assertEqual(["list"], calls.read_text().splitlines())
 
     def test_missing_codex_keeps_registration_and_warns_hooks_will_be_skipped(self):
         result = self.install()

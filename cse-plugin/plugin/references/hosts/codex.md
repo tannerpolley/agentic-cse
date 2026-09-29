@@ -88,9 +88,10 @@ python3 scripts/workflow/install_cse_hooks.py --check
 ```
 
 The installer writes the stable runtime under
-`$HOME/.local/share/cse/hooks` and the repository registration under
-`.codex/hooks.json`. It preserves unrelated configuration, replaces only
-recognized CSE registrations, remains safe to repeat, and keeps the four
+`$HOME/.local/share/cse/hooks` and registers handlers in either the user-level
+`$HOME/.codex/hooks.json` (`--user`) or repository `.codex/hooks.json`
+(`--repo`). It preserves unrelated configuration, replaces only recognized
+CSE registrations, remains safe to repeat, and keeps the four
 `SessionStart`, `SubagentStart`, `UserPromptSubmit`, and `Stop` events. A
 changed installed runtime requires the explicit `--replace-runtime` guard.
 
@@ -98,16 +99,20 @@ Codex never runs a hook that lacks persisted trust, and T3 Code has no hook
 review screen. After registering, the installer therefore asks `codex
 app-server` (`hooks/list`, then one `config/value/write` upsert under
 `hooks.state`) to record trust for exactly the CSE hooks it wrote to the
-repository's `.codex/hooks.json`, and prints which it trusted. It never trusts
-other hooks. Codex also ignores project hooks until the project itself is
-trusted in Codex. Trust is recorded in the `CODEX_HOME` of the `codex` CLI the
-installer runs (`CSE_CODEX_BIN` selects it), so run it with the same Codex home
-the agents use. Trust is keyed by the absolute path of `.codex/hooks.json`, so a
-separate worktree checkout needs its own trust. If the `codex` CLI is missing, the call fails or times out
+selected registration source, and prints which it trusted. It never trusts
+other hooks. Codex ignores project hooks until the project itself is trusted;
+user-level hooks remain independent of project trust. Trust is recorded in the
+`CODEX_HOME` of the `codex` CLI the installer runs (`CSE_CODEX_BIN` selects
+it), so run it with the same Codex home the agents use. Trust is keyed to the
+absolute registration path; separate repository registrations in worktrees
+have separate trust, while a user-level registration is shared. If the `codex` CLI is missing, the call fails or times out
 (30 s), or Codex lists no CSE hooks, the registration stays and the installer
 warns that Codex will skip the hooks until trusted (for example with `/hooks`
 in the Codex TUI). `--diagnose` reports `codex_hook_trust` (`trusted`,
 `untrusted`, or `unknown` when Codex is unavailable) without changing anything.
+It checks active CSE hooks from both an existing repository
+`.codex/hooks.json` and the user-level `.codex/hooks.json` under `--home`,
+and lists each source path.
 
 Plugin availability, native registration, enabled state, active-session
 loading, trust, and observed hook execution are separate claims; installed

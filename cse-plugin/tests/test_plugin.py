@@ -121,8 +121,8 @@ class PluginBehaviorTests(unittest.TestCase):
         normalized_workflow = " ".join(workflow.split())
         for phrase in (
             "CSE owns its scientific stages, evidence, and acceptance",
-            "selected by project preference or explicit task override",
-            "does not require a Build worker",
+            "Direct execution is the default",
+            "native host delegation",
         ):
             self.assertIn(phrase, normalized_workflow)
         frontmatter = yaml.safe_load(workflow.split("---", 2)[1])
@@ -137,7 +137,7 @@ class PluginBehaviorTests(unittest.TestCase):
         self.assertFalse((PLUGIN / "references/workflow/execution-modes.md").exists())
         setup = (PLUGIN / "skills/setup/SKILL.md").read_text()
         self.assertIn("CSE execution mode: direct.", setup)
-        self.assertIn("CSE execution mode: baton.", setup)
+        self.assertNotIn("CSE execution mode: baton.", setup)
         projects = (PLUGIN / "references/workflow/scientific-projects.md").read_text()
         self.assertIn("required renderer executable", projects)
         self.assertNotIn("Visualize is absent", projects)

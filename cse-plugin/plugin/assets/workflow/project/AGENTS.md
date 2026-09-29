@@ -4,10 +4,10 @@ This is a CSE project. Every agent performing scientific or engineering work
 MUST use the installed CSE skills and MUST read `docs/scientific/README.md` and
 `docs/scientific/CONTEXT.md` before selecting the evidence-justified CSE route.
 
-Setup records the selected project execution preference as a separate
-`CSE execution mode: direct.` or `CSE execution mode: baton.` paragraph in this
-file. Until one is recorded, Workflow uses direct. A task override does not
-change the stored preference.
+CSE execution mode: direct.
+
+Use native host delegation for bounded independent work when useful, including
+T3 Code delegated tasks. The current task remains accountable for the result.
 
 This is a private computational research project, not a public package. Before
 the first scientific write, state the question, intended use, starting CSE
