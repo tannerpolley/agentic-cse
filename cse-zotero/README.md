@@ -116,6 +116,13 @@ concrete `reason`. The top-level `configured_paths`, `observed_live_checks`,
 `unverified_active_host`, and `identity` fields keep configured paths, live
 probes, host uncertainty, and package/source/payload identity separate.
 
+Data readiness checks both current normalized inventories for every declared
+registry pack and all standalone inventories outside those packs. Other nested
+inventories are reported in `readiness.data.non_authoritative_inventories`
+with their paths and discrepancies; their assertions do not gate current
+readiness. A nested file's bytes still must match when a current inventory
+declares its hash.
+
 Better BibTeX and Zotero are live capabilities, not prerequisites for reading
 an intact retained corpus offline. A live library response does not certify a
 project view or dataset. Mathpix readiness requires both the installed `mpx`

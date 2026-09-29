@@ -14,10 +14,10 @@ import subprocess
 from typing import Any
 
 from .config import CAPABILITIES, CompanionConfig, PROTOCOL_VERSION, config_payload
+from .scientific_data import ScientificDataError, search_registry
 from .wiki import _collect_evidence_chunks, verify_wiki
 
 
-_DATA_SUFFIXES = {".csv", ".json", ".jsonl", ".parquet", ".tsv"}
 _INVENTORY_NAMES = {
     "catalog.json",
     "inventory.csv",
@@ -285,8 +285,6 @@ def _hash_inventory_path(root: Path, inventory: Path, relative: str, expected: s
     if not relative or not expected:
         return None
     bases = [root, inventory.parent]
-    if inventory.name in {"registry-records.csv", "source-files.csv"}:
-        bases.append(inventory.parent.parent / "source" / "registry")
     candidates = []
     for base in bases:
         candidate = (base / relative).resolve()
@@ -337,7 +335,7 @@ def _inventory_errors(path: Path, root: Path) -> list[str]:
 
 def _inventory_paths(root: Path) -> list[Path]:
     paths = {path for name in _INVENTORY_NAMES for path in root.rglob(name) if path.is_file()}
-    return sorted(paths or [path for path in root.iterdir() if path.is_file() and path.suffix.casefold() in _DATA_SUFFIXES])
+    return sorted(paths)
 
 
 def _data_readiness(config: CompanionConfig | None) -> dict[str, Any]:
@@ -347,13 +345,56 @@ def _data_readiness(config: CompanionConfig | None) -> dict[str, Any]:
     if not root.is_dir():
         return _status(f"configured data root is missing: {root}", configured=True, readable=False, ready=False, inventories=[], data_root=str(root))
     try:
-        inventories = _inventory_paths(root)
-        errors = [error for path in inventories for error in _inventory_errors(path, root)]
+        candidates = [root]
+        domains = root / "domains"
+        if domains.is_dir():
+            candidates.extend(path for path in sorted(domains.iterdir()) if path.is_dir())
+        packs = [
+            path for path in candidates
+            if (path / "normalized").exists() or (path / "source/registry").exists()
+        ]
+        inventories = []
+        errors = []
+        for pack in packs:
+            inventories.extend(
+                pack / "normalized" / name
+                for name in ("registry-records.csv", "source-files.csv")
+            )
+            try:
+                current = search_registry(pack / "source/registry", limit=None)
+                errors.extend(current["warnings"])
+                errors.extend(
+                    f"{packet['metadata_path']}: {error}"
+                    for packet in current["results"]
+                    for error in packet["integrity"]["errors"]
+                )
+                if not current["count"]:
+                    errors.append(f"Current registry authority has no readable records: {pack}")
+            except (OSError, ScientificDataError) as exc:
+                errors.append(f"{pack}: {exc}")
+        diagnostics = []
+        for path in _inventory_paths(root):
+            if path in inventories:
+                continue
+            if any(pack == path or pack in path.parents for pack in packs):
+                try:
+                    discrepancies = _inventory_errors(path, root)
+                except OSError as exc:
+                    discrepancies = [str(exc)]
+                diagnostics.append({"inventory": str(path), "errors": discrepancies})
+            else:
+                inventories.append(path)
+                errors.extend(_inventory_errors(path, root))
     except OSError as exc:
         return _status(f"configured data root is not readable: {exc}", configured=True, readable=False, ready=False, inventories=[], data_root=str(root))
-    details = {"data_root": str(root), "inventories": [str(path) for path in inventories], "errors": errors}
+    details = {
+        "data_root": str(root),
+        "inventories": [str(path) for path in inventories],
+        "errors": errors,
+        "non_authoritative_inventories": diagnostics,
+    }
     if not inventories:
-        return _status(f"data root is present but no inventory or retained data file was found: {root}", configured=True, readable=True, ready=False, **details)
+        return _status(f"data root is present but no current inventory was found: {root}", configured=True, readable=True, ready=False, **details)
     if errors:
         return _status(f"data inventory is damaged: {errors[0]}", configured=True, readable=False, ready=False, **details)
     return _status(f"data root and inventory are readable ({len(inventories)} file{'' if len(inventories) == 1 else 's'})", configured=True, readable=True, ready=True, **details)

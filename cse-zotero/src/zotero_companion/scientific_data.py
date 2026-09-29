@@ -94,14 +94,6 @@ def _relative_path(root: Path, value: str) -> Path:
     return candidate
 
 
-def _read_inventory(path: Path) -> list[dict[str, str]]:
-    try:
-        with path.open(newline="", encoding="utf-8") as stream:
-            return [dict(row) for row in csv.DictReader(stream)]
-    except (OSError, csv.Error) as exc:
-        raise ScientificDataError(f"Could not read registry inventory {path}: {exc}") from exc
-
-
 def _read_inventory_table(path: Path) -> tuple[list[dict[str, str]], list[str]]:
     if not path.is_file():
         return [], []
@@ -109,9 +101,23 @@ def _read_inventory_table(path: Path) -> tuple[list[dict[str, str]], list[str]]:
         with path.open(newline="", encoding="utf-8") as stream:
             reader = csv.DictReader(stream)
             fields = list(reader.fieldnames or [])
-            return [dict(row) for row in reader], fields
-    except (OSError, csv.Error) as exc:
+            rows = [dict(row) for row in reader]
+    except (OSError, UnicodeError, csv.Error) as exc:
         raise ScientificDataError(f"Could not read registry inventory {path}: {exc}") from exc
+    if not {"source_path", "sha256"} <= set(fields):
+        raise ScientificDataError(
+            f"Registry inventory requires source_path and sha256 columns: {path}"
+        )
+    if len(fields) != len(set(fields)):
+        raise ScientificDataError(f"Registry inventory has duplicate columns: {path}")
+    for number, row in enumerate(rows, start=2):
+        if None in row or any(value is None for value in row.values()):
+            raise ScientificDataError(f"Malformed registry inventory row {number}: {path}")
+        if not row["source_path"].strip() or not _SHA256_PATTERN.fullmatch(row["sha256"].strip()):
+            raise ScientificDataError(
+                f"Registry inventory row {number} requires a path and SHA-256: {path}"
+            )
+    return rows, fields
 
 
 def _within(root: Path, value: Path) -> bool:
@@ -445,7 +451,7 @@ def search_registry(
     registry_root: Path,
     *,
     query: str = "",
-    limit: int = 20,
+    limit: int | None = 20,
 ) -> dict[str, Any]:
     """Find retained registry packages and resolve their source resources.
 
@@ -453,9 +459,10 @@ def search_registry(
     second index or discovering arbitrary files.  Raw files remain data owned
     by the registry; this result is only a read-only packet for callers that
     need to decide what to inspect.
+    With no limit, verify every source-file declaration and return all matches.
     """
 
-    if limit < 1:
+    if limit is not None and limit < 1:
         raise ValueError("limit must be positive")
     root = Path(registry_root).expanduser().resolve()
     if not root.is_dir():
@@ -468,23 +475,26 @@ def search_registry(
         raise ScientificDataError(
             f"Normalized registry inventory is missing: {inventory_path}"
         )
-    inventory = _read_inventory(inventory_path)
-    source_files = (
-        {
-            str(row.get("source_path", "")).strip(): str(row.get("sha256", "")).strip()
-            for row in _read_inventory(source_files_path)
-            if str(row.get("source_path", "")).strip()
-        }
-        if source_files_path.is_file()
-        else {}
-    )
+    inventory, _ = _read_inventory_table(inventory_path)
+    source_rows, _ = _read_inventory_table(source_files_path)
+    source_files = {
+        row["source_path"].strip(): row["sha256"].strip() for row in source_rows
+    }
     if not source_files_path.is_file():
         warnings.append(f"Resource hashes are unchecked; inventory is missing: {source_files_path}")
+    if limit is None:
+        for row in source_rows:
+            try:
+                candidate = _relative_path(root, row["source_path"].strip())
+                if not candidate.is_file():
+                    warnings.append(f"Inventory file is missing: {candidate}")
+                elif _sha256(candidate).casefold() != row["sha256"].strip().casefold():
+                    warnings.append(f"Inventory SHA-256 does not match: {candidate}")
+            except (OSError, ScientificDataError) as exc:
+                warnings.append(str(exc))
     packages: list[tuple[int, Path, dict[str, Any], dict[str, str]]] = []
     for inventory_row in inventory:
         relative_metadata = str(inventory_row.get("source_path", "")).strip()
-        if not relative_metadata or "/raw/" in f"/{relative_metadata}/":
-            continue
         try:
             metadata_path = _relative_path(root, relative_metadata)
         except ScientificDataError as exc:
@@ -492,10 +502,11 @@ def search_registry(
             continue
         try:
             value = json.loads(metadata_path.read_text(encoding="utf-8"))
-        except (OSError, json.JSONDecodeError) as exc:
+        except (OSError, UnicodeError, json.JSONDecodeError) as exc:
             warnings.append(f"Could not read registry metadata {metadata_path}: {exc}")
             continue
-        if not isinstance(value, Mapping) or "resources" not in value:
+        if not isinstance(value, Mapping):
+            warnings.append(f"Registry metadata must be an object: {metadata_path}")
             continue
         metadata = dict(value)
         searchable = _normalise_text(json.dumps({**inventory_row, **metadata}, ensure_ascii=False))
@@ -519,7 +530,11 @@ def search_registry(
     results: list[dict[str, Any]] = []
     for score, metadata_path, metadata, inventory_row in packages[:limit]:
         metadata_relative = _stored_path(root, metadata_path)
-        metadata_actual_hash = _sha256(metadata_path)
+        try:
+            metadata_actual_hash = _sha256(metadata_path)
+        except OSError as exc:
+            warnings.append(f"Could not hash registry metadata {metadata_path}: {exc}")
+            continue
         metadata_expected_hash = str(inventory_row.get("sha256", "")).strip()
         metadata_hash_matches = (
             None
@@ -529,7 +544,14 @@ def search_registry(
         resources = []
         resource_errors: list[str] = []
         declared_resources = metadata.get("resources")
-        if not isinstance(declared_resources, list) or not declared_resources:
+        inline_record = (
+            "resources" not in metadata
+            and metadata.get("record_type", inventory_row.get("record_type"))
+            in {"species", "mixture", "reaction-constant", "observation"}
+        )
+        if inline_record:
+            declared_resources = []
+        elif not isinstance(declared_resources, list) or not declared_resources:
             resource_errors.append("resources must be a nonempty array")
             declared_resources = []
         for resource in declared_resources:
@@ -559,13 +581,15 @@ def search_registry(
             for resource in resources
             for error in resource["errors"]
         ]
+        if not source_files_path.is_file() and not inline_record:
+            integrity_errors.append("resource inventory is missing")
         if metadata_hash_matches is False:
             integrity_errors.insert(0, "metadata SHA-256 does not match normalized registry inventory")
         elif metadata_hash_matches is None:
             integrity_errors.insert(0, "metadata SHA-256 is unchecked; expected hash is missing")
         verified = bool(
             not integrity_errors
-            and resources
+            and (resources or inline_record)
             and metadata_hash_matches is True
             and all(resource["hash_matches"] is True for resource in resources)
         )
@@ -639,7 +663,7 @@ def search_registry(
     return {
         "registry_root": str(root),
         "inventory_path": str(inventory_path),
-        "scope": "canonical packages with resources; zero matches does not exclude review candidates",
+        "scope": "canonical records and packages; zero matches does not exclude review candidates",
         "candidate_inventories": [
             str(path) for path in (
                 root.parent.parent / "normalized/source-ready-candidates.csv",
