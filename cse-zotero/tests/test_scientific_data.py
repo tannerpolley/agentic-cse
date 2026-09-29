@@ -309,6 +309,21 @@ def test_registry_search_requires_the_canonical_inventory(tmp_path):
         search_registry(tmp_path / "registry", query="MEA")
 
 
+@pytest.mark.parametrize("name", ["registry-records.csv", "source-files.csv"])
+@pytest.mark.parametrize("declaration", [
+    "unexpected\nvalue\n",
+    "source_path,sha256\n," + "0" * 64 + "\n",
+    "source_path,sha256\nfile.csv,not-a-hash\n",
+    "source_path,sha256\nfile.csv\n",
+])
+def test_registry_rejects_malformed_current_inventory(tmp_path, name, declaration):
+    registry, _ = _registry_fixture(tmp_path)
+    (tmp_path / "normalized" / name).write_text(declaration)
+
+    with pytest.raises(ScientificDataError, match="Registry inventory|Malformed registry"):
+        search_registry(registry, limit=None)
+
+
 def _rewrite_fixture_metadata(registry, **changes):
     index = registry.parent.parent / "normalized/registry-records.csv"
     with index.open(newline="") as stream:
