@@ -147,11 +147,6 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
       if (!found) throw new Error(`collection ${key} no longer exists`);
       return found;
     };
-    const itemIDs = keys => keys.map(key => {
-      const item = zotero.Items.getByLibraryAndKey(libraryID(), key);
-      if (!item || !item.isRegularItem()) throw new Error(`item ${key} is not a top-level Zotero item`);
-      return item.id;
-    });
     for (const step of steps) {
       if (step.op === "create") {
         const target = new zotero.Collection({ libraryID: libraryID(), name: step.name, parentKey: resolve(step.parent) });
@@ -168,7 +163,7 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
         target.parentKey = resolve(step.parent);
         await target.saveTx();
       } else {
-        const ids = itemIDs(step.items);
+        const ids = step.items.map(key => zotero.Items.getByLibraryAndKey(libraryID(), key).id);
         await zotero.DB.executeTransaction(async () => {
           if (step.op === "add") await target.addItems(ids);
           else await target.removeItems(ids);
@@ -182,6 +177,13 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     const registry = await readRegistry();
     if (!registry) return response(409, { error: "project_registry_unavailable" });
     const { errors, steps, scope } = organize.resolvePlan(data, registry, collectionRows());
+    // Check item keys here too, so a bad key fails the preview, not a half-applied plan.
+    for (const step of steps) {
+      for (const key of step.items || []) {
+        const item = zotero.Items.getByLibraryAndKey(libraryID(), key);
+        if (!item || !item.isRegularItem()) errors.push(`item ${key} is not a top-level Zotero item`);
+      }
+    }
     if (errors.length) return response(422, { error: "invalid_plan", errors });
     if (data.mode !== "apply") {
       return response(200, { mode: "dry-run", scope, steps, applyToken: organize.ORGANIZE_TOKEN });

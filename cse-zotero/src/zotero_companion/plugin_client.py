@@ -48,7 +48,8 @@ class ZoteroPluginClient:
         return self._request("/zotero-companion/saved-searches", method="POST", payload=payload)
 
     def project_organize(self, plan: dict, *, apply: bool = False) -> dict:
-        payload = dict(plan)
+        # Only the plan itself; mode and confirmation come from --apply alone.
+        payload = {"project": plan.get("project"), "operations": plan.get("operations")}
         if apply:
             payload.update(mode="apply", confirm="ZOTERO-COMPANION-ORGANIZE-v1")
         return self._request("/zotero-companion/project-organize", method="POST", payload=payload)

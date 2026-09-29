@@ -80,7 +80,7 @@ def test_changed_source_refresh_reports_counts(tmp_path: Path):
 
     assert first["ok"] is True
     assert first["refresh"]["changed"] == 1
-    assert set(first) == {"ok", "status", "mode", "refresh", "evidence", "verify", "errors"}
+    assert set(first) == {"ok", "status", "mode", "refresh", "evidence", "verify", "projects", "errors"}
     assert api.calls.count("items:all") == 1
 
     repeat = maintain_wiki(root, api=api, apply=True)

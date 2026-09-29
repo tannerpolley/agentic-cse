@@ -10,6 +10,7 @@ from typing import Any, Iterator
 
 from .evidence_sync import sync_evidence
 from .local_api import LocalAPIError, ZoteroLocalAPI
+from .projects import project_collections, sync_projects
 from .wiki import (
     MANIFEST_FILENAME,
     WikiSnapshot,
@@ -50,9 +51,9 @@ def _overlap_lock(root: Path) -> Iterator[bool]:
 
 
 def _run_locked(
-    root: Path, *, api: Any, apply: bool, projects: Mapping[str, str] | None
+    root: Path, *, api: Any, apply: bool, registry: Mapping[str, Any] | None
 ) -> dict[str, Any]:
-    snapshot = WikiSnapshot.from_api(api, projects)
+    snapshot = WikiSnapshot.from_api(api, project_collections(registry or {}))
     records = build_source_records(snapshot)
     refresh = materialize_snapshot(
         snapshot,
@@ -86,6 +87,10 @@ def _run_locked(
             if (root / MANIFEST_FILENAME).exists()
             else {"ok": True, "errors": []}
         )
+    # Project pages link source pages and briefs, so they follow this refresh.
+    projects = sync_projects(
+        registry or {}, root, collections=snapshot.collections, items=snapshot.items, apply=apply
+    )
 
     errors = [
         (
@@ -114,6 +119,7 @@ def _run_locked(
             "issues": issues,
         },
         "verify": {"ok": bool(verification.get("ok", False))},
+        "projects": {key: projects[key] for key in ("stale", "missing", "written")},
         "errors": errors,
     }
 
@@ -123,11 +129,12 @@ def maintain_wiki(
     *,
     api: Any | None = None,
     apply: bool = False,
-    projects: Mapping[str, str] | None = None,
+    registry: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Refresh sources, sync existing companions, and verify the repository.
 
-    ``projects`` maps registered slugs to collection keys for source membership.
+    ``registry`` is the project registry: it sets source membership and the
+    project pages re-rendered after the refresh.
     """
 
     root = Path(root).expanduser().resolve()
@@ -140,7 +147,7 @@ def maintain_wiki(
                     "status": "skipped_overlap",
                     "mode": "apply" if apply else "dry-run",
                 }
-            return _run_locked(root, api=api, apply=apply, projects=projects)
+            return _run_locked(root, api=api, apply=apply, registry=registry)
     except LocalAPIError as exc:
         return {
             "ok": False,

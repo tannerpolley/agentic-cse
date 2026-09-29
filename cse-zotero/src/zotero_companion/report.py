@@ -257,8 +257,12 @@ def _project_libraries(observed: dict[str, Any]) -> dict[str, Any]:
         reason = f"project registry is not usable: {observed['error']}"
     elif not registered:
         reason = "no project libraries are registered"
+    elif observed.get("missing"):
+        reason = f"registered collections are missing from Zotero: {', '.join(observed['missing'])}"
     elif stale:
-        reason = f"project pages differ from Zotero; run project-sync --apply: {', '.join(stale)}"
+        reason = f"project pages are out of date; run project-sync --apply: {', '.join(stale)}"
+    elif sync.get("lastSync") and not sync["lastSync"].get("ok"):
+        reason = f"the add-on's last live sync failed: {sync['lastSync'].get('error', 'unknown error')}"
     elif not sync.get("observing"):
         reason = "project pages are current, but the Zotero add-on is not refreshing them live"
     else:
@@ -267,7 +271,12 @@ def _project_libraries(observed: dict[str, Any]) -> dict[str, Any]:
         reason,
         configured=bool(registered),
         readable=not observed.get("error"),
-        ready=bool(registered) and not stale and not observed.get("error") and bool(sync.get("observing")),
+        ready=bool(registered)
+        and not stale
+        and not observed.get("error")
+        and not observed.get("missing")
+        and bool(sync.get("observing"))
+        and (sync.get("lastSync") or {}).get("ok", True),
         **observed,
     )
 

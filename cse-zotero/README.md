@@ -406,7 +406,7 @@ collection or in any collection nested below it.
 ```bash
 cse-zotero project-register --root <root key> --slug <slug> --collection <key> \
   --repository /path/to/repo --json            # preview; add --apply to record
-cse-zotero project-register --slug <slug> --create "<Name>" --repository ... --json
+cse-zotero project-register --slug <slug> --create "<Name>" --repository ... --json  # root already registered
 cse-zotero project-list --json
 cse-zotero project-sync [--slug <slug>] --json # stale pages; --apply rewrites them
 cse-zotero project-organize plan.json --json   # preview; --apply writes Zotero, then syncs
@@ -430,7 +430,10 @@ project collection).
 
 With the add-on installed, Zotero reruns `project-sync` a few seconds after a
 project's collections or filing change, using the registry's `sync_command`.
-`doctor` reports registered projects, stale pages, and the add-on's last sync.
+`wiki-maintain` also re-renders the pages, because they link the source pages
+and briefs it refreshes. A registered collection that is missing from Zotero
+(for example, trashed) is reported and its page is left as it is. `doctor`
+reports registered projects, stale or missing ones, and the add-on's last sync.
 
 ## Stage 2 background plugin
 

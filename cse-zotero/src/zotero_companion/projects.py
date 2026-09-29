@@ -253,8 +253,6 @@ def render_library(
     """Render the generated part of a project page from the live tree."""
 
     root = entry["collection"]
-    if root not in table:
-        raise ProjectError(f"project {slug}: collection {root} is not in the Zotero library")
     tree = set(descendants(table, root))
     by_collection: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
     papers = set()
@@ -290,7 +288,7 @@ def render_library(
         lines.extend(_paper_line(item, wiki_root, routes) for item in members)
         if members:
             lines.append("")
-        for child in sorted(children.get(key, []), key=lambda value: table[value]["name"].casefold()):
+        for child in sorted(children.get(key, []), key=lambda value: (table[value]["name"].casefold(), value)):
             emit(child, depth + 1)
 
     emit(root, 2)
@@ -349,6 +347,10 @@ def sync_projects(
     for name in selected:
         entry = projects[name]
         path = directory / f"{name}.md"
+        if entry["collection"] not in table:
+            # Trashed or deleted in Zotero: keep the page, report it, sync the rest.
+            pages.append({"slug": name, "path": str(path), "stale": False, "missing_collection": entry["collection"]})
+            continue
         existing = _read(path)
         generated = render_library(name, entry, table, items, Path(wiki_root))
         page = render_page(existing, name, generated, table[entry["collection"]]["name"])
@@ -358,13 +360,14 @@ def sync_projects(
             writes.append((path, page))
     index_path = directory / INDEX_NAME
     index_existing = _read(index_path)
-    index = render_index(index_existing, registry, table)
+    index = render_index(index_existing, registry, table) if projects else index_existing
     if index != index_existing:
         writes.append((index_path, index))
     if apply:
         directory.mkdir(parents=True, exist_ok=True)
         for path, text in writes:
-            temporary = path.with_name(f".{path.name}.tmp")
+            # Per-process name: the add-on and the CLI may sync at the same time.
+            temporary = path.with_name(f".{path.name}.{os.getpid()}.tmp")
             temporary.write_text(text, encoding="utf-8")
             os.replace(temporary, path)
     return {
@@ -372,6 +375,7 @@ def sync_projects(
         "wiki_root": str(wiki_root),
         "pages": pages,
         "stale": [page["slug"] for page in pages if page["stale"]],
+        "missing": [page["slug"] for page in pages if "missing_collection" in page],
         "written": [str(path) for path, _ in writes] if apply else [],
     }
 

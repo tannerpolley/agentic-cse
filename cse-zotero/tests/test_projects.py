@@ -79,3 +79,12 @@ def test_registration_is_limited_to_disjoint_collections_under_the_root():
         with pytest.raises(ProjectError):
             plan_registration(REGISTRY, slug="other", collection=collection,
                               repository="", collections=COLLECTIONS)
+
+
+def test_missing_project_collection_is_reported_without_blocking_others(tmp_path):
+    registry = {**REGISTRY, "projects": {**REGISTRY["projects"],
+                                         "gone": {"collection": "TRASHED1", "repository": ""}}}
+    result = sync_projects(registry, tmp_path, collections=COLLECTIONS, items=ITEMS, apply=True)
+    assert result["missing"] == ["gone"]
+    assert result["stale"] == ["mea"] and (tmp_path / "projects" / "mea.md").exists()
+    assert not (tmp_path / "projects" / "gone.md").exists()

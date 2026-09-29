@@ -27,6 +27,7 @@ from .mathpix_ops import MathpixOperationError, mathpix_conversion
 from .manifests import ManifestError, lint_manifests, load_manifests, manifest_lookup
 from .plugin_client import PluginClientError, ZoteroPluginClient
 from .projects import (
+    SLUG,
     ProjectError,
     default_registry_path,
     load_registry,
@@ -140,6 +141,9 @@ def _project_command(args: argparse.Namespace) -> dict:
         # The add-on reads the root from the registry file, so it must be recorded.
         if not registry["root_collection"] or args.root not in (None, registry["root_collection"]):
             raise ProjectError("--create needs an already registered root collection; register one with --root and --collection first")
+        # Check before creating, so a rejected registration leaves nothing behind in Zotero.
+        if not SLUG.fullmatch(args.slug) or args.slug in registry["projects"]:
+            raise ProjectError(f"--create needs a new, valid project slug; {args.slug!r} is invalid or already registered")
         plan = {"operations": [{"op": "create", "name": args.create}]}
         created = ZoteroPluginClient().project_organize(plan, apply=args.apply)
         if not args.apply:
@@ -184,9 +188,10 @@ def _project_doctor(config, zotero_ok: bool) -> dict:
     if zotero_ok and config is not None and registry["projects"]:
         try:
             api = ZoteroLocalAPI()
-            observed["stale"] = sync_projects(
+            result = sync_projects(
                 registry, config.wiki_root, collections=api.collections(), items=api.items(top_level=True)
-            )["stale"]
+            )
+            observed["stale"], observed["missing"] = result["stale"], result["missing"]
         except (ProjectError, LocalAPIError) as exc:
             observed["error"] = str(exc)
     try:
@@ -609,7 +614,10 @@ def main() -> int:
     project_organize.add_argument("--apply", action="store_true", help="apply through the Zotero add-on, then sync")
     for command in (project_register, project_list, project_sync, project_organize):
         add_wiki_options(command)
-        command.add_argument("--registry", type=Path, default=None, help="project registry path")
+        command.add_argument(
+            "--registry", type=Path, default=None,
+            help="project registry path (the Zotero add-on always reads the default one)",
+        )
     args = parser.parse_args()
     if args.command in {
         "zotero-search",
@@ -884,7 +892,7 @@ def main() -> int:
                     args.wiki_root,
                     api=ZoteroLocalAPI(),
                     apply=args.apply,
-                    projects=project_collections(load_registry()),
+                    registry=load_registry(),
                 )
             elif args.command == "wiki-index":
                 if args.apply:
