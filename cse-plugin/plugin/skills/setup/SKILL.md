@@ -73,6 +73,11 @@ Offer the explicit source/data adoption choice `none`, `zotero`, or
 regenerate the managed protocol pointer from that record. An omitted choice
 preserves an existing adoption decision and adds no pointer to an existing
 repository.
+When adoption is `zotero` and Companion reports `project-libraries-v1`, bind the
+project to its Zotero collection as in the
+[project library](../../references/sources/zotero-companion.md#project-library)
+reference. Show the `project-register` preview (an existing collection or a new
+one under the root), then apply only after approval.
 The same `--check-routing` plan also reports a missing, stale, or malformed block, a missing agent role, and the exact
 proposed repair; approved application replaces the legacy pointer paragraph and
 preserves all other guidance. Duplicate or unmatched markers require manual
