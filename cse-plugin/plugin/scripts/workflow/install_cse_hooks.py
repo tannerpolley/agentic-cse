@@ -202,14 +202,18 @@ def codex_cse_hooks(root: Path, trust: bool) -> tuple[list[dict], list[str]]:
     With trust=True, persist trust for the ones not yet trusted and return the refreshed
     list plus the keys newly trusted. Talks to `codex app-server` (JSON-RPC over stdio).
     """
-    codex = shutil.which("codex")
+    # CSE_CODEX_BIN selects the Codex CLI (as in sync-live.sh); trust lands in that CLI's CODEX_HOME.
+    codex = shutil.which(os.environ.get("CSE_CODEX_BIN", "codex"))
     if codex is None:
-        raise InstallError("codex CLI not found on PATH")
+        raise InstallError("codex CLI not found")
     target = (root / CONFIG_PATHS["codex"]).resolve()
     owned = {command for event in EVENTS for command in owned_commands(event)}
     deadline = time.monotonic() + CODEX_TIMEOUT
-    proc = subprocess.Popen([codex, "app-server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
-                            stderr=subprocess.DEVNULL, text=True)
+    try:
+        proc = subprocess.Popen([codex, "app-server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                                stderr=subprocess.DEVNULL, text=True)
+    except OSError as exc:
+        raise InstallError(f"codex app-server could not start: {exc}") from exc
     lines: queue.Queue = queue.Queue()
     threading.Thread(target=lambda: ([lines.put(line) for line in proc.stdout], lines.put(None)),
                      daemon=True).start()

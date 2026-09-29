@@ -96,7 +96,10 @@ app-server` (`hooks/list`, then one `config/value/write` upsert under
 `hooks.state`) to record trust for exactly the CSE hooks it wrote to the
 repository's `.codex/hooks.json`, and prints which it trusted. It never trusts
 other hooks. Codex also ignores project hooks until the project itself is
-trusted in Codex. If the `codex` CLI is missing, the call fails or times out
+trusted in Codex. Trust is recorded in the `CODEX_HOME` of the `codex` CLI the
+installer runs (`CSE_CODEX_BIN` selects it), so run it with the same Codex home
+the agents use. Trust is keyed by the absolute path of `.codex/hooks.json`, so a
+separate worktree checkout needs its own trust. If the `codex` CLI is missing, the call fails or times out
 (30 s), or Codex lists no CSE hooks, the registration stays and the installer
 warns that Codex will skip the hooks until trusted (for example with `/hooks`
 in the Codex TUI). `--diagnose` reports `codex_hook_trust` (`trusted`,

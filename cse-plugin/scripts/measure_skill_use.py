@@ -3,9 +3,11 @@
 
 Claude Code records an explicit event for each skill use: a ``Skill`` tool call
 (model-invoked) or a ``/cse:<skill>`` slash command (user-invoked). Codex has no
-skill event; a skill is used by reading its ``SKILL.md``, so a Codex use is a
-shell read (cat/sed/head/nl/awk/less) naming one CSE ``skills/<name>/SKILL.md``.
-Bulk listings (wildcards, ls/find/wc/rg) are not uses.
+skill event; a skill is used by reading its ``SKILL.md``. So that both harnesses
+follow one rule, a direct read of a CSE ``skills/<name>/SKILL.md`` also counts:
+Claude's Read tool, or a shell segment (split on ; & | and newlines) whose read
+command (cat/sed/head/nl/awk/less/bat/tail) names it. Segments with wildcards or
+listing commands (ls/find/wc/rg/grep/fd/du) are not uses.
 
 Sessions count when their working directory is under ``--root`` (default: the
 Engineering workspace). Run under ``nice``; files are streamed line by line.
@@ -23,9 +25,20 @@ import re
 HOME = Path.home()
 CLAUDE = HOME / ".t3/provider-homes/claude/projects"
 CODEX = HOME / ".t3/provider-homes/codex/sessions"
-SKILL_PATH = re.compile(r"(?:plugins/cache/cse/cse/[^/\s'\"]+|cse-plugin/plugin)/skills/([a-z]+)/SKILL\.md")
-READ_VERB = re.compile(r"(?:^|[\s;&|(])(?:cat|sed|head|nl|awk|less|bat|tail)\s")
-LISTING = re.compile(r"\*|(?:^|[\s;&|(])(?:ls|find|wc|rg|grep|fd|du)\s")
+SKILL_PATH = re.compile(r"(?:plugins/cache/[^/\s'\"]+/cse[^/\s'\"]*/[^/\s'\"]+|cse-plugin/plugin|plugins/cse[^/\s'\"]*)"
+                        r"/skills/([a-z]+)/SKILL\.md")
+READ_VERB = re.compile(r"(?:^|[\s(\"'`])(?:cat|sed|head|nl|awk|less|bat|tail)\s")
+LISTING = re.compile(r"\*|(?:^|[\s(\"'`])(?:ls|find|wc|rg|grep|fd|du)\s")
+SEGMENT = re.compile(r"\\n|[;&|\n]")
+
+
+def shell_reads(command: str) -> set[str]:
+    """CSE skill names read by individual shell segments of a command."""
+    names = set()
+    for segment in SEGMENT.split(command):
+        if READ_VERB.search(segment) and not LISTING.search(segment):
+            names.update(SKILL_PATH.findall(segment))
+    return names
 SLASH = re.compile(r"<command-name>/cse:([a-z]+)</command-name>")
 
 
@@ -43,7 +56,7 @@ def claude_file(path: Path, root: str, since: str) -> tuple[bool, int, int, int,
             if cwd is None and '"cwd"' in line:
                 cwd = (re.search(r'"cwd":"([^"]*)"', line) or [None, None])[1]
                 stamp = (re.search(r'"timestamp":"([^"]*)"', line) or [None, ""])[1]
-            if "Skill" not in line and "/cse:" not in line and "tool_use_id" not in line:
+            if "Skill" not in line and "SKILL.md" not in line and "/cse:" not in line and "tool_use_id" not in line:
                 continue
             try:
                 record = json.loads(line)
@@ -58,7 +71,11 @@ def claude_file(path: Path, root: str, since: str) -> tuple[bool, int, int, int,
             for block in content or []:
                 if not isinstance(block, dict):
                     continue
-                if block.get("type") == "tool_use" and block.get("name") == "Skill":
+                if block.get("type") == "tool_use" and block.get("name") == "Read":
+                    found = SKILL_PATH.findall(str((block.get("input") or {}).get("file_path", "")))
+                    uses += len(found)
+                    skills.update(found)
+                elif block.get("type") == "tool_use" and block.get("name") == "Skill":
                     name = str((block.get("input") or {}).get("skill", ""))
                     if name.startswith("cse:"):
                         uses += 1
@@ -77,7 +94,10 @@ def claude_file(path: Path, root: str, since: str) -> tuple[bool, int, int, int,
 
 def codex_file(path: Path, root: str, since: str) -> tuple[str, bool, int, Counter] | None:
     with path.open(errors="replace") as handle:
-        meta = json.loads(handle.readline()).get("payload", {})
+        try:
+            meta = json.loads(handle.readline()).get("payload", {})
+        except json.JSONDecodeError:
+            return None
         if not str(meta.get("cwd", "")).startswith(root) or str(meta.get("timestamp", "")) < since:
             return None
         kind = "subagent" if isinstance(meta.get("source"), dict) and "subagent" in meta["source"] else "parent"
@@ -86,13 +106,13 @@ def codex_file(path: Path, root: str, since: str) -> tuple[str, bool, int, Count
         for line in handle:
             if "SKILL.md" not in line or '"call' not in line and "tool_call" not in line:
                 continue
-            payload = json.loads(line).get("payload", {})
+            try:
+                payload = json.loads(line).get("payload", {})
+            except json.JSONDecodeError:
+                continue  # a session still being written can end mid-line
             if payload.get("type") not in {"function_call", "custom_tool_call"}:
                 continue
-            command = str(payload.get("input") or payload.get("arguments") or "")
-            if LISTING.search(command) or not READ_VERB.search(command):
-                continue
-            for name in set(SKILL_PATH.findall(command)):
+            for name in shell_reads(str(payload.get("input") or payload.get("arguments") or "")):
                 uses += 1
                 skills[name] += 1
     return kind, bool(uses), uses, skills

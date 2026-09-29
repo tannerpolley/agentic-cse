@@ -14,10 +14,11 @@ ROOT = Path(__file__).resolve().parents[1]
 
 
 def setUpModule() -> None:
-    # The Codex installer consults the codex CLI; keep these tests off the real Codex configuration.
-    codex_home = tempfile.TemporaryDirectory()
-    unittest.addModuleCleanup(codex_home.cleanup)
-    os.environ["CODEX_HOME"] = codex_home.name
+    # Offline tests: the Codex installer must not start the host Codex CLI (trust has its own test).
+    previous = os.environ.get("CSE_CODEX_BIN")
+    os.environ["CSE_CODEX_BIN"] = "/nonexistent/codex"
+    unittest.addModuleCleanup(lambda: os.environ.pop("CSE_CODEX_BIN") if previous is None
+                              else os.environ.__setitem__("CSE_CODEX_BIN", previous))
 
 
 class ScriptBehaviorTests(unittest.TestCase):

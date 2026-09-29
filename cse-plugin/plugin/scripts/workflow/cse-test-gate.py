@@ -24,7 +24,7 @@ ROUTING_LEAD = ("CSE skill routing: before doing a stage's work, invoke its skil
 # T3 Code prefixes a delegated task with "Act as the <role> sub-agent"; each role is one CSE stage.
 DELEGATED_ROLE = re.compile(r"\A\s*Act as the ([\w-]+) sub-agent\b", re.IGNORECASE)
 ROLES_LINE = "delegated roles — "
-NAMED_SKILL = re.compile(r"(?<![/$\w-])cse:([a-z]+)\b")
+NAMED_SKILL = re.compile(r"(?<![/$\w-])cse:([a-z]+)\b", re.IGNORECASE)
 TEST_PARTS = {"test", "tests", "testing"}
 MAX_INPUT_BYTES = 1024 * 1024
 SCHEMA_VERSION = 3
@@ -82,11 +82,16 @@ def render_stance(scientific_context: Path, *, diagnostics: bool = True) -> str:
 
 
 def routing_lines() -> list[str]:
-    return [line.strip() for line in ROUTING.read_text(encoding="utf-8").splitlines() if line.strip()]
+    # Routing is guidance on top of the stance; a runtime without the file keeps the stance.
+    try:
+        return [line.strip() for line in ROUTING.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except OSError:
+        return []
 
 
 def routing_table() -> str:
-    return f"{ROUTING_LEAD} " + "; ".join(routing_lines()) + "."
+    lines = routing_lines()
+    return f"{ROUTING_LEAD} " + "; ".join(lines) + "." if lines else ""
 
 
 def prompt_route(event: dict[str, object]) -> str:
@@ -101,7 +106,8 @@ def prompt_route(event: dict[str, object]) -> str:
     role = DELEGATED_ROLE.match(prompt)
     role_name = role.group(1).lower() if role else ""
     skills = [roles[role_name]] if role_name in roles else []
-    skills += [name for name in NAMED_SKILL.findall(prompt) if name in known and name not in skills]
+    skills += [name for name in dict.fromkeys(n.lower() for n in NAMED_SKILL.findall(prompt))
+               if name in known and name not in skills]
     if not skills:
         return ""
     names = ", ".join(f"`cse:{name}`" for name in skills)
@@ -423,7 +429,7 @@ def main() -> int:
         repository, project, scientific_context = found
         role = repository_role(scientific_context)
         if event_name == "SessionStart":
-            stance = f"{render_stance(scientific_context)} {routing_table()}"
+            stance = " ".join(filter(None, (render_stance(scientific_context), routing_table())))
             try:
                 start(event, repository, project)
             except (HookError, OSError, subprocess.TimeoutExpired) as exc:
@@ -475,7 +481,8 @@ def main() -> int:
             emit(context(event_name, " ".join(filter(None, (
                 render_stance(scientific_context, diagnostics=False), PROMPT_REMINDER, route)))))
         else:
-            emit(context(event_name, f"{render_stance(scientific_context, diagnostics=False)} {routing_table()}"))
+            emit(context(event_name, " ".join(filter(None, (render_stance(scientific_context, diagnostics=False),
+                                                             routing_table())))))
     except (HookError, OSError, subprocess.TimeoutExpired) as exc:
         emit({"systemMessage": f"CSE hook skipped safely: {exc}"})
     return 0
