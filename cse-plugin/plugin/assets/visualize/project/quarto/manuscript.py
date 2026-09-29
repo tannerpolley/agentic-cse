@@ -20,10 +20,10 @@ import urllib.request
 ASSET_ROOT = Path(__file__).resolve().parent
 CONFIG_FILES = ("_quarto.yml", "_cse-manuscript.json", "_quarto-presentation.yml")
 # Plugin-owned files that re-running init on a managed root replaces with the current plugin copies.
-TOOLING_FILES = ("_quarto-presentation.yml", "render.sh", "manuscript.py", ".cse-quarto-source.json")
+TOOLING_FILES = ("_quarto-presentation.yml", "render.sh", "manuscript.py", "preview.service", ".cse-quarto-source.json")
 # The shared stylesheet is installed once and then owned by the project, like the configuration.
 SITE_CSS = "site.css"
-REQUIRED_FILES = (*CONFIG_FILES, "index.qmd", ".cse-quarto-source.json",
+REQUIRED_FILES = (*CONFIG_FILES, "index.qmd", "preview.service", ".cse-quarto-source.json",
                   ".gitignore", "render.sh", "manuscript.py", SITE_CSS)
 REQUIRED_IGNORES = ("/.quarto/", "/_site/", "/site_libs/", "/_freeze/", "/notebook.tex")
 SITE_CONFIG = {
@@ -413,7 +413,7 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
     require(not (root / ".cse-quarto-source.json").exists() or managed,
             root / "_cse-manuscript.json", "cannot reconstruct missing managed membership")
     require(article.suffix == ".qmd", article, "article must be a populated QMD")
-    files = {name: read_file(ASSET_ROOT / name) for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py", SITE_CSS)}
+    files = {name: read_file(ASSET_ROOT / name) for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py", "preview.service", SITE_CSS)}
     files.update({"_quarto.yml": json_bytes(SITE_CONFIG), "index.qmd": read_file(article.absolute()),
                   "_cse-manuscript.json": json_bytes({"project": {"render": ["index.qmd"]},
                                                            "website": {"sidebar": {"style": "docked", "collapse-level": 1,
