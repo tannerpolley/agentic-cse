@@ -300,8 +300,9 @@ files govern forbidden language and completeness checks.
 
 - The plugin remains advisory about scientific correctness and interpretation.
   Optional hooks block on prose violations and report test changes as advisories.
-  They cannot prevent transient writes. Repository hook activation is separate
-  from plugin enablement and remains subject to host-managed hook policy.
+  They cannot prevent transient writes. Hook activation (once at user level,
+  or per repository) is separate from plugin enablement and remains subject to
+  host-managed hook policy; hooks stay silent outside a CSE repository.
 - The domain expert must supply or approve the question, equations, sources,
   conventions, tolerances, intended use, and claims. Missing context can stop
   a route.

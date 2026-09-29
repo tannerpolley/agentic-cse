@@ -36,6 +36,7 @@ CODEX_TIMEOUT = 30
 NO_HOOKS_LISTED = "Codex lists no CSE hooks for this repository (project not trusted in Codex, or hooks disabled)"
 SKIPPED_UNTRUSTED = "Codex will skip these hooks until they are trusted (run /hooks in the Codex TUI)"
 CONFIG_PATHS = {"codex": Path(".codex/hooks.json"), "claude": Path(".claude/settings.json")}
+# The same relative paths hold the user-level registration under $HOME (--user).
 
 
 class InstallError(RuntimeError):
@@ -156,7 +157,8 @@ def owned_commands(event: str) -> dict[str, Path]:
     return owned
 
 
-def merged_configuration(target: Path, agent: str) -> dict:
+def merged_configuration(target: Path, agent: str, add: bool = True) -> dict:
+    """The target's configuration with recognized CSE handlers replaced (add) or removed."""
     check_target(target)
     result = json.loads(target.read_text()) if target.exists() else {}
     if not isinstance(result, dict) or not isinstance(result.get("hooks", {}), dict):
@@ -178,6 +180,8 @@ def merged_configuration(target: Path, agent: str) -> dict:
             hooks[event] = retained
         else:
             del hooks[event]
+    if not add:
+        return result
     desired = configuration(agent)
     for event, groups in desired["hooks"].items():
         hooks.setdefault(event, []).extend(groups)
@@ -186,17 +190,19 @@ def merged_configuration(target: Path, agent: str) -> dict:
     return result
 
 
-def install_repository(path: Path, agent: str = "codex") -> tuple[Path, str]:
-    root = project_root(path)
-    target = root / CONFIG_PATHS[agent]
-    content = (json.dumps(merged_configuration(target, agent), indent=2) + "\n").encode()
-    if target.is_file() and target.read_bytes() == content:
+def write_registration(target: Path, agent: str, add: bool) -> tuple[Path, str]:
+    content = (json.dumps(merged_configuration(target, agent, add), indent=2) + "\n").encode()
+    if target.is_file() and target.read_bytes() == content or not add and not target.exists():
         return target, "unchanged"
     atomic_write(target, content, 0o644)
-    return target, "installed"
+    return target, "installed" if add else "removed"
 
 
-def codex_cse_hooks(root: Path, trust: bool) -> tuple[list[dict], list[str]]:
+def install_repository(path: Path, agent: str = "codex", add: bool = True) -> tuple[Path, str]:
+    return write_registration(project_root(path) / CONFIG_PATHS[agent], agent, add)
+
+
+def codex_cse_hooks(root: Path, trust: bool, source: Path | None = None) -> tuple[list[dict], list[str]]:
     """List the CSE hooks Codex reads from the repository's .codex/hooks.json.
 
     With trust=True, persist trust for the ones not yet trusted and return the refreshed
@@ -206,7 +212,7 @@ def codex_cse_hooks(root: Path, trust: bool) -> tuple[list[dict], list[str]]:
     codex = shutil.which(os.environ.get("CSE_CODEX_BIN", "codex"))
     if codex is None:
         raise InstallError("codex CLI not found")
-    target = (root / CONFIG_PATHS["codex"]).resolve()
+    target = (source or root / CONFIG_PATHS["codex"]).resolve()
     owned = {command for event in EVENTS for command in owned_commands(event)}
     deadline = time.monotonic() + CODEX_TIMEOUT
     try:
@@ -376,10 +382,10 @@ def diagnose(path: Path, home: Path, agent: str) -> dict:
             "scope": "on-disk files only; command targets use inspection_home, while execution uses the host's HOME; saved plugin disables do not disable project hooks"}
 
 
-def trust_codex_hooks(root: Path) -> None:
+def trust_codex_hooks(root: Path, source: Path | None = None) -> None:
     """Best effort: the registration stays in place if Codex trust cannot be recorded."""
     try:
-        hooks, newly = codex_cse_hooks(root, trust=True)
+        hooks, newly = codex_cse_hooks(root, trust=True, source=source)
     except InstallError as exc:
         print(f"warning: could not record Codex hook trust: {exc}. {SKIPPED_UNTRUSTED}", file=sys.stderr)
         return
@@ -399,6 +405,10 @@ def main() -> int:
     parser.add_argument("--check", action="store_true")
     parser.add_argument("--agent", choices=tuple(CONFIG_PATHS), default="codex")
     parser.add_argument("--diagnose", action="store_true", help="read-only installation report; does not run hooks")
+    parser.add_argument("--user", action="store_true",
+                        help="register in the user configuration under --home, active in every CSE repository")
+    parser.add_argument("--remove", action="store_true",
+                        help="remove the CSE registrations from --repo targets or the user configuration")
     args = parser.parse_args()
     try:
         validate_sources()
@@ -408,8 +418,17 @@ def main() -> int:
         if args.check:
             print("CSE hook sources validated")
             return 0
+        user = args.home.resolve() / CONFIG_PATHS[args.agent]
         for repository in args.repo:
             merged_configuration(project_root(repository) / CONFIG_PATHS[args.agent], args.agent)
+        if args.user:
+            merged_configuration(user, args.agent)
+        if args.remove:
+            targets = [*(project_root(r) / CONFIG_PATHS[args.agent] for r in args.repo), *([user] if args.user else [])]
+            for target in targets:
+                target, status = write_registration(target, args.agent, add=False)
+                print(f"{status}: {target}")
+            return 0
         for target, status in install_runtime(args.home, args.replace_runtime):
             print(f"{status}: {target}")
         for repository in args.repo:
@@ -417,6 +436,12 @@ def main() -> int:
             print(f"{status}: {target}")
             if args.agent == "codex":
                 trust_codex_hooks(project_root(repository))
+        if args.user:
+            target, status = write_registration(user, args.agent, add=True)
+            print(f"{status}: {target}")
+            if args.agent == "codex":
+                # User hooks are listed for any trusted working directory; list from this one.
+                trust_codex_hooks(Path.cwd().resolve(), source=user)
     except (InstallError, OSError, json.JSONDecodeError, subprocess.TimeoutExpired) as exc:
         parser.exit(1, f"CSE hook installation failed: {exc}\n")
     return 0

@@ -71,14 +71,18 @@ manifests.
 
 ## Opt-in hooks and diagnostics
 
-Hooks are separate user-owned runtime files and must be opted in for each CSE
-repository. Run the installer from the installed plugin root (the directory
-containing `skills/`); from a cse-plugin source checkout, prefix the path with
-`plugin/`:
+Hooks are separate user-owned runtime files and an explicit opt-in. Register
+them once at user level (`--user`): they then run in every CSE repository and
+worktree and stay silent outside a repository with `docs/scientific/CONTEXT.md`.
+A repository registration (`--repo`) remains supported; do not keep both, or
+each hook runs twice (`--remove` drops CSE registrations only). Run the
+installer from the installed plugin root (the directory containing `skills/`);
+from a cse-plugin source checkout, prefix the path with `plugin/`:
 
 ```bash
+python3 scripts/workflow/install_cse_hooks.py --agent claude --user
 python3 scripts/workflow/install_cse_hooks.py \
-  --agent claude --repo <absolute-repository>
+  --agent claude --remove --repo <absolute-repository>
 python3 scripts/workflow/install_cse_hooks.py \
   --agent claude --diagnose --repo <absolute-repository>
 python3 scripts/workflow/install_cse_hooks.py --check

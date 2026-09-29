@@ -197,6 +197,25 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertIn("other.md", fallback["reason"])
                 self.assertIn("fell back to Git state", fallback.get("systemMessage", ""))
 
+    def test_user_registration_is_added_and_removed_without_touching_other_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            settings = home / ".claude/settings.json"
+            settings.parent.mkdir()
+            original = {"model": "opus", "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "notify.sh done"}]}]}}
+            settings.write_text(json.dumps(original), encoding="utf-8")
+            installer = [sys.executable, str(ROOT / "plugin/scripts/workflow/install_cse_hooks.py"),
+                         "--agent", "claude", "--user", "--home", str(home)]
+            added = subprocess.run(installer, text=True, capture_output=True, check=False)
+            self.assertEqual(0, added.returncode, added.stderr)
+            registered = json.loads(settings.read_text(encoding="utf-8"))
+            self.assertEqual("opus", registered["model"])
+            self.assertEqual({"SessionStart", "SubagentStart", "UserPromptSubmit", "Stop"}, set(registered["hooks"]))
+            self.assertIn("notify.sh done", json.dumps(registered["hooks"]["Stop"]))
+            removed = subprocess.run([*installer, "--remove"], text=True, capture_output=True, check=False)
+            self.assertEqual(0, removed.returncode, removed.stderr)
+            self.assertEqual(original, json.loads(settings.read_text(encoding="utf-8")))
+
     def test_stop_review_does_not_resend_answer_text(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
