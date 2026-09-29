@@ -23,7 +23,8 @@ selected sources into the existing project view, query retained knowledge
 read-only, or check and maintain corpus health. Search the configured corpus
 before the live library, and use source, evidence, typed-record, lineage, and
 live library commands only as the operation needs. Preserve parent and
-attachment keys plus exact locators. Treat metadata and generated summaries as
+attachment keys plus exact locators. A project's registered Zotero collection is its
+reading list; reorganize it only through a previewed, approved `project-organize` plan. Treat metadata and generated summaries as
 discovery aids, not claim support.
 
 Preview every library, collection, attachment, metadata, or bibliography

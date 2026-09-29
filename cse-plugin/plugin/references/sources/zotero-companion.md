@@ -8,6 +8,7 @@ Start with `cse-zotero doctor --json` (`zotero-companion` is an equivalent alias
 
 - `zotero-local-api-v1` for live item and attachment reads;
 - `configured-local-corpus-v1` and `project-views-v1` for durable synthesis;
+- `project-libraries-v1` for a project's registered Zotero collection and its generated page;
 - `exact-source-locators-v1` for evidence promoted into claims;
 - `better-bibtex-library-export-v1` for the central path-sanitized bibliography;
 - `mathpix-on-demand-v1` for last-resort PDF conversion;
@@ -34,6 +35,10 @@ Use the project view command above first and `--global` as the fallback, then `w
 ### Check and maintain
 
 `wiki-verify` and `wiki-health` are read-only corpus checks; `wiki-coverage --json` bounds curation work. A green result does not establish evidence Markdown hash integrity. Read the exact passage with `wiki-evidence <KEY> --query "<terms>" --json` and inspect `hash_matches` and mismatch warnings. Use `doctor --json` to check capability and configuration state. Separate broken paths and verified content-hash drift from scientific disagreement and missing interpretation. `wiki-maintain` is deterministic: it refreshes generated metadata, existing companions, and indexes, and neither synthesizes papers nor replaces curated claims. New evidence never silently alters analysis snapshots or reviewed claims; a changed interpretation goes through explicit incorporation and Review. Report freshness and review state with every result.
+
+### Project library
+
+A project that adopts Zotero owns one collection under the Companion's root project collection. The Companion registry is the only record of that binding; CSE does not copy it. Use `cse-zotero project-list --json` to find the slug and collection. `wiki/projects/<slug>.md` keeps curated notes above its generated marker and shows the live collection tree below it. Reorganize papers in Zotero or with a `project-organize` plan: show the dry-run preview, get native approval, then apply with `--apply`. Never hand-edit the generated part. Setup registers the project with `project-register`; a dry run first, then `--apply` after approval. It links an existing collection with `--collection <key>` (the first registration also names the root with `--root <key>`) or, once a root is registered, creates one under it with `--create "<name>"`. With the Companion add-on installed, Zotero refreshes the page after a collection change. `project-sync --json` lists pages that no longer match Zotero, and `project-sync --apply` rewrites them.
 
 ## Evidence and data authority
 
