@@ -101,3 +101,10 @@ test("project-organize endpoint previews by default and writes only with the tok
   const badItem = { project: "mea", operations: [{ op: "add", collection: "PROJ0001", items: ["NOTANITM"] }] };
   assert.equal((await call(badItem)).status, 422);
 });
+
+test("manifest has the fields Zotero 10 requires to install an add-on", async () => {
+  const { readFileSync } = await import("node:fs");
+  const manifest = JSON.parse(readFileSync(new URL("../zotero-plugin/manifest.json", import.meta.url), "utf8"));
+  const zotero = manifest.applications.zotero;
+  for (const field of ["id", "update_url", "strict_max_version"]) assert.ok(zotero[field], field);
+});
