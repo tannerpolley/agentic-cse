@@ -69,6 +69,12 @@ resolves live attachment lists, syncs existing Markdown companions, rebuilds
 the index once, and verifies the repository. Changed or unavailable evidence
 is preserved and reported with concrete errors; PDFs are never converted, and
 Zotero is never mutated.
+Each registered project's Zotero collection tree is its reading list:
+`wiki/projects/<slug>.md` shows it below the curated notes, and
+`cse-zotero project-list --json` names the slug and collection. To reorganize
+it, write a `project-organize` plan, show the user the dry-run preview, and
+apply with `--apply` only after they approve; never edit the generated part of
+a project page by hand.
 For model-driving work, use `wiki/curation/model-driving-records.json` as a
 small starting set before expanding through global search and lineage.
 

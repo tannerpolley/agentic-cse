@@ -20,6 +20,7 @@ from typing import Any
 
 from .manifests import ManifestError, lint_manifests, manifest_lookup
 from .records import _registry_root, lint_records, search_records
+from .projects import collection_table, memberships
 
 WIKI_SCHEMA_VERSION = 1
 INDEX_SCHEMA_VERSION = 2
@@ -352,27 +353,6 @@ CLAIM_REQUIRED_METADATA = (
     "locator",
 )
 
-PROJECT_ALIASES: dict[str, tuple[str, ...]] = {
-    "epcsaft-equilibrium": (
-        "epc-saft",
-        "epcsaft",
-        "ePC-SAFT-project",
-        "ePC-SAFT Equilibrium",
-        "equilibrium",
-    ),
-    "lithium-extraction": (
-        "lithium extraction",
-        "lithium_extraction",
-        "lithium",
-    ),
-    "mea-thermodynamics": (
-        "mea thermodynamics",
-        "mea-thermodynamics",
-        "mea",
-    ),
-}
-
-
 class WikiError(RuntimeError):
     """Raised when a wiki operation cannot safely proceed."""
 
@@ -385,14 +365,17 @@ class WikiSnapshot:
     collections: tuple[dict[str, Any], ...]
     tags: tuple[dict[str, Any], ...]
     searches: tuple[dict[str, Any], ...]
+    # Registered project slug -> Zotero collection key (see projects.py).
+    projects: tuple[tuple[str, str], ...] = ()
 
     @classmethod
-    def from_api(cls, api: Any) -> WikiSnapshot:
+    def from_api(cls, api: Any, projects: Mapping[str, str] | None = None) -> WikiSnapshot:
         return cls(
             items=tuple(api.items()),
             collections=tuple(api.collections()),
             tags=tuple(api.tags()),
             searches=tuple(api.searches()),
+            projects=tuple(sorted((projects or {}).items())),
         )
 
 
@@ -458,15 +441,6 @@ def _collection_name_map(collections: Iterable[Mapping[str, Any]]) -> dict[str, 
         if key and name:
             names[key] = str(name)
     return names
-
-
-def _projects_for_collections(collection_names: Sequence[str]) -> list[str]:
-    normalized = " | ".join(collection_names).casefold().replace("_", " ")
-    projects = []
-    for slug, aliases in PROJECT_ALIASES.items():
-        if any(alias.casefold().replace("_", " ") in normalized for alias in aliases):
-            projects.append(slug)
-    return sorted(set(projects))
 
 
 def _default_classification_config() -> dict[str, Any]:
@@ -702,6 +676,8 @@ def build_source_records(snapshot: WikiSnapshot) -> list[dict[str, Any]]:
     """Convert a Zotero snapshot into deterministic source records."""
 
     collection_names = _collection_name_map(snapshot.collections)
+    collection_tree = collection_table(snapshot.collections)
+    projects = dict(snapshot.projects)
     children: dict[str, list[Mapping[str, Any]]] = defaultdict(list)
     for item in snapshot.items:
         parent_key = str(_data(item).get("parentItem") or "")
@@ -749,7 +725,7 @@ def build_source_records(snapshot: WikiSnapshot) -> list[dict[str, Any]]:
             "note": data.get("note", ""),
             "tags": _normalize_tags(data.get("tags", [])),
             "collections": names,
-            "projects": _projects_for_collections(names),
+            "projects": memberships(collection_keys, collection_tree, projects),
             "attachments": attachments,
             "child_notes": notes,
         }
@@ -3238,7 +3214,6 @@ __all__ = [
     "INDEX_FILENAME",
     "INDEX_SCHEMA_VERSION",
     "MANIFEST_FILENAME",
-    "PROJECT_ALIASES",
     "SOURCE_DIRNAME",
     "TRIAGE_FILENAME",
     "TRIAGE_SCHEMA_VERSION",

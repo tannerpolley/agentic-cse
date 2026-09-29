@@ -32,6 +32,7 @@ def _snapshot() -> WikiSnapshot:
             {"key": "COLL001", "data": {"name": "ePC-SAFT Equilibrium"}},
             {"key": "COLL002", "data": {"name": "Lithium Extraction"}},
         ),
+        projects=(("epcsaft-equilibrium", "COLL001"), ("lithium-extraction", "COLL002")),
         tags=(),
         searches=(),
     )

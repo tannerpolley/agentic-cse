@@ -394,6 +394,47 @@ cse-zotero wiki-maintain --apply --json
 cse-zotero bibliography-export --apply --json
 ```
 
+## Project libraries
+
+Each project that adopts Zotero owns one collection under a single top-level
+project collection (for example "Project Libraries"). The registry
+`~/.config/zotero-companion/projects.json` binds a project slug to that
+collection's key, so renaming or moving the collection in Zotero keeps the
+binding. A source belongs to a project when it is filed in the project
+collection or in any collection nested below it.
+
+```bash
+cse-zotero project-register --root <root key> --slug <slug> --collection <key> \
+  --repository /path/to/repo --json            # preview; add --apply to record
+cse-zotero project-register --slug <slug> --create "<Name>" --repository ... --json  # root already registered
+cse-zotero project-list --json
+cse-zotero project-sync [--slug <slug>] --json # stale pages; --apply rewrites them
+cse-zotero project-organize plan.json --json   # preview; --apply writes Zotero, then syncs
+```
+
+`project-sync` renders `wiki/projects/<slug>.md` from the live collection tree:
+each Zotero folder becomes a nested section listing authors, year and title,
+with links to the source page and paper brief and a note when Markdown text is
+retained. Everything above the page's generated marker is curated and kept
+verbatim; a page without a marker is treated as curated in full on its first
+sync. `wiki/projects/README.md` lists the registered libraries the same way.
+
+`project-organize` takes `{"project": "<slug>", "operations": [...]}` with
+`create` (`name`, optional `parent`, optional `id` for later `@id` references),
+`rename` (`collection`, `name`), `move` (`collection`, `parent`), and `add` or
+`remove` (`collection`, `items` as Zotero item keys). The add-on checks every
+step against the registered project tree, answers a dry-run preview by
+default, and writes only with `--apply`. Without a project, only `create`
+directly under the root is allowed (that is how `--create` makes a new
+project collection).
+
+With the add-on installed, Zotero reruns `project-sync` a few seconds after a
+project's collections or filing change, using the registry's `sync_command`.
+`wiki-maintain` also re-renders the pages, because they link the source pages
+and briefs it refreshes. A registered collection that is missing from Zotero
+(for example, trashed) is reported and its page is left as it is. `doctor`
+reports registered projects, stale or missing ones, and the add-on's last sync.
+
 ## Stage 2 background plugin
 
 Build the bootstrapped plugin package with:
@@ -409,6 +450,11 @@ loopback-only endpoints to Zotero's existing local server:
 - `GET /zotero-companion/status`
 - `POST /zotero-companion/tag-cleanup` (dry-run unless an exact confirmation token is supplied)
 - `POST /zotero-companion/saved-searches` (dry-run unless an exact confirmation token is supplied)
+- `POST /zotero-companion/project-organize` (dry-run unless an exact confirmation
+  token is supplied; limited to registered project collection trees)
+
+It also watches collection changes and refreshes registered project pages; see
+[Project libraries](#project-libraries).
 
 The CLI never controls the desktop pointer or keyboard:
 

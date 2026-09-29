@@ -10,6 +10,7 @@ from typing import Any, Iterator
 
 from .evidence_sync import sync_evidence
 from .local_api import LocalAPIError, ZoteroLocalAPI
+from .projects import project_collections, sync_projects
 from .wiki import (
     MANIFEST_FILENAME,
     WikiSnapshot,
@@ -49,8 +50,10 @@ def _overlap_lock(root: Path) -> Iterator[bool]:
         handle.close()
 
 
-def _run_locked(root: Path, *, api: Any, apply: bool) -> dict[str, Any]:
-    snapshot = WikiSnapshot.from_api(api)
+def _run_locked(
+    root: Path, *, api: Any, apply: bool, registry: Mapping[str, Any] | None
+) -> dict[str, Any]:
+    snapshot = WikiSnapshot.from_api(api, project_collections(registry or {}))
     records = build_source_records(snapshot)
     refresh = materialize_snapshot(
         snapshot,
@@ -84,6 +87,10 @@ def _run_locked(root: Path, *, api: Any, apply: bool) -> dict[str, Any]:
             if (root / MANIFEST_FILENAME).exists()
             else {"ok": True, "errors": []}
         )
+    # Project pages link source pages and briefs, so they follow this refresh.
+    projects = sync_projects(
+        registry or {}, root, collections=snapshot.collections, items=snapshot.items, apply=apply
+    )
 
     errors = [
         (
@@ -112,6 +119,7 @@ def _run_locked(root: Path, *, api: Any, apply: bool) -> dict[str, Any]:
             "issues": issues,
         },
         "verify": {"ok": bool(verification.get("ok", False))},
+        "projects": {key: projects[key] for key in ("stale", "missing", "written")},
         "errors": errors,
     }
 
@@ -121,8 +129,13 @@ def maintain_wiki(
     *,
     api: Any | None = None,
     apply: bool = False,
+    registry: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Refresh sources, sync existing companions, and verify the repository."""
+    """Refresh sources, sync existing companions, and verify the repository.
+
+    ``registry`` is the project registry: it sets source membership and the
+    project pages re-rendered after the refresh.
+    """
 
     root = Path(root).expanduser().resolve()
     api = api if api is not None else ZoteroLocalAPI()
@@ -134,7 +147,7 @@ def maintain_wiki(
                     "status": "skipped_overlap",
                     "mode": "apply" if apply else "dry-run",
                 }
-            return _run_locked(root, api=api, apply=apply)
+            return _run_locked(root, api=api, apply=apply, registry=registry)
     except LocalAPIError as exc:
         return {
             "ok": False,
