@@ -19,6 +19,8 @@ import urllib.request
 
 ASSET_ROOT = Path(__file__).resolve().parent
 CONFIG_FILES = ("_quarto.yml", "_cse-manuscript.json", "_quarto-presentation.yml")
+# Plugin-owned files that re-running init on a managed root replaces with the current plugin copies.
+TOOLING_FILES = ("_quarto-presentation.yml", "render.sh", "manuscript.py", ".cse-quarto-source.json")
 # The shared stylesheet is installed once and then owned by the project, like the configuration.
 SITE_CSS = "site.css"
 REQUIRED_FILES = (*CONFIG_FILES, "index.qmd", ".cse-quarto-source.json",
@@ -252,10 +254,11 @@ def check_boundary(root: Path) -> None:
     if config.is_file():
         project = read_json(read_file(config), config).get("project")
         require(not (isinstance(project, dict) and project.get("type") == "manuscript"), config,
-                "earlier CSE Quarto Manuscript root; rebuild it as a website by removing _quarto.yml, "
-                "_quarto-presentation.yml, _cse-manuscript.json, .cse-quarto-source.json, manuscript.py, and "
-                "render.sh, rerunning init "
-                "with --article-source index.qmd, and including each notebook again")
+                "earlier CSE Quarto Manuscript root; rebuild it as a website by removing page-level execute: "
+                "settings and nested Quarto projects, removing _quarto.yml, _quarto-presentation.yml, "
+                "_cse-manuscript.json, .cse-quarto-source.json, manuscript.py, and render.sh, rerunning init "
+                "with --article-source index.qmd, including each notebook again with include --group, then "
+                "running render.sh and service (see references/visualize/quarto-execution.md)")
     output = root / "_site"
     reject_symlink(output)
     require(not output.exists() or output.is_dir(), output, "output is not a directory")
@@ -401,10 +404,13 @@ def atomic_write(path: Path, data: bytes) -> None:
             temporary.unlink(missing_ok=True)
 
 
-def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str) -> Path:
+def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str) -> tuple[Path, list[str]]:
+    """Create or adopt a root; on a managed root, also replace the plugin-owned TOOLING_FILES."""
     root = root_path(root, must_exist=False)
     check_boundary(root)
-    require(not (root / ".cse-quarto-source.json").exists() or (root / "_cse-manuscript.json").is_file(),
+    managed = (root / "_cse-manuscript.json").is_file()
+    replaced = []
+    require(not (root / ".cse-quarto-source.json").exists() or managed,
             root / "_cse-manuscript.json", "cannot reconstruct missing managed membership")
     require(article.suffix == ".qmd", article, "article must be a populated QMD")
     files = {name: read_file(ASSET_ROOT / name) for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py", SITE_CSS)}
@@ -420,7 +426,10 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
         if not target.exists():
             continue
         existing = read_file(target)
-        if name == ".gitignore":
+        if managed and name in TOOLING_FILES:
+            if existing != data:
+                replaced.append(name)
+        elif name == ".gitignore":
             missing = [n for n in REQUIRED_IGNORES if n not in existing.decode().splitlines()]
             files[name] = existing + (("" if existing.endswith(b"\n") or not existing else "\n") + "\n".join(missing) + "\n").encode() if missing else existing
         else:
@@ -446,13 +455,15 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
                     if name != ".gitignore" and not (root / name).exists():
                         os.replace(staging / name, root / name)
                         installed.append(root / name)
+                    elif name in replaced:
+                        os.replace(staging / name, root / name)
                 if not (root / ".gitignore").exists() or read_file(root / ".gitignore") != files[".gitignore"]:
                     atomic_write(root / ".gitignore", files[".gitignore"])
             except OSError:
                 for path in reversed(installed):
                     path.unlink()
                 raise
-    return root
+    return root, replaced
 
 
 def notebook_argument(root: Path, value: Path) -> str:
@@ -917,7 +928,10 @@ def main() -> int:
     args = parser.parse_args()
     try:
         if args.command == "init":
-            print(init(args.root, args.article_source, args.source_commit, args.runtime_tree_sha256))
+            root, replaced = init(args.root, args.article_source, args.source_commit, args.runtime_tree_sha256)
+            print(root)
+            for name in replaced:
+                print(f"replaced: {root / name}")
         elif args.command == "include":
             print(include(args.root, args.notebook, args.title, args.group))
         elif args.command == "sync":

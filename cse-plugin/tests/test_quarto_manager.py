@@ -46,6 +46,27 @@ class QuartoManagerTests(unittest.TestCase):
             with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "rerunning init"):
                 MANUSCRIPT.check_boundary(root)
 
+    def test_init_on_a_managed_root_replaces_only_plugin_tooling(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "analyses"
+            root.mkdir()
+            owned = {"_quarto.yml": json.dumps(MANUSCRIPT.SITE_CONFIG), "_cse-manuscript.json": '{"project": 1}\n',
+                     "site.css": "body { color: teal; }\n", "index.qmd": "# Synthesis\n",
+                     ".gitignore": "\n".join((*MANUSCRIPT.REQUIRED_IGNORES, "/scratch/")) + "\n"}
+            for name in MANUSCRIPT.TOOLING_FILES:
+                (root / name).write_text("older plugin copy\n")
+            for name, text in owned.items():
+                (root / name).write_text(text)
+            with (patch.object(MANUSCRIPT, "home_section", return_value={}),
+                  patch.object(MANUSCRIPT, "validate_root")):
+                _, replaced = MANUSCRIPT.init(root, root / "index.qmd", "c" * 40, "d" * 64)
+
+            self.assertEqual(sorted(MANUSCRIPT.TOOLING_FILES), sorted(replaced))
+            for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py"):
+                self.assertEqual((SCRIPT.parent / name).read_bytes(), (root / name).read_bytes())
+            self.assertEqual("c" * 40, json.loads((root / ".cse-quarto-source.json").read_text())["sourceCommit"])
+            self.assertEqual(owned, {name: (root / name).read_text() for name in owned})
+
     def test_refresh_renders_notebook_then_root_with_presentation_cache_refresh(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

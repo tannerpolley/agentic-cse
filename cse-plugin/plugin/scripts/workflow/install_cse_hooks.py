@@ -270,18 +270,20 @@ def codex_cse_hooks(root: Path, trust: bool, source: Path | None = None) -> tupl
         proc.wait()
 
 
-def codex_trust_report(root: Path) -> dict:
-    """Read-only trust status of the CSE hooks: trusted, untrusted, or unknown."""
-    if not (root / CONFIG_PATHS["codex"]).is_file():
-        return {"status": "unknown", "reason": "no repository hook registration"}
+def codex_trust_report(root: Path, home: Path) -> dict:
+    """Read-only trust status of the CSE hooks in the effective registration: the repository's
+    .codex/hooks.json when present, otherwise the user-level one under home."""
+    source = next((path for path in (root / CONFIG_PATHS["codex"], home / CONFIG_PATHS["codex"]) if path.is_file()), None)
+    if source is None:
+        return {"status": "unknown", "reason": "no repository or user hook registration"}
     try:
-        hooks, _ = codex_cse_hooks(root, trust=False)
+        hooks, _ = codex_cse_hooks(root, trust=False, source=source)
     except InstallError as exc:
-        return {"status": "unknown", "reason": str(exc)}
+        return {"status": "unknown", "source": str(source), "reason": str(exc)}
     if not hooks:
-        return {"status": "unknown", "reason": NO_HOOKS_LISTED}
+        return {"status": "unknown", "source": str(source), "reason": NO_HOOKS_LISTED}
     status = "trusted" if all(h["trustStatus"] == "trusted" for h in hooks) else "untrusted"
-    return {"status": status, "hooks": {h["key"]: h["trustStatus"] for h in hooks}}
+    return {"status": status, "source": str(source), "hooks": {h["key"]: h["trustStatus"] for h in hooks}}
 
 
 def diagnose_configuration(target: Path, home: Path) -> dict:
@@ -364,7 +366,7 @@ def diagnose(path: Path, home: Path, agent: str) -> dict:
         "codex": "Fresh Codex check: open a new session in this repository, run /hooks, and verify SessionStart prints the CSE stance with the repository role, confirmed agent role, and AGENTS.md CSE Protocol pointer.",
         "claude": "Fresh Claude Code check: close the current session, open a new session in this repository with the plugin loaded, and verify SessionStart prints the CSE stance with the repository role, confirmed agent role, and AGENTS.md CSE Protocol pointer.",
     }[agent]
-    trust = {"codex_hook_trust": codex_trust_report(root)} if agent == "codex" else {}
+    trust = {"codex_hook_trust": codex_trust_report(root, home)} if agent == "codex" else {}
     return {**trust, "agent": agent, "project": str(root), "configuration": str(target),
             "configuration_current": current, "configuration_sources": sources,
             "inspection_home": str(home), "home_matches_environment": home == Path.home().resolve(),

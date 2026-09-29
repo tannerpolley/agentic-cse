@@ -108,6 +108,9 @@ separate worktree checkout needs its own trust. If the `codex` CLI is missing, t
 warns that Codex will skip the hooks until trusted (for example with `/hooks`
 in the Codex TUI). `--diagnose` reports `codex_hook_trust` (`trusted`,
 `untrusted`, or `unknown` when Codex is unavailable) without changing anything.
+It checks the effective registration, the repository's `.codex/hooks.json`
+when present and otherwise the user-level `.codex/hooks.json` under `--home`,
+and names that file as `source`.
 
 Plugin availability, native registration, enabled state, active-session
 loading, trust, and observed hook execution are separate claims; installed

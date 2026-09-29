@@ -59,12 +59,6 @@ sets `notebook-links: false`, so an article that embeds a labeled cell from a
 retained notebook with `{{< embed >}}` shows the cell without a link to a
 separate notebook page.
 
-A root created before the website layout (`project.type: manuscript`) is
-refused with the rebuild steps: remove `_quarto.yml`, `_quarto-presentation.yml`,
-`_cse-manuscript.json`, `.cse-quarto-source.json`, `manuscript.py`, and
-`render.sh`, rerun `init` with `--article-source index.qmd`, and include each
-report again. Sources and retained results stay in place.
-
 Initialize with `manuscript.py init`, include substantive report `.qmd` files
 with `manuscript.py include`, and use `manuscript.py validate` before a render.
 The root configuration and presentation profile must be JSON-compatible YAML;
@@ -152,6 +146,39 @@ renders do not share hidden kernel state.
 execution-security boundaries: cached output can become stale, and an explicit
 execution command can rerun cells. Environment and filesystem isolation provide
 the stronger boundary when executable presentation cells are enabled.
+
+## Upgrading a managed root
+
+To give a managed root (one with `_cse-manuscript.json`) the current plugin
+tooling, rerun the plugin's `init` on it:
+
+```bash
+python3 assets/visualize/project/quarto/manuscript.py init analyses/ \
+  --article-source analyses/index.qmd --source-commit <SHA> --runtime-tree-sha256 <SHA256>
+```
+
+It replaces `manuscript.py`, `render.sh`, `_quarto-presentation.yml`, and the
+`.cse-quarto-source.json` source record with the current plugin versions and
+prints each replaced file. It keeps everything the project owns: `_quarto.yml`,
+`_cse-manuscript.json` membership, `site.css`, `index.qmd`, `.gitignore`
+additions, and all sources and retained results. The replacement is validated
+before any write, so a failed validation leaves the root unchanged. `init` still
+refuses to overwrite files in a root without `_cse-manuscript.json`.
+
+A root created before the website layout (`project.type: manuscript`) is
+refused rather than rewritten. Migrate it once:
+
+1. Remove page-level `execute:` settings from the pages; the root configuration
+   and presentation profile own execution.
+2. Remove nested Quarto projects (`_quarto.yml` or `_metadata.yml` below the
+   root) or move them out of the root.
+3. Remove `_quarto.yml`, `_quarto-presentation.yml`, `_cse-manuscript.json`,
+   `.cse-quarto-source.json`, `manuscript.py`, and `render.sh`, then rerun
+   `init` with that root's `index.qmd` as `--article-source`.
+4. Include each report again with `include --title <title> [--group <heading>]`.
+5. Render with `render.sh`, then rerun `service` for the preview.
+
+Sources and retained results stay in place.
 
 ## Main-checkout preview service
 
