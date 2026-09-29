@@ -111,7 +111,8 @@ scientific files. In the existing material-choice round, inspect the selected ho
 selected host and the actual repository or worktree so the report describes that checkout) and explain once that the reinforcement injects the
 confirmed agent and repository roles at entry and requests one bounded semantic completion review at the
 first Stop; installed files do not establish host trust or scientific truth. On explicit opt-in, invoke the
-same installer with `--agent <host> --repo <root>` and preserve unrelated settings. Whether hooks are
+same installer with `--agent <host> --user` (once per host; it covers every CSE repository and worktree)
+and preserve unrelated settings; a repository already registered with `--repo` is moved with `--remove --repo <root>`. Whether hooks are
 accepted or declined, Setup maintains the role-first `AGENTS.md` protocol and scientific guidance; declining
 is not Setup failure. Do not re-ask
 after the choice is settled unless host state materially changes. Setup prepares scientific records and project

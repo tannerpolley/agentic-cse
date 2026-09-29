@@ -1,6 +1,6 @@
 ---
 name: build
-description: "Implement an agreed scientific model, method, data transformation, or document correction from an accepted issue. Use when asked to \"implement issue #N\", \"code this model\", or fix a cause diagnose already established. An unexplained failure goes to diagnose first."
+description: "Implement an agreed scientific model, method, data transformation, or document correction from an accepted issue. Use when acting as an implementation sub-agent, or asked to \"implement issue #N\" or \"code this model\". An unexplained failure goes to diagnose first."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"

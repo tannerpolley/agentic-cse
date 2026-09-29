@@ -17,6 +17,14 @@ from check_prose import violations
 
 SOURCE_STANCE = Path(__file__).resolve().parents[2] / "assets/workflow/scientific-stance.txt"
 STANCE = SOURCE_STANCE if SOURCE_STANCE.is_file() else Path(__file__).with_name("cse-scientific-stance.txt")
+SOURCE_ROUTING = SOURCE_STANCE.with_name("skill-routing.txt")
+ROUTING = SOURCE_ROUTING if SOURCE_ROUTING.is_file() else Path(__file__).with_name("cse-skill-routing.txt")
+ROUTING_LEAD = ("CSE skill routing: before doing a stage's work, invoke its skill (Claude Code: the Skill tool; "
+                "Codex: open that skill's SKILL.md from the skill list).")
+# T3 Code prefixes a delegated task with "Act as the <role> sub-agent"; each role is one CSE stage.
+DELEGATED_ROLE = re.compile(r"\A\s*Act as the ([\w-]+) sub-agent\b", re.IGNORECASE)
+ROLES_LINE = "delegated roles — "
+NAMED_SKILL = re.compile(r"(?<![/$\w-])cse:([a-z]+)\b", re.IGNORECASE)
 TEST_PARTS = {"test", "tests", "testing"}
 MAX_INPUT_BYTES = 1024 * 1024
 SCHEMA_VERSION = 3
@@ -25,8 +33,9 @@ OPTIONAL_END = "]]"
 ROLE_SLOT = "{repository_role}"
 AGENT_ROLE_CLAUSE = "{agent_role_clause}"
 PROMPT_REMINDER = "Answer the scientific question: outcome, evidence, physical meaning, limits, and unresolved decisions. For analysis work, distinguish prediction, numerical verification, and physical validation; software status is provenance."
-ROLE_CORRECTION = "Setup must confirm repository role as analysis or tool before routing."
-AGENT_ROLE_CORRECTION = "Setup diagnostic: agent role not confirmed; run Setup."
+ROLE_CORRECTION = ("Repository role is not confirmed in docs/scientific/CONTEXT.md; ask the investigator to run "
+                   "cse:setup. Route every other stage to its skill as usual.")
+AGENT_ROLE_CORRECTION = "Setup diagnostic: agent role not confirmed; cse:setup records it."
 CLAUDE_WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 PATCH_TARGET = re.compile(r"\*\*\* (?:Add File|Update File|Move to): (.+?)(?:\\n|\n|$)")
 PROSE_PATH = r"([^\s'\"\\<>|;&()]+\.(?:md|qmd|tex))\b"
@@ -48,7 +57,7 @@ def context(event: str, message: str) -> dict[str, object]:
     return {"hookSpecificOutput": {"hookEventName": event, "additionalContext": message}}
 
 
-def render_stance(scientific_context: Path) -> str:
+def render_stance(scientific_context: Path, *, diagnostics: bool = True) -> str:
     template = STANCE.read_text(encoding="utf-8").strip()
     if template.count(OPTIONAL_START) != 1 or template.count(OPTIONAL_END) != 1:
         raise HookError("scientific stance has an invalid optional clause")
@@ -66,12 +75,45 @@ def render_stance(scientific_context: Path) -> str:
             f"; confirmed agent role: {agent}" if agent else "",
         )
     rendered = template[:start] + clause + template[end + len(OPTIONAL_END):]
-    diagnostics = []
-    if role is None:
-        diagnostics.append(ROLE_CORRECTION)
-    if agent is None:
-        diagnostics.append(AGENT_ROLE_CORRECTION)
-    return f"{rendered}{(' ' + ' '.join(diagnostics)) if diagnostics else ''}"
+    # Setup diagnostics appear once per session (start and stop), not on every prompt and subagent.
+    notes = [] if not diagnostics else [
+        *([ROLE_CORRECTION] if role is None else []), *([AGENT_ROLE_CORRECTION] if agent is None else [])]
+    return f"{rendered}{(' ' + ' '.join(notes)) if notes else ''}"
+
+
+def routing_lines() -> list[str]:
+    # Routing is guidance on top of the stance; a runtime without the file keeps the stance.
+    try:
+        return [line.strip() for line in ROUTING.read_text(encoding="utf-8").splitlines() if line.strip()]
+    except OSError:
+        return []
+
+
+def routing_table() -> str:
+    lines = routing_lines()
+    return f"{ROUTING_LEAD} " + "; ".join(lines) + "." if lines else ""
+
+
+def prompt_route(event: dict[str, object]) -> str:
+    """Name the skill for a prompt whose stage is explicit: a delegated role or a named CSE skill."""
+    prompt = event.get("prompt")
+    if not isinstance(prompt, str):
+        return ""
+    lines = routing_lines()
+    known = {name for line in lines for name in re.findall(r"cse:([a-z]+)", line.split(" — ")[0])}
+    roles = {role: skill for line in lines if line.startswith(ROLES_LINE)
+             for role, skill in re.findall(r"([\w-]+): cse:([a-z]+)", line)}
+    role = DELEGATED_ROLE.match(prompt)
+    role_name = role.group(1).lower() if role else ""
+    skills = [roles[role_name]] if role_name in roles else []
+    skills += [name for name in dict.fromkeys(n.lower() for n in NAMED_SKILL.findall(prompt))
+               if name in known and name not in skills]
+    if not skills:
+        return ""
+    names = ", ".join(f"`cse:{name}`" for name in skills)
+    why = f"delegated {role_name} task" if role_name in roles else "named in the request"
+    return (f"CSE route for this prompt ({why}): invoke {names} before other work "
+            "(Claude Code: the Skill tool; Codex: open its SKILL.md).")
 
 
 def answer_review(event: dict[str, object], role: str | None) -> str | None:
@@ -387,7 +429,7 @@ def main() -> int:
         repository, project, scientific_context = found
         role = repository_role(scientific_context)
         if event_name == "SessionStart":
-            stance = render_stance(scientific_context)
+            stance = " ".join(filter(None, (render_stance(scientific_context), routing_table())))
             try:
                 start(event, repository, project)
             except (HookError, OSError, subprocess.TimeoutExpired) as exc:
@@ -435,9 +477,12 @@ def main() -> int:
             if advisory:
                 emit({"systemMessage": advisory})
         elif event_name == "UserPromptSubmit":
-            emit(context(event_name, f"{render_stance(scientific_context)} {PROMPT_REMINDER}"))
+            route = prompt_route(event)
+            emit(context(event_name, " ".join(filter(None, (
+                render_stance(scientific_context, diagnostics=False), PROMPT_REMINDER, route)))))
         else:
-            emit(context(event_name, render_stance(scientific_context)))
+            emit(context(event_name, " ".join(filter(None, (render_stance(scientific_context, diagnostics=False),
+                                                             routing_table())))))
     except (HookError, OSError, subprocess.TimeoutExpired) as exc:
         emit({"systemMessage": f"CSE hook skipped safely: {exc}"})
     return 0

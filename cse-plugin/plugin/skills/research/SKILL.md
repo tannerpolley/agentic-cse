@@ -1,6 +1,6 @@
 ---
 name: research
-description: "Find and assess sources, equations, correlations, data, and methods when authority or applicability is uncertain. Use when asked \"find the paper for this correlation\" or \"is this equation valid here\". Zotero library work goes to zotero; datasets to data; figure values to digitize."
+description: "Find and assess sources, equations, correlations, data, and methods when authority or applicability is uncertain. Use when acting as a research sub-agent, or asked \"find the paper for this correlation\" or \"is this equation valid here\". Zotero library work goes to zotero; datasets to data."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"

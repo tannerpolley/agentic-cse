@@ -70,14 +70,18 @@ hooks automatically.
 
 ## Opt-in hooks and diagnostics
 
-Hooks are separate user-owned runtime files and must be opted in for each CSE
-repository. Run the installer from the installed plugin root (the directory
-containing `skills/`); from a cse-plugin source checkout, prefix the path with
-`plugin/`:
+Hooks are separate user-owned runtime files and an explicit opt-in. Register
+them once at user level (`--user`): they then run in every CSE repository and
+worktree and stay silent outside a repository with `docs/scientific/CONTEXT.md`.
+A repository registration (`--repo`) remains supported; do not keep both, or
+each hook runs twice (`--remove` drops CSE registrations only). Run the
+installer from the installed plugin root (the directory containing `skills/`);
+from a cse-plugin source checkout, prefix the path with `plugin/`:
 
 ```bash
+python3 scripts/workflow/install_cse_hooks.py --agent codex --user
 python3 scripts/workflow/install_cse_hooks.py \
-  --agent codex --repo <absolute-repository>
+  --agent codex --remove --repo <absolute-repository>
 python3 scripts/workflow/install_cse_hooks.py \
   --agent codex --diagnose --repo <absolute-repository>
 python3 scripts/workflow/install_cse_hooks.py --check
@@ -89,9 +93,25 @@ The installer writes the stable runtime under
 recognized CSE registrations, remains safe to repeat, and keeps the four
 `SessionStart`, `SubagentStart`, `UserPromptSubmit`, and `Stop` events. A
 changed installed runtime requires the explicit `--replace-runtime` guard.
+
+Codex never runs a hook that lacks persisted trust, and T3 Code has no hook
+review screen. After registering, the installer therefore asks `codex
+app-server` (`hooks/list`, then one `config/value/write` upsert under
+`hooks.state`) to record trust for exactly the CSE hooks it wrote to the
+repository's `.codex/hooks.json`, and prints which it trusted. It never trusts
+other hooks. Codex also ignores project hooks until the project itself is
+trusted in Codex. Trust is recorded in the `CODEX_HOME` of the `codex` CLI the
+installer runs (`CSE_CODEX_BIN` selects it), so run it with the same Codex home
+the agents use. Trust is keyed by the absolute path of `.codex/hooks.json`, so a
+separate worktree checkout needs its own trust. If the `codex` CLI is missing, the call fails or times out
+(30 s), or Codex lists no CSE hooks, the registration stays and the installer
+warns that Codex will skip the hooks until trusted (for example with `/hooks`
+in the Codex TUI). `--diagnose` reports `codex_hook_trust` (`trusted`,
+`untrusted`, or `unknown` when Codex is unavailable) without changing anything.
+
 Plugin availability, native registration, enabled state, active-session
 loading, trust, and observed hook execution are separate claims; installed
-files and registrations do not prove host trust or observed execution. For the
+files and registrations do not prove observed execution. For the
 exact fresh-session check, open a new Codex session in the repository, run
 `/hooks`, and verify that `SessionStart` prints the CSE stance with the
 repository role, confirmed agent role, and the `AGENTS.md` CSE Protocol

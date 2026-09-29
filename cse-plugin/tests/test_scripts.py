@@ -13,6 +13,14 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def setUpModule() -> None:
+    # Offline tests: the Codex installer must not start the host Codex CLI (trust has its own test).
+    previous = os.environ.get("CSE_CODEX_BIN")
+    os.environ["CSE_CODEX_BIN"] = "/nonexistent/codex"
+    unittest.addModuleCleanup(lambda: os.environ.pop("CSE_CODEX_BIN") if previous is None
+                              else os.environ.__setitem__("CSE_CODEX_BIN", previous))
+
+
 class ScriptBehaviorTests(unittest.TestCase):
     def run_script(self, path: str, *args: str, env: dict[str, str] | None = None, cwd: Path = ROOT):
         return subprocess.run(
@@ -189,6 +197,25 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertIn("other.md", fallback["reason"])
                 self.assertIn("fell back to Git state", fallback.get("systemMessage", ""))
 
+    def test_user_registration_is_added_and_removed_without_touching_other_settings(self):
+        with tempfile.TemporaryDirectory() as directory:
+            home = Path(directory)
+            settings = home / ".claude/settings.json"
+            settings.parent.mkdir()
+            original = {"model": "opus", "hooks": {"Stop": [{"hooks": [{"type": "command", "command": "notify.sh done"}]}]}}
+            settings.write_text(json.dumps(original), encoding="utf-8")
+            installer = [sys.executable, str(ROOT / "plugin/scripts/workflow/install_cse_hooks.py"),
+                         "--agent", "claude", "--user", "--home", str(home)]
+            added = subprocess.run(installer, text=True, capture_output=True, check=False)
+            self.assertEqual(0, added.returncode, added.stderr)
+            registered = json.loads(settings.read_text(encoding="utf-8"))
+            self.assertEqual("opus", registered["model"])
+            self.assertEqual({"SessionStart", "SubagentStart", "UserPromptSubmit", "Stop"}, set(registered["hooks"]))
+            self.assertIn("notify.sh done", json.dumps(registered["hooks"]["Stop"]))
+            removed = subprocess.run([*installer, "--remove"], text=True, capture_output=True, check=False)
+            self.assertEqual(0, removed.returncode, removed.stderr)
+            self.assertEqual(original, json.loads(settings.read_text(encoding="utf-8")))
+
     def test_stop_review_does_not_resend_answer_text(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
@@ -206,13 +233,20 @@ class ScriptBehaviorTests(unittest.TestCase):
             start = self.run_hook(project, "SessionStart", source="startup")
             stance = start["hookSpecificOutput"]["additionalContext"]
             self.assertIn("repository role: tool", stance)
-            self.assertIn("agent role not confirmed; run Setup", stance)
+            self.assertIn("agent role not confirmed", stance)
             self.assertNotIn("confirmed agent role:", stance)
+            self.assertIn("cse:diagnose", stance)
 
-            prompt = self.run_hook(project, "UserPromptSubmit")
+            # The Setup diagnostic is said once per session; a delegated role routes to its stage skill.
+            prompt = self.run_hook(project, "UserPromptSubmit", prompt="Act as the review sub-agent for this task. Check PR #3.")
             prompt_text = prompt["hookSpecificOutput"]["additionalContext"]
             self.assertIn("repository role: tool", prompt_text)
-            self.assertIn("agent role not confirmed; run Setup", prompt_text)
+            self.assertNotIn("agent role not confirmed", prompt_text)
+            self.assertIn("invoke `cse:review`", prompt_text)
+            plain = self.run_hook(project, "UserPromptSubmit", prompt="What changed since yesterday?")
+            self.assertNotIn("CSE route for this prompt", plain["hookSpecificOutput"]["additionalContext"])
+            named = self.run_hook(project, "UserPromptSubmit", prompt="Please do this (cse:analyze, retained sweep).")
+            self.assertIn("invoke `cse:analyze`", named["hookSpecificOutput"]["additionalContext"])
 
             stop = self.run_hook(project, "Stop", last_assistant_message="Infrastructure only.")
             self.assertIn("capability review", stop["reason"])
