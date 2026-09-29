@@ -1,0 +1,15 @@
+cse:setup — set up or reconcile the repository's scientific records, roles, and hooks
+cse:research — find or judge sources, equations, correlations, data, or methods
+cse:diagnose — find the cause of an unexpected numerical result or failure before changing code
+cse:design — plan a study, model change, or tool fix and write its issue
+cse:build — implement an agreed model, method, data transformation, or correction
+cse:analyze — run an accepted study and interpret its numbers
+cse:summarize — write retained results into the analysis notebook
+cse:review — independently check a plan, a delivered result, or a change
+cse:write — turn accepted evidence into manuscript or report prose
+cse:prose — inspect scientific writing without editing it
+cse:workflow — carry one task through several stages
+cse:zotero, cse:data, cse:digitize, cse:mathpix — sources, datasets, figure values, and PDF transcription
+cse:plot, cse:pgfplots, cse:tikz, cse:latex, cse:quarto, cse:beamer — figures, diagrams, and documents
+cse:audit — remove software ceremony, duplicated values, or misplaced records
+delegated roles — review: cse:review; implementation: cse:build; design: cse:design; research: cse:research; diagnosis: cse:diagnose; analysis: cse:analyze; writing: cse:write

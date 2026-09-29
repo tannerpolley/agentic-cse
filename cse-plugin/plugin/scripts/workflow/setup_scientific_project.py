@@ -29,6 +29,7 @@ except ImportError:
 ROOT = Path(__file__).resolve().parents[2]
 ASSETS = ROOT / "assets" / "workflow" / "project"
 PROTOCOL_TEMPLATE = ROOT / "assets" / "workflow" / "protocol.md"
+SKILL_ROUTING = ROOT / "assets" / "workflow" / "skill-routing.txt"
 BLOCK_BEGIN = "<!-- CSE:BEGIN PROTOCOL -->"
 BLOCK_END = "<!-- CSE:END PROTOCOL -->"
 AGENT_ROLE_SECTION = re.compile(r"(?ms)^## Agent role[ \t]*\n.*?(?=^#{1,2}[ \t]|\Z)")
@@ -178,6 +179,8 @@ def render_protocol(repository_role_value: str, agent_role_value: str, responsib
         validate_source_data_adoption(source_data_adoption)
     text = PROTOCOL_TEMPLATE.read_text(encoding="utf-8").strip()
     text = text.replace("{agent_role}", agent_role_value).replace("{repository_role}", repository_role_value)
+    routes = [line.strip() for line in SKILL_ROUTING.read_text(encoding="utf-8").splitlines() if line.strip()]
+    text = text.replace("{skill_routing}", "\n".join(f"- {line}" for line in routes))
     text = text.replace("{responsibilities}", responsibilities.strip()) if responsibilities.strip() else text.replace("{responsibilities}\n\n", "")
     pointer = SOURCE_DATA_ADOPTION_POINTER if source_data_adoption not in {None, "none"} else ""
     text = text.replace("{source_data_adoption}", pointer) if pointer else text.replace("\n{source_data_adoption}\n", "")

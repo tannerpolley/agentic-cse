@@ -31,6 +31,7 @@ def load_module(name: str, path: Path):
 setup = load_module("setup_scientific_project", SCRIPT)
 
 ADOPTION_POINTER = "Use the source/data adoption recorded in `docs/scientific/CONTEXT.md`."
+ROUTES = "\n".join(f"- {line.strip()}" for line in (ROOT / "plugin/assets/workflow/skill-routing.txt").read_text(encoding="utf-8").splitlines() if line.strip())
 PRE_FEATURE_PROTOCOL = f"""## CSE Protocol
 
 **Agent role:** Work as {ROLE}.
@@ -42,8 +43,13 @@ Apply this scientific role to investigation, implementation, review, handoffs,
 and responses. Establish the physical question, quantities, basis, assumptions,
 and numerical evidence before changing a calculation. Reuse accepted decisions.
 
-Use the installed CSE skills. Read `docs/scientific/README.md` and
-`docs/scientific/CONTEXT.md` before selecting the evidence-justified route.
+Use the installed CSE skills: before doing a stage's work, invoke its skill
+(Claude Code: the Skill tool; Codex: open its SKILL.md). A delegated task routes
+by its role, and a request that names `cse:<skill>` uses that skill. Read
+`docs/scientific/README.md` and `docs/scientific/CONTEXT.md` before selecting the
+evidence-justified route.
+
+{ROUTES}
 
 Report the engineering result or capability, supporting evidence, meaning,
 and limits before software provenance. Do not invent physical results.

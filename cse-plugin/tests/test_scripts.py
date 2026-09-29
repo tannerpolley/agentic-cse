@@ -13,6 +13,13 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 
 
+def setUpModule() -> None:
+    # The Codex installer consults the codex CLI; keep these tests off the real Codex configuration.
+    codex_home = tempfile.TemporaryDirectory()
+    unittest.addModuleCleanup(codex_home.cleanup)
+    os.environ["CODEX_HOME"] = codex_home.name
+
+
 class ScriptBehaviorTests(unittest.TestCase):
     def run_script(self, path: str, *args: str, env: dict[str, str] | None = None, cwd: Path = ROOT):
         return subprocess.run(
@@ -206,13 +213,20 @@ class ScriptBehaviorTests(unittest.TestCase):
             start = self.run_hook(project, "SessionStart", source="startup")
             stance = start["hookSpecificOutput"]["additionalContext"]
             self.assertIn("repository role: tool", stance)
-            self.assertIn("agent role not confirmed; run Setup", stance)
+            self.assertIn("agent role not confirmed", stance)
             self.assertNotIn("confirmed agent role:", stance)
+            self.assertIn("cse:diagnose", stance)
 
-            prompt = self.run_hook(project, "UserPromptSubmit")
+            # The Setup diagnostic is said once per session; a delegated role routes to its stage skill.
+            prompt = self.run_hook(project, "UserPromptSubmit", prompt="Act as the review sub-agent for this task. Check PR #3.")
             prompt_text = prompt["hookSpecificOutput"]["additionalContext"]
             self.assertIn("repository role: tool", prompt_text)
-            self.assertIn("agent role not confirmed; run Setup", prompt_text)
+            self.assertNotIn("agent role not confirmed", prompt_text)
+            self.assertIn("invoke `cse:review`", prompt_text)
+            plain = self.run_hook(project, "UserPromptSubmit", prompt="What changed since yesterday?")
+            self.assertNotIn("CSE route for this prompt", plain["hookSpecificOutput"]["additionalContext"])
+            named = self.run_hook(project, "UserPromptSubmit", prompt="Please do this (cse:analyze, retained sweep).")
+            self.assertIn("invoke `cse:analyze`", named["hookSpecificOutput"]["additionalContext"])
 
             stop = self.run_hook(project, "Stop", last_assistant_message="Infrastructure only.")
             self.assertIn("capability review", stop["reason"])

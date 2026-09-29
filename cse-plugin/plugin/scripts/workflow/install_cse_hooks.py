@@ -6,11 +6,16 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import itertools
 import os
 from pathlib import Path
+import queue
 import shutil
 import subprocess
+import sys
 import tempfile
+import threading
+import time
 import tomllib
 
 from cse_hook_common import nearest_context
@@ -22,10 +27,14 @@ RUNTIME_SOURCE = ROOT / "scripts/workflow/cse-test-gate.py"
 COMMON_SOURCE = ROOT / "scripts/workflow/cse_hook_common.py"
 PROSE_SOURCE = ROOT / "scripts/workflow/check_prose.py"
 STANCE_SOURCE = ROOT / "assets/workflow/scientific-stance.txt"
+ROUTING_SOURCE = ROOT / "assets/workflow/skill-routing.txt"
 CONFIG_SOURCE = ROOT / "assets/workflow/codex/hooks.json"
 EVENTS = {"SessionStart", "SubagentStart", "UserPromptSubmit", "Stop"}
 FORBIDDEN = ("plugins/cache", "PLUGIN_ROOT", "CLAUDE_PLUGIN_ROOT")
 RUNTIME_DIRECTORY = Path(".local/share/cse/hooks")
+CODEX_TIMEOUT = 30
+NO_HOOKS_LISTED = "Codex lists no CSE hooks for this repository (project not trusted in Codex, or hooks disabled)"
+SKIPPED_UNTRUSTED = "Codex will skip these hooks until they are trusted (run /hooks in the Codex TUI)"
 CONFIG_PATHS = {"codex": Path(".codex/hooks.json"), "claude": Path(".claude/settings.json")}
 
 
@@ -40,6 +49,8 @@ def validate_sources() -> None:
     stance = STANCE_SOURCE.read_text(encoding="utf-8").strip()
     if not stance or len(stance.split()) > 180:
         raise InstallError("scientific stance must contain 1 to 180 words")
+    if not ROUTING_SOURCE.read_text(encoding="utf-8").strip():
+        raise InstallError("skill routing text must not be empty")
     config_text = CONFIG_SOURCE.read_text(encoding="utf-8")
     config = json.loads(config_text)
     hooks = config.get("hooks") if isinstance(config, dict) else None
@@ -91,6 +102,7 @@ def runtime_files(home: Path):
         (PROSE_SOURCE, directory / "check_prose.py", 0o644),
         (ROOT / "BANNED.md", directory / "cse-BANNED.md", 0o644),
         (STANCE_SOURCE, directory / "cse-scientific-stance.txt", 0o644),
+        (ROUTING_SOURCE, directory / "cse-skill-routing.txt", 0o644),
     )
 
 
@@ -184,6 +196,84 @@ def install_repository(path: Path, agent: str = "codex") -> tuple[Path, str]:
     return target, "installed"
 
 
+def codex_cse_hooks(root: Path, trust: bool) -> tuple[list[dict], list[str]]:
+    """List the CSE hooks Codex reads from the repository's .codex/hooks.json.
+
+    With trust=True, persist trust for the ones not yet trusted and return the refreshed
+    list plus the keys newly trusted. Talks to `codex app-server` (JSON-RPC over stdio).
+    """
+    codex = shutil.which("codex")
+    if codex is None:
+        raise InstallError("codex CLI not found on PATH")
+    target = (root / CONFIG_PATHS["codex"]).resolve()
+    owned = {command for event in EVENTS for command in owned_commands(event)}
+    deadline = time.monotonic() + CODEX_TIMEOUT
+    proc = subprocess.Popen([codex, "app-server"], stdin=subprocess.PIPE, stdout=subprocess.PIPE,
+                            stderr=subprocess.DEVNULL, text=True)
+    lines: queue.Queue = queue.Queue()
+    threading.Thread(target=lambda: ([lines.put(line) for line in proc.stdout], lines.put(None)),
+                     daemon=True).start()
+    identifiers = itertools.count(1)
+
+    def send(message: dict) -> None:
+        proc.stdin.write(json.dumps({"jsonrpc": "2.0", **message}) + "\n")
+        proc.stdin.flush()
+
+    def call(method: str, params: dict) -> dict:
+        identifier = next(identifiers)
+        send({"id": identifier, "method": method, "params": params})
+        while True:
+            try:
+                line = lines.get(timeout=max(deadline - time.monotonic(), 0))
+            except queue.Empty:
+                raise InstallError(f"codex app-server timed out after {CODEX_TIMEOUT} s") from None
+            if line is None:
+                raise InstallError("codex app-server exited early")
+            try:
+                reply = json.loads(line)
+            except ValueError:
+                continue
+            if reply.get("id") == identifier:
+                if "error" in reply:
+                    raise InstallError(f"codex app-server rejected {method}: {reply['error']}")
+                return reply["result"]
+
+    def listing() -> list[dict]:
+        hooks = call("hooks/list", {"cwds": [str(root)]})["data"][0]["hooks"]
+        return [h for h in hooks if Path(h["sourcePath"]).resolve() == target and h["command"] in owned]
+
+    try:
+        call("initialize", {"clientInfo": {"name": "cse-hooks", "version": "0"}})
+        send({"method": "initialized"})
+        hooks = listing()
+        pending = [h for h in hooks if h["trustStatus"] != "trusted"]
+        if trust and pending:
+            call("config/value/write", {
+                "keyPath": "hooks.state", "mergeStrategy": "upsert", "filePath": None, "expectedVersion": None,
+                "value": {h["key"]: {"trusted_hash": h["currentHash"]} for h in pending}})
+            hooks = listing()
+        return hooks, [h["key"] for h in pending] if trust else []
+    except (OSError, KeyError, IndexError, TypeError) as exc:
+        raise InstallError(f"unexpected codex app-server exchange: {exc!r}") from exc
+    finally:
+        proc.kill()
+        proc.wait()
+
+
+def codex_trust_report(root: Path) -> dict:
+    """Read-only trust status of the CSE hooks: trusted, untrusted, or unknown."""
+    if not (root / CONFIG_PATHS["codex"]).is_file():
+        return {"status": "unknown", "reason": "no repository hook registration"}
+    try:
+        hooks, _ = codex_cse_hooks(root, trust=False)
+    except InstallError as exc:
+        return {"status": "unknown", "reason": str(exc)}
+    if not hooks:
+        return {"status": "unknown", "reason": NO_HOOKS_LISTED}
+    status = "trusted" if all(h["trustStatus"] == "trusted" for h in hooks) else "untrusted"
+    return {"status": status, "hooks": {h["key"]: h["trustStatus"] for h in hooks}}
+
+
 def diagnose_configuration(target: Path, home: Path) -> dict:
     report = {"path": str(target), "exists": None, "registrations": [], "saved_cse_state": {}}
     try:
@@ -264,7 +354,8 @@ def diagnose(path: Path, home: Path, agent: str) -> dict:
         "codex": "Fresh Codex check: open a new session in this repository, run /hooks, and verify SessionStart prints the CSE stance with the repository role, confirmed agent role, and AGENTS.md CSE Protocol pointer.",
         "claude": "Fresh Claude Code check: close the current session, open a new session in this repository with the plugin loaded, and verify SessionStart prints the CSE stance with the repository role, confirmed agent role, and AGENTS.md CSE Protocol pointer.",
     }[agent]
-    return {"agent": agent, "project": str(root), "configuration": str(target),
+    trust = {"codex_hook_trust": codex_trust_report(root)} if agent == "codex" else {}
+    return {**trust, "agent": agent, "project": str(root), "configuration": str(target),
             "configuration_current": current, "configuration_sources": sources,
             "inspection_home": str(home), "home_matches_environment": home == Path.home().resolve(),
             "runtime": runtime, "dependencies": {name: shutil.which(name) for name in (agent, "python3", "git")},
@@ -279,6 +370,21 @@ def diagnose(path: Path, home: Path, agent: str) -> dict:
             "fresh_session_check": fresh_session_check,
             "not_inspected": ["plugin-bundled hooks", "managed and ancestor configuration", "active task loaded state"],
             "scope": "on-disk files only; command targets use inspection_home, while execution uses the host's HOME; saved plugin disables do not disable project hooks"}
+
+
+def trust_codex_hooks(root: Path) -> None:
+    """Best effort: the registration stays in place if Codex trust cannot be recorded."""
+    try:
+        hooks, newly = codex_cse_hooks(root, trust=True)
+    except InstallError as exc:
+        print(f"warning: could not record Codex hook trust: {exc}. {SKIPPED_UNTRUSTED}", file=sys.stderr)
+        return
+    for hook in hooks:
+        label = "trusted" if hook["key"] in newly else "already " + hook["trustStatus"]
+        print(f"{label}: {hook['key']}")
+    if not hooks or any(h["trustStatus"] != "trusted" for h in hooks):
+        print(f"warning: {NO_HOOKS_LISTED if not hooks else 'some CSE hooks are not trusted'}. {SKIPPED_UNTRUSTED}",
+              file=sys.stderr)
 
 
 def main() -> int:
@@ -305,6 +411,8 @@ def main() -> int:
         for repository in args.repo:
             target, status = install_repository(repository, args.agent)
             print(f"{status}: {target}")
+            if args.agent == "codex":
+                trust_codex_hooks(project_root(repository))
     except (InstallError, OSError, json.JSONDecodeError, subprocess.TimeoutExpired) as exc:
         parser.exit(1, f"CSE hook installation failed: {exc}\n")
     return 0

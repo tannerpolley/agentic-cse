@@ -1,7 +1,6 @@
 ---
 name: latex
 description: "Choose the build path for a scientific LaTeX document or standalone figure or table, then compile and verify it. Use when asked to \"build the paper PDF\", \"my LaTeX won't compile\", or about overfull boxes. Slides go to beamer; .qmd sources to quarto; figures to tikz or pgfplots."
-disable-model-invocation: true
 metadata:
   cse-kind: "tool"
   cse-family: "visualize"
