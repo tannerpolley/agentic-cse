@@ -223,9 +223,12 @@ prescribe or install a dataset versioning tool.
 ## GitHub and research-record choices
 
 GitHub issues, Git history, pull requests, remote rules, and current worktrees
-are authoritative. A standalone issue is normal. Labels remain advisory;
-milestones, Projects, relationships, issue types, and Actions are optional
-context and are used only when the science or user chooses them. Substantive
+are authoritative. A standalone issue is normal. Every open issue belongs to
+one milestone through GitHub's native field, under the milestone convention in
+[github-and-git](../../plugin/references/workflow/github-and-git.md#milestones),
+which Setup reconciles after an approved preview. Labels remain advisory;
+Projects, relationships, issue types, and Actions are optional context and are
+used only when the science or user chooses them. Substantive
 construction records the question, equations or model, assumptions, inputs,
 references, reference cases, metrics and tolerances, analyses, outputs, claim
 limits, limitations, unresolved questions, and required result checks. A negative
@@ -292,7 +295,7 @@ files govern forbidden language and completeness checks.
 | Universal result-status machinery | Rejected as successor baggage. Scientific work needs evidence and interpretation tied to the question, not a generic status taxonomy. |
 | Strict question-only stage gates | Rejected. Material alignment questions are required, but the agent should continue through connected routes once the user confirms rather than stopping at every stage. |
 | Generic TDD, test pyramids, or coverage targets | Rejected. Tests protect scientific expectations and realistic corruption risks; coverage can reveal gaps but does not establish correctness. |
-| Mandatory labels, milestones, Projects, Actions, or issue hierarchy | Rejected. These remain optional GitHub context and should not become a hidden lifecycle database. |
+| Mandatory labels, Projects, Actions, or issue hierarchy | Rejected. These remain optional GitHub context and should not become a hidden lifecycle database. Milestones are the exception: every open issue belongs to one, titled by the shared convention, so hosts can browse issues by milestone; they grant no authority. |
 | Hand-edit a BibTeX snapshot or automate publisher access | Rejected. Zotero and the approved Better BibTeX export own metadata and attachments; repository snapshots are one-way and source-linked acquisition stays user-controlled. |
 | Prescribe one dataset versioning tool | Rejected. Data authority, formats, lineage, retention, versioning, and recovery are scientific-project decisions. |
 
