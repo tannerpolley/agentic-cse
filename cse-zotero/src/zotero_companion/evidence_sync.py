@@ -51,6 +51,13 @@ def _sha256(content: bytes) -> str:
     return hashlib.sha256(content).hexdigest()
 
 
+def _file_sha256(path: Path) -> str:
+    try:
+        return _sha256(path.read_bytes())
+    except OSError:
+        return ""
+
+
 def _display_path(root: Path, path: Path) -> str:
     try:
         return str(path.resolve().relative_to(root.resolve().parent))
@@ -257,11 +264,7 @@ def _plan_candidate(root: Path, candidate: dict[str, Any], record: Mapping[str, 
             candidate["reason"] = "existing manifest hash differs from Zotero companion"
             return
         if destination.is_file():
-            try:
-                existing_hash = _sha256(destination.read_bytes())
-            except OSError:
-                existing_hash = ""
-            if existing_hash != candidate["source_sha256"]:
+            if _file_sha256(destination) != candidate["source_sha256"]:
                 candidate["action"] = "conflict"
                 candidate["reason"] = "existing evidence file differs from Zotero companion"
                 return
@@ -285,6 +288,11 @@ def _plan_candidate(root: Path, candidate: dict[str, Any], record: Mapping[str, 
         candidate["reason"] = "destination filename is already used by another attachment"
         return
     if destination.exists():
+        # A companion linked in place at its evidence path is already materialized.
+        if _file_sha256(destination) == candidate["source_sha256"]:
+            candidate["action"] = "adopt"
+            candidate["reason"] = "existing evidence file matches Zotero companion"
+            return
         candidate["action"] = "conflict"
         candidate["reason"] = "destination file exists outside the evidence manifest"
         return
@@ -386,7 +394,7 @@ def sync_evidence(
 
     applied: list[str] = []
     for candidate in candidates:
-        if candidate["action"] != "copy":
+        if candidate["action"] not in ("copy", "adopt"):
             continue
         record = record_by_key[str(candidate["zotero_key"])]
         source_path = _local_attachment_path(api, str(candidate["zotero_attachment_key"]))
@@ -397,7 +405,12 @@ def sync_evidence(
             )
         destination = root / str(candidate["destination"])
         bundle = root / EVIDENCE_DIRNAME / str(candidate["zotero_key"])
-        _write_atomic(destination, content)
+        if candidate["action"] == "copy":
+            _write_atomic(destination, content)
+        elif _file_sha256(destination) != candidate["source_sha256"]:
+            raise EvidenceSyncError(
+                f"Evidence file changed during sync for {candidate['zotero_attachment_key']}; rerun the dry run"
+            )
         manifest = _updated_manifest(record, bundle, candidate)
         _write_atomic(bundle / "manifest.json", _stable_json(manifest))
         readme = bundle / "README.md"
