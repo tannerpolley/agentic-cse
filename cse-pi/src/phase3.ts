@@ -77,7 +77,7 @@ const MAX_DIRECTORIES = 4096;
 const MAX_DEPTH = 32;
 const MAX_BYTES = 128 * 1024 * 1024;
 const EFFORTS = ["off", "minimal", "low", "medium", "high", "xhigh", "max"];
-const MODEL_EFFORTS: Record<string, string[]> = { "gpt-6-astra": EFFORTS, "gpt-5.6-sol": EFFORTS, "gpt-5.6-terra": EFFORTS, "gpt-5.6-luna": EFFORTS };
+const MODEL_EFFORTS: Record<string, string[]> = { "gpt-6-astra": EFFORTS, "gpt-6.1-sol": EFFORTS, "gpt-5.6-sol": EFFORTS, "gpt-5.6-terra": EFFORTS, "gpt-5.6-luna": EFFORTS };
 const ROLE_DEFAULTS: Record<Phase3Role, Phase3Model> = {
   build: { provider: "openai-codex", model: "gpt-5.6-luna", effort: "high" },
 };
