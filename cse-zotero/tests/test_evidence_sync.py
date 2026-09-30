@@ -189,3 +189,24 @@ def test_linked_file_uses_path_basename_when_filename_is_missing(tmp_path: Path)
     )
     assert record["attachments"][0]["filename"] == linked.name
     assert (root / "evidence/PARENT123" / linked.name).read_bytes() == linked.read_bytes()
+
+
+def test_companion_linked_in_place_is_adopted_and_different_file_conflicts(tmp_path: Path):
+    root, api, _article, supporting, _pdf = _materialized(tmp_path)
+    bundle = root / "evidence/PARENT123"
+    bundle.mkdir(parents=True)
+    in_place = bundle / "article.md"
+    in_place.write_bytes(b"# article linked in place\n")
+    api.paths["MD123456"] = in_place.as_uri()
+    (bundle / "supporting-information.mmd").write_bytes(b"# unrelated file\n")
+
+    result = sync_evidence(root, api=api, apply=True)
+
+    assert result["actions"] == {"adopt": 1, "conflict": 1}
+    assert result["applied_attachment_keys"] == ["MD123456"]
+    manifest = json.loads((bundle / "manifest.json").read_text(encoding="utf-8"))
+    assert [entry["zotero_attachment_key"] for entry in manifest["files"]] == ["MD123456"]
+    assert in_place.read_bytes() == b"# article linked in place\n"
+    assert (bundle / "supporting-information.mmd").read_bytes() == b"# unrelated file\n"
+    assert supporting.read_bytes().startswith(b"# SI")
+    assert sync_evidence(root, api=api)["actions"] == {"conflict": 1, "unchanged": 1}
