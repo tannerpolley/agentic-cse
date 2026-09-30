@@ -18,7 +18,12 @@ Read first: [operating-model](../../references/workflow/operating-model.md).
 Inspect repository guidance, existing scientific records, terminology, inputs,
 analyses, documents, Git state, and available commands. Activate
 [scientific-projects](../../references/workflow/scientific-projects.md) for record ownership or migration and [github-and-git](../../references/workflow/github-and-git.md)
-for issue and integration rules. Use `cse:zotero` or
+for issue and integration rules. For a GitHub repository, reconcile its
+[milestones](../../references/workflow/github-and-git.md#milestones) on every
+run: read all milestones and open issues with `gh`, then preview the exact
+milestone renames and missing descriptions, issue title-prefix removals, and a
+proposed milestone for each unassigned open issue. Apply only the approved
+subset and read it back. Use `cse:zotero` or
 `cse:data` after checking the requested external capability when source authority
 or lineage is unresolved. Use CSE rendering only for a selected render output or
 the root Quarto analysis site assets for a confirmed analysis; `tool` gets no
