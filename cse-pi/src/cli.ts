@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { run } from "./worker.js";
 
-const help = "Usage: cse-pi run --task /absolute/work-order.json --result-dir /absolute/new-run-directory [--role build] [--no-inference]\\n\\nSupports schema v3 build-only one-shot workers. --no-inference validates and retains a preflight without provider authentication or model execution.";
+const help = "Usage: cse-pi run --task /absolute/work-order.json --result-dir /absolute/new-run-directory [--role build] [--no-inference]\\n\\nSupports schema v3 build-only one-shot workers. --no-inference verifies frozen identity, captures the candidate, runs declared checks in a fresh verification worktree, retains evidence, and removes both worktrees without authentication or model execution.";
 
 function option(args: string[], name: string): string | undefined {
   const index = args.indexOf(name);

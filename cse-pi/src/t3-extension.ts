@@ -4,14 +4,14 @@ import { runPhase3, type Phase3Session } from "./phase3.js";
 
 export const T3_BUILD_USAGE = "Usage: /cse-build /absolute/work-order.json /absolute/new-result-directory";
 const WORKER_SYSTEM_PROMPT = "CSE-Pi bounded worker.";
-const WORKER_TOOLS = new Set(["cse_run_command", "cse_write_candidate", "cse_delete_candidate", "cse_submit_result"]);
+const WORKER_TOOLS = new Set(["cse_run_command", "cse_edit", "cse_write", "cse_run_check", "cse_submit_result"]);
 type Listener = (event: Record<string, unknown>) => void;
 
 /**
  * Pi extension for hosts that run Pi as a visible subagent (T3 Code). `/cse-build` runs the
  * same Build worker as `cse-pi run`, but the current Pi session is the worker session: its
- * turns and tool calls appear in the host while the worker tools, frozen snapshot, candidate
- * copy, Bubblewrap commands and retained evidence stay unchanged.
+ * turns and tool calls appear in the host while the worktree, worker tools,
+ * Bubblewrap commands and retained evidence stay unchanged.
  *
  * Pi starts a message sent from a command only after the command returns, so the command
  * returns as soon as the worker prompt is sent. The worker tools and system prompt stay in
@@ -69,6 +69,7 @@ export default function cseT3Worker(pi: ExtensionAPI): void {
             throw new Error(`T3 child runs ${observed?.provider ?? "no provider"}/${observed?.id ?? "no model"}; the work order requires ${model.provider}/${model.model}. Delegate with that model.`);
           }
           for (const tool of tools) pi.registerTool(tool as Parameters<ExtensionAPI["registerTool"]>[0]);
+          const priorEntries = new Set(ctx.sessionManager.getEntries().map(entry => entry.id));
           let runEnded: Promise<void> = Promise.resolve();
           // Set when the worker aborts itself (turn limit, timeout, cancellation) so that abort keeps its own status.
           let selfAborted = false;
@@ -99,6 +100,20 @@ export default function cseT3Worker(pi: ExtensionAPI): void {
               };
               listeners.add(wrapped);
               return () => listeners.delete(wrapped);
+            },
+            getSessionStats() {
+              // ExtensionContext exposes the session manager, not AgentSession.getSessionStats().
+              // Read persisted usage, including retries/compaction, and exclude earlier host work.
+              const tokens = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 };
+              for (const entry of ctx.sessionManager.getEntries()) {
+                if (priorEntries.has(entry.id)) continue;
+                const usage = entry.type === "message" && (entry.message.role === "assistant" || entry.message.role === "toolResult") ? entry.message.usage
+                  : (entry.type === "compaction" || entry.type === "branch_summary") ? entry.usage : undefined;
+                if (!usage) continue;
+                for (const key of ["input", "output", "cacheRead", "cacheWrite"] as const) tokens[key] += usage[key];
+              }
+              tokens.total = tokens.input + tokens.output + tokens.cacheRead + tokens.cacheWrite;
+              return { tokens };
             },
             dispose: () => pi.setActiveTools(previousTools),
           };

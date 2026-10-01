@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { lstat, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
+import { SessionManager } from "@earendil-works/pi-coding-agent";
 import cseT3Worker, { T3_BUILD_USAGE } from "../src/t3-extension.ts";
 import { fixture } from "./build-fixture.ts";
 
@@ -13,7 +14,10 @@ const SUBMIT = { outcome: "accepted", facts: ["changed candidate"], assumptions:
  * A Pi host whose agent run executes `agent` against the tools active when it starts. Like Pi,
  * a message sent from a command runs only after the command handler returns.
  */
-function fakeHost(options: { busy?: boolean; model?: { provider: string; id: string }; thinking?: string; retries?: number; agent: (tools: Map<string, Tool>, attempt: number) => Promise<string | undefined> }) {
+function fakeHost(options: { busy?: boolean; model?: { provider: string; id: string }; thinking?: string; retries?: number; finalPlain?: boolean; agent: (tools: Map<string, Tool>, attempt: number) => Promise<string | undefined> }) {
+  const sessionManager = SessionManager.inMemory();
+  const usage = { input: 23, output: 7, cacheRead: 11, cacheWrite: 3, totalTokens: 44, cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0, total: 0 } };
+  sessionManager.appendMessage({ role: "assistant", content: [], usage: { ...usage, input: 10000 }, timestamp: 0 } as never);
   const handlers = new Map<string, Handler[]>();
   const tools = new Map<string, Tool>();
   const notes: string[] = [];
@@ -39,7 +43,9 @@ function fakeHost(options: { busy?: boolean; model?: { provider: string; id: str
           seen.activePerAttempt.push([...active]);
           emit("turn_start", { turnIndex: attempt });
           const stopReason = await options.agent(new Map([...tools].filter(([name]) => active.includes(name))), attempt);
-          emit("message_end", { message: { role: "assistant", content: [{ type: "toolCall" }], stopReason: stopReason ?? "toolUse" } });
+          const message = { role: "assistant", content: options.finalPlain ? [{ type: "text", text: "Done." }] : [{ type: "toolCall" }], stopReason: stopReason ?? "toolUse", usage, timestamp: Date.now() };
+          sessionManager.appendMessage(message as never);
+          emit("message_end", { message });
           emit("agent_end", {});
           await new Promise(resolve => setTimeout(resolve, 20));
         }
@@ -48,7 +54,7 @@ function fakeHost(options: { busy?: boolean; model?: { provider: string; id: str
     },
   };
   cseT3Worker(pi as never);
-  const ctx = { model: options.model ?? { provider: "openai-codex", id: "gpt-5.6-luna" }, ui: { notify: (message: string) => notes.push(message) }, isIdle: () => !options.busy, abort() {} };
+  const ctx = { sessionManager, model: options.model ?? { provider: "openai-codex", id: "gpt-5.6-luna" }, ui: { notify: (message: string) => notes.push(message) }, isIdle: () => !options.busy, abort() {} };
   const runCommand = async (args: string) => {
     await command!(args, ctx);
     const run = queued;
@@ -75,11 +81,13 @@ async function orderFile(modelTurnLimit?: number): Promise<{ data: Awaited<Retur
   return { data, path, resultDir: join(data.base, "run") };
 }
 
-test("/cse-build runs the Build worker as the host session and restores its tools", async () => {
-  const { data, path, resultDir } = await orderFile();
+test("/cse-build keeps an earlier plain response from poisoning a later submission", async () => {
+  const { data, path, resultDir } = await orderFile(5);
   const host = fakeHost({
-    async agent(tools) {
-      await tools.get("cse_write_candidate")!.execute("write", { path: "model.txt", content: "after\n" });
+    retries: 1,
+    finalPlain: true,
+    async agent(tools, attempt) {
+      if (attempt === 0) return "error";
       await tools.get("cse_submit_result")!.execute("submit", SUBMIT);
       return undefined;
     },
@@ -88,10 +96,31 @@ test("/cse-build runs the Build worker as the host session and restores its tool
     await host.runCommand(`${path} ${resultDir}`);
     const body = await resultOf(resultDir);
     assert.equal(body.status, "completed");
+    assert.equal(body.model_requests, 2);
+    assert.deepEqual(host.activeTools(), ["read", "bash", "t3_thread_list"]);
+  } finally { await rm(data.base, { recursive: true, force: true }); }
+});
+
+test("/cse-build completes a successful submission followed by plain text and restores its tools", async () => {
+  const { data, path, resultDir } = await orderFile();
+  const host = fakeHost({
+    finalPlain: true,
+    async agent(tools) {
+      await tools.get("cse_write")!.execute("write", { path: "model.txt", content: "after\n" });
+      await tools.get("cse_submit_result")!.execute("submit", SUBMIT);
+      return "stop";
+    },
+  });
+  try {
+    await host.runCommand(`${path} ${resultDir}`);
+    const body = await resultOf(resultDir);
+    assert.equal(body.status, "completed");
+    assert.equal(body.model_requests, 1);
+    assert.equal(host.seen.activePerAttempt.length, 1);
     assert.equal(body.candidate_changes[0].path, "model.txt");
     assert.equal(body.supervisor.source_before_after_equal, true);
     assert.equal(await readFile(join(data.source, "model.txt"), "utf8"), "before\n");
-    assert.deepEqual(host.seen.activeDuringRun.sort(), ["cse_delete_candidate", "cse_run_command", "cse_submit_result", "cse_write_candidate"]);
+    assert.deepEqual(host.seen.activeDuringRun.sort(), ["cse_edit", "cse_run_check", "cse_run_command", "cse_submit_result", "cse_write"]);
     assert.equal(host.seen.systemPrompt, "CSE-Pi bounded worker.");
     assert.deepEqual(host.activeTools(), ["read", "bash", "t3_thread_list"]);
   } finally {
@@ -159,7 +188,7 @@ test("/cse-build keeps the worker tools through Pi's automatic retry", async () 
     retries: 1,
     async agent(tools, attempt) {
       if (attempt === 0) return "error";
-      await tools.get("cse_write_candidate")!.execute("write", { path: "model.txt", content: "after\n" });
+      await tools.get("cse_write")!.execute("write", { path: "model.txt", content: "after\n" });
       await tools.get("cse_submit_result")!.execute("submit", SUBMIT);
       return undefined;
     },
@@ -173,6 +202,22 @@ test("/cse-build keeps the worker tools through Pi's automatic retry", async () 
   } finally {
     await rm(data.base, { recursive: true, force: true });
   }
+});
+
+test("/cse-build records real session usage across retries, excluding earlier host messages", async () => {
+  const { data, path, resultDir } = await orderFile(5);
+  const host = fakeHost({ retries: 1, async agent(tools, attempt) {
+    if (attempt === 0) return "error";
+    await tools.get("cse_submit_result")!.execute("submit", SUBMIT);
+    return undefined;
+  } });
+  try {
+    await host.runCommand(`${path} ${resultDir}`);
+    const body = await resultOf(resultDir);
+    assert.equal(body.status, "completed");
+    assert.deepEqual(body.usage, { input: 46, output: 14, cacheRead: 22, cacheWrite: 6, total: 88 });
+    assert.equal(body.model_requests, 2);
+  } finally { await rm(data.base, { recursive: true, force: true }); }
 });
 
 test("a CSE-Pi session blocks every tool except the worker tools", () => {

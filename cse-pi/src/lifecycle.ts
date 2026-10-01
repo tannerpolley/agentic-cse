@@ -13,13 +13,12 @@ export class ResultLifecycle {
 export type Runner = { prompt(text: string): Promise<void>; waitForIdle(): Promise<void>; abort(): Promise<void> | void; subscribe(listener: (event: any) => void): () => void };
 export async function runOneTurn(session: Runner, prompt: string, lifecycle: ResultLifecycle, budget: { wall_timeout_ms: number; model_turn_limit: number }, signal?: AbortSignal, onEvent?: (event: Record<string, unknown>) => void): Promise<WorkerTerminal> {
   if (signal?.aborted) return "cancelled";
-  let turns = 0; let plain = false; let cancelled = false; let timedOut = false; let turnLimitExceeded = false;
+  let turns = 0; let cancelled = false; let timedOut = false; let turnLimitExceeded = false;
   const cancel = () => { cancelled = true; void session.abort(); }; const timeout = () => { timedOut = true; void session.abort(); };
   const timer = setTimeout(timeout, budget.wall_timeout_ms); signal?.addEventListener("abort", cancel, { once: true });
   const unlisten = session.subscribe((event) => {
-    if (event.type === "turn_start") { turns += 1; if (turns > budget.model_turn_limit) { turnLimitExceeded = true; void session.abort(); } }
-    if (event.type === "message_end" && event.message?.role === "assistant" && !event.message?.content?.some((x: any) => x.type === "toolCall") && !lifecycle.terminal()) plain = true;
+    if (event.type === "turn_start") { turns += 1; if (turns > budget.model_turn_limit && !lifecycle.terminal()) { turnLimitExceeded = true; void session.abort(); } }
     onEvent?.({ type: event.type, turnIndex: event.turnIndex, toolName: event.toolName, isError: event.isError });
   });
-  try { await session.prompt(prompt); await session.waitForIdle(); if (timedOut) return "timed_out"; if (cancelled) return "cancelled"; if (turnLimitExceeded) return "turn_limit_exceeded"; if (plain || !lifecycle.terminal()) lifecycle.plainFinal(); return lifecycle.terminal()!; } catch (error) { if (timedOut) return "timed_out"; if (cancelled) return "cancelled"; if (turnLimitExceeded) return "turn_limit_exceeded"; throw error; } finally { clearTimeout(timer); signal?.removeEventListener("abort", cancel); unlisten(); }
+  try { await session.prompt(prompt); await session.waitForIdle(); if (lifecycle.terminal()) return lifecycle.terminal()!; if (timedOut) return "timed_out"; if (cancelled) return "cancelled"; if (turnLimitExceeded) return "turn_limit_exceeded"; return lifecycle.plainFinal(); } catch (error) { if (timedOut) return "timed_out"; if (cancelled) return "cancelled"; if (turnLimitExceeded) return "turn_limit_exceeded"; throw error; } finally { clearTimeout(timer); signal?.removeEventListener("abort", cancel); unlisten(); }
 }
