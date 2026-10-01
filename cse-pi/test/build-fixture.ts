@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { git } from "../src/worker.ts";
 import { mkdir, mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -12,6 +13,10 @@ export async function fixture(): Promise<{ base: string; source: string; order: 
   await mkdir(source);
   await writeFile(join(source, "model.txt"), "before\n");
   await writeFile(join(source, "input.json"), '{"value":1}\n');
+  await git(source, ["init", "--quiet"]);
+  await git(source, ["add", "--", "model.txt", "input.json"]);
+  await git(source, ["-c", "user.name=CSE Test", "-c", "user.email=test@example.invalid", "commit", "--quiet", "-m", "fixture"]);
+  const commit = (await git(source, ["rev-parse", "HEAD"])).toString().trim();
   const hashes = { "input.json": digest('{"value":1}\n'), "model.txt": digest("before\n") };
   const order = parsePhase3WorkOrder({
     schema_version: 3,
@@ -19,7 +24,7 @@ export async function fixture(): Promise<{ base: string; source: string; order: 
     role: "build",
     objective: "bounded build fixture",
     scientific_question: "does the build retain bounded evidence?",
-    workspace: { root: source, expected_identity: digest("input.json\0" + hashes["input.json"] + "\nmodel.txt\0" + hashes["model.txt"]) },
+    workspace: { root: source, commit, expected_identity: digest("input.json\0" + hashes["input.json"] + "\nmodel.txt\0" + hashes["model.txt"]) },
     context_files: [{ path: "input.json", sha256: hashes["input.json"], purpose: "fixture input" }],
     known_context: ["synthetic fixture"],
     constraints: ["bounded"],

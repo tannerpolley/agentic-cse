@@ -1,176 +1,125 @@
 import assert from "node:assert/strict";
-import { lstat, mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
-import { tmpdir } from "node:os";
+import { lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
-import { parsePhase3WorkOrder, runPhase3, type Phase3WorkOrder } from "../src/phase3.ts";
-import { digest, fixture } from "./build-fixture.ts";
+import { parsePhase3WorkOrder, runPhase3, type Phase3Hooks } from "../src/phase3.ts";
+import { git } from "../src/worker.ts";
+import { fixture } from "./build-fixture.ts";
 
-function fakeSessionFactory() {
-  const seen: Array<{ role: string; model: string; effort: string; tools: string[]; prompt: string }> = [];
-  const createSession = async (config: { role: Phase3WorkOrder["role"]; model: { model: string; effort: string }; prompt: string; tools: readonly unknown[] }) => {
-    const names = config.tools.map(tool => (tool as { name: string }).name);
-    seen.push({ role: config.role, model: config.model.model, effort: config.model.effort, tools: names, prompt: config.prompt });
-    const find = (name: string) => config.tools.find(tool => (tool as { name: string }).name === name) as { execute: (id: string, params: any) => Promise<any> } | undefined;
-    const session = {
-      setActiveToolsByName() {},
-      getActiveToolNames: () => names,
-      thinkingLevel: config.model.effort,
-      async prompt() {
-        assert.equal(config.role, "build");
-        const runCommand = find("cse_run_command");
-        const write = find("cse_write_candidate");
-        const remove = find("cse_delete_candidate");
-        const submit = find("cse_submit_result");
-        assert.ok(runCommand && write && remove && submit);
-        assert.equal((await runCommand.execute("read", { command: "cat /workspace/model.txt" })).isError, false);
-        assert.equal((await runCommand.execute("deny", { command: "touch /workspace/forbidden.txt" })).isError, true);
-        await assert.rejects(() => write.execute("forbidden", { path: "../outside.txt", content: "no" }), /relative|scope|escapes/);
-        await remove.execute("delete", { path: "model.txt" });
-        await write.execute("allowed", { path: "model.txt", content: "after\n" });
-        await submit.execute("submit", { outcome: "accepted", facts: ["changed candidate"], assumptions: [], findings: ["candidate changed"], evidence: ["candidate.diff"], limitations: ["parent must inspect"], deviations: [], questions: [], recommended_parent_action: "inspect candidate" });
-      },
-      async waitForIdle() {},
-      async abort() {},
-      subscribe() { return () => {}; },
-      getSessionStats: () => ({ tokens: { input: 1, output: 1 } }),
-      retryAttempt: 0,
-      async dispose() {},
+type Tool = { name: string; execute: (id: string, params: any) => Promise<any> };
+const SUBMIT = { outcome: "accepted", facts: ["changed candidate"], assumptions: [], findings: ["candidate changed"], evidence: ["candidate.diff"], limitations: ["parent must inspect"], deviations: [], questions: [], recommended_parent_action: "inspect candidate" };
+function fakeSession(agent: (tools: Map<string, Tool>) => Promise<void>): Phase3Hooks["createSession"] {
+  return async config => {
+    const tools = new Map((config.tools as Tool[]).map(tool => [tool.name, tool]));
+    return {
+      setActiveToolsByName() {}, getActiveToolNames: () => [...tools.keys()], thinkingLevel: config.model.effort,
+      async prompt() { await agent(tools); await tools.get("cse_submit_result")!.execute("submit", SUBMIT); },
+      async waitForIdle() {}, async abort() {}, subscribe() { return () => {}; },
+      getSessionStats: () => ({ tokens: { input: 1, output: 1 } }), async dispose() {},
     };
-    return session;
   };
-  return { createSession, seen };
 }
-
 test("parser rejects retired roles and analysis-only fields", () => {
   assert.throws(() => parsePhase3WorkOrder({ schema_version: 1, role: "investigate" }), /schema_version/);
   assert.throws(() => parsePhase3WorkOrder({ schema_version: 3, role: "research" }), /only supports role=build/);
   assert.throws(() => parsePhase3WorkOrder({ schema_version: 3, role: "implement" }), /only supports role=build/);
   assert.throws(() => parsePhase3WorkOrder({ schema_version: 3, role: "build", analysis_checks: [] }), /unknown field/);
 });
-
 test("non-build runs reject before result creation", async () => {
-  const fixtureData = await fixture();
-  try {
-    await assert.rejects(() => runPhase3({ ...fixtureData.order, role: "research" as never, worker: { provider: "retired" } }, join(fixtureData.base, "run")), /only supports role=build/);
-    await assert.rejects(() => lstat(join(fixtureData.base, "run")), /ENOENT/);
-  } finally {
-    await rm(fixtureData.base, { recursive: true, force: true });
-  }
+  const data = await fixture();
+  try { await assert.rejects(() => runPhase3({ ...data.order, role: "research" }, join(data.base, "run")), /only supports role=build/); await assert.rejects(() => lstat(join(data.base, "run")), /ENOENT/); }
+  finally { await rm(data.base, { recursive: true, force: true }); }
 });
-
-test("build preflight retains candidate evidence and preserves source", async () => {
-  const fixtureData = await fixture();
+test("worktree is removed, candidate is retained, and the source checkout is unchanged", async () => {
+  const data = await fixture();
   try {
-    const result = await runPhase3(fixtureData.order, join(fixtureData.base, "run"), true);
-    assert.equal(result.status, "preflight");
+    // The frozen commit, not the current dirty source, supplies the worker's input.
+    await writeFile(join(data.source, "model.txt"), "local source edit\n");
+    const before = await git(data.source, ["status", "--porcelain=v1"]);
+    const registry = await git(data.source, ["worktree", "list", "--porcelain"]);
+    const result = await runPhase3(data.order, join(data.base, "run"), false, undefined, { createSession: fakeSession(async tools => {
+      await tools.get("cse_edit")!.execute("edit", { path: "model.txt", edits: [{ oldText: "before", newText: "after" }] });
+    }) });
     const body = JSON.parse(await readFile(result.result_path, "utf8"));
-    assert.equal(body.schema_version, 3);
-    assert.equal(body.role, "build");
-    assert.equal(body.requested_model.provider, "openai-codex");
+    assert.equal(result.status, "completed"); assert.equal(body.worktree_removed, true);
+    assert.equal(body.worktree_commit, data.order.workspace.commit); assert.equal(body.workspace_identity, data.order.workspace.expected_identity);
     assert.equal(body.supervisor.source_before_after_equal, true);
-    assert.equal(body.candidate_identity, fixtureData.order.workspace.expected_identity);
-    assert.deepEqual(body.candidate_changes, []);
-    assert.equal(await readFile(join(fixtureData.base, "run", "candidate.diff"), "utf8"), "");
-    assert.equal(await readFile(join(fixtureData.source, "model.txt"), "utf8"), "before\n");
-  } finally {
-    await rm(fixtureData.base, { recursive: true, force: true });
-  }
+    assert.equal(await readFile(join(data.source, "model.txt"), "utf8"), "local source edit\n");
+    assert.equal(await readFile(join(data.base, "run", "candidate", "model.txt"), "utf8"), "after\n");
+    assert.match(await readFile(join(data.base, "run", "candidate.diff"), "utf8"), /-before\n\+after/);
+    assert.deepEqual(await git(data.source, ["status", "--porcelain=v1"]), before);
+    assert.deepEqual(await git(data.source, ["worktree", "list", "--porcelain"]), registry);
+    await assert.rejects(() => lstat(join(data.base, "run", "worktree")), /ENOENT/);
+    assert.ok(body.wall_ms > 0); assert.ok(Date.parse(body.ended_at) >= Date.parse(body.started_at));
+  } finally { await rm(data.base, { recursive: true, force: true }); }
 });
-
-test("live final-integrity failures override a completed build", async () => {
-  const fixtureData = await fixture();
-  const fake = fakeSessionFactory();
+test("out-of-scope and forbidden changes fail with scope_violation but retain their diff", async () => {
+  const data = await fixture(); data.order.access.write_paths = ["out"]; data.order.access.write_scopes = [{ path: "out", kind: "directory" }]; data.order.access.forbidden_paths = ["out/forbidden.txt"]; data.order.specification.permitted_paths = ["out"];
   try {
-    const result = await runPhase3(fixtureData.order, join(fixtureData.base, "run"), false, undefined, { createSession: fake.createSession, beforeFinalIntegrity: async () => rm(join(fixtureData.source, "input.json")) });
+    const result = await runPhase3(data.order, join(data.base, "run"), false, undefined, { createSession: fakeSession(async tools => {
+      const command = await tools.get("cse_run_command")!.execute("change", { command: "printf changed > model.txt; mkdir out .pi; printf stray > .pi/stray; printf secret > out/forbidden.txt; printf new > outside.txt" });
+      assert.equal(command.isError, false);
+    }) });
+    const body = JSON.parse(await readFile(result.result_path, "utf8"));
+    assert.equal(result.status, "failed"); assert.equal(body.termination, "scope_violation");
+    assert.deepEqual(body.scope_violations, [".pi/stray", "model.txt", "out/forbidden.txt", "outside.txt"]);
+    const diff = await readFile(join(data.base, "run", "candidate.diff"), "utf8");
+    for (const path of body.scope_violations) assert.ok(diff.includes(path));
+    assert.equal(await readFile(join(data.source, "model.txt"), "utf8"), "before\n");
+    assert.equal(body.worktree_removed, true);
+  } finally { await rm(data.base, { recursive: true, force: true }); }
+});
+test("cse_edit and cse_write refuse outside scope, dependencies, forbidden paths, and symlink escapes", async () => {
+  const data = await fixture(); data.order.access.write_paths = ["out"]; data.order.access.write_scopes = [{ path: "out", kind: "directory" }]; data.order.access.forbidden_paths = ["out/forbidden.txt"]; data.order.specification.permitted_paths = ["out"];
+  await writeFile(join(data.base, "outside.txt"), "safe\n");
+  await mkdir(join(data.source, "out", "deps"), { recursive: true });
+  await writeFile(join(data.source, ".gitignore"), "out/deps/\n");
+  await git(data.source, ["add", ".gitignore"]); await git(data.source, ["-c", "user.name=CSE Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "dependencies"]);
+  data.order.workspace.commit = (await git(data.source, ["rev-parse", "HEAD"])).toString().trim(); data.order.workspace.dependency_paths = ["out/deps"];
+  try {
+    const result = await runPhase3(data.order, join(data.base, "run"), false, undefined, { createSession: fakeSession(async tools => {
+      const root = join(data.base, "run", "worktree"); await mkdir(join(root, "out"));
+      await symlink(join(data.base, "outside.txt"), join(root, "out", "link"));
+      await symlink(data.base, join(root, "out", "linked-dir"));
+      for (const path of ["input.json", "../outside.txt", ".git", "out/forbidden.txt", "out/deps/installed.txt", "out/link", "out/linked-dir/outside.txt"]) {
+        await assert.rejects(() => tools.get("cse_edit")!.execute("edit", { path, edits: [{ oldText: "safe", newText: "unsafe" }] }), /scope|symlink|escapes|forbidden|regular/);
+        await assert.rejects(() => tools.get("cse_write")!.execute("write", { path, content: "unsafe" }), /scope|symlink|escapes|forbidden|regular/);
+      }
+      await tools.get("cse_write")!.execute("create", { path: "out/new/file.txt", content: "new\n" });
+      await rm(join(root, "out", "link")); await rm(join(root, "out", "linked-dir"));
+    }) });
+    assert.equal(result.status, "completed"); assert.equal(await readFile(join(data.base, "outside.txt"), "utf8"), "safe\n");
+    assert.equal(await readFile(join(data.base, "run", "candidate", "out", "new", "file.txt"), "utf8"), "new\n");
+  } finally { await rm(data.base, { recursive: true, force: true }); }
+});
+test("command checks run in Bubblewrap during the worker and again on final content, with read-only dependencies", async () => {
+  const data = await fixture();
+  await writeFile(join(data.source, ".gitignore"), "node_modules/\n");
+  await git(data.source, ["add", ".gitignore"]); await git(data.source, ["-c", "user.name=CSE Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "dependencies"]);
+  data.order.workspace.commit = (await git(data.source, ["rev-parse", "HEAD"])).toString().trim();
+  await mkdir(join(data.source, "node_modules")); await writeFile(join(data.source, "node_modules", "dependency.txt"), "installed\n");
+  data.order.workspace.dependency_paths = ["node_modules"];
+  data.order.scientific_checks = [{ id: "suite", kind: "command", command: "test $(cat node_modules/dependency.txt) = installed && ! touch node_modules/denied && grep -q after model.txt && git diff --exit-code -- input.json", timeout_ms: 1000 }];
+  try {
+    const result = await runPhase3(data.order, join(data.base, "run"), false, undefined, { createSession: fakeSession(async tools => {
+      assert.equal((await tools.get("cse_run_check")!.execute("before", { id: "suite" })).isError, true);
+      await tools.get("cse_edit")!.execute("edit", { path: "model.txt", edits: [{ oldText: "before", newText: "after" }] });
+      assert.equal((await tools.get("cse_run_check")!.execute("after", { id: "suite" })).isError, false, await readFile(join(data.base, "run", "command-evidence", "command-1.out"), "utf8"));
+    }) });
+    const body = JSON.parse(await readFile(result.result_path, "utf8"));
+    assert.equal(result.status, "completed", JSON.stringify(body)); assert.equal(body.supervisor.commands.length, 3);
+    assert.equal(body.supervisor.checks[0].ok, true); assert.equal(body.supervisor.checks[0].exit_code, 0);
+    assert.equal(body.supervisor.checks[0].evidence.output_path, "command-evidence/command-2.out");
+    assert.match(await readFile(join(data.base, "run", body.supervisor.checks[0].evidence.output_path), "utf8"), /Read-only file system/);
+    assert.equal(await readFile(join(data.source, "node_modules", "dependency.txt"), "utf8"), "installed\n");
+    await assert.rejects(() => lstat(join(data.source, "node_modules", "denied")), /ENOENT/);
+  } finally { await rm(data.base, { recursive: true, force: true }); }
+});
+test("final-integrity failures override a completed build and still remove its worktree", async () => {
+  const data = await fixture();
+  try {
+    const result = await runPhase3(data.order, join(data.base, "run"), false, undefined, { createSession: fakeSession(async () => {}), beforeFinalIntegrity: async () => rm(join(data.source, "input.json")) });
     assert.equal(result.status, "failed");
-    const body = JSON.parse(await readFile(result.result_path, "utf8"));
-    assert.equal(body.termination, "integrity_check_failed");
-  } finally {
-    await rm(fixtureData.base, { recursive: true, force: true });
-  }
-});
-
-test("build retains scoped candidate diff and denies traversal", async () => {
-  const fixtureData = await fixture();
-  const fake = fakeSessionFactory();
-  try {
-    const result = await runPhase3(fixtureData.order, join(fixtureData.base, "run"), false, undefined, { createSession: fake.createSession });
-    assert.equal(result.status, "completed");
-    assert.equal(await readFile(join(fixtureData.source, "model.txt"), "utf8"), "before\n");
-    const body = JSON.parse(await readFile(result.result_path, "utf8"));
-    assert.equal(body.role, "build");
-    assert.equal(body.candidate_changes[0].path, "model.txt");
-    assert.equal(body.candidate_changes[0].action, "modified");
-    assert.equal(body.supervisor.source_before_after_equal, true);
-    assert.match(await readFile(join(fixtureData.base, "run", "candidate.diff"), "utf8"), /model.txt/);
-    assert.equal(fake.seen[0].model, "gpt-5.6-luna");
-    assert.deepEqual(fake.seen[0].tools.sort(), ["cse_delete_candidate", "cse_run_command", "cse_submit_result", "cse_write_candidate"]);
-  } finally {
-    await rm(fixtureData.base, { recursive: true, force: true });
-  }
-});
-
-test("build supports deletion and nested creation in an explicit directory scope", async () => {
-  const base = await mkdtemp(join(tmpdir(), "cse-pi-phase3-directory-"));
-  const source = join(base, "source");
-  await mkdir(join(source, "out"), { recursive: true });
-  await writeFile(join(source, "input.json"), '{"value":1}\n');
-  await writeFile(join(source, "out", "keep.txt"), "keep\n");
-  const inputHash = digest('{"value":1}\n');
-  const keepHash = digest("keep\n");
-  const order = parsePhase3WorkOrder({
-    schema_version: 3,
-    task_id: "phase3-directory",
-    role: "build",
-    objective: "exercise directory scope",
-    scientific_question: "are nested changes retained?",
-    workspace: { root: source, expected_identity: digest("input.json\0" + inputHash + "\nout/keep.txt\0" + keepHash) },
-    context_files: [{ path: "input.json", sha256: inputHash, purpose: "fixture input" }],
-    known_context: [],
-    constraints: ["bounded"],
-    non_goals: [],
-    access: { read_paths: ["input.json", "out"], write_paths: ["out"], write_scopes: [{ path: "out", kind: "directory" }], forbidden_paths: [] },
-    write_policy: "candidate",
-    network_policy: "none",
-    expected_artifacts: [],
-    acceptance_criteria: ["directory changes"],
-    validation: [],
-    scientific_checks: [],
-    parent_identity: "parent-phase3",
-    budget: { wall_timeout_ms: 5000, model_turn_limit: 1, command_timeout_ms: 1000, output_bytes: 65536 },
-    specification: { text: "directory scope", required_changes: ["delete keep and create new"], forbidden_changes: [], permitted_paths: ["out"] },
-  });
-  const createSession = async (config: { model: { effort: string }; tools: readonly unknown[] }) => {
-    const names = config.tools.map(tool => (tool as { name: string }).name);
-    const find = (name: string) => config.tools.find(tool => (tool as { name: string }).name === name) as { execute: (id: string, params: any) => Promise<unknown> };
-    const remove = find("cse_delete_candidate");
-    const write = find("cse_write_candidate");
-    const submit = find("cse_submit_result");
-    return {
-      setActiveToolsByName() {},
-      getActiveToolNames: () => names,
-      thinkingLevel: config.model.effort,
-      async prompt() {
-        await remove.execute("delete", { path: "out/keep.txt" });
-        await write.execute("write", { path: "out/new.txt", content: "new\n" });
-        await submit.execute("submit", { outcome: "accepted", facts: ["directory changes"], assumptions: [], findings: ["nested file"], evidence: ["candidate.diff"], limitations: [], deviations: [], questions: [], recommended_parent_action: "inspect" });
-      },
-      async waitForIdle() {},
-      async abort() {},
-      subscribe() { return () => {}; },
-      async dispose() {},
-    };
-  };
-  try {
-    const result = await runPhase3(order, join(base, "run"), false, undefined, { createSession });
-    assert.equal(result.status, "completed");
-    assert.equal(await readFile(join(source, "out", "keep.txt"), "utf8"), "keep\n");
-    assert.equal(await readFile(join(base, "run", "candidate", "out", "new.txt"), "utf8"), "new\n");
-    await assert.rejects(() => lstat(join(base, "run", "candidate", "out", "keep.txt")), /ENOENT/);
-    const body = JSON.parse(await readFile(result.result_path, "utf8"));
-    assert.deepEqual(body.candidate_changes.map((change: { path: string; action: string }) => [change.path, change.action]), [["out/keep.txt", "deleted"], ["out/new.txt", "created"]]);
-  } finally {
-    await rm(base, { recursive: true, force: true });
-  }
+    const body = JSON.parse(await readFile(result.result_path, "utf8")); assert.equal(body.termination, "integrity_check_failed"); assert.equal(body.worktree_removed, true);
+  } finally { await rm(data.base, { recursive: true, force: true }); }
 });

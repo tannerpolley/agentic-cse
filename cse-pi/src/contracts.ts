@@ -24,8 +24,8 @@ export async function safeRegularFile(root: string, path: string): Promise<strin
   const out = under(root, path); await assertNoSymlinkComponents(root, path); const stat = await lstat(out); if (!stat.isFile() || stat.isSymbolicLink() || stat.nlink > 1) throw new Error(`only unlinked regular non-symlink files are allowed: ${path}`);
   const resolved = await realpath(out); if (relative(resolve(root), resolved).startsWith("..")) throw new Error(`resolved path escapes workspace: ${path}`); return out;
 }
-export async function sha256File(path: string, signal?: AbortSignal, maxBytes = Number.MAX_SAFE_INTEGER): Promise<string> {
-  const hash = createHash("sha256"); let bytes = 0; const stream = createReadStream(path, { signal });
-  for await (const chunk of stream) { bytes += chunk.length; if (bytes > maxBytes) throw new Error(`file exceeds ${maxBytes} byte limit: ${path}`); hash.update(chunk); }
+export async function sha256File(path: string, signal?: AbortSignal): Promise<string> {
+  const hash = createHash("sha256"); const stream = createReadStream(path, { signal });
+  for await (const chunk of stream) hash.update(chunk);
   return hash.digest("hex");
 }
