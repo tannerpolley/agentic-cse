@@ -67,7 +67,8 @@ class ScriptBehaviorTests(unittest.TestCase):
                 reason = first["reason"]
                 self.assertEqual("block", first["decision"])
                 self.assertIn(review, reason)
-                self.assertIn("sufficient short answer", reason)
+                self.assertIn("end the turn without writing anything more", reason)
+                self.assertIn("never repeat or rewrite the answer", reason)
                 self.assertIn("physical significance", reason)
 
                 second = self.run_hook(project, "Stop", stop_hook_active=True,
