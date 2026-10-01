@@ -4,7 +4,7 @@ import { join } from "node:path";
 import test from "node:test";
 import { parsePhase3WorkOrder, runPhase3, type Phase3Hooks } from "../src/phase3.ts";
 import { git } from "../src/worker.ts";
-import { fixture } from "./build-fixture.ts";
+import { digest, fixture } from "./build-fixture.ts";
 
 type Tool = { name: string; execute: (id: string, params: any) => Promise<any> };
 const SUBMIT = { outcome: "accepted", facts: ["changed candidate"], assumptions: [], findings: ["candidate changed"], evidence: ["candidate.diff"], limitations: ["parent must inspect"], deviations: [], questions: [], recommended_parent_action: "inspect candidate" };
@@ -19,11 +19,18 @@ function fakeSession(agent: (tools: Map<string, Tool>) => Promise<void>): Phase3
     };
   };
 }
-test("parser rejects retired roles and analysis-only fields", () => {
+test("parser rejects retired roles, analysis-only fields, and checks exceeding the wall budget", async () => {
   assert.throws(() => parsePhase3WorkOrder({ schema_version: 1, role: "investigate" }), /schema_version/);
   assert.throws(() => parsePhase3WorkOrder({ schema_version: 3, role: "research" }), /only supports role=build/);
   assert.throws(() => parsePhase3WorkOrder({ schema_version: 3, role: "implement" }), /only supports role=build/);
   assert.throws(() => parsePhase3WorkOrder({ schema_version: 3, role: "build", analysis_checks: [] }), /unknown field/);
+  const data = await fixture();
+  try {
+    const check = { id: "suite", kind: "command", command: "true", timeout_ms: data.order.budget.wall_timeout_ms };
+    const parsedCheck = parsePhase3WorkOrder({ ...data.order, scientific_checks: [check] }).scientific_checks[0];
+    assert.ok(parsedCheck.kind === "command"); assert.equal(parsedCheck.timeout_ms, check.timeout_ms);
+    for (const timeout_ms of [99, check.timeout_ms + 1]) assert.throws(() => parsePhase3WorkOrder({ ...data.order, scientific_checks: [{ ...check, timeout_ms }] }), /check.timeout_ms/);
+  } finally { await rm(data.base, { recursive: true, force: true }); }
 });
 test("non-build runs reject before result creation", async () => {
   const data = await fixture();
@@ -81,7 +88,7 @@ test("cse_edit and cse_write refuse outside scope, dependencies, forbidden paths
       const root = join(data.base, "run", "worktree"); await mkdir(join(root, "out"));
       await symlink(join(data.base, "outside.txt"), join(root, "out", "link"));
       await symlink(data.base, join(root, "out", "linked-dir"));
-      for (const path of ["input.json", "../outside.txt", ".git", "out/forbidden.txt", "out/deps/installed.txt", "out/link", "out/linked-dir/outside.txt"]) {
+      for (const path of ["input.json", "../outside.txt", ".git", "out/.gitignore", "out/forbidden.txt", "out/deps/installed.txt", "out/link", "out/linked-dir/outside.txt"]) {
         await assert.rejects(() => tools.get("cse_edit")!.execute("edit", { path, edits: [{ oldText: "safe", newText: "unsafe" }] }), /scope|symlink|escapes|forbidden|regular/);
         await assert.rejects(() => tools.get("cse_write")!.execute("write", { path, content: "unsafe" }), /scope|symlink|escapes|forbidden|regular/);
       }
@@ -99,7 +106,8 @@ test("command checks run in Bubblewrap during the worker and again on final cont
   data.order.workspace.commit = (await git(data.source, ["rev-parse", "HEAD"])).toString().trim();
   await mkdir(join(data.source, "node_modules")); await writeFile(join(data.source, "node_modules", "dependency.txt"), "installed\n");
   data.order.workspace.dependency_paths = ["node_modules"];
-  data.order.scientific_checks = [{ id: "suite", kind: "command", command: "test $(cat node_modules/dependency.txt) = installed && ! touch node_modules/denied && grep -q after model.txt && git diff --exit-code -- input.json", timeout_ms: 1000 }];
+  data.order.budget.command_timeout_ms = 100;
+  data.order.scientific_checks = [{ id: "suite", kind: "command", command: "sleep 0.2; test $(cat node_modules/dependency.txt) = installed && ! touch node_modules/denied && mkdir -p node_modules/.vite-temp/generated && printf cache > node_modules/.vite-temp/generated/config && grep -q after model.txt && git diff --exit-code -- input.json", timeout_ms: 1000 }];
   try {
     const result = await runPhase3(data.order, join(data.base, "run"), false, undefined, { createSession: fakeSession(async tools => {
       assert.equal((await tools.get("cse_run_check")!.execute("before", { id: "suite" })).isError, true);
@@ -109,10 +117,89 @@ test("command checks run in Bubblewrap during the worker and again on final cont
     const body = JSON.parse(await readFile(result.result_path, "utf8"));
     assert.equal(result.status, "completed", JSON.stringify(body)); assert.equal(body.supervisor.commands.length, 3);
     assert.equal(body.supervisor.checks[0].ok, true); assert.equal(body.supervisor.checks[0].exit_code, 0);
+    assert.equal(body.supervisor.checks[0].timeout_ms, 1000);
     assert.equal(body.supervisor.checks[0].evidence.output_path, "command-evidence/command-2.out");
+    assert.deepEqual(body.supervisor.commands.map((command: { phase: string }) => command.phase), ["advisory", "advisory", "verification"]);
+    assert.equal(body.verification.candidate_applied, true);
     assert.match(await readFile(join(data.base, "run", body.supervisor.checks[0].evidence.output_path), "utf8"), /Read-only file system/);
     assert.equal(await readFile(join(data.source, "node_modules", "dependency.txt"), "utf8"), "installed\n");
     await assert.rejects(() => lstat(join(data.source, "node_modules", "denied")), /ENOENT/);
+    await assert.rejects(() => lstat(join(data.source, "node_modules", ".vite-temp")), /ENOENT/);
+  } finally { await rm(data.base, { recursive: true, force: true }); }
+});
+test("a symlinked result parent uses real paths and unregisters both worktrees", async () => {
+  const data = await fixture(); const parent = join(data.base, "real-parent"); const alias = join(data.base, "alias");
+  await mkdir(parent); await symlink(parent, alias);
+  const registry = await git(data.source, ["worktree", "list", "--porcelain"]);
+  try {
+    const result = await runPhase3(data.order, join(alias, "run"), false, undefined, { createSession: fakeSession(async tools => {
+      await tools.get("cse_edit")!.execute("edit", { path: "model.txt", edits: [{ oldText: "before", newText: "edited" }] });
+      await tools.get("cse_write")!.execute("write", { path: "model.txt", content: "after\n" });
+    }) });
+    const body = JSON.parse(await readFile(result.result_path, "utf8"));
+    assert.equal(result.status, "completed", JSON.stringify(body)); assert.equal(result.result_path, join(parent, "run", "result.json"));
+    assert.equal(body.worktree_removed, true); assert.equal(body.verification_worktree_removed, true);
+    assert.deepEqual(await git(data.source, ["worktree", "list", "--porcelain"]), registry);
+    assert.equal(await readFile(join(alias, "run", "candidate", "model.txt"), "utf8"), "after\n");
+    assert.equal(await readFile(join(data.source, "model.txt"), "utf8"), "before\n");
+  } finally { await rm(data.base, { recursive: true, force: true }); }
+});
+test("nested ignore rules cannot hide candidate files or pollute decisive verification checks", async () => {
+  const data = await fixture();
+  await writeFile(join(data.source, ".gitignore"), "out/ignored/\n");
+  await git(data.source, ["add", ".gitignore"]); await git(data.source, ["-c", "user.name=CSE Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "frozen ignore rules"]);
+  data.order.workspace.commit = (await git(data.source, ["rev-parse", "HEAD"])).toString().trim();
+  data.order.access.write_paths = ["out"]; data.order.access.write_scopes = [{ path: "out", kind: "directory" }]; data.order.specification.permitted_paths = ["out"];
+  data.order.scientific_checks = [{ id: "hidden-config", kind: "command", command: "if test -e out/ignored/vitest.config.ts; then echo polluted; exit 0; else echo clean-verification; exit 7; fi" }];
+  try {
+    const result = await runPhase3(data.order, join(data.base, "run"), false, undefined, { createSession: fakeSession(async tools => {
+      assert.equal((await tools.get("cse_run_command")!.execute("hide", { command: "mkdir -p out/ignored; printf '*' > out/.gitignore; printf '*' > out/ignored/.gitignore; printf hidden > out/hidden.ts; printf skip-tests > out/ignored/vitest.config.ts" })).isError, false);
+      assert.equal((await tools.get("cse_run_check")!.execute("advisory", { id: "hidden-config" })).isError, false);
+    }) });
+    const body = JSON.parse(await readFile(result.result_path, "utf8"));
+    assert.equal(result.status, "failed"); assert.equal(body.termination, "scope_violation");
+    assert.deepEqual(body.scope_violations, ["out/.gitignore", "out/ignored/.gitignore"]);
+    assert.deepEqual(body.excluded_ignored_output, ["out/ignored/.gitignore", "out/ignored/vitest.config.ts"]);
+    const diff = await readFile(join(data.base, "run", "candidate.diff"), "utf8");
+    assert.match(diff, /out\/hidden\.ts/); assert.match(diff, /out\/\.gitignore/); assert.doesNotMatch(diff, /out\/ignored/);
+    assert.equal(body.verification.candidate_applied, true);
+    assert.equal(body.supervisor.checks[0].phase, "verification"); assert.equal(body.supervisor.checks[0].exit_code, 7); assert.equal(body.supervisor.checks[0].ok, false);
+    assert.match(await readFile(join(data.base, "run", body.supervisor.checks[0].evidence.output_path), "utf8"), /clean-verification/);
+    assert.equal(body.supervisor.commands[1].phase, "advisory");
+    assert.equal(body.worktree_removed, true); assert.equal(body.verification_worktree_removed, true);
+  } finally { await rm(data.base, { recursive: true, force: true }); }
+});
+test("unwritable working and verification directories are cleaned without capturing verification writes", async () => {
+  const data = await fixture(); const registry = await git(data.source, ["worktree", "list", "--porcelain"]);
+  data.order.access.write_paths = ["locked"]; data.order.access.write_scopes = [{ path: "locked", kind: "directory" }]; data.order.specification.permitted_paths = ["locked"];
+  data.order.scientific_checks = [{ id: "writes-snapshot", kind: "command", command: "mkdir locked-check; printf snapshot > locked-check/result; chmod 555 locked-check" }];
+  try {
+    const result = await runPhase3(data.order, join(data.base, "run"), false, undefined, { createSession: fakeSession(async tools => {
+      assert.equal((await tools.get("cse_run_command")!.execute("lock", { command: "mkdir locked; printf content > locked/child; chmod 555 locked" })).isError, false);
+    }) });
+    const body = JSON.parse(await readFile(result.result_path, "utf8"));
+    assert.equal(result.status, "completed", JSON.stringify(body));
+    assert.deepEqual(body.candidate_changes.map((change: { path: string }) => change.path), ["locked/child"]);
+    assert.equal(body.supervisor.checks[0].ok, true); assert.equal(body.supervisor.checks[0].phase, "verification");
+    assert.equal(body.worktree_removed, true); assert.equal(body.verification_worktree_removed, true);
+    assert.deepEqual(await git(data.source, ["worktree", "list", "--porcelain"]), registry);
+    await assert.rejects(() => lstat(join(data.base, "run", "worktree")), /ENOENT/);
+    await assert.rejects(() => lstat(join(data.base, "run", "verification-worktree")), /ENOENT/);
+    assert.doesNotMatch(await readFile(join(data.base, "run", "candidate.diff"), "utf8"), /locked-check/);
+  } finally { await rm(data.base, { recursive: true, force: true }); }
+});
+test("deleted files are retained in the candidate and applied in verification only", async () => {
+  const data = await fixture(); data.order.scientific_checks = [{ id: "deleted", kind: "command", command: "test ! -e model.txt" }];
+  try {
+    const result = await runPhase3(data.order, join(data.base, "run"), false, undefined, { createSession: fakeSession(async tools => {
+      assert.equal((await tools.get("cse_run_command")!.execute("delete", { command: "rm -- model.txt" })).isError, false);
+    }) });
+    const body = JSON.parse(await readFile(result.result_path, "utf8"));
+    assert.equal(result.status, "completed", JSON.stringify(body));
+    assert.deepEqual(body.candidate_changes, [{ path: "model.txt", action: "deleted", before_sha256: digest("before\n"), after_sha256: null }]);
+    assert.match(await readFile(join(data.base, "run", "candidate.diff"), "utf8"), /deleted file mode/);
+    assert.equal(body.verification.candidate_applied, true); assert.equal(body.supervisor.checks[0].ok, true);
+    assert.equal(await readFile(join(data.source, "model.txt"), "utf8"), "before\n");
   } finally { await rm(data.base, { recursive: true, force: true }); }
 });
 test("final-integrity failures override a completed build and still remove its worktree", async () => {

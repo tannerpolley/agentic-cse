@@ -8,9 +8,10 @@ export type Check =
 export function shellQuote(value: string): string { return "'" + value.replaceAll("'", "'\"'\"'") + "'"; }
 export async function runCheck(check: Check, worktree: string, timeout: number, bytes: number, signal: AbortSignal | undefined, options: SandboxOptions, retain: (result: SandboxResult) => Promise<unknown>) {
   const command = check.kind === "command" ? check.command : "cat -- " + shellQuote(join(worktree, check.path));
-  const result = await runSandbox(command, worktree, Math.min(timeout, check.kind === "command" ? check.timeout_ms ?? timeout : timeout), bytes, signal, options);
+  const timeoutMs = check.kind === "command" ? check.timeout_ms ?? timeout : timeout;
+  const result = await runSandbox(command, worktree, timeoutMs, bytes, signal, options);
   const evidence = await retain(result);
-  const base = { id: check.id, kind: check.kind, checker_identity: check.checker_identity ?? null, evidence, output: result.output };
+  const base = { id: check.id, kind: check.kind, checker_identity: check.checker_identity ?? null, timeout_ms: timeoutMs, evidence, output: result.output };
   if (check.kind === "command") return { ...base, ok: result.evidence.exit_code === 0 && !result.evidence.output_limited && !result.evidence.timed_out, exit_code: result.evidence.exit_code, detail: "sandboxed command check" };
   if (result.evidence.exit_code !== 0 || result.evidence.output_limited) return { ...base, ok: false, sha256: "", detail: "sandboxed scientific-check read failed" };
   const actual = createHash("sha256").update(result.raw_output).digest("hex");

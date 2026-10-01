@@ -2,7 +2,7 @@ import { lstat, mkdir, readFile, realpath, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import { Type } from "typebox";
 import { createEditToolDefinition, defineTool, withFileMutationQueue } from "@earendil-works/pi-coding-agent";
-import { under } from "./contracts.js";
+import { under, writablePath } from "./contracts.js";
 import type { Phase3WorkOrder } from "./phase3.js";
 import { runSandbox, type SandboxOptions } from "./sandbox.js";
 import { ResultLifecycle } from "./lifecycle.js";
@@ -24,8 +24,7 @@ export function safeCommandTool(worktree: string, timeoutMs: () => number, outpu
 async function writableTarget(root: string, rawPath: string, order: Phase3WorkOrder, allowMissing: boolean): Promise<string> {
   const path = relative(root, resolve(root, rawPath)).split(sep).join("/");
   const target = under(root, path);
-  const contains = (scope: string) => path === scope || path.startsWith(scope + "/");
-  if (!order.access.write_scopes.some(scope => scope.kind === "directory" ? contains(scope.path) : path === scope.path) || order.access.forbidden_paths.some(contains) || (order.workspace.dependency_paths ?? []).some(contains)) throw new Error("write is outside frozen scope: " + path);
+  if (!writablePath(order, path)) throw new Error("write is outside frozen scope: " + path);
   let current = root;
   const parts = path.split("/");
   for (let index = 0; index < parts.length; index++) {

@@ -1,7 +1,15 @@
 import { createHash } from "node:crypto";
 import { createReadStream } from "node:fs";
 import { lstat, realpath } from "node:fs/promises";
-import { isAbsolute, join, relative, resolve, sep } from "node:path";
+import { basename, isAbsolute, join, relative, resolve, sep } from "node:path";
+import type { Phase3WorkOrder } from "./phase3.js";
+
+export function writablePath(order: Pick<Phase3WorkOrder, "access" | "workspace">, path: string): boolean {
+  try { under(order.workspace.root, path); } catch { return false; }
+  const contains = (scope: string) => path === scope || path.startsWith(scope + "/");
+  return basename(path) !== ".gitignore" && order.access.write_scopes.some(scope => scope.kind === "directory" ? contains(scope.path) : path === scope.path)
+    && !order.access.forbidden_paths.some(contains) && !(order.workspace.dependency_paths ?? []).some(contains);
+}
 
 export function under(root: string, path: string): string {
   if (!isAbsolute(root)) throw new Error("workspace.root must be absolute");

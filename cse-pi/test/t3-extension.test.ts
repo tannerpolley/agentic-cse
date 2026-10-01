@@ -81,15 +81,13 @@ async function orderFile(modelTurnLimit?: number): Promise<{ data: Awaited<Retur
   return { data, path, resultDir: join(data.base, "run") };
 }
 
-test("/cse-build completes a successful submission followed by plain text and restores its tools", async () => {
+test("/cse-build keeps an earlier plain response from poisoning a later submission", async () => {
   const { data, path, resultDir } = await orderFile(5);
   const host = fakeHost({
     retries: 1,
     finalPlain: true,
     async agent(tools, attempt) {
-      // A prior plain/error response must not poison a later successful submission either.
       if (attempt === 0) return "error";
-      await tools.get("cse_write")!.execute("write", { path: "model.txt", content: "after\n" });
       await tools.get("cse_submit_result")!.execute("submit", SUBMIT);
       return undefined;
     },
@@ -98,6 +96,27 @@ test("/cse-build completes a successful submission followed by plain text and re
     await host.runCommand(`${path} ${resultDir}`);
     const body = await resultOf(resultDir);
     assert.equal(body.status, "completed");
+    assert.equal(body.model_requests, 2);
+    assert.deepEqual(host.activeTools(), ["read", "bash", "t3_thread_list"]);
+  } finally { await rm(data.base, { recursive: true, force: true }); }
+});
+
+test("/cse-build completes a successful submission followed by plain text and restores its tools", async () => {
+  const { data, path, resultDir } = await orderFile();
+  const host = fakeHost({
+    finalPlain: true,
+    async agent(tools) {
+      await tools.get("cse_write")!.execute("write", { path: "model.txt", content: "after\n" });
+      await tools.get("cse_submit_result")!.execute("submit", SUBMIT);
+      return "stop";
+    },
+  });
+  try {
+    await host.runCommand(`${path} ${resultDir}`);
+    const body = await resultOf(resultDir);
+    assert.equal(body.status, "completed");
+    assert.equal(body.model_requests, 1);
+    assert.equal(host.seen.activePerAttempt.length, 1);
     assert.equal(body.candidate_changes[0].path, "model.txt");
     assert.equal(body.supervisor.source_before_after_equal, true);
     assert.equal(await readFile(join(data.source, "model.txt"), "utf8"), "before\n");

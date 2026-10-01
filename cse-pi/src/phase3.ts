@@ -5,11 +5,11 @@ import { dirname, join, resolve, sep } from "node:path";
 import { DefaultResourceLoader, ModelRuntime, SessionManager, SettingsManager, createAgentSession, defineTool, readStoredCredential } from "@earendil-works/pi-coding-agent";
 import { Type } from "typebox";
 import { runCheck, type Check } from "./checks.js";
-import { sha256File } from "./contracts.js";
+import { sha256File, writablePath } from "./contracts.js";
 import { ResultLifecycle, runOneTurn, tokenUsage, type Runner } from "./lifecycle.js";
 import { requireSandbox, type SandboxResult } from "./sandbox.js";
 import { cseSubmitTool, safeCommandTool, writeTools } from "./cse-extension.js";
-import { git, removeWorktree, retainCandidate, verifyIdentity, worktreeOptions } from "./worker.js";
+import { captureCandidate, git, removeWorktree, retainCandidate, verifyIdentity, worktreeOptions } from "./worker.js";
 
 export const PHASE3_SCHEMA_VERSION = 3;
 export const PHASE3_ROLES = ["build"] as const;
@@ -68,13 +68,13 @@ function hash(value: unknown, name: string): string { const result = text(value,
 function integer(value: unknown, name: string, min: number, max: number): number {
   if (!Number.isInteger(value) || (value as number) < min || (value as number) > max) throw new Error(name + " must be an integer between " + min + " and " + max); return value as number;
 }
-function parseChecks(value: unknown): Check[] {
+function parseChecks(value: unknown, wallTimeoutMs: number): Check[] {
   if (!Array.isArray(value) || value.length > 128) throw new Error("scientific_checks must be an array");
   const checks = value.map((raw): Check => {
     const command = raw?.kind === "command";
     const check = object(raw, "scientific check", command ? ["id", "kind", "command", "timeout_ms"] : ["id", "kind", "path", "sha256", "checker_identity"]);
     const id = text(check.id, "check.id", 120);
-    if (command) return { id, kind: "command", command: text(check.command, "check.command", 16000), ...(check.timeout_ms === undefined ? {} : { timeout_ms: integer(check.timeout_ms, "check.timeout_ms", 100, 3_600_000) }) };
+    if (command) return { id, kind: "command", command: text(check.command, "check.command", 16000), ...(check.timeout_ms === undefined ? {} : { timeout_ms: integer(check.timeout_ms, "check.timeout_ms", 100, wallTimeoutMs) }) };
     if (!["json", "convergence", "plot_metadata"].includes(String(check.kind))) throw new Error("scientific check kind is unsupported");
     return { id, kind: check.kind as "json" | "convergence" | "plot_metadata", path: path(check.path, "check.path"), sha256: hash(check.sha256, "check.sha256"), checker_identity: text(check.checker_identity ?? "cse-pi-phase3", "check.checker_identity", 200) };
   });
@@ -103,6 +103,7 @@ export function parsePhase3WorkOrder(raw: unknown): Phase3WorkOrder {
   if (value.write_policy !== "candidate") throw new Error("build requires write_policy=candidate");
   if (value.network_policy !== "none") throw new Error("only network_policy=none is supported");
   const budget = object(value.budget, "budget", ["wall_timeout_ms", "model_turn_limit", "command_timeout_ms", "output_bytes"]);
+  const wallTimeoutMs = integer(budget.wall_timeout_ms, "budget.wall_timeout_ms", 1000, 86_400_000);
   const spec = object(value.specification ?? {}, "specification", ["text", "required_changes", "forbidden_changes", "permitted_paths"]);
   const specification = { text: text(spec.text ?? value.objective, "specification.text"), required_changes: strings(spec.required_changes ?? [], "required_changes"), forbidden_changes: strings(spec.forbidden_changes ?? [], "forbidden_changes"), permitted_paths: paths(spec.permitted_paths ?? writePaths, "permitted_paths") };
   if (specification.permitted_paths.some(item => !writeScopes.some(scope => item === scope.path || scope.kind === "directory" && item.startsWith(scope.path + "/")))) throw new Error("specification.permitted_paths exceeds write scope");
@@ -116,14 +117,14 @@ export function parsePhase3WorkOrder(raw: unknown): Phase3WorkOrder {
     workspace: { root, commit, expected_identity: hash(workspace.expected_identity, "workspace.expected_identity"), ...(workspace.dependency_paths === undefined ? {} : { dependency_paths: paths(workspace.dependency_paths, "workspace.dependency_paths") }) }, context_files: contextFiles,
     known_context: strings(value.known_context ?? [], "known_context"), constraints: strings(value.constraints ?? [], "constraints"), non_goals: strings(value.non_goals ?? [], "non_goals"),
     access: { read_paths: paths(access.read_paths ?? [], "access.read_paths"), write_paths: writePaths, write_scopes: writeScopes, forbidden_paths: paths(access.forbidden_paths ?? [], "access.forbidden_paths") },
-    write_policy: "candidate", network_policy: "none", expected_artifacts: strings(value.expected_artifacts ?? [], "expected_artifacts"), acceptance_criteria: strings(value.acceptance_criteria ?? [], "acceptance_criteria"), validation: strings(value.validation ?? [], "validation"), scientific_checks: parseChecks(value.scientific_checks ?? []), parent_identity: text(value.parent_identity, "parent_identity", 400),
-    budget: { wall_timeout_ms: integer(budget.wall_timeout_ms, "budget.wall_timeout_ms", 1000, 86_400_000), model_turn_limit: integer(budget.model_turn_limit, "budget.model_turn_limit", 1, 100), command_timeout_ms: integer(budget.command_timeout_ms, "budget.command_timeout_ms", 100, 3_600_000), output_bytes: integer(budget.output_bytes, "budget.output_bytes", 1024, 100_000_000) }, worker, specification };
+    write_policy: "candidate", network_policy: "none", expected_artifacts: strings(value.expected_artifacts ?? [], "expected_artifacts"), acceptance_criteria: strings(value.acceptance_criteria ?? [], "acceptance_criteria"), validation: strings(value.validation ?? [], "validation"), scientific_checks: parseChecks(value.scientific_checks ?? [], wallTimeoutMs), parent_identity: text(value.parent_identity, "parent_identity", 400),
+    budget: { wall_timeout_ms: wallTimeoutMs, model_turn_limit: integer(budget.model_turn_limit, "budget.model_turn_limit", 1, 100), command_timeout_ms: integer(budget.command_timeout_ms, "budget.command_timeout_ms", 100, 3_600_000), output_bytes: integer(budget.output_bytes, "budget.output_bytes", 1024, 100_000_000) }, worker, specification };
 }
 function requestedModel(order: Phase3WorkOrder): Phase3Model {
   return { provider: order.worker?.provider ?? process.env.CSE_PI_BUILD_PROVIDER ?? process.env.CSE_PI_PROVIDER ?? DEFAULT_MODEL.provider, model: order.worker?.model ?? process.env.CSE_PI_BUILD_MODEL ?? process.env.CSE_PI_MODEL ?? DEFAULT_MODEL.model, effort: order.worker?.effort ?? process.env.CSE_PI_BUILD_EFFORT ?? process.env.CSE_PI_EFFORT ?? DEFAULT_MODEL.effort };
 }
 function rolePrompt(order: Phase3WorkOrder, root: string): string {
-  return ["You are the bounded CSE-Pi build worker. The frozen work order is authoritative; do not expand scope.", "Your cwd is " + root + ". Use cse_edit for exact-text replacements, cse_write for new/whole files, and cse_run_command for sandboxed shell commands. Dependencies are read-only. Use /tmp for disposable scratch. Never install dependencies.", "Run declared checks with cse_run_check. The supervisor repeats checks on the final worktree. The parent decides whether to apply candidate.diff; never modify the source checkout.", JSON.stringify(order), "Submit exactly one terminating cse_submit_result call after the build work is complete."].join("\n");
+  return ["You are the bounded CSE-Pi build worker. The frozen work order is authoritative; do not expand scope.", "Your cwd is " + root + ". Use cse_edit for exact-text replacements, cse_write for new/whole files, and cse_run_command for sandboxed shell commands. Dependencies are read-only. Use /tmp for disposable scratch. Never install dependencies.", "Run advisory checks with cse_run_check. The supervisor checks only candidate.diff applied to a fresh verification worktree. The parent decides whether to apply candidate.diff; never modify the source checkout.", JSON.stringify(order), "Submit exactly one terminating cse_submit_result call after the build work is complete."].join("\n");
 }
 async function existingParent(path: string): Promise<string> {
   let current = resolve(path); while (true) { try { return await realpath(current); } catch { const parent = dirname(current); if (parent === current) throw new Error("result directory has no existing parent"); current = parent; } }
@@ -134,23 +135,24 @@ export async function runPhase3(raw: unknown, resultDir: string, noInference = f
   const controller = new AbortController(); let timedOut = false;
   const timer = setTimeout(() => { timedOut = true; controller.abort(); }, order.budget.wall_timeout_ms);
   const activeSignal = signal ? AbortSignal.any([signal, controller.signal]) : controller.signal;
-  const output = resolve(resultDir); const root = join(output, "worktree");
+  let output = resolve(resultDir); let root = ""; let verificationRoot = "";
   const remaining = () => Math.max(1, Math.floor(order.budget.wall_timeout_ms - (performance.now() - started)));
   const commandTimeout = () => Math.min(order.budget.command_timeout_ms, remaining());
-  let status: Phase3Status = "failed"; let resultReady = false; let worktreeAdded = false; let worktreeAttempted = false; let checkingIntegrity = false;
+  let status: Phase3Status = "failed"; let resultReady = false; let worktreeAdded = false; let worktreeAttempted = false; let verificationAttempted = false; let checkingIntegrity = false;
   const selectedModel = requestedModel(order); const commands: unknown[] = []; const runtimeEvents: Record<string, unknown>[] = []; const events: string[] = [];
   const body: Record<string, any> = { schema_version: 3, run_id: runId, task_id: order.task_id, role: order.role, parent_identity: order.parent_identity, status, started_at: startedAt, ended_at: null, wall_ms: null,
     requested_model: { ...selectedModel, source: order.worker ? "work_order" : "environment_or_role_default" }, resolved_model: selectedModel, observed_model: null, runtime: { node: process.version, role_defaults: DEFAULT_MODEL }, termination: null, model_requests: 0, usage: null, model_authored: null, role_result: null,
-    worktree_commit: order.workspace.commit, workspace_identity: null, workspace_files: [], supervisor: { commands, checks: [], runtime_events: runtimeEvents, retained_evidence: ["candidate/", "candidate.diff", "events.jsonl", "command-evidence/"], source_before_after_equal: null, actual_changes: [] } };
-  const retain = async (result: SandboxResult) => {
+    worktree_commit: order.workspace.commit, workspace_identity: null, workspace_files: [], supervisor: { commands, checks: [], runtime_events: runtimeEvents, retained_evidence: ["candidate/", "candidate.diff", "events.jsonl", "command-evidence/"], source_before_after_equal: null } };
+  const retain = async (result: SandboxResult, phase: "working" | "advisory" | "verification" = "working") => {
     const name = "command-" + commands.length + ".out"; await mkdir(join(output, "command-evidence"), { recursive: true });
     await writeFile(join(output, "command-evidence", name), result.raw_output, { flag: "wx", mode: 0o600 });
-    const evidence = { ...result.evidence, output_path: "command-evidence/" + name }; commands.push(evidence); return evidence;
+    const evidence = { ...result.evidence, phase, output_path: "command-evidence/" + name }; commands.push(evidence); return evidence;
   };
   try {
     const workspace = await realpath(order.workspace.root); const parent = await existingParent(dirname(output));
     if ([output, parent].some(path => path === workspace || path.startsWith(workspace + sep))) throw new Error("result directory must be outside source workspace");
     await mkdir(output, { recursive: false, mode: 0o700 }); resultReady = true;
+    output = await realpath(output); root = join(output, "worktree"); verificationRoot = join(output, "verification-worktree");
     if (selectedModel.provider !== "openai-codex" || !MODELS.includes(selectedModel.model) || !EFFORTS.includes(selectedModel.effort)) throw new Error("unsupported build provider/model/effort: " + Object.values(selectedModel).join("/"));
     const commit = (await git(workspace, ["rev-parse", "--verify", order.workspace.commit + "^{commit}"], activeSignal)).toString().trim();
     if (commit !== order.workspace.commit) throw new Error("workspace.commit did not resolve to itself");
@@ -162,12 +164,12 @@ export async function runPhase3(raw: unknown, resultDir: string, noInference = f
     const sourceState = () => git(workspace, ["diff", "--binary", "HEAD", "--"], activeSignal);
     const sourceBefore = await sourceState();
     events.push(JSON.stringify({ type: "validated", task_id: order.task_id, worktree_commit: commit }));
-    const check = (item: Check) => runCheck(item, root, commandTimeout(), order.budget.output_bytes, activeSignal, sandbox, retain);
+    const check = (item: Check) => runCheck(item, root, commandTimeout(), order.budget.output_bytes, activeSignal, sandbox, result => retain(result, "advisory"));
     if (noInference) { status = "preflight"; body.termination = "no_inference_preflight"; }
     else {
       const lifecycle = new ResultLifecycle();
       const tools = [safeCommandTool(root, commandTimeout, order.budget.output_bytes, sandbox, activeSignal, retain), ...writeTools(root, order, activeSignal),
-        defineTool({ name: "cse_run_check", label: "Run declared check", description: "Run a frozen scientific check by id. The supervisor repeats it on the final worktree.", parameters: Type.Object({ id: Type.String({ minLength: 1 }) }), executionMode: "sequential", async execute(_id, params) {
+        defineTool({ name: "cse_run_check", label: "Run declared check", description: "Run an advisory frozen check by id in the working worktree. Only supervisor checks in a fresh verification worktree decide the result.", parameters: Type.Object({ id: Type.String({ minLength: 1 }) }), executionMode: "sequential", async execute(_id, params) {
           const item = order.scientific_checks.find(item => item.id === params.id); if (!item) throw new Error("unknown declared check: " + params.id);
           const { output: checkOutput, ...result } = await check(item); return { content: [{ type: "text" as const, text: JSON.stringify(result) + "\n" + checkOutput }], details: result, isError: !result.ok };
         } }), cseSubmitTool(lifecycle, value => { body.model_authored = value; })];
@@ -196,17 +198,10 @@ export async function runPhase3(raw: unknown, resultDir: string, noInference = f
         body.termination = terminal; status = terminal === "turn_limit_exceeded" ? "failed" : terminal;
       } finally { if (session.getSessionStats) body.usage = tokenUsage(session.getSessionStats()); body.retries = session.retryAttempt ?? null; await session.dispose(); }
     }
-    // These runs, not intermediate worker checks, determine the final check results.
-    for (const item of order.scientific_checks) {
-      if (activeSignal.aborted) break;
-      const { output: _checkOutput, ...result } = await check(item); body.supervisor.checks.push(result);
-    }
-    if (activeSignal.aborted) { status = timedOut ? "timed_out" : "cancelled"; body.termination = timedOut ? "wall_timeout" : "cancelled"; }
-    else if (!noInference && body.supervisor.checks.some((item: { ok: boolean }) => !item.ok)) { status = "failed"; body.termination = "scientific_check_failed"; }
     if (!activeSignal.aborted) {
       checkingIntegrity = true; await hooks.beforeFinalIntegrity?.();
       const sourceAfter = await sourceState(); body.supervisor.source_before_after_equal = sourceBefore.equals(sourceAfter);
-      if (!body.supervisor.source_before_after_equal) { body.supervisor.actual_changes = ["source tracked content changed during CSE-Pi run"]; throw new Error("source workspace content changed during CSE-Pi run"); }
+      if (!body.supervisor.source_before_after_equal) throw new Error("source workspace content changed during CSE-Pi run");
       checkingIntegrity = false;
     }
   } catch (error) {
@@ -217,18 +212,44 @@ export async function runPhase3(raw: unknown, resultDir: string, noInference = f
     else { status = "failed"; body.termination ??= "failed"; }
   } finally {
     if (worktreeAdded) {
+      let failure = "candidate_retention_failed";
       try {
-        const candidate = await retainCandidate(root, order.workspace.commit, output, paths => {
-          const contains = (path: string, scope: string) => path === scope || path.startsWith(scope + "/");
-          const violations = paths.filter(path => !order.access.write_scopes.some(scope => scope.kind === "directory" ? contains(path, scope.path) : path === scope.path) || order.access.forbidden_paths.some(scope => contains(path, scope)) || (order.workspace.dependency_paths ?? []).some(scope => contains(path, scope)));
+        // Freeze content and diffs before creating the verification worktree or running checks.
+        const captured = await captureCandidate(root, order.workspace.commit);
+        failure = "verification_worktree_failed"; verificationAttempted = true;
+        await git(order.workspace.root, ["worktree", "add", "--detach", verificationRoot, order.workspace.commit]);
+        body.verification = { worktree_commit: order.workspace.commit, candidate_applied: false };
+        failure = "candidate_retention_failed";
+        const candidate = await retainCandidate(captured, verificationRoot, output, paths => {
+          const violations = paths.filter(path => !writablePath(order, path));
           if (violations.length) { status = "failed"; body.termination = "scope_violation"; body.scope_violations = violations; }
         });
-        body.candidate_changes = candidate.changes; body.diff_sha256 = candidate.diff_sha256;
+        body.candidate_changes = candidate.changes; body.excluded_ignored_output = candidate.excluded_ignored_output; body.diff_sha256 = candidate.diff_sha256;
         body.role_result = { outcome: body.model_authored?.outcome ?? null, files_changed: candidate.changes, validation_results: body.supervisor.checks };
-      } catch (error) { status = "failed"; body.termination = body.scope_violations?.length ? "scope_violation" : "candidate_retention_failed"; body.candidate_error = String(error); }
+        if (!activeSignal.aborted) {
+          failure = "candidate_apply_failed";
+          await git(verificationRoot, ["apply", "--allow-empty", "--binary", "--", join(output, "candidate.diff")], activeSignal);
+          body.verification.candidate_applied = true;
+          failure = "verification_check_failed";
+          const sandbox = await worktreeOptions(order, activeSignal);
+          for (const item of order.scientific_checks) {
+            if (activeSignal.aborted) break;
+            const { output: _checkOutput, ...result } = await runCheck(item, verificationRoot, commandTimeout(), order.budget.output_bytes, activeSignal, sandbox, result => retain(result, "verification"));
+            body.supervisor.checks.push({ ...result, phase: "verification" });
+          }
+          if (!noInference && status === "completed" && body.supervisor.checks.some((item: { ok: boolean }) => !item.ok)) { status = "failed"; body.termination = "scientific_check_failed"; }
+        }
+      } catch (error) {
+        status = "failed"; body.termination = body.scope_violations?.length ? "scope_violation" : failure;
+        body.finalization_error = String(error);
+      }
     }
-    if (worktreeAttempted) {
-      try { await removeWorktree(order.workspace.root, root); body.worktree_removed = true; }
+    if (activeSignal.aborted && !body.scope_violations?.length && body.termination !== "integrity_check_failed") {
+      status = timedOut ? "timed_out" : "cancelled"; body.termination = timedOut ? "wall_timeout" : "cancelled";
+    }
+    for (const [attempted, path, field] of [[verificationAttempted, verificationRoot, "verification_worktree_removed"], [worktreeAttempted, root, "worktree_removed"]] as const) {
+      if (!attempted) continue;
+      try { await removeWorktree(order.workspace.root, path); body[field] = true; }
       catch (error) { status = "failed"; body.termination = "worktree_cleanup_failed"; body.cleanup_error = String(error); }
     }
     clearTimeout(timer);
