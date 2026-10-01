@@ -1,5 +1,5 @@
 import { spawn } from "node:child_process";
-import { access, readdir, readlink, realpath } from "node:fs/promises";
+import { access, lstat, mkdir, realpath } from "node:fs/promises";
 import { constants } from "node:fs";
 import { createHash } from "node:crypto";
 import { join } from "node:path";
@@ -41,18 +41,15 @@ export async function runSandbox(command: string, worktree: string, timeoutMs: n
     "--bind", root, root, "--ro-bind", options.commonGitDir, options.commonGitDir, "--ro-bind", join(root, ".git"), join(root, ".git")];
   for (const dependency of options.dependencies) {
     const target = join(root, dependency.path);
-    // A synthetic directory supplies cache mount points even when the source has none.
-    // Preserve dependency symlinks; bind package contents read-only without copying them.
-    const caches = [".vite", ".vite-temp"];
-    args.push("--tmpfs", target);
-    for (const entry of await readdir(dependency.source, { withFileTypes: true })) {
-      if (caches.includes(entry.name)) continue;
-      const source = join(dependency.source, entry.name); const destination = join(target, entry.name);
-      args.push(...(entry.isSymbolicLink() ? ["--symlink", await readlink(source), destination] : ["--ro-bind", source, destination]));
+    // One read-only bind per dependency folder keeps bwrap's argument count constant.
+    // Tool caches get a disposable tmpfs; a missing cache directory is created empty
+    // on the host first (as the tool itself would), else that cache stays unmounted.
+    args.push("--ro-bind", dependency.source, target);
+    for (const cache of [".vite", ".vite-temp"]) {
+      const mountPoint = join(dependency.source, cache);
+      try { await mkdir(mountPoint); } catch (error) { if ((error as NodeJS.ErrnoException).code !== "EEXIST") continue; }
+      if ((await lstat(mountPoint)).isDirectory()) args.push("--tmpfs", join(target, cache));
     }
-    for (const cache of caches) args.push("--dir", join(target, cache));
-    args.push("--remount-ro", target);
-    for (const cache of caches) args.push("--tmpfs", join(target, cache));
   }
   args.push("--chdir", root,
     "--setenv", "PATH", "/usr/bin:/bin", "--setenv", "HOME", "/home", "--setenv", "TMPDIR", "/tmp", "--setenv", "XDG_CACHE_HOME", "/tmp/cache", "--setenv", "LANG", "C.UTF-8",

@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import { lstat, mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import test from "node:test";
 import { parsePhase3WorkOrder, runPhase3, type Phase3Hooks } from "../src/phase3.ts";
@@ -124,7 +124,43 @@ test("command checks run in Bubblewrap during the worker and again on final cont
     assert.match(await readFile(join(data.base, "run", body.supervisor.checks[0].evidence.output_path), "utf8"), /Read-only file system/);
     assert.equal(await readFile(join(data.source, "node_modules", "dependency.txt"), "utf8"), "installed\n");
     await assert.rejects(() => lstat(join(data.source, "node_modules", "denied")), /ENOENT/);
-    await assert.rejects(() => lstat(join(data.source, "node_modules", ".vite-temp")), /ENOENT/);
+    // The cache mount point exists on the host, but sandbox cache writes never reach it.
+    assert.deepEqual(await readdir(join(data.source, "node_modules", ".vite-temp")), []);
+  } finally { await rm(data.base, { recursive: true, force: true }); }
+});
+
+test("a dependency folder with thousands of entries still runs sandboxed commands", async () => {
+  const data = await fixture();
+  await writeFile(join(data.source, ".gitignore"), "node_modules/\n");
+  await git(data.source, ["add", ".gitignore"]); await git(data.source, ["-c", "user.name=CSE Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "dependencies"]);
+  data.order.workspace.commit = (await git(data.source, ["rev-parse", "HEAD"])).toString().trim();
+  await mkdir(join(data.source, "node_modules"));
+  // bwrap rejects more than 9000 arguments; one bind per entry would exceed that.
+  for (let index = 0; index < 3500; index++) await mkdir(join(data.source, "node_modules", "package-" + index));
+  data.order.workspace.dependency_paths = ["node_modules"];
+  data.order.scientific_checks = [{ id: "suite", kind: "command", command: "test -d node_modules/package-3499" }];
+  try {
+    const result = await runPhase3(data.order, join(data.base, "run"), true, undefined, {});
+    const body = JSON.parse(await readFile(result.result_path, "utf8"));
+    assert.equal(body.supervisor.checks[0].ok, true, JSON.stringify(body.supervisor.checks[0]));
+  } finally { await rm(data.base, { recursive: true, force: true }); }
+});
+
+test("file names with pathspec characters produce a candidate that verifies", async () => {
+  const data = await fixture();
+  for (const name of ["a1.txt", "a[12].txt"]) await writeFile(join(data.source, name), "before\n");
+  await git(data.source, ["add", "--", "a1.txt", "a[12].txt"]); await git(data.source, ["-c", "user.name=CSE Test", "-c", "user.email=test@example.invalid", "commit", "-qm", "names"]);
+  data.order.workspace.commit = (await git(data.source, ["rev-parse", "HEAD"])).toString().trim();
+  data.order.access.write_paths = ["a1.txt", "a[12].txt"];
+  data.order.access.write_scopes = [{ path: "a1.txt", kind: "file" }, { path: "a[12].txt", kind: "file" }];
+  data.order.specification.permitted_paths = ["a1.txt", "a[12].txt"];
+  try {
+    const result = await runPhase3(data.order, join(data.base, "run"), false, undefined, { createSession: fakeSession(async tools => {
+      for (const path of ["a1.txt", "a[12].txt"]) await tools.get("cse_write")!.execute(path, { path, content: "after\n" });
+    }) });
+    const body = JSON.parse(await readFile(result.result_path, "utf8"));
+    assert.equal(body.verification.candidate_applied, true, JSON.stringify(body));
+    assert.deepEqual(body.candidate_changes.map((change: { path: string }) => change.path).sort(), ["a1.txt", "a[12].txt"]);
   } finally { await rm(data.base, { recursive: true, force: true }); }
 });
 test("a symlinked result parent uses real paths and unregisters both worktrees", async () => {

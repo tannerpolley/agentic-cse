@@ -54,7 +54,7 @@ export async function worktreeOptions(order: Phase3WorkOrder, signal?: AbortSign
     const source = under(root, path); await assertNoSymlinkComponents(root, path);
     if (!(await lstat(source)).isDirectory()) throw new Error("dependency must be a directory: " + path);
     await git(root, ["check-ignore", "--quiet", "--", path], signal).catch(() => { throw new Error("dependency must be ignored by git: " + path); });
-    if ((await git(root, ["ls-files", "-z", "--", path], signal)).length) throw new Error("dependency contains tracked files: " + path);
+    if ((await git(root, ["--literal-pathspecs", "ls-files", "-z", "--", path], signal)).length) throw new Error("dependency contains tracked files: " + path);
     dependencies.push({ source: await realpath(source), path });
   }
   return { commonGitDir, dependencies };
@@ -95,7 +95,7 @@ export async function captureCandidate(root: string, commit: string): Promise<Ca
     if (untracked.includes(path)) {
       try { diff = await git(root, ["diff", "--no-index", "--binary", "--no-ext-diff", "--no-textconv", "--", "/dev/null", path]); }
       catch (error) { const failure = error as { code?: number; stdout?: Buffer }; if (failure.code !== 1 || !failure.stdout) throw error; diff = failure.stdout; }
-    } else diff = await git(root, ["diff", "--binary", "--no-ext-diff", "--no-textconv", "--no-renames", commit, "--", path]);
+    } else diff = await git(root, ["--literal-pathspecs", "diff", "--binary", "--no-ext-diff", "--no-textconv", "--no-renames", commit, "--", path]); // file names are not patterns
     const hash = (value: Buffer | null) => value === null ? null : createHash("sha256").update(value).digest("hex");
     changes.push({ path, action: before === null ? "created" : after === null ? "deleted" : "modified", before_sha256: hash(before), after_sha256: hash(after), content: after, diff });
   }
