@@ -115,6 +115,8 @@ proof that every layer is usable. Its keys are `configuration`,
 concrete `reason`. The top-level `configured_paths`, `observed_live_checks`,
 `unverified_active_host`, and `identity` fields keep configured paths, live
 probes, host uncertainty, and package/source/payload identity separate.
+The separate `acquisition` object reports configured token names and status,
+plus managed-browser status; it never includes token values.
 
 Data readiness checks both current normalized inventories for every declared
 registry pack and all standalone inventories outside those packs. Other nested
@@ -185,6 +187,38 @@ honors configured denied tags and collections, refuses a PDF with an existing
 Markdown child, and never mutates Zotero. `zotero-attach-companion` is a
 separate dry-run-first authenticated write for making an approved generated
 Markdown file visible as a linked Zotero child.
+
+## Acquire one requested paper
+
+Use this route only when the user has identified one specific paper by DOI or
+article URL; that request authorizes acquisition without a separate per-save
+approval. `doctor --json` reports configured token names and their status under
+`acquisition.tokens`. Token files live under
+`~/.config/zotero-companion/` as one token per mode-0600 file:
+`elsevier-api-key`, optional `elsevier-insttoken`, and `wiley-tdm-token`.
+Doctor reports names and status only, never token values.
+
+The command writes the requested paper by default. Its optional dry run previews
+metadata only and does not create a Zotero item, download a PDF, or start the
+browser. Use the default `auto` route for normal acquisition; force
+`--route browser` only for a permitted, non-restricted live test.
+
+```bash
+uv run cse-zotero doctor --json
+uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --dry-run --json
+uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
+uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --route browser --json
+uv run cse-zotero agent-browser status --json
+uv run cse-zotero agent-browser start --json
+uv run cse-zotero agent-browser stop --json
+```
+
+The dedicated agent browser runs headless and does not take desktop focus.
+Acquire results include the route, stop reason or handoff URL, and any verified
+item, attachment, or collection keys. For other Zotero writes, retain their
+reviewed previews and explicit approval. Read
+[`ZOTERO_ACQUISITION.md`](ZOTERO_ACQUISITION.md) for route eligibility and
+publisher/browser boundaries.
 
 ## Stages
 
@@ -459,6 +493,14 @@ loopback-only endpoints to Zotero's existing local server:
 - `POST /zotero-companion/saved-searches` (dry-run unless an exact confirmation token is supplied)
 - `POST /zotero-companion/project-organize` (dry-run unless an exact confirmation
   token is supplied; limited to registered project collection trees)
+- `POST /zotero-companion/acquire-metadata` (dry-run by default; apply creates
+  one Zotero parent without translator attachments)
+- `POST /zotero-companion/acquire-attachment` (dry-run by default; apply imports
+  supplied PDF bytes as an attachment to the selected item)
+
+The acquisition endpoints accept `mode: "dry-run"` or `mode: "apply"`.
+Metadata requests use `identifier` and `collection`; attachment requests use
+`item_key` and `pdf_base64`. A dry run does not write to Zotero.
 
 It also watches collection changes and refreshes registered project pages; see
 [Project libraries](#project-libraries).

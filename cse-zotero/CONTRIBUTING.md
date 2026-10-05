@@ -7,12 +7,16 @@
 - Controlled package examples: `examples/`
 - Native Zotero add-on: `zotero-plugin/`
 - Build and validation entry points: `scripts/`
-- Source-use guidance and acquisition safeguards: `.agent/skills/` and
-  `ZOTERO_ACQUISITION.md`
+- Source-use guidance: `.agent/skills/`; acquisition eligibility and
+  publisher/browser boundaries: `ZOTERO_ACQUISITION.md` (the single owner of
+  that protocol)
 
 The configured `wiki/` and `data/` trees represent retained or generated
 corpus state. They are not package fixtures. Zotero remains the bibliographic
 authority, and no software check should require a personal library or corpus.
+The user's request for one specific paper routes through the bounded
+`cse-zotero acquire` command; the contract documents that workflow and its
+eligibility rules.
 
 ## Offline checks
 

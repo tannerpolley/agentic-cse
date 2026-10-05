@@ -38,9 +38,12 @@ thermophysical-data-registry is optional, not a runtime requirement.
 7. Use `zotero-search`, `zotero-children`, and `zotero-attachment-path` when
    the live library is newer than the materialized corpus.
 8. When retained evidence leaves a named literature gap, read the
-   [acquisition contract](../../../ZOTERO_ACQUISITION.md) and use its optional
-   external-discovery handoff. Return candidates to Zotero by DOI or exact
-   bibliographic identity.
+   [acquisition contract](../../../ZOTERO_ACQUISITION.md) before any external
+   discovery. When the user specifically requests one paper by DOI or article
+   URL, check `doctor --json` acquisition readiness and use
+   `cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json`.
+   That bounded route needs no per-save approval; do not use it to broaden the
+   request into a literature search.
 
 ## Evidence and authority
 
@@ -114,7 +117,9 @@ exists, read `.agent/skills/mathpix/SKILL.md` and follow its explicit
 `--confirmed-no-companion` gate; keep the PDF immutable and never expose
 credentials. The [acquisition contract](../../../ZOTERO_ACQUISITION.md) is the
 repository-owned authority for external discovery, publisher access, and every
-route that can add a paper to Zotero.
+route that can add a paper to Zotero. Follow its eligibility and browser
+boundaries; all Zotero writes other than the specifically requested `acquire`
+route retain their reviewed-preview and approval steps.
 
 ## Validation
 

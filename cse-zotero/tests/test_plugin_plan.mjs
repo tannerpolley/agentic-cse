@@ -102,6 +102,146 @@ test("project-organize endpoint previews by default and writes only with the tok
   assert.equal((await call(badItem)).status, 422);
 });
 
+test("metadata acquisition previews without writes and applies one attachment-free parent", async () => {
+  const { readFileSync } = await import("node:fs");
+  const vm = await import("node:vm");
+  const collection = { id: 2, key: "COLL0001", name: "Papers", libraryID: 1 };
+  const calls = [];
+  const saved = [];
+  let pendingTranslation = null;
+  class Search {
+    setSearch(search) { this.search = search; }
+    setIdentifier(identifier) { this.identifier = identifier; }
+    setTranslator(id) { this.translatorID = id; }
+    async translate(options) {
+      calls.push({ search: this.search, identifier: this.identifier, translatorID: this.translatorID, options });
+      if (pendingTranslation) await pendingTranslation;
+      return [{ toJSON: () => ({
+        itemType: "journalArticle", title: "An Example Paper", DOI: "10.1234/example",
+        attachments: [{ title: "publisher PDF" }]
+      }) }];
+    }
+  }
+  class Item {
+    fromJSON(data) { this.data = { ...data }; }
+    toJSON() { return { ...this.data }; }
+    isRegularItem() { return this.data.itemType === "journalArticle"; }
+    setCollections(ids) { this.collections = ids; }
+    async saveTx() { this.key = "NEWITEM1"; saved.push(this); }
+  }
+  const Zotero = {
+    Libraries: { userLibraryID: 1 }, Server: { Endpoints: {} },
+    Notifier: { registerObserver: () => "observer", unregisterObserver() {} },
+    Collections: { getByLibrary: () => [collection] },
+    getActiveZoteroPane: () => ({ getSelectedLibraryIDs: () => [1], getSelectedCollections: () => [collection] }),
+    Utilities: {
+      extractIdentifiers: text => text === "10.1234/example" ? [{ DOI: "10.1234/example" }] : [],
+      cleanDOI: text => text.toLowerCase()
+    },
+    Translate: { Search }, Item, ItemFields: { getID: field => field === "DOI" ? 1 : 2 },
+    DB: { queryAsync: async (sql, params) => {
+      assert.ok(Array.isArray(params), "Zotero query parameters must be an array");
+      assert.equal(params.length, (sql.match(/\?/g) || []).length);
+      return [];
+    } },
+    Items: { getAsync: async () => false }
+  };
+  const context = vm.createContext({ Zotero, Services: {}, Components: {} });
+  for (const name of ["cleanup-plan.js", "organize-plan.js", "zotero-companion.js"])
+    vm.runInContext(readFileSync(new URL(`../zotero-plugin/${name}`, import.meta.url), "utf8"), context);
+  vm.runInContext("ZoteroCompanion.start()", context);
+  const Endpoint = Zotero.Server.Endpoints["/zotero-companion/acquire-metadata"];
+  const call = async data => {
+    const [status, , body] = await new Endpoint().init({ data });
+    return { status, body: JSON.parse(body) };
+  };
+
+  const preview = await call({ identifier: "10.1234/example", collection: "Papers" });
+  assert.equal(preview.status, 200);
+  assert.equal(preview.body.mode, "dry-run");
+  assert.equal(preview.body.existing, false);
+  assert.equal(preview.body.metadata.title, "An Example Paper");
+  assert.equal(preview.body.metadata.attachments, undefined);
+  assert.equal(calls[0].translatorID, "0a61e167-de9a-4f93-a68a-628b48855909");
+  assert.equal(calls[0].options.libraryID, false);
+  assert.equal(calls[0].options.saveAttachments, false);
+  assert.equal(saved.length, 0);
+
+  const applied = await call({ identifier: "10.1234/example", collection: "Papers", mode: "apply" });
+  assert.equal(applied.status, 200);
+  assert.equal(applied.body.existing, false);
+  assert.equal(applied.body.item_key, "NEWITEM1");
+  assert.equal(applied.body.collection_key, "COLL0001");
+  assert.equal(saved.length, 1);
+  assert.equal(saved[0].data.attachments, undefined);
+  assert.equal(saved[0].collections.length, 1);
+  assert.equal(saved[0].collections[0], 2);
+  Zotero.DB.queryAsync = async (_sql, params) => params[1] === 2
+    ? [{ itemID: 99, value: " AN EXAMPLE PAPER " }] : [];
+  Zotero.Items.getAsync = async () => ({ key: "EXISTING", isRegularItem: () => true });
+  const duplicate = await call({ identifier: "10.1234/example", mode: "apply" });
+  assert.equal(duplicate.body.item_key, "EXISTING");
+  assert.equal(duplicate.body.existing, true);
+  assert.equal(saved.length, 1);
+
+  let release;
+  pendingTranslation = new Promise(resolve => { release = resolve; });
+  const running = call({ identifier: "10.1234/example", mode: "apply" });
+  const count = calls.length;
+  const busy = await call({ identifier: "10.1234/example", mode: "apply" });
+  assert.equal(busy.status, 409);
+  assert.equal(busy.body.error, "metadata_acquisition_busy");
+  assert.equal(calls.length, count);
+  release();
+  assert.equal((await running).status, 200);
+  pendingTranslation = null;
+  assert.equal((await call({ identifier: "10.1234/example" })).status, 200);
+
+  let reject;
+  pendingTranslation = new Promise((_resolve, fail) => { reject = fail; });
+  const failing = call({ identifier: "10.1234/example" });
+  assert.equal((await call({ identifier: "10.1234/example" })).status, 409);
+  reject(new Error("native translation failure"));
+  assert.equal((await failing).status, 500);
+  pendingTranslation = null;
+  assert.equal((await call({ identifier: "10.1234/example" })).status, 200);
+  assert.equal(saved.length, 1);
+});
+
+test("attachment acquisition validates PDF bytes and dry-run does not import", async () => {
+  const { readFileSync } = await import("node:fs");
+  const vm = await import("node:vm");
+  let imported = 0;
+  const parent = { id: 5, key: "PARENT01", isRegularItem: () => true };
+  const Zotero = {
+    Libraries: { userLibraryID: 1 }, Server: { Endpoints: {} },
+    Notifier: { registerObserver: () => "observer", unregisterObserver() {} },
+    Items: { getByLibraryAndKey: (_libraryID, key) => key === parent.key && parent },
+    Attachments: { importFromFile: async () => { imported++; return { key: "ATTACH01" }; } }
+  };
+  const context = vm.createContext({ Zotero, Services: {}, Components: {}, atob });
+  for (const name of ["cleanup-plan.js", "organize-plan.js", "zotero-companion.js"])
+    vm.runInContext(readFileSync(new URL(`../zotero-plugin/${name}`, import.meta.url), "utf8"), context);
+  vm.runInContext("ZoteroCompanion.start()", context);
+  const Endpoint = Zotero.Server.Endpoints["/zotero-companion/acquire-attachment"];
+  const call = async data => {
+    const [status, , body] = await new Endpoint().init({ data });
+    return { status, body: JSON.parse(body) };
+  };
+  const pdf = Buffer.from("%PDF-1.7\n").toString("base64");
+
+  assert.equal((await call({ item_key: parent.key, pdf_base64: "not-base64" })).status, 422);
+  const preview = await call({ item_key: parent.key, pdf_base64: pdf });
+  assert.equal(preview.status, 200);
+  assert.equal(preview.body.byte_length, 9);
+  // A normal multi-megabyte PDF must not overflow a base64-validation regexp.
+  const largePDF = Buffer.concat([Buffer.from("%PDF-1.7\n"), Buffer.alloc(4 * 1024 * 1024, 0x80)]);
+  const largePreview = await call({ item_key: parent.key, pdf_base64: largePDF.toString("base64") });
+  assert.equal(largePreview.status, 200);
+  assert.equal(largePreview.body.byte_length, largePDF.length);
+  assert.equal(imported, 0);
+});
+
 test("manifest has the fields Zotero 10 requires to install an add-on", async () => {
   const { readFileSync } = await import("node:fs");
   const manifest = JSON.parse(readFileSync(new URL("../zotero-plugin/manifest.json", import.meta.url), "utf8"));

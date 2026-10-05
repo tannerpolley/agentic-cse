@@ -8,9 +8,14 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
   const TAG_CLEANUP_PATH = "/zotero-companion/tag-cleanup";
   const SEARCHES_PATH = "/zotero-companion/saved-searches";
   const ORGANIZE_PATH = "/zotero-companion/project-organize";
-  const registeredPaths = [STATUS_PATH, TAG_CLEANUP_PATH, SEARCHES_PATH, ORGANIZE_PATH];
+  const ACQUIRE_METADATA_PATH = "/zotero-companion/acquire-metadata";
+  const ACQUIRE_ATTACHMENT_PATH = "/zotero-companion/acquire-attachment";
+  const CROSSREF_TRANSLATOR = "0a61e167-de9a-4f93-a68a-628b48855909";
+  const registeredPaths = [STATUS_PATH, TAG_CLEANUP_PATH, SEARCHES_PATH, ORGANIZE_PATH,
+    ACQUIRE_METADATA_PATH, ACQUIRE_ATTACHMENT_PATH];
   const SYNC_DELAY_MS = 3000;
   let observerID = null;
+  let metadataInFlight = false;
   let lastSync = null;
 
   function response(status, payload) {
@@ -203,6 +208,177 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     }
   }
 
+  function acquisitionCollection(requested) {
+    const available = zotero.Collections.getByLibrary(libraryID(), true);
+    if (requested) {
+      if (typeof requested !== "string") return { error: "invalid_collection" };
+      const byKey = available.find(collection => collection.key === requested);
+      if (byKey) return { collection: byKey };
+      const byName = available.filter(collection => collection.name === requested);
+      if (byName.length === 1) return { collection: byName[0] };
+      if (byName.length > 1) return { error: "collection_ambiguous" };
+      return { error: "collection_not_found" };
+    }
+    const pane = zotero.getActiveZoteroPane && zotero.getActiveZoteroPane();
+    const selectedLibrary = pane && pane.getSelectedLibraryIDs && pane.getSelectedLibraryIDs()[0];
+    const selectedRows = pane && pane.getSelectedCollections && pane.getSelectedCollections();
+    if (selectedRows && selectedRows.length > 1) return { error: "collection_ambiguous" };
+    const selected = selectedRows ? selectedRows[0] :
+      pane && pane.getSelectedCollection && pane.getSelectedCollection();
+    if ((selectedLibrary && selectedLibrary !== libraryID()) ||
+        (selected && selected.libraryID !== libraryID())) {
+      return { error: "group_library_unsupported", collection_key: selected && selected.key || null };
+    }
+    return { collection: selected && selected.id ? selected : null };
+  }
+
+  function normalizedTitle(title) {
+    return String(title || "").normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
+  }
+
+  async function existingItem(metadata) {
+    const doi = zotero.Utilities.cleanDOI(metadata.DOI || "");
+    const fields = zotero.ItemFields;
+    const queries = doi ? [{
+      sql: "SELECT items.itemID FROM items JOIN itemData USING (itemID) " +
+        "JOIN itemDataValues USING (valueID) " +
+        "WHERE items.libraryID=? AND itemData.fieldID=? AND lower(itemDataValues.value)=lower(?) " +
+        "AND items.itemID NOT IN (SELECT itemID FROM deletedItems)",
+      fieldID: fields.getID("DOI"), value: doi, title: false
+    }] : [];
+    const title = normalizedTitle(metadata.title);
+    if (title) queries.push({
+      sql: "SELECT items.itemID, itemDataValues.value AS value FROM items " +
+        "JOIN itemData USING (itemID) JOIN itemDataValues USING (valueID) " +
+        "WHERE items.libraryID=? AND itemData.fieldID=? " +
+        "AND items.itemID NOT IN (SELECT itemID FROM deletedItems)",
+      fieldID: fields.getID("title"), title: true
+    });
+    for (const query of queries) {
+      const rows = query.title
+        ? await zotero.DB.queryAsync(query.sql, [libraryID(), query.fieldID])
+        : await zotero.DB.queryAsync(query.sql, [libraryID(), query.fieldID, query.value]);
+      for (const row of rows) {
+        if (query.title && normalizedTitle(row.value) !== title) continue;
+        const item = await zotero.Items.getAsync(row.itemID, { noCache: true });
+        if (item && item.isRegularItem()) return item;
+      }
+    }
+    return null;
+  }
+
+  function metadataJSON(item) {
+    const json = item && item.toJSON ? item.toJSON() : { ...item };
+    for (const field of ["attachments", "notes", "collections", "relations", "key", "version", "itemID"])
+      delete json[field];
+    return json;
+  }
+
+  async function acquireMetadata(data) {
+    if (!data || typeof data.identifier !== "string" || !data.identifier.trim())
+      return response(400, { error: "identifier_required" });
+    if (data.mode && !["apply", "dry-run"].includes(data.mode))
+      return response(400, { error: "invalid_mode" });
+    const target = acquisitionCollection(data.collection);
+    if (target.error) return response(422, { error: target.error, collection_key: target.collection_key || null });
+    const identifiers = zotero.Utilities.extractIdentifiers(data.identifier);
+    const identifier = identifiers && identifiers[0];
+    if (!identifier) return response(422, { error: "unsupported_identifier" });
+    const translate = new zotero.Translate.Search();
+    if (identifier.DOI) {
+      translate.setSearch({ itemType: "journalArticle", DOI: identifier.DOI });
+      translate.setTranslator(CROSSREF_TRANSLATOR);
+    } else {
+      translate.setIdentifier(identifier);
+      const translators = await translate.getTranslators();
+      translate.setTranslator(translators);
+    }
+    const translated = await translate.translate({ libraryID: false, saveAttachments: false });
+    if (!translated || !translated.length) return response(404, { error: "metadata_not_found" });
+    const source = translated[0];
+    const metadata = metadataJSON(source);
+    const existing = await existingItem(metadata);
+    if (existing) return response(200, {
+      mode: data.mode === "apply" ? "apply" : "dry-run",
+      metadata,
+      existing: true,
+      item_key: existing.key,
+      collection_key: target.collection && target.collection.key || null
+    });
+    if (data.mode !== "apply") return response(200, {
+      mode: "dry-run", existing: false, metadata,
+      collection_key: target.collection && target.collection.key || null
+    });
+    const item = new zotero.Item();
+    item.fromJSON(metadata);
+    if (!item.isRegularItem()) return response(422, { error: "metadata_not_regular_item" });
+    item.libraryID = libraryID();
+    if (target.collection) item.setCollections([target.collection.id]);
+    await item.saveTx();
+    return response(200, {
+      mode: "apply", existing: false, metadata: metadataJSON(item), item_key: item.key,
+      collection_key: target.collection && target.collection.key || null
+    });
+  }
+
+  function pdfBytes(value) {
+    if (typeof value !== "string" || !value.length || value.length > 4 * Math.ceil(50 * 1024 * 1024 / 3)) return null;
+    try {
+      const bytes = atob(value);
+      return bytes.length <= 50 * 1024 * 1024 && bytes.startsWith("%PDF") ? bytes : null;
+    } catch (_error) {
+      return null;
+    }
+  }
+
+  function writeTempPDF(bytes) {
+    const file = services.dirsvc.get("TmpD", Components.interfaces.nsIFile).clone();
+    file.append("zotero-companion-acquire.pdf");
+    file.createUnique(Components.interfaces.nsIFile.NORMAL_FILE_TYPE, 0o600);
+    try {
+      const stream = Components.classes["@mozilla.org/network/file-output-stream;1"]
+        .createInstance(Components.interfaces.nsIFileOutputStream);
+      stream.init(file, 0x02 | 0x08 | 0x20, 0o600, 0);
+      const binary = Components.classes["@mozilla.org/binaryoutputstream;1"]
+        .createInstance(Components.interfaces.nsIBinaryOutputStream);
+      binary.setOutputStream(stream);
+      binary.writeBytes(bytes, bytes.length);
+      binary.close();
+      return file;
+    } catch (error) {
+      if (file.exists()) file.remove(false);
+      throw error;
+    }
+  }
+
+  async function acquireAttachment(data) {
+    if (!data || typeof data.item_key !== "string" || !data.item_key || typeof data.pdf_base64 !== "string")
+      return response(400, { error: "item_key_and_pdf_required" });
+    if (data.mode && !["apply", "dry-run"].includes(data.mode))
+      return response(400, { error: "invalid_mode" });
+    const bytes = pdfBytes(data.pdf_base64);
+    if (!bytes) return response(422, { error: "invalid_pdf" });
+    const parent = zotero.Items.getByLibraryAndKey(libraryID(), data.item_key);
+    if (!parent || !parent.isRegularItem()) return response(404, { error: "item_not_found" });
+    if (data.mode !== "apply") return response(200, {
+      mode: "dry-run", item_key: parent.key, byte_length: bytes.length
+    });
+    let file;
+    try {
+      file = writeTempPDF(bytes);
+      const attachment = await zotero.Attachments.importFromFile({
+        file, parentItemID: parent.id, libraryID: libraryID(), contentType: "application/pdf"
+      });
+      return response(200, { mode: "apply", item_key: parent.key, attachment_key: attachment.key });
+    } finally {
+      if (file && file.exists()) file.remove(false);
+    }
+  }
+
+  function endpointError(error) {
+    return response(500, { error });
+  }
+
   // Live refresh: collection changes re-render every project page (a move can
   // leave one tree and enter another); item filing re-renders the owning page.
   let pending = null;
@@ -283,7 +459,9 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
         status: { method: "GET", path: STATUS_PATH },
         tagCleanup: { method: "POST", path: TAG_CLEANUP_PATH, defaultMode: "dry-run" },
         savedSearches: { method: "POST", path: SEARCHES_PATH, defaultMode: "dry-run" },
-        projectOrganize: { method: "POST", path: ORGANIZE_PATH, defaultMode: "dry-run" }
+        projectOrganize: { method: "POST", path: ORGANIZE_PATH, defaultMode: "dry-run" },
+        acquireMetadata: { method: "POST", path: ACQUIRE_METADATA_PATH, defaultMode: "dry-run" },
+        acquireAttachment: { method: "POST", path: ACQUIRE_ATTACHMENT_PATH, defaultMode: "dry-run" }
       },
       projectSync: { observing: observerID !== null, lastSync },
       config: plan.getConfig()
@@ -334,6 +512,29 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
         const data = requestData(request);
         if (data === null) return response(400, { error: "invalid_json" });
         return projectOrganize(data);
+      }
+    };
+    zotero.Server.Endpoints[ACQUIRE_METADATA_PATH] = class {
+      supportedMethods = ["POST"];
+      supportedDataTypes = ["application/json"];
+      permitBookmarklet = false;
+      init(request) {
+        const data = requestData(request);
+        if (data === null) return response(400, { error: "invalid_json" });
+        if (metadataInFlight) return response(409, { error: "metadata_acquisition_busy" });
+        metadataInFlight = true;
+        return acquireMetadata(data).catch(() => endpointError("metadata_acquisition_failed"))
+          .finally(() => { metadataInFlight = false; });
+      }
+    };
+    zotero.Server.Endpoints[ACQUIRE_ATTACHMENT_PATH] = class {
+      supportedMethods = ["POST"];
+      supportedDataTypes = ["application/json"];
+      permitBookmarklet = false;
+      init(request) {
+        const data = requestData(request);
+        if (data === null) return response(400, { error: "invalid_json" });
+        return acquireAttachment(data).catch(() => endpointError("attachment_import_failed"));
       }
     };
     observerID = zotero.Notifier.registerObserver(observer, ["collection", "collection-item"], "zotero-companion");

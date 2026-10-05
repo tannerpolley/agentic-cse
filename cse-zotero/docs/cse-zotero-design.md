@@ -336,11 +336,12 @@ gaps. It should be safe to run on every task and useful before a release.
 
 ### Human acquisition gate
 
-Agents may identify missing papers and prepare exact DOI or official article
-URLs, but the user performs publisher access and Zotero Connector saving in a
-normal browser session. Agents do not bypass CAPTCHA/Cloudflare, automate
-publisher pages, or retry blocked access. The existing acquisition rules in
-[AGENTS.md](../AGENTS.md) remain mandatory.
+The canonical [`ZOTERO_ACQUISITION.md`](../ZOTERO_ACQUISITION.md) owns
+acquisition eligibility and publisher/browser boundaries. For one paper the
+user specifically requests by DOI or article URL, use the bounded
+`cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json`
+route; it does not add a per-save approval. All other Zotero writes keep their
+reviewed-preview and approval steps.
 
 ## Revised execution order
 
@@ -564,8 +565,8 @@ verified without violating authority boundaries.
 | Two papers disagree or a parameter set is superseded | Both records remain visible with contradicts or supersedes, validity/model conventions are shown, and downstream consumers receive a review warning. |
 | A data record and equation record come from the same paper | They remain separate typed records with shared evidence links and can be traced independently into the selected data authority and implementation use. |
 | An insight or workflow is synthesized from several papers | It is marked derived, names all supporting sources and uncertainty, and is never mistaken for a direct source quotation. |
-| A source has no usable Markdown companion | The system reports evidence unavailable and follows the strict human acquisition/Mathpix gate; it does not silently convert or invent evidence. |
-| A publisher blocks or challenges access | The agent stops, reports the blocker, and asks the user to complete a normal browser step; it never bypasses, spoofs, or rapidly retries. |
+| A source has no usable Markdown companion | The system reports evidence unavailable and follows the PDF companion and Mathpix rules; a separate request for one identified paper follows `ZOTERO_ACQUISITION.md`. |
+| A publisher blocks or challenges access | The agent stops and reports the blocker according to `ZOTERO_ACQUISITION.md`. |
 | An agent starts a routine question | It reads index/context/brief/evidence first; full PDF/source inspection is an explicit audit path, not the default. |
 | The entire Zotero library is refreshed | All source records remain searchable, generated layers update deterministically, curated pages remain intact, and wiki-verify/wiki-stale expose any review work. |
 
@@ -575,8 +576,7 @@ verified without violating authority boundaries.
   companion.
 - Do not run routine OCR or re-OCR; preserve immutable PDFs and never expose
   Mathpix/API credentials.
-- Do not bypass publisher access controls, CAPTCHA, Cloudflare, VPN/IP bans,
-  login walls, or Connector human-presence checks.
+- Follow `ZOTERO_ACQUISITION.md` for publisher and browser boundaries.
 - Do not mutate Zotero as part of wiki refresh, ingestion, or synthesis.
 - Do not promote a paper statement to selected data-authority or implementation truth without
   source locators, assumptions, and review status.
@@ -642,8 +642,9 @@ The system is mature enough when:
   creating isolated summaries;
 - stale, unsupported, orphaned, contradictory, and unvalidated records are
   reported by routine lint;
-- human approval is needed for publisher acquisition, Zotero writes, and
-  important promotion/synthesis decisions, not for every read-only lookup;
+- a specifically requested paper can use the bounded `acquire` route without
+  per-save approval; all other Zotero writes and important
+  promotion/synthesis decisions retain their approval requirements;
 - measured performance evidence, rather than fashion, justifies any additional
   retrieval or service infrastructure.
 
