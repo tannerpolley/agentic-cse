@@ -1,6 +1,6 @@
 ---
 name: review
-description: "Independently check a design issue before build (Ready, Revise, Block) or delivered results or code (Supported, Not supported). Use when acting as a reviewer or review sub-agent, or asked to \"review this plan\", \"is this result supported\", or \"review this change\". Writing quality goes to prose."
+description: "Independently check scientific design readiness (Ready, Revise, Block) or delivered numerical results and scientific code (Supported, Not supported). Use when reviewing scientific work as a sub-agent, or asked \"is this result supported\". Writing quality goes to prose."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
