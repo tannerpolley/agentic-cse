@@ -17,12 +17,14 @@ from typing import Iterable
 try:
     from .cse_hook_common import (
         AGENT_ROLE_DECLARATION, DECLARATION_LINE, HEADING, ROLE_VALUES,
-        agent_role_state, repository_role, role_state,
+        agent_role_state, glossary_entries, glossary_paths, has_source, read_glossaries,
+        repository_role, role_state,
     )
 except ImportError:
     from cse_hook_common import (
         AGENT_ROLE_DECLARATION, DECLARATION_LINE, HEADING, ROLE_VALUES,
-        agent_role_state, repository_role, role_state,
+        agent_role_state, glossary_entries, glossary_paths, has_source, read_glossaries,
+        repository_role, role_state,
     )
 
 
@@ -355,8 +357,58 @@ def table_rows(text: str) -> tuple[list[list[str]], list[list[str]]]:
     return glossary, avoid
 
 
-def markdown_rows(rows: list[list[str]]) -> str:
-    return "\n".join("| " + " | ".join(cell.replace("|", "\\|") for cell in row) + " |" for row in rows)
+GLOSSARY_LINK = "Project vocabulary: [GLOSSARY.md](../../GLOSSARY.md)."
+
+
+def without_vocabulary(text: str) -> str:
+    text = re.sub(r"(?ms)^## (?:Glossary|Avoid)[ \t]*\n.*?(?=^#{1,2} |\Z)", "", text)
+    return re.sub(r"(?m)^\|[^\n]*\n\|[-: |]+\n(?:\|[^\n]*(?:\n|$))*",
+                  lambda match: "" if any(table_rows(match[0])) else match[0], text).strip()
+
+
+def migrate_glossary(repo: Path, contexts: list[Path]) -> tuple[str, list[dict]]:
+    entries = read_glossaries(repo)
+    existing = {entry["term"].casefold() for entry in entries}
+    additions = {}
+    avoids = []
+    for path in contexts:
+        rows, rules = table_rows(path.read_text(encoding="utf-8"))
+        for term, meaning, source, scope in rows:
+            term = term.strip("`")
+            key = term.casefold()
+            if key not in existing and key not in additions:
+                additions[key] = {"term": term, "meaning": meaning, "source": source,
+                                  "scope": scope, "avoid": []}
+        avoids.extend(rules)
+    for avoid, prefer, meaning, scope, _, evidence in avoids:
+        prefer = prefer.strip("`")
+        key = prefer.casefold()
+        if key in existing:
+            continue
+        entry = additions.setdefault(key, {"term": prefer, "meaning": meaning,
+                                            "source": evidence or "sourceless", "scope": scope, "avoid": []})
+        if avoid not in entry["avoid"]:
+            entry["avoid"].append(avoid.strip("`"))
+        if evidence and not evidence.casefold().startswith("sourceless"):
+            sources = [] if entry["source"].casefold().startswith("sourceless") else entry["source"].split("; ")
+            if evidence not in sources:
+                sources.append(evidence)
+            entry["source"] = "; ".join(sources)
+        if not entry["scope"]:
+            entry["scope"] = scope
+    path = repo / "GLOSSARY.md"
+    before = path.read_text(encoding="utf-8") if path.is_file() else ""
+    after = before
+    if additions:
+        after = before or "# Project vocabulary\n\n## Language\n"
+        for entry in additions.values():
+            after += (
+                ("\n" if after.endswith("\n") else "\n\n")
+                + f"**{entry['term']}**:\n{entry['meaning']}\n"
+                f"_Avoid_: {', '.join(entry['avoid'])}\nSource: {entry['source'] or 'sourceless'}\n"
+                + (f"Scope: {entry['scope']}\n" if entry["scope"] else "")
+            )
+    return after, [entry for entry in entries if not entry["locator"].startswith(f"{path}:")] + glossary_entries(after, str(path))
 
 
 def markdown_record(text: str) -> str:
@@ -369,7 +421,7 @@ def markdown_record(text: str) -> str:
 
 def retained_context(path: Path, repo: Path) -> str:
     text = path.read_text(encoding="utf-8", errors="replace").strip()
-    return DECLARATION_LINE.sub("", text).strip()
+    return without_vocabulary(DECLARATION_LINE.sub("", text)).strip()
 
 
 def validate_role(role: str) -> None:
@@ -437,7 +489,7 @@ def record_target(path: Path, repo: Path, document_roots: tuple[Path, ...] = ())
     parts = rel.parts
     if parts in (("docs", "scientific", "README.md"), ("docs", "scientific", "CONTEXT.md")):
         return None
-    if parts[-1] == "CONTEXT.md":
+    if parts[-1] in {"CONTEXT.md", "GLOSSARY.md", "GLOSSARY-MAP.md"}:
         return None
     if any(path.is_relative_to(root) for root in document_roots):
         return repo / "docs/scientific/latex" / path.relative_to(repo / "docs/scientific")
@@ -462,6 +514,13 @@ def record_target(path: Path, repo: Path, document_roots: tuple[Path, ...] = ())
     return None
 
 
+def rewrite_links(text: str, links: dict[str, str]) -> str:
+    if not links:
+        return text
+    names = "|".join(re.escape(name) for name in sorted(links, key=len, reverse=True))
+    return re.sub(rf"(?<![\w/.-])(?:{names})(?![\w/-])", lambda match: links[match[0]], text)
+
+
 def plan_reconciliation(repo: Path, role: str | None = None,
                         source_data_adoption: str | None = None) -> dict:
     repo = repo.resolve()
@@ -482,39 +541,33 @@ def plan_reconciliation(repo: Path, role: str | None = None,
         relative(path, repo) for path in files
         if "docs" in path.relative_to(repo).parts
     )
-    glossary: list[list[str]] = []
-    avoid: list[list[str]] = []
-    for path in contexts:
-        source = relative(path, repo)
-        rows, avoids = table_rows(path.read_text(encoding="utf-8", errors="replace"))
-        glossary.extend([row[:2] + [row[2] or f"sourceless ({source})", row[3]] for row in rows])
-        avoid.extend(avoids)
-    seen = set()
-    glossary = [row for row in glossary if not (tuple(row) in seen or seen.add(tuple(row)))]
+    # The canonical scientific record wins when old tables repeat a term.
+    ordered_contexts = sorted(contexts, key=lambda path: (path != target, str(path)))
+    merged_glossary, entries = migrate_glossary(repo, ordered_contexts)
     folded_search = searchable.casefold()
-    sourced = {row[0].strip("`").casefold() for row in glossary
-               if row[2] and not row[2].casefold().startswith("sourceless")}
-    terms = [term for term in UNSOURCED_TERMS if term not in sourced and (
-        all(word in folded_search for word in term.split())
-        or term == "claim boundary" and "claim boundar" in folded_search
-    )]
-    merged = (ASSETS / "CONTEXT.md").read_text(encoding="utf-8")
-    if glossary:
-        merged = merged.replace("|---|---|---|---|\n\n## Avoid", "|---|---|---|---|\n" + markdown_rows(glossary) + "\n\n## Avoid")
-    if avoid:
-        merged = merged.replace("|---|---|---|---|---|---|\n\nLeave the table", "|---|---|---|---|---|---|\n" + markdown_rows(avoid) + "\n\nLeave the table")
-    if contexts:
-        retained = [
-            f"### `{relative(path, repo)}`\n\n{retained_context(path, repo)}"
-            for path in contexts
-        ]
-        if retained:
-            merged += "\n## Retained source records\n\n" + "\n\n".join(retained) + "\n"
-    if contexts == [target]:
-        merged = target.read_text(encoding="utf-8")
+    sourced = {entry["term"].casefold() for entry in entries if has_source(entry)}
+    terms = list(dict.fromkeys(
+        [entry["term"] for entry in entries if not has_source(entry)]
+        + [term for term in UNSOURCED_TERMS if term not in sourced and (
+            all(word in folded_search for word in term.split())
+            or term == "claim boundary" and "claim boundar" in folded_search
+        )]
+    ))
+    merged = (without_vocabulary(target.read_text(encoding="utf-8")) + "\n" if target.is_file()
+              else (ASSETS / "CONTEXT.md").read_text(encoding="utf-8"))
+    if not target.is_file() and agent_role_state(all_context_text)["role"]:
+        merged = AGENT_ROLE_SECTION.sub("", merged)
+    if GLOSSARY_LINK not in merged:
+        heading = re.search(r"(?m)^## ", merged)
+        position = heading.start() if heading else len(merged)
+        merged = merged[:position].rstrip() + "\n\n" + GLOSSARY_LINK + "\n\n" + merged[position:]
+    retained = [f"### `{relative(path, repo)}`\n\n{retained_context(path, repo)}"
+                for path in contexts if path != target]
+    if retained:
+        merged += "\n## Retained source records\n\n" + "\n\n".join(retained) + "\n"
     if source_data_adoption is not None and source_data_adoption != persisted_adoption:
         merged = set_source_data_adoption(merged, source_data_adoption)
-    elif contexts != [target] and persisted_adoption is not None:
+    elif persisted_adoption is not None and stored_source_data_adoption(merged) != persisted_adoption:
         merged = set_source_data_adoption(merged, persisted_adoption)
     merged = (canonical_context(merged, selected_role) if selected_role else
               DECLARATION_LINE.sub("", merged).strip() + "\n")
@@ -542,7 +595,7 @@ def plan_reconciliation(repo: Path, role: str | None = None,
         links[old] = new
     for path in contexts:
         if path != target:
-            merges.append({"source": relative(path, repo), "target": "docs/scientific/CONTEXT.md", "reason": "merge glossary and scientific context"})
+            merges.append({"source": relative(path, repo), "target": "docs/scientific/CONTEXT.md", "reason": "migrate vocabulary to GLOSSARY.md; retain scientific context"})
             links[relative(path, repo)] = "docs/scientific/CONTEXT.md"
     for path in files:
         rel = path.relative_to(repo).parts
@@ -555,13 +608,18 @@ def plan_reconciliation(repo: Path, role: str | None = None,
         moves.append({"source": "(asset)", "target": "docs/scientific/README.md", "reason": "mandatory record"})
     updates = []
     for path in files:
-        if path == target or path.suffix.lower() not in CALLER_SUFFIXES:
+        if path == target or path.name in {"GLOSSARY.md", "GLOSSARY-MAP.md"} or path.suffix.lower() not in CALLER_SUFFIXES:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
-        replacements = [(old, new) for old, new in links.items() if old in text]
+        replacements = [(old, new) for old, new in links.items()
+                        if rewrite_links(text, {old: new}) != text]
         if replacements:
             updates.append({"path": relative(path, repo), "replacements": replacements})
-    affected = {"AGENTS.md", "docs/scientific/CONTEXT.md"}
+    glossary = repo / "GLOSSARY.md"
+    glossary_before = glossary.read_text(encoding="utf-8") if glossary.is_file() else ""
+    glossary_update = merged_glossary != glossary_before
+    affected = {"AGENTS.md", "docs/scientific/CONTEXT.md", "GLOSSARY.md", "GLOSSARY-MAP.md"}
+    affected.update(relative(path, repo) for path in glossary_paths(repo))
     for item in moves + merges:
         affected.add(item["target"])
         if not item["source"].startswith("("):
@@ -576,6 +634,9 @@ def plan_reconciliation(repo: Path, role: str | None = None,
         "role_state": role_state(all_context_text),
         "contexts": [relative(path, repo) for path in contexts],
         "sourceless_terms": terms,
+        "glossaries": [relative(path, repo) for path in glossary_paths(repo)],
+        "glossary_update": glossary_update,
+        "merged_glossary": merged_glossary,
         "moves": moves,
         "merges": merges,
         "deletes": deletes,
@@ -598,6 +659,11 @@ def plan_text(plan: dict) -> str:
         lines.append("Role declarations: " + ", ".join([*roles, *[f"default deliverable: {value}" for value in legacy]]))
     if len(legacy) == 1 and legacy[0] in {"result", "capability"}:
         lines.append(f"Legacy role proposal: {legacy[0]} → {'analysis' if legacy[0] == 'result' else 'tool'}")
+    if plan["glossaries"]:
+        lines += ["", "Glossary files read:", *[f"- `{path}`" for path in plan["glossaries"]]]
+    if plan["glossary_update"]:
+        lines += ["", "Vocabulary migration: add missing terms to root `GLOSSARY.md`; existing entries stay untouched.",
+                  "", plan["merged_glossary"]]
     if plan["sourceless_terms"]:
         lines += ["", "Sourceless glossary terms:", *[f"- {term}" for term in plan["sourceless_terms"]]]
     for title, key in (("Moves", "moves"), ("Merges", "merges"), ("Deletes", "deletes"), ("Caller and link updates", "updates")):
@@ -668,6 +734,8 @@ def validate_reconciliation_plan(repo: Path, plan: dict) -> None:
         actual = digest(path) if path.is_file() else None
         if actual != expected:
             raise SetupError(f"record changed after preview; generate a new plan: {name}")
+    if (repo / "GLOSSARY.md").exists() and not (repo / "GLOSSARY.md").is_file():
+        raise SetupError("glossary destination is not a file: GLOSSARY.md")
     for item in plan["moves"]:
         if item["source"].startswith("("):
             continue
@@ -728,6 +796,8 @@ def apply_reconciliation(repo: Path, plan: dict, role: str, agent_role_value: st
     if malformed_markers(repo / "AGENTS.md"):
         raise SetupError("root AGENTS.md has duplicate or unmatched CSE Protocol markers; reconcile it manually first")
     agent_role_value = require_agent_role(plan["merged_context"], agent_role_value)
+    if plan["glossary_update"]:
+        (repo / "GLOSSARY.md").write_text(plan["merged_glossary"], encoding="utf-8")
     target_context = repo / "docs/scientific/CONTEXT.md"
     target_context.parent.mkdir(parents=True, exist_ok=True)
     new_context = canonical_context(plan["merged_context"], role, agent_role_value, responsibilities,
@@ -763,12 +833,10 @@ def apply_reconciliation(repo: Path, plan: dict, role: str, agent_role_value: st
             remove_path(path, repo)
     links = {item["source"]: item["target"] for item in [*plan["moves"], *plan["merges"]] if item.get("source") and not item["source"].startswith("(")}
     for path in repository_files(repo):
-        if path.suffix.lower() not in CALLER_SUFFIXES:
+        if path.name in {"GLOSSARY.md", "GLOSSARY-MAP.md"} or path.suffix.lower() not in CALLER_SUFFIXES:
             continue
         text = path.read_text(encoding="utf-8", errors="replace")
-        updated = text
-        for old, new in sorted(links.items(), key=lambda item: -len(item[0])):
-            updated = updated.replace(old, new)
+        updated = rewrite_links(text, links)
         if path == target_context:
             for old, new in sorted(links.items(), key=lambda item: -len(item[0])):
                 updated = updated.replace(Path(old).name, Path(new).name)

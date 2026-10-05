@@ -1,6 +1,6 @@
 ---
 name: audit
-description: "Report read-only where software ceremony, duplicated scientific values, misplaced records, or unsourced names displace scientific work, with delete, dedupe, and move findings. Use when asked \"what can I delete\" or \"audit this repo\". Scientific support goes to review; writing to prose."
+description: "Audit scientific repositories read-only for software ceremony, duplicated values, misplaced records, and unsourced scientific names. Use when asked \"what can I delete\" or \"audit this scientific repo\". Scientific support goes to review; writing to prose."
 metadata:
   cse-kind: "supporting"
   cse-family: "supporting"
@@ -21,7 +21,10 @@ interpretation. Do not grade scientific truth or apply edits.
 
 Inspect active source, tests, instructions, configuration, analyses, and documentation. Skip vendored, generated, cache, and historical result archives
 unless the user includes them. Use `rg`, file and row counts, callers, and Git
-history when ownership or origin is unclear.
+history when ownership or origin is unclear. Project vocabulary belongs in
+root `GLOSSARY.md` or the glossaries linked by `GLOSSARY-MAP.md`,
+not scientific context tables. Inspect `Source:` lines; missing or `sourceless` sources remain
+findings. Shared glossary files are not duplicate CSE records to remove.
 
 Hunt for:
 

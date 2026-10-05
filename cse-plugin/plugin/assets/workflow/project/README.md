@@ -22,9 +22,12 @@ evidence-justified route:
 Normal CSE work may ask every material question needed. A task-specific request
 not to ask questions does not change the general project doctrine.
 
-- `CONTEXT.md` owns the question, intended use, owners, sourced glossary,
-  avoid table, source/data adoption choice, one confirmed repository role
-  (`analysis` or `tool`), and the confirmed agent role with its responsibilities.
+- `CONTEXT.md` owns the question, intended use, owners, source/data adoption
+  choice, one confirmed repository role (`analysis` or `tool`), and the
+  confirmed agent role with its responsibilities; it links to project vocabulary.
+- Root `GLOSSARY.md` owns vocabulary in Matt Pocock's format, with CSE's
+  required `Source:` and optional `Scope:` lines. Read every glossary linked by
+  an existing `GLOSSARY-MAP.md`; CSE never creates a map or requires Matt's skills.
 - Optional `formulation.md`, `methods.md`, `evidence.md`, `decisions/`, and
   `writing/` records are Markdown and are created only when selected.
 - LaTeX is reserved for manuscript sources under `latex/`; it is never a

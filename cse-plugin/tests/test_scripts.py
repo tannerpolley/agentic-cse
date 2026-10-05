@@ -198,6 +198,42 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertIn("other.md", fallback["reason"])
                 self.assertIn("fell back to Git state", fallback.get("systemMessage", ""))
 
+    def test_prose_check_reads_glossary_terms_and_avoid_lists_with_scope(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            self.hook_fixture(project, "tool")
+            (project / "GLOSSARY.md").write_text(
+                "# Heat transfer\n\n## Language\n\n### Evidence\n\n"
+                "**schema**:\nA named scientific classification.\n_Avoid_: classification token\n"
+                "Source: paper §2\nScope: analyses/*\n"
+            )
+            (project / "analyses").mkdir()
+            inside = project / "analyses/report.md"
+            outside = project / "report.md"
+            inside.write_text("The schema is fixed.\n")
+            outside.write_text(inside.read_text())
+            checker = "plugin/scripts/workflow/check_prose.py"
+            accepted = self.run_script(checker, str(inside), cwd=project)
+            self.assertEqual(0, accepted.returncode, accepted.stdout + accepted.stderr)
+            rejected = self.run_script(checker, str(outside), cwd=project)
+            self.assertEqual(1, rejected.returncode, rejected.stdout + rejected.stderr)
+            self.assertIn("avoid 'schema'", rejected.stdout)
+            inside.write_text("The classification token is fixed.\n")
+            avoided = self.run_script(checker, str(inside), cwd=project)
+            self.assertEqual(1, avoided.returncode, avoided.stdout + avoided.stderr)
+            self.assertIn("classification token", avoided.stdout)
+            self.assertIn("GLOSSARY.md", avoided.stdout)
+            inside.write_text("The schema is fixed.\n")
+            self.run_hook(project, "SessionStart", source="startup")
+            accepted_stop = self.run_hook(project, "Stop", stop_hook_active=True)
+            self.assertIn("report.md", accepted_stop["reason"])
+            self.assertNotIn(str(inside), accepted_stop["reason"])
+            self.assertNotIn("GLOSSARY.md", accepted_stop["reason"])
+            inside.write_text("The classification token changed.\n")
+            avoided_stop = self.run_hook(project, "Stop", stop_hook_active=True)
+            self.assertIn("classification token", avoided_stop["reason"])
+            self.assertIn("GLOSSARY.md", avoided_stop["reason"])
+
     def test_user_registration_is_added_and_removed_without_touching_other_settings(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)

@@ -147,6 +147,28 @@ or lifecycle database. The installed plugin supplies the skills and shared
 references; user repositories, local configuration, Zotero, and the separately
 installed Companion remain separate.
 
+## Coexistence with Matt Pocock's skills (2026-10-05, issue #127)
+
+CSE and Matt's engineering skills are separate plugins that share files.
+Neither absorbs the other; CSE remains self-contained without a runtime
+requirement on Matt's skills. The subject decides overlapping routes: Matt's
+skills own software work, while CSE owns scientific questions and evidence.
+See [skill families](../../plugin/references/workflow/skill-families.md).
+
+Root `GLOSSARY.md` owns project vocabulary in Matt's format, with CSE's required
+`Source:` and optional `Scope:` lines. CSE also reads every glossary linked by
+an existing root `GLOSSARY-MAP.md` but never creates a map. Setup migrates old
+scientific-context vocabulary tables with approval, keeps existing glossary
+entries intact, and never deletes either glossary file. The scientific context
+retains questions, owners, roles, and source/data adoption, with a glossary link.
+Absorbing and deleting `GLOSSARY.md`, as proposed in draft PR #125, is rejected.
+
+Use Matt's `/retro` for a requested retrospective, supplemented by CSE's
+[science categories](../../plugin/references/workflow/retrospective.md).
+Candidates trace to session moments, mechanical problems become checks, and
+nothing changes before the user picks a candidate. Setup adds only one
+retrospective navigation line to its always-loaded protocol.
+
 ## Science-first and numerical-testing doctrine
 
 The plugin uses result-first Scientific Software Test-Driven Development. A

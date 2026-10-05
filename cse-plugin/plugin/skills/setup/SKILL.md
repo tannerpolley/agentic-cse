@@ -8,7 +8,7 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model]
-    conditional: [scientific-projects, github-and-git]
+    conditional: [scientific-projects, github-and-git, skill-families]
 ---
 
 # Establish or revise repository setup
@@ -18,7 +18,9 @@ Read first: [operating-model](../../references/workflow/operating-model.md).
 Inspect repository guidance, existing scientific records, terminology, inputs,
 analyses, documents, Git state, and available commands. Activate
 [scientific-projects](../../references/workflow/scientific-projects.md) for record ownership or migration and [github-and-git](../../references/workflow/github-and-git.md)
-for issue and integration rules. For a GitHub repository, reconcile its
+for issue and integration rules. When CSE and engineering skills overlap, use
+[skill families](../../references/workflow/skill-families.md) to choose by subject.
+For a GitHub repository, reconcile its
 [milestones](../../references/workflow/github-and-git.md#milestones) on every
 run: read all milestones and open issues with `gh`, then preview the exact
 milestone renames and missing descriptions, issue title-prefix removals, and a
@@ -54,8 +56,14 @@ Align only the unresolved material subset. Inspect purpose and owners, recommend
 `--reconcile` produce a complete read-only move, merge, delete, and caller/link
 plan; add `--role analysis` or `--role tool` for a confirmed preview. They
 write nothing until the same plan is rerun with `--approve --role <role>`. Merge
-every root or nested `CONTEXT.md` into the one root `CONTEXT.md`, including
-its sourced glossary and avoid table, and mark missing sources as `sourceless`.
+the non-glossary content of every stray root or nested `CONTEXT.md` into
+`docs/scientific/CONTEXT.md`. Migrate glossary and avoid rows from those files
+and the scientific context into root `GLOSSARY.md`, in Matt Pocock's entry
+format with required `Source:` and optional `Scope:` lines. Mark missing
+sources `sourceless`; add only missing terms and leave existing entries intact.
+Never delete, rename, or merge away `GLOSSARY.md` or `GLOSSARY-MAP.md`. Read
+every glossary linked by an existing map; never create a map.
+The scientific context links to the glossary and no longer holds vocabulary tables.
 Literal caller rewrites miss code-built paths and fixed parent-directory climbs;
 check those manually after approved moves.
 The scientific context owns the question, intended use, owners, one

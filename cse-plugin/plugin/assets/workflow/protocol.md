@@ -19,6 +19,8 @@ evidence-justified route.
 
 {skill_routing}
 
+For a requested retrospective, read CSE `references/workflow/retrospective.md`.
+
 Report the engineering result or capability, supporting evidence, meaning,
 and limits before software provenance. Do not invent physical results.
 

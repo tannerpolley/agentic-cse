@@ -18,25 +18,7 @@ State the scientific question, intended decision or use, and the domain in which
 Name the accountable owners for the scientific question, source data, model,
 analysis, and writing.
 
-## Glossary
-
-Every project term has a meaning and a source. Mark a missing source as
-`sourceless` for later review; do not invent a source during Setup.
-
-| Term | Meaning | Source | Scope |
-|---|---|---|---|
-
-## Avoid
-
-Use one row per confirmed repository-specific preference. Scopes are
-repository-relative POSIX globs; separate multiple scopes or exceptions with
-semicolons. Keep personal preferences in `~/.config/cse/config.toml`.
-
-| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |
-|---|---|---|---|---|---|
-
-Leave the table without data rows when the repository has no confirmed scoped
-terminology rules; do not invent a preference during Setup.
+Project vocabulary: [GLOSSARY.md](../../GLOSSARY.md).
 
 ## Scientific map
 

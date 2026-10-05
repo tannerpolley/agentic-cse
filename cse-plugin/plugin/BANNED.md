@@ -9,7 +9,7 @@ claim instead.
 
 The list does not apply to exact code identifiers, official filenames, product
 names, quotations, source titles, genuine domain terms such as contact
-mechanics, or a defined project term in `CONTEXT.md`. A Markdown link target
+mechanics, or a sourced project term in `GLOSSARY.md`. A Markdown link target
 in `[text](target)` or `[id]: target` counts as a filename or URL; the link
 text is still prose. When a listed word is necessary, state its concrete
 meaning.
@@ -40,13 +40,16 @@ meaning.
 Before naming a durable file, class, test, record, or glossary entry, require
 either a domain source that uses the term with that meaning or the quantity,
 equation, or operation itself. Record the meaning, source, and scope beside
-the term in `docs/scientific/CONTEXT.md`. An invented label with no source
+the term in root `GLOSSARY.md`, or a glossary linked by `GLOSSARY-MAP.md`.
+Use `**Term**:`, a short definition, `_Avoid_: a, b`, required `Source:`, and
+optional `Scope:` lines. Missing sources are marked `sourceless` and reported. An invented label with no source
 remains an Audit finding; it does not become accepted vocabulary by repetition.
 
 For genuine domain terms, product names, and source titles that resemble a
 listed word, retain a sourced glossary entry rather than weakening a rule.
 The checker exempts quoted passages, fenced code, exact inline identifiers
-and filenames, and sourced glossary terms within their declared path scope.
+and filenames, and sourced glossary terms within their declared path scope
+(or throughout the repository when `Scope:` is absent).
 Mark exact identifiers and official filenames as inline code; a filename-like
 word in ordinary prose does not establish an exemption. State a concrete
 meaning using “term means …” or “term: …” when the word itself is necessary.

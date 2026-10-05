@@ -51,6 +51,8 @@ evidence-justified route.
 
 {ROUTES}
 
+For a requested retrospective, read CSE `references/workflow/retrospective.md`.
+
 Report the engineering result or capability, supporting evidence, meaning,
 and limits before software provenance. Do not invent physical results.
 
@@ -324,19 +326,16 @@ class ManagedProtocolTests(unittest.TestCase):
 
             plan = setup.plan_reconciliation(root)
             self.assertIn("formulation.tex", setup.plan_text(plan))
-            self.assertIn("certificate", plan["merged_context"])
+            self.assertIn("certificate", plan["merged_glossary"])
             self.assertFalse((root / "docs/scientific/CONTEXT.md").exists())
             self.assertEqual(before, (root / "CONTEXT.md").read_text())
 
             setup.apply_reconciliation(root, plan, "analysis", AGENT_ROLE)
             merged = (root / "docs/scientific/CONTEXT.md").read_text()
-            lines = merged.splitlines()
-            self.assertEqual(1, lines.count("| Term | Meaning | Source | Scope |"))
-            self.assertEqual(1, lines.count("|---|---|---|---|"))
-            self.assertEqual(1, lines.count("| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |"))
-            self.assertEqual(1, lines.count("|---|---|---|---|---|---|"))
-            self.assertIn("| certificate | returned proof | sourceless | engine/* |", merged)
-            self.assertIn("| proof token | certificate | use the project term |  |  | sourceless |", merged)
+            self.assertNotIn("| Term |", merged)
+            self.assertNotIn("| Avoid |", merged)
+            glossary = (root / "GLOSSARY.md").read_text()
+            self.assertIn("**certificate**:\nreturned proof\n_Avoid_: proof token\nSource: sourceless\nScope: engine/*", glossary)
             self.assertIn("repository role: analysis", merged)
             self.assertFalse((root / "CONTEXT.md").exists())
             self.assertFalse((root / "docs/scientific/formulation.tex").exists())
@@ -349,6 +348,103 @@ class ManagedProtocolTests(unittest.TestCase):
             self.assertTrue((root / "docs/scientific/README.md").is_file())
             self.assertFalse((root / ".codex/hooks.json").exists())
             self.assertFalse((root / ".claude/settings.json").exists())
+
+    def test_reconciliation_migrates_context_tables_to_root_glossary(self):
+        root = self.repo
+        scientific = root / "docs/scientific"
+        scientific.mkdir(parents=True)
+        (scientific / "CONTEXT.md").write_text(
+            f"# Scientific context\n\nrepository role: analysis\n\n## Agent role\n\nagent role: {ROLE}\n\n{DUTIES}\n\n"
+            "## Question\n\nCooling rate.\n\n## Owners\n\nRetain the investigator.\n\n"
+            "## Source/data adoption\n\nsource/data adoption: zotero\n\n"
+            "## Glossary\n\n| Term | Meaning | Source | Scope |\n|---|---|---|---|\n"
+            "| certificate | returned proof | paper §2 | engine/* |\n\n"
+            "## Avoid\n\n| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |\n"
+            "|---|---|---|---|---|---|\n| proof token | certificate | returned proof | engine/* | | paper §2 |\n"
+        )
+        (root / "CONTEXT.md").write_text(
+            "# Old vocabulary\n\n| Term | Meaning | Scope |\n|---|---|---|\n"
+            "| certificate | duplicate definition | engine/* |\n| flux | transported heat | analyses/* |\n\n"
+            "## Owners\n\nRetain the source owner.\n"
+        )
+        (root / "notes").mkdir()
+        (root / "notes/CONTEXT.md").write_text(
+            "# Nested vocabulary\n\n## Avoid\n\n| Avoid | Prefer | Meaning |\n|---|---|---|\n"
+            "| heat rate | flux | transported heat |\n\n## Question\n\nRetain the nested question.\n"
+        )
+        (root / "caller.md").write_text("See notes/CONTEXT.md.\n")
+        before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+        preview = run("--repo", str(root), "--reconcile", "--role", "analysis", cwd=root)
+        self.assertEqual(0, preview.returncode, preview.stderr)
+        self.assertIn("GLOSSARY.md", preview.stdout)
+        self.assertEqual(before, {path: path.read_bytes() for path in root.rglob("*") if path.is_file()})
+        applied = self.approve("--agent-role", ROLE)
+        self.assertEqual(0, applied.returncode, applied.stderr)
+        glossary = (root / "GLOSSARY.md").read_text()
+        self.assertTrue(glossary.startswith("# "))
+        self.assertIn("\n## Language\n", glossary)
+        self.assertIn("**certificate**:\nreturned proof\n_Avoid_: proof token\nSource: paper §2\nScope: engine/*", glossary)
+        self.assertIn("**flux**:\ntransported heat\n_Avoid_: heat rate\nSource: sourceless\nScope: analyses/*", glossary)
+        self.assertEqual(1, glossary.count("**certificate**:"))
+        context = self.context()
+        self.assertNotIn("## Glossary", context)
+        self.assertNotIn("## Avoid", context)
+        self.assertNotIn("| Term |", context)
+        self.assertIn("[GLOSSARY.md](../../GLOSSARY.md)", context)
+        self.assertIn("Cooling rate.", context)
+        self.assertIn("Retain the investigator.", context)
+        self.assertEqual(1, context.count("agent role:"))
+        self.assertIn(f"agent role: {ROLE}", context)
+        self.assertIn(DUTIES, context)
+        self.assertIn("source/data adoption: zotero", context)
+        self.assertIn("Retain the source owner.", context)
+        self.assertIn("Retain the nested question.", context)
+        self.assertFalse((root / "CONTEXT.md").exists())
+        self.assertFalse((root / "notes/CONTEXT.md").exists())
+        self.assertEqual("See docs/scientific/CONTEXT.md.\n", (root / "caller.md").read_text())
+
+    def test_reconciliation_preserves_existing_glossary_and_adds_only_missing_terms(self):
+        root = self.repo
+        original = "# Heat transfer\n\n## Language\n\n**Flux**:\nExisting definition.\n_Avoid_: heat flow\nSource: paper §1\nScope: engine/*\n\n\n"
+        (root / "GLOSSARY.md").write_text(original)
+        (root / "CONTEXT.md").write_text(
+            "# Old vocabulary\n\n| Term | Meaning | Source | Scope |\n|---|---|---|---|\n"
+            "| flux | replacement must not win | paper §2 | other/* |\n"
+            "| gradient | spatial derivative | paper §3 | engine/* |\n"
+            "| gradient | duplicate | paper §3 | engine/* |\n"
+        )
+        plan = setup.plan_reconciliation(root, "analysis")
+        self.assertEqual(original, (root / "GLOSSARY.md").read_text())
+        setup.apply_reconciliation(root, plan, "analysis", ROLE)
+        glossary = (root / "GLOSSARY.md").read_text()
+        self.assertTrue(glossary.startswith(original))
+        self.assertNotIn("replacement must not win", glossary)
+        self.assertEqual(1, glossary.count("**gradient**:"))
+        self.assertIn("Source: paper §3", glossary)
+        repeat = setup.plan_reconciliation(root, "analysis")
+        setup.apply_reconciliation(root, repeat, "analysis", ROLE)
+        self.assertEqual(glossary, (root / "GLOSSARY.md").read_text())
+        self.assertFalse((root / "GLOSSARY-MAP.md").exists())
+
+    def test_reconciliation_reads_every_mapped_glossary_without_creating_a_map(self):
+        root = self.repo
+        mapping = "# Glossary Map\n\n## Contexts\n\n- [Engine](./src/engine/GLOSSARY.md): calculations\n- [Study](./analyses/GLOSSARY.md): evidence\n"
+        (root / "GLOSSARY-MAP.md").write_text(mapping)
+        for directory, term in (("src/engine", "certificate"), ("analyses", "flux")):
+            path = root / directory / "GLOSSARY.md"
+            path.parent.mkdir(parents=True)
+            path.write_text(f"# Scientific vocabulary\n\n## Language\n\n**{term}**:\nA project quantity.\n_Avoid_: old name\nSource: sourceless\n")
+        before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
+        plan = setup.plan_reconciliation(root, "analysis")
+        self.assertEqual({"src/engine/GLOSSARY.md", "analyses/GLOSSARY.md"}, set(plan.get("glossaries", [])))
+        self.assertIn("certificate", plan["sourceless_terms"])
+        self.assertIn("flux", plan["sourceless_terms"])
+        setup.apply_reconciliation(root, plan, "analysis", ROLE)
+        self.assertEqual(before, {path: path.read_bytes() for path in before})
+        self.assertFalse((root / "GLOSSARY.md").exists())
+        (root / "GLOSSARY-MAP.md").unlink()
+        setup.apply_reconciliation(root, setup.plan_reconciliation(root, "analysis"), "analysis", ROLE)
+        self.assertFalse((root / "GLOSSARY-MAP.md").exists())
 
     def test_reconciliation_moves_nested_latex_document_trees_together(self):
         root = self.repo
@@ -454,7 +550,9 @@ class ManagedProtocolTests(unittest.TestCase):
         scientific.mkdir(parents=True)
         (scientific / "README.md").write_text("# Scientific project records\n", encoding="utf-8")
         (scientific / "CONTEXT.md").write_text(
-            "# Scientific context\n\nrepository role: analysis\n\n## Question and intended use\n\nCooling rate.\n",
+            "# Scientific context\n\nrepository role: analysis\n\n"
+            "Project vocabulary: [GLOSSARY.md](../../GLOSSARY.md).\n\n"
+            "## Question and intended use\n\nCooling rate.\n",
             encoding="utf-8",
         )
 
