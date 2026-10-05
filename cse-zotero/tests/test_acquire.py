@@ -5,6 +5,7 @@ from pathlib import Path
 import pytest
 
 from zotero_companion import acquire as mod
+from zotero_companion.acquire import request as http_request
 from zotero_companion.plugin_client import PluginClientError
 
 
@@ -37,6 +38,8 @@ def runtime(monkeypatch, tmp_path):
             return json.dumps({'message': {'member': current['member']}}).encode()
         if 'unpaywall' in url:
             return b'{"oa_locations":[]}'
+        if 'idconv' in url:
+            return b'{"records":[]}'
         return b'%PDF-1.7 test'
     current = {'doi': '', 'member': '', 'has_pdf': True}
     monkeypatch.setattr(mod, 'ZoteroLocalAPI', API)
@@ -126,6 +129,78 @@ def test_oa_pdf_stops_further_requests(runtime, monkeypatch):
     monkeypatch.setattr(mod, 'request', request)
     result = mod.acquire(current['doi'])
     assert result['ok'] and result['verified'] and result['route'] == 'unpaywall'
+
+
+@pytest.mark.parametrize('source', ['location', 'landing', 'converter', 'outside-oa'])
+def test_pmc_cloud_selects_declared_main_pdf_and_preserves_cooldowns(runtime, monkeypatch, source):
+    import base64
+    import io
+    from urllib.parse import parse_qs, urlsplit
+    current, calls, root = runtime
+    current.update(doi='10.1371/test', member=340, has_pdf=False)
+    monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda self, **kwargs: [
+        {'key': 'EXISTING', 'data': {'itemType': 'journalArticle', 'DOI': current['doi']}}])
+    clock = [1000000.0]
+    monkeypatch.setattr(mod.time, 'time', lambda: clock[0])
+    monkeypatch.setattr(mod.time, 'sleep', lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    cooldowns = {} if source == 'outside-oa' else {'crossref-340': {'cooldown_until': clock[0] + 86400}}
+    if source != 'converter':
+        cooldowns['pmc.ncbi.nlm.nih.gov'] = {'cooldown_until': clock[0] + 86400}
+    (root / 'state.json').write_text(json.dumps(cooldowns))
+    main = b'%PDF-1.7 main article'
+    location = {'host_type': 'repository', 'url_for_pdf': 'https://pmc.ncbi.nlm.nih.gov/articles/PMC123/pdf/paper.pdf'}
+    if source == 'landing':
+        location = {'host_type': 'repository', 'url_for_landing_page': 'https://www.ncbi.nlm.nih.gov/pmc/articles/123/'}
+    urls, times = [], []
+    class Opener:
+        def open(self, request, **kwargs):
+            url = request.full_url
+            urls.append(url)
+            times.append(clock[0])
+            assert 'cse-zotero' in request.get_header('User-agent') and mod.EMAIL in request.get_header('User-agent')
+            if 'crossref.org' in url:
+                body = json.dumps({'message': {'member': 340}}).encode()
+            elif 'unpaywall.org' in url:
+                locations = [] if source == 'converter' else [location]
+                if source == 'outside-oa':
+                    locations.append({'url_for_pdf': 'https://repository.example/alternative.pdf'})
+                body = json.dumps({'oa_locations': locations}).encode()
+            elif 'idconv' in url:
+                params = parse_qs(urlsplit(url).query)
+                assert params['ids'] == [current['doi']] and params['tool'] == ['cse-zotero'] and params['email'] == [mod.EMAIL]
+                body = json.dumps({'records': [{'doi': current['doi'], 'pmcid': 'PMC123'}]}).encode()
+            elif 'list-type=2' in url:
+                assert parse_qs(urlsplit(url).query)['prefix'] == ['metadata/PMC123.']
+                body = b'<ListBucketResult xmlns="http://s3.amazonaws.com/doc/2006-03-01/"><IsTruncated>false</IsTruncated><Contents><Key>metadata/PMC123.2.json</Key></Contents></ListBucketResult>'
+            elif url.endswith('.json'):
+                body = json.dumps({'pmcid': 'PMC123', 'doi': current['doi'], 'is_pmc_openaccess': source != 'outside-oa',
+                                   'pdf_url': 's3://pmc-oa-opendata/PMC123.2/article.pdf?md5=abc',
+                                   'media_urls': ['s3://pmc-oa-opendata/PMC123.2/supplement.pdf']}).encode()
+            else:
+                assert url in {mod.PMC_CLOUD + '/PMC123.2/article.pdf?md5=abc', 'https://repository.example/alternative.pdf'}
+                body = main
+            response = io.BytesIO(body)
+            response.code, response.headers = 200, {}
+            response.geturl = lambda: url
+            return response
+    monkeypatch.setattr(mod, 'request', http_request)
+    monkeypatch.setattr(mod, 'build_opener', lambda *args: Opener())
+    original_plugin = mod.ZoteroPluginClient._request
+    def attach(self, path, **kwargs):
+        assert path.endswith('attachment') and kwargs['payload']['item_key'] == 'EXISTING'
+        assert base64.b64decode(kwargs['payload']['pdf_base64']) == main
+        return original_plugin(self, path, **kwargs)
+    monkeypatch.setattr(mod.ZoteroPluginClient, '_request', attach)
+    result = mod.acquire(current['doi'])
+    assert result['ok'] and result['verified'] and result['attachment_key'] == 'PDFKEY'
+    assert result['route'] == ('unpaywall' if source == 'outside-oa' else 'pmc-cloud')
+    assert all(b - a >= 1 for a, b in zip(times, times[1:]))
+    state = json.loads((root / 'state.json').read_text())
+    assert all(state[host]['cooldown_until'] == entry['cooldown_until'] for host, entry in cooldowns.items())
+    assert not any('/pdf/' in url or 'supplement.pdf' in url for url in urls)
+    with mod.Safety() as safety:
+        with pytest.raises(mod.AcquireStop, match='official PMC Cloud'):
+            safety.check_url(location.get('url_for_pdf') or 'https://pmc.ncbi.nlm.nih.gov/articles/PMC123/pdf/paper.pdf')
 
 
 @pytest.mark.parametrize('has_pdf', [True, False])

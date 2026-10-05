@@ -51,6 +51,8 @@ attachments, then tries:
    `citation_pdf_url` and fetching it in page context with credentials.
 4. Human handoff with the exact DOI or official article URL.
 
+PMC OA locations use NCBI's [official PMC Cloud dataset](https://pmc.ncbi.nlm.nih.gov/tools/pmcaws/) and its metadata-declared main PDF via Unpaywall's PMCID or the [ID Converter](https://pmc.ncbi.nlm.nih.gov/tools/id-converter-api/) fallback (`tool=cse-zotero`, maintainer email), preserving cooldowns, sequential one-request-per-second pacing, and the 50 MiB limit; PMC web PDF links and the legacy OA Web Service/compressed packages (retired August 2026) are never fetched.
+
 The first successful route wins. Hard stops end the acquisition immediately;
 they never trigger another route. Parent metadata may remain if a PDF route
 fails; output reports its key and the handoff URL. A PDF must begin with `%PDF`

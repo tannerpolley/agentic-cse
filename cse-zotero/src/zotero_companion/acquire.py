@@ -12,7 +12,9 @@ import time
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, unquote, urljoin, urlsplit
+from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener
+from xml.etree import ElementTree as ET
 
 from .local_api import ZoteroLocalAPI
 from .plugin_client import ZoteroPluginClient
@@ -23,6 +25,8 @@ STATE = Path.home() / ".local/state/cse-zotero/acquire.json"
 CONFIG = Path.home() / ".config/zotero-companion"
 TOKENS = ("elsevier-api-key", "elsevier-insttoken", "wiley-tdm-token")
 RESTRICTED = {"elsevier", "wiley", "acs"}
+PMC_CLOUD_HOST = "pmc-oa-opendata.s3.amazonaws.com"
+PMC_CLOUD = "https://" + PMC_CLOUD_HOST
 
 
 class AcquireStop(RuntimeError):
@@ -168,6 +172,8 @@ class Safety:
 
     def check_url(self, url, *, api=False):
         host = checked_url(url)
+        if host in {"pmc.ncbi.nlm.nih.gov", "www.ncbi.nlm.nih.gov", "ncbi.nlm.nih.gov"} and re.search(r"/pdf(?:/|$)", urlsplit(url).path, re.I):
+            raise AcquireStop("PMC web PDF links require the official PMC Cloud route")
         blocked = restricted_host(host)
         if blocked and not api:
             raise AcquireStop(f"{blocked} publisher sites are API-only")
@@ -219,10 +225,12 @@ class NoRedirect(HTTPRedirectHandler):
         return None
 
 
-def request(url, *, safety=None, pub="", route="oa", headers=None, is_pdf=False):
+def request(url, *, safety=None, pub="", route="oa", headers=None, is_pdf=False, allowed_hosts=None):
     opener = build_opener(NoRedirect())
     for _ in range(8):
         host = checked_url(url)
+        if allowed_hosts and host not in allowed_hosts:
+            raise AcquireStop("Official service redirect outside its allowed host refused")
         public = host in {"api.crossref.org", "api.unpaywall.org"}
         if safety:
             safety.before(pub or host, url, route, api=route == "api", public=public)
@@ -236,6 +244,8 @@ def request(url, *, safety=None, pub="", route="oa", headers=None, is_pdf=False)
             raise AcquireStop("Remote request failed; no retry") from None
         with response:
             final_host = checked_url(response.geturl())
+            if allowed_hosts and final_host not in allowed_hosts:
+                raise AcquireStop("Official service redirect outside its allowed host refused")
             if public and final_host not in {"api.crossref.org", "api.unpaywall.org"}:
                 raise AcquireStop("Metadata service redirected outside its API; refused")
             if safety:
@@ -263,6 +273,59 @@ def request(url, *, safety=None, pub="", route="oa", headers=None, is_pdf=False)
                 safety.response(pub, status, body, is_pdf=True, host=final_host)
             return body
     raise AcquireStop("Redirect limit exceeded; no retry")
+
+
+def pmc_id(location):
+    for field in ("url_for_pdf", "url_for_landing_page", "url"):
+        parsed = urlsplit(location.get(field) or "")
+        if canonical_host(parsed.hostname or "") in {"pmc.ncbi.nlm.nih.gov", "www.ncbi.nlm.nih.gov", "ncbi.nlm.nih.gov"}:
+            match = re.search(r"/(?:pmc/)?articles/(?:PMC)?(\d+)(?:/|$)", parsed.path, re.I)
+            if match:
+                return "PMC" + match[1]
+    match = re.fullmatch(r"oai:pubmedcentral.nih.gov:(\d+)", location.get("pmh_id") or "")
+    return "PMC" + match[1] if match else None
+
+
+def pmc_pdf(pmcid, doi, safety):
+    if not pmcid:
+        url = "https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/?" + urlencode(
+            {"ids": doi, "idtype": "doi", "format": "json", "tool": "cse-zotero", "email": EMAIL})
+        raw = request(url, safety=safety, pub="ncbi-pmc", allowed_hosts={"pmc.ncbi.nlm.nih.gov"})
+        records = json.loads(raw).get("records", []) if raw else []
+        pmcid = next((r.get("pmcid") for r in records if r.get("doi", "").lower() == doi), None)
+    if not pmcid or not re.fullmatch(r"PMC\d+", pmcid):
+        return None
+    url = PMC_CLOUD + "/?" + urlencode({"list-type": 2, "prefix": "metadata/" + pmcid + ".", "max-keys": 20})
+    raw = request(url, safety=safety, pub="ncbi-pmc", allowed_hosts={PMC_CLOUD_HOST})
+    if not raw:
+        return None
+    try:
+        listing = ET.fromstring(raw)
+    except ET.ParseError:
+        raise AcquireStop("Invalid PMC Cloud listing; no retry") from None
+    if listing.findtext("{*}IsTruncated") == "true":
+        raise AcquireStop("PMC article has more than 20 versions; automatic retrieval refused")
+    records = []
+    for node in listing.findall("{*}Contents/{*}Key"):
+        if not re.fullmatch(r"metadata/" + pmcid + r"\.\d+\.json", node.text or ""):
+            continue
+        raw = request(PMC_CLOUD + "/" + node.text, safety=safety, pub="ncbi-pmc", allowed_hosts={PMC_CLOUD_HOST})
+        if raw:
+            records.append(json.loads(raw))
+    # Prefer the published article; version numbers do not imply publication order.
+    for record in sorted(records, key=lambda r: bool(r.get("is_manuscript"))):
+        if record.get("pmcid") != pmcid or record.get("doi", "").lower() != doi or not record.get("is_pmc_openaccess"):
+            continue
+        url = record.get("pdf_url")
+        if not url:
+            continue
+        url = url.replace("s3://pmc-oa-opendata/", PMC_CLOUD + "/", 1)
+        if checked_url(url) != PMC_CLOUD_HOST or not re.match("/" + pmcid + r"\.\d+/", urlsplit(url).path):
+            raise AcquireStop("PMC declared PDF is outside the official article prefix")
+        body = request(url, safety=safety, pub="ncbi-pmc", is_pdf=True, allowed_hosts={PMC_CLOUD_HOST})
+        if body:
+            return body
+    return None
 
 
 def identifier(value):
@@ -326,11 +389,10 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
             result["publisher"] = pub
             if route == "browser" and pub in RESTRICTED:
                 raise AcquireStop(f"{pub} is API-only; browser route refused")
-            safety.available(pub)
             if existing:
                 metadata = {"metadata": api.get(f"/api/users/0/items/{existing}")["data"]}
             else:
-                safety.before(pub, None, "api", public=True)  # Reserve the native metadata operation's slot.
+                safety.before("metadata", None, "api", public=True)  # Reserve the native metadata operation's slot.
                 metadata = plugin._request("/zotero-companion/acquire-metadata", method="POST",
                                            payload={"identifier": ident, "collection": collection, "mode": "dry-run" if dry_run else "apply"})
                 if not dry_run:
@@ -350,7 +412,6 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     target = native["url"].replace("http://", "https://", 1)
                     checked_url(target)
                     result["handoff_url"] = target
-                safety.available(pub)
                 if route == "browser" and pub in RESTRICTED:
                     raise AcquireStop(f"{pub} is API-only; browser route refused")
             if dry_run:
@@ -362,9 +423,20 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                 oa = json.loads(raw) if raw else {}
                 locations = [oa.get("best_oa_location")] + oa.get("oa_locations", [])
                 seen = set()
+                tried_pmc = False
                 for location in locations:
                     location = location or {}
                     if pub in RESTRICTED and location.get("host_type") != "repository":
+                        continue
+                    pmcid = pmc_id(location)
+                    if pmcid:
+                        if pmcid not in seen:
+                            seen.add(pmcid)
+                            tried_pmc = True
+                            body = pmc_pdf(pmcid, doi, safety)
+                            if body:
+                                result["route"] = "pmc-cloud"
+                                break
                         continue
                     url = location.get("url_for_pdf")
                     if not url or url in seen or restricted_host(checked_url(url)):
@@ -374,6 +446,10 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     if body:
                         result["route"] = "unpaywall"
                         break
+                if not body and not tried_pmc:
+                    body = pmc_pdf(None, doi, safety)
+                    if body:
+                        result["route"] = "pmc-cloud"
             if not body and route == "auto" and pub in {"elsevier", "wiley"}:
                 name = "elsevier-api-key" if pub == "elsevier" else "wiley-tdm-token"
                 credential = token(name)
