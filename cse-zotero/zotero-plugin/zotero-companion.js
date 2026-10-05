@@ -15,6 +15,7 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     ACQUIRE_METADATA_PATH, ACQUIRE_ATTACHMENT_PATH];
   const SYNC_DELAY_MS = 3000;
   let observerID = null;
+  let metadataInFlight = false;
   let lastSync = null;
 
   function response(status, payload) {
@@ -520,7 +521,10 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
       init(request) {
         const data = requestData(request);
         if (data === null) return response(400, { error: "invalid_json" });
-        return acquireMetadata(data).catch(() => endpointError("metadata_acquisition_failed"));
+        if (metadataInFlight) return response(409, { error: "metadata_acquisition_busy" });
+        metadataInFlight = true;
+        return acquireMetadata(data).catch(() => endpointError("metadata_acquisition_failed"))
+          .finally(() => { metadataInFlight = false; });
       }
     };
     zotero.Server.Endpoints[ACQUIRE_ATTACHMENT_PATH] = class {

@@ -81,8 +81,13 @@ def publisher(doi="", member=""):
     return f"crossref-{member}" if member else prefix or "unknown"
 
 
+def canonical_host(host):
+    return host.rstrip(".").encode("idna").decode("ascii").lower().rstrip(".")
+
+
 def restricted_host(host):
-    for name, domains in {"elsevier": ("elsevier.com", "sciencedirect.com", "cell.com"),
+    host = canonical_host(host)
+    for name, domains in {"elsevier": ("elsevier.com", "sciencedirect.com", "sciencedirectassets.com", "cell.com", "thelancet.com"),
                           "wiley": ("wiley.com", "wiley-vch.de"),
                           "acs": ("acs.org", "acs.figshare.com")}.items():
         if any(host == d or host.endswith("." + d) for d in domains):
@@ -94,13 +99,13 @@ def checked_url(url):
     parsed = urlsplit(url)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
         raise AcquireStop("Remote URL must use HTTPS without embedded credentials")
-    return parsed.hostname.lower()
+    return canonical_host(parsed.hostname)
 
 
 def challenge(text):
     text = text.lower()
     return next((s for s in ("just a moment", "captcha", "cf-chl-", "unusual activity", "access denied",
-                            "verify you are human", "sign in to access", "log in to access", "login required")
+                            "verify you are human", "pow_challenge", "sign in to access", "log in to access", "login required")
                  if s in text), None)
 
 
@@ -146,31 +151,36 @@ class Safety:
         temp.replace(self.path)
 
     def available(self, pub):
-        entry = self.data.get(pub, {})
+        entry = self.data.get(canonical_host(pub), {})
         remaining = entry.get("cooldown_until", 0) - time.time()
         if remaining > 0:
             raise AcquireStop(f"{pub} cooldown active for {int(remaining)} seconds")
 
-    def stop(self, pub, reason, *, cooldown=False):
-        entry = self.data.setdefault(pub, {})
-        entry["stop_reason"] = reason
-        entry["stopped_at"] = time.time()
-        if cooldown:
-            entry["cooldown_until"] = time.time() + 86400
+    def stop(self, pub, reason, *, cooldown=False, host=""):
+        now = time.time()
+        for key in {canonical_host(pub), canonical_host(host)} - {""}:
+            entry = self.data.setdefault(key, {})
+            entry.update(stop_reason=reason, stopped_at=now)
+            if cooldown:
+                entry["cooldown_until"] = now + 86400
         self.save()
         raise AcquireStop(reason)
 
-    def before(self, pub, url, route, *, api=False, public=False):
-        host = checked_url(url) if url else ""
-        self.available(pub)
-        self.available(host)
-        if not public:
-            require_vpn()
+    def check_url(self, url, *, api=False):
+        host = checked_url(url)
         blocked = restricted_host(host)
         if blocked and not api:
             raise AcquireStop(f"{blocked} publisher sites are API-only")
         if api and host not in {"api.elsevier.com", "api.wiley.com"}:
             raise AcquireStop("Publisher API redirect outside official API host refused")
+        self.available(host)
+        return host
+
+    def before(self, pub, url, route, *, api=False, public=False):
+        host = self.check_url(url, api=api) if url else ""
+        self.available(pub)
+        if not public:
+            require_vpn()
         entry = self.data.setdefault(pub, {})
         now = time.time()
         if route == "browser":
@@ -194,14 +204,14 @@ class Safety:
             self.data["last_api"] = time.time()
         self.save()
 
-    def response(self, pub, status, body=b"", *, is_pdf=False):
+    def response(self, pub, status, body=b"", *, is_pdf=False, host=""):
         reason = None if body.startswith(b"%PDF") else challenge(body[:200000].decode("utf-8", "replace"))
         if reason:
-            self.stop(pub, f"Publisher access challenge: {reason} (HTTP {status})", cooldown=True)
+            self.stop(pub, f"Publisher access challenge: {reason} (HTTP {status})", cooldown=True, host=host)
         if status in {401, 403, 429}:
-            self.stop(pub, f"Publisher HTTP {status}; no retry", cooldown=status == 429)
+            self.stop(pub, f"Publisher HTTP {status}; no retry", cooldown=status == 429, host=host)
         if is_pdf and not body.startswith(b"%PDF"):
-            self.stop(pub, "Non-PDF bytes where a PDF was expected")
+            self.stop(pub, "Non-PDF bytes where a PDF was expected", host=host)
 
 
 class NoRedirect(HTTPRedirectHandler):
@@ -225,10 +235,15 @@ def request(url, *, safety=None, pub="", route="oa", headers=None, is_pdf=False)
         except (URLError, TimeoutError):
             raise AcquireStop("Remote request failed; no retry") from None
         with response:
+            final_host = checked_url(response.geturl())
+            if public and final_host not in {"api.crossref.org", "api.unpaywall.org"}:
+                raise AcquireStop("Metadata service redirected outside its API; refused")
+            if safety:
+                safety.check_url(response.geturl(), api=route == "api")
             status = response.code
             body = response.read(50 * 1024 * 1024 + 1)
             if not public:
-                safety.response(pub, status, body)
+                safety.response(pub, status, body, host=final_host)
             if status in {301, 302, 303, 307, 308}:
                 target = urljoin(url, response.headers.get("Location", ""))
                 if public and checked_url(target) not in {"api.crossref.org", "api.unpaywall.org"}:
@@ -245,7 +260,7 @@ def request(url, *, safety=None, pub="", route="oa", headers=None, is_pdf=False)
             if len(body) > 50 * 1024 * 1024:
                 raise AcquireStop("PDF exceeds 50 MiB limit")
             if is_pdf:
-                safety.response(pub, status, body, is_pdf=True)
+                safety.response(pub, status, body, is_pdf=True, host=final_host)
             return body
     raise AcquireStop("Redirect limit exceeded; no retry")
 
@@ -254,12 +269,12 @@ def identifier(value):
     value = value.strip()
     if value.startswith(("http://", "https://")):
         parsed = urlsplit(value)
-        checked_url(value.replace("http://", "https://", 1))
+        host = checked_url(value.replace("http://", "https://", 1))
         candidates = parse_qs(parsed.query)
         candidate = next((v for key in ("doi", "id") for v in candidates.get(key, [])
                           if re.match(r"10\.\d{4,9}/", v, re.I)), None)
         path = unquote(parsed.path)
-        if parsed.hostname not in {"doi.org", "dx.doi.org"}:
+        if host not in {"doi.org", "dx.doi.org"}:
             path = re.sub(r"/(?:full|pdf|epdf|abstract)/?$", "", path, flags=re.I)
         match = re.search(r"10\.\d{4,9}/[^\s?#]+", candidate or path, re.I)
     else:
@@ -277,6 +292,15 @@ def duplicate(items, doi=""):
     return None
 
 
+def use_existing_parent(api, result, key):
+    result["item_key"] = key
+    children = api.get(f"/api/users/0/items/{key}/children")
+    pdf = next((i["key"] for i in children if i["data"].get("contentType") == "application/pdf"), None)
+    if pdf:
+        result.update(ok=True, attachment_key=pdf, route="existing", verified=True, handoff_url=None)
+    return bool(pdf)
+
+
 def acquire(value, *, collection=None, dry_run=False, route="auto"):
     result = {"ok": False, "item_key": None, "attachment_key": None, "route": None, "stop_reason": None,
               "handoff_url": None}
@@ -292,8 +316,8 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
             if doi:
                 result["handoff_url"] = "https://doi.org/" + doi
             existing = duplicate(api.items(top_level=True), doi)
-            if existing:
-                return {**result, "ok": True, "item_key": existing, "route": "existing"}
+            if existing and use_existing_parent(api, result, existing):
+                return result
             crossref = {}
             if doi:
                 raw = request("https://api.crossref.org/works/" + quote(doi, safe=""), safety=safety)
@@ -303,11 +327,16 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
             if route == "browser" and pub in RESTRICTED:
                 raise AcquireStop(f"{pub} is API-only; browser route refused")
             safety.available(pub)
-            safety.before(pub, None, "api", public=True)  # Reserve the native metadata operation's slot.
-            metadata = plugin._request("/zotero-companion/acquire-metadata", method="POST",
-                                       payload={"identifier": ident, "collection": collection, "mode": "dry-run" if dry_run else "apply"})
-            if not dry_run:
-                result.update(item_key=metadata.get("item_key"), collection_key=metadata.get("collection_key"))
+            if existing:
+                metadata = {"metadata": api.get(f"/api/users/0/items/{existing}")["data"]}
+            else:
+                safety.before(pub, None, "api", public=True)  # Reserve the native metadata operation's slot.
+                metadata = plugin._request("/zotero-companion/acquire-metadata", method="POST",
+                                           payload={"identifier": ident, "collection": collection, "mode": "dry-run" if dry_run else "apply"})
+                if not dry_run:
+                    result.update(item_key=metadata.get("item_key"), collection_key=metadata.get("collection_key"))
+                if metadata.get("existing") and use_existing_parent(api, result, metadata["item_key"]):
+                    return result
             if not doi:
                 native = metadata.get("metadata", {})
                 doi = identifier(native.get("DOI", ""))
@@ -324,8 +353,6 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                 safety.available(pub)
                 if route == "browser" and pub in RESTRICTED:
                     raise AcquireStop(f"{pub} is API-only; browser route refused")
-            if metadata.get("existing"):
-                return {**result, "ok": True, "item_key": metadata["item_key"], "route": "existing"}
             if dry_run:
                 return {**result, "ok": True, "mode": "dry-run", "metadata": metadata,
                         "tokens": configured_tokens(), "planned_routes": ["oa", "api", "handoff"] if pub in RESTRICTED else ["oa", "browser", "handoff"]}

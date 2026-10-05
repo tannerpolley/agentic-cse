@@ -28,8 +28,9 @@ The dry run translates metadata, checks duplicates and the collection, and
 reports planned routes without creating a parent or downloading a PDF. The
 collection must already exist and be an unambiguous name or key in the personal
 library. Without it, use Zotero's selected collection; a selected group library
-is refused. A duplicate returns its existing key without moving or attaching
-anything. Deduplication checks DOI first, then normalized exact title.
+is refused. A duplicate with a PDF returns both keys without moving or attaching
+anything; one missing a PDF continues the permitted routes for its existing
+parent. Deduplication checks DOI first, then normalized exact title.
 
 DOIs embedded in article URLs and identifiers recognized by Zotero (DOI, ISBN,
 arXiv, PMID) use Zotero's search translators. DOI translation is pinned to
@@ -117,8 +118,8 @@ consume their recorded pacing slot. No parallel acquisition.
 Publisher and PDF requests stop without retry for HTTP 401, 403, or 429, CAPTCHA, Cloudflare/“Just a
 moment”, human-verification or unusual-activity pages, login walls, or
 non-PDF bytes where a PDF was expected. Record the reason. A publisher 429 or
-challenge adds a 24-hour publisher cooldown; acquisitions refuse that
-publisher until expiry. Do not solve, bypass, probe, replay, or retry
+challenge adds a 24-hour cooldown for both publisher and canonical responding
+host; acquisitions refuse either until expiry. Do not solve, bypass, probe, replay, or retry
 challenges, nor attempt another route after a hard stop. Do not remove safety
 state to evade cooldowns. The user can complete ordinary login or Connector
 saving manually.

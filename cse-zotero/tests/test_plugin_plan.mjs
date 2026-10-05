@@ -108,12 +108,14 @@ test("metadata acquisition previews without writes and applies one attachment-fr
   const collection = { id: 2, key: "COLL0001", name: "Papers", libraryID: 1 };
   const calls = [];
   const saved = [];
+  let pendingTranslation = null;
   class Search {
     setSearch(search) { this.search = search; }
     setIdentifier(identifier) { this.identifier = identifier; }
     setTranslator(id) { this.translatorID = id; }
     async translate(options) {
       calls.push({ search: this.search, identifier: this.identifier, translatorID: this.translatorID, options });
+      if (pendingTranslation) await pendingTranslation;
       return [{ toJSON: () => ({
         itemType: "journalArticle", title: "An Example Paper", DOI: "10.1234/example",
         attachments: [{ title: "publisher PDF" }]
@@ -180,6 +182,29 @@ test("metadata acquisition previews without writes and applies one attachment-fr
   const duplicate = await call({ identifier: "10.1234/example", mode: "apply" });
   assert.equal(duplicate.body.item_key, "EXISTING");
   assert.equal(duplicate.body.existing, true);
+  assert.equal(saved.length, 1);
+
+  let release;
+  pendingTranslation = new Promise(resolve => { release = resolve; });
+  const running = call({ identifier: "10.1234/example", mode: "apply" });
+  const count = calls.length;
+  const busy = await call({ identifier: "10.1234/example", mode: "apply" });
+  assert.equal(busy.status, 409);
+  assert.equal(busy.body.error, "metadata_acquisition_busy");
+  assert.equal(calls.length, count);
+  release();
+  assert.equal((await running).status, 200);
+  pendingTranslation = null;
+  assert.equal((await call({ identifier: "10.1234/example" })).status, 200);
+
+  let reject;
+  pendingTranslation = new Promise((_resolve, fail) => { reject = fail; });
+  const failing = call({ identifier: "10.1234/example" });
+  assert.equal((await call({ identifier: "10.1234/example" })).status, 409);
+  reject(new Error("native translation failure"));
+  assert.equal((await failing).status, 500);
+  pendingTranslation = null;
+  assert.equal((await call({ identifier: "10.1234/example" })).status, 200);
   assert.equal(saved.length, 1);
 });
 
