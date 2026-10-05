@@ -1,0 +1,296 @@
+"""Acquisition regressions: route boundaries, hard stops and persistent limits."""
+import json
+from pathlib import Path
+
+import pytest
+
+from zotero_companion import acquire as mod
+
+
+@pytest.fixture
+def runtime(monkeypatch, tmp_path):
+    real_safety = mod.Safety
+    monkeypatch.setattr(mod, "Safety", lambda: real_safety(tmp_path / 'state.json'))
+    monkeypatch.setattr(mod, "require_vpn", lambda: None)
+    monkeypatch.setattr(mod, "CONFIG", tmp_path)
+    calls = []
+    class API:
+        def items(self, **kwargs):
+            return []
+        def get(self, path):
+            if path.endswith('children'):
+                return [{'key': 'PDFKEY', 'data': {'contentType': 'application/pdf'}}]
+            return {'data': {'DOI': current['doi']}}
+    class Plugin:
+        def __init__(self, **kwargs):
+            pass
+        def _request(self, path, **kwargs):
+            calls.append((path, kwargs['payload']['mode']))
+            if path.endswith('metadata'):
+                return {'metadata': {'title': 'Regression paper', 'DOI': current['doi']}, 'item_key': 'PARENT', 'collection_key': 'COLL'}
+            return {'attachment_key': 'PDFKEY'}
+    def request(url, **kwargs):
+        calls.append((url, kwargs.get('route')))
+        if 'crossref' in url:
+            return json.dumps({'message': {'member': current['member']}}).encode()
+        if 'unpaywall' in url:
+            return b'{"oa_locations":[]}'
+        return b'%PDF-1.7 test'
+    current = {'doi': '', 'member': ''}
+    monkeypatch.setattr(mod, 'ZoteroLocalAPI', API)
+    monkeypatch.setattr(mod, 'ZoteroPluginClient', Plugin)
+    monkeypatch.setattr(mod, 'request', request)
+    def forbidden(*args):
+        pytest.fail('Restricted publisher reached the browser')
+    monkeypatch.setattr('zotero_companion.agent_browser.browser_pdf', forbidden)
+    return current, calls, tmp_path
+
+
+@pytest.mark.parametrize('doi,member,name,tokenfile', [
+    ('10.1016/test', 78, 'elsevier', 'elsevier-api-key'),
+    ('10.1002/test', 311, 'wiley', 'wiley-tdm-token'),
+    ('10.1021/test', 316, 'acs', None),
+    ('10.5555/test', 78, 'elsevier', 'elsevier-api-key'),
+])
+def test_api_only_publishers_never_reach_browser(runtime, doi, member, name, tokenfile):
+    current, calls, root = runtime
+    current.update(doi=doi, member=member)
+    if tokenfile:
+        path = root / tokenfile
+        path.write_text('secret-test-token\n')
+        path.chmod(0o600)
+    result = mod.acquire(doi)
+    assert result['publisher'] == name
+    assert result['ok'] == bool(tokenfile)
+    assert result['route'] == (name + '-api' if tokenfile else None)
+    assert result['attachment_key'] == ('PDFKEY' if tokenfile else None)
+    forced = mod.acquire(doi, route='browser')
+    assert not forced['ok'] and 'API-only' in forced['stop_reason']
+    assert all('secret-test-token' not in str(call) for call in calls)
+
+
+def test_429_and_challenge_stop_and_survive_restart(tmp_path):
+    path = tmp_path / 'state.json'
+    for status, body in [(429, b''), (200, b'<title>Just a moment...</title>')]:
+        with mod.Safety(path) as state:
+            with pytest.raises(mod.AcquireStop):
+                state.response('elsevier', status, body)
+        with mod.Safety(path) as state:
+            with pytest.raises(mod.AcquireStop, match='cooldown'):
+                state.available('elsevier')
+    with mod.Safety(path) as state:
+        with pytest.raises(mod.AcquireStop, match='Non-PDF'):
+            state.response('other', 200, b'<html>not a pdf</html>', is_pdf=True)
+    assert json.loads(path.read_text())['other']['stop_reason'].startswith('Non-PDF')
+
+
+def test_pacing_daily_cap_and_lock_persist(monkeypatch, tmp_path):
+    monkeypatch.setattr(mod, 'require_vpn', lambda: None)
+    clock = [1000000.0]
+    monkeypatch.setattr(mod.time, 'time', lambda: clock[0])
+    monkeypatch.setattr(mod.time, 'sleep', lambda seconds: clock.__setitem__(0, clock[0] + seconds))
+    path = tmp_path / 'state.json'
+    with mod.Safety(path) as state:
+        state.before('plos', 'https://journals.plos.org/article', 'browser')
+        with pytest.raises(mod.AcquireStop, match='Another acquisition'):
+            with mod.Safety(path):
+                pass
+    with mod.Safety(path) as state:
+        state.before('plos', 'https://journals.plos.org/pdf', 'browser')
+        assert clock[0] == 1000060
+        state.data['plos']['count'] = 25
+        state.save()
+    with mod.Safety(path) as state:
+        with pytest.raises(mod.AcquireStop, match='daily'):
+            state.before('plos', 'https://journals.plos.org/another', 'browser')
+        state.before('wiley', 'https://api.wiley.com/article', 'api', api=True)
+        state.before('wiley', 'https://api.wiley.com/article', 'api', api=True)
+        assert clock[0] == 1000070
+        with pytest.raises(mod.AcquireStop, match='API-only'):
+            state.before('elsevier', 'https://www.sciencedirect.com/pdf', 'oa')
+
+
+def test_oa_pdf_and_duplicate_stop_further_requests(runtime, monkeypatch):
+    current, calls, root = runtime
+    current.update(doi='10.1371/test', member=340)
+    original = mod.request
+    def request(url, **kwargs):
+        if 'unpaywall' in url:
+            return b'{"best_oa_location":{"url_for_pdf":"https://repository.example/paper.pdf"},"oa_locations":[]}'
+        return original(url, **kwargs)
+    monkeypatch.setattr(mod, 'request', request)
+    result = mod.acquire(current['doi'])
+    assert result['ok'] and result['verified'] and result['route'] == 'unpaywall'
+    calls.clear()
+    monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda self, **kwargs: [
+        {'key': 'EXISTING', 'data': {'itemType': 'journalArticle', 'DOI': current['doi']}}])
+    result = mod.acquire(current['doi'])
+    assert result['item_key'] == 'EXISTING' and result['route'] == 'existing'
+    assert not calls
+
+
+@pytest.mark.parametrize('status,body', [(429, b''), (403, b''), (403, b'<html>CAPTCHA</html>'), (200, b'<html>CAPTCHA</html>'), (200, b'not a PDF')])
+def test_api_hard_stop_cannot_fall_through(runtime, monkeypatch, status, body):
+    current, calls, root = runtime
+    current.update(doi='10.1016/test', member=78)
+    path = root / 'elsevier-api-key'
+    path.write_text('secret-test-token')
+    path.chmod(0o600)
+    original = mod.request
+    def response(url, **kwargs):
+        if 'api.elsevier' in url:
+            kwargs['safety'].response('elsevier', status, body, is_pdf=True)
+        return original(url, **kwargs)
+    monkeypatch.setattr(mod, 'request', response)
+    result = mod.acquire(current['doi'])
+    assert not result['ok'] and result['item_key'] == 'PARENT' and not result['attachment_key']
+    assert not any(path.endswith('attachment') for path, _ in calls)
+    state = json.loads((root / 'state.json').read_text())
+    assert bool(state['elsevier'].get('cooldown_until')) == (status == 429 or b'CAPTCHA' in body)
+
+
+@pytest.mark.parametrize("value,doi", [
+    ("https://onlinelibrary.wiley.com/doi/10.1002/test/full", "10.1002/test"),
+    ("https://onlinelibrary.wiley.com/doi/pdf/10.1002/test", "10.1002/test"),
+    ("https://journals.plos.org/article?id=10.1371/test&tracking=1", "10.1371/test"),
+    ("https://doi.org/10.5555/test/full", "10.5555/test/full"),
+    ("10.5555/test/full", "10.5555/test/full"),
+])
+def test_article_url_doi_boundary(value, doi):
+    assert mod.identifier(value) == doi
+
+
+@pytest.mark.parametrize("url,doi,member", [
+    ("https://www.sciencedirect.com/science/article/doi/10.1016/test", "10.1016/test", 78),
+    ("https://onlinelibrary.wiley.com/doi/10.1002/test/full", "10.1002/test", 311),
+    ("https://pubs.acs.org/doi/10.1021/test", "10.1021/test", 316),
+])
+def test_restricted_article_url_uses_only_identifier_translation(runtime, monkeypatch, url, doi, member):
+    current, calls, _ = runtime
+    current.update(doi=doi, member=member)
+    original = mod.ZoteroPluginClient._request
+    def translated(self, path, **kwargs):
+        if path.endswith("metadata"):
+            assert kwargs["payload"]["identifier"] == doi
+        return original(self, path, **kwargs)
+    monkeypatch.setattr(mod.ZoteroPluginClient, "_request", translated)
+    result = mod.acquire(url)
+    assert result["item_key"] == "PARENT" and result["doi"] == doi
+    assert not any(path == url for path, _ in calls)
+
+
+def test_input_credentials_never_reach_json_or_network(runtime):
+    _, calls, _ = runtime
+    result = mod.acquire("https://user:private-password@example.org/article")
+    assert not result["ok"] and result["handoff_url"] is None
+    assert "private-password" not in json.dumps(result)
+    assert not calls
+
+
+@pytest.mark.parametrize("doi,member", [("10.1016/test", 78), ("10.1002/test", 311), ("10.1021/test", 316)])
+def test_restricted_oa_requires_explicit_repository(runtime, monkeypatch, doi, member):
+    current, calls, root = runtime
+    current.update(doi=doi, member=member)
+    original = mod.request
+    def response(url, **kwargs):
+        if "unpaywall" in url:
+            return json.dumps({"oa_locations": [
+                {"url_for_pdf": "https://alternate-publisher.example/paper.pdf", "host_type": "publisher"},
+                {"url_for_pdf": "https://unverified.example/paper.pdf"},
+                {"url_for_pdf": "https://repository.example/paper.pdf", "host_type": "repository"},
+            ]}).encode()
+        return original(url, **kwargs)
+    monkeypatch.setattr(mod, "request", response)
+    result = mod.acquire(doi)
+    assert result["ok"] and result["route"] == "unpaywall"
+    fetched = [url for url, route in calls if route is None and url.startswith("https:")]
+    assert "https://repository.example/paper.pdf" in fetched
+    assert not any("alternate-publisher" in url or "unverified" in url for url in fetched)
+
+
+def test_native_identifier_discovered_doi_still_blocks_browser(runtime):
+    current, calls, _ = runtime
+    current.update(doi="10.1016/test", member=78)
+    result = mod.acquire("PMID:12345678", route="browser")
+    assert not result["ok"] and "API-only" in result["stop_reason"]
+    assert result["item_key"] == "PARENT" and result["doi"] == current["doi"]
+    assert not result["attachment_key"]
+
+
+def test_public_api_pacing_and_credential_redirect(monkeypatch, tmp_path):
+    import io
+    clock = [1000000.0]
+    monkeypatch.setattr(mod.time, "time", lambda: clock[0])
+    monkeypatch.setattr(mod.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0]+seconds))
+    urls = []
+    class Opener:
+        def open(self, request, **kwargs):
+            urls.append(request.full_url)
+            response = io.BytesIO(b"{}")
+            response.code = 302 if "elsevier" in request.full_url else 200
+            response.headers = {"Location": "https://other.example/file.pdf"}
+            return response
+    monkeypatch.setattr(mod, "build_opener", lambda *args: Opener())
+    def vpn():
+        pytest.fail("Public metadata request incorrectly requires the VPN")
+    monkeypatch.setattr(mod, "require_vpn", vpn)
+    with mod.Safety(tmp_path / "state.json") as safety:
+        mod.request("https://api.crossref.org/works/test", safety=safety)
+        mod.request("https://api.unpaywall.org/v2/test", safety=safety)
+        assert clock[0] == 1000001.0
+        monkeypatch.setattr(mod, "require_vpn", lambda: None)
+        with pytest.raises(mod.AcquireStop, match="credential redirect"):
+            mod.request("https://api.elsevier.com/content/article/doi/test", safety=safety,
+                        pub="elsevier", route="api", headers={"X-ELS-APIKey": "private-token"})
+    assert urls[-1].startswith("https://api.elsevier.com/") and len(urls) == 3
+
+
+@pytest.mark.parametrize("outcome", ["active", "activated", "failed", "not_active"])
+def test_vpn_activation_is_bounded_and_rechecked(monkeypatch, outcome):
+    from types import SimpleNamespace
+    commands = []
+    def run(command, **kwargs):
+        commands.append((command, kwargs["timeout"]))
+        if "up" in command:
+            if outcome == "failed":
+                raise mod.subprocess.TimeoutExpired(command, kwargs["timeout"])
+            return SimpleNamespace(stdout="")
+        up_done = any("up" in cmd for cmd, _ in commands)
+        return SimpleNamespace(stdout="CAEDM IKEv2 VPN\n" if outcome == "active" or (up_done and outcome == "activated") else "")
+    monkeypatch.setattr(mod.subprocess, "run", run)
+    if outcome in {"failed", "not_active"}:
+        with pytest.raises(mod.AcquireStop):
+            mod.require_vpn()
+    else:
+        mod.require_vpn()
+    assert len(commands) == (1 if outcome == "active" else 2 if outcome == "failed" else 3)
+    assert all(timeout in {5, 30} for _, timeout in commands)
+    assert not any("down" in cmd or "modify" in cmd for cmd, _ in commands)
+
+
+
+def test_non_doi_parent_identity_is_verified(runtime, monkeypatch):
+    monkeypatch.setattr("zotero_companion.agent_browser.browser_pdf", lambda *args: b"%PDF-1.7")
+    original = mod.ZoteroPluginClient._request
+    def metadata(self, path, **kwargs):
+        result = original(self, path, **kwargs)
+        if path.endswith("metadata"):
+            result["metadata"]["url"] = "https://arxiv.org/abs/1234.5678"
+        return result
+    monkeypatch.setattr(mod.ZoteroPluginClient, "_request", metadata)
+    result = mod.acquire("arXiv:1234.5678")
+    assert not result["ok"] and "parent title" in result["stop_reason"]
+    assert result["attachment_key"] == "PDFKEY"
+
+
+
+def test_native_metadata_operation_reserves_api_slot(runtime, monkeypatch):
+    _, _, path = runtime
+    clock = [1000000.0]
+    monkeypatch.setattr(mod.time, "time", lambda: clock[0])
+    monkeypatch.setattr(mod.time, "sleep", lambda seconds: clock.__setitem__(0, clock[0]+seconds))
+    result = mod.acquire("arXiv:1234.5678", dry_run=True)
+    assert result["ok"]
+    assert json.loads((path / "state.json").read_text())["last_api"] == clock[0]
+    result = mod.acquire("PMID:12345678", dry_run=True)
+    assert result["ok"] and clock[0] == 1000001.0

@@ -127,11 +127,18 @@ print, commit, or copy Mathpix authentication tokens.
 
 ## Paper acquisition and publisher access
 
-Before external literature discovery, publisher access, remote paper
-acquisition, or a Zotero Connector save, read `ZOTERO_ACQUISITION.md`. It owns
-the local-first search, optional Undermind handoff, VPN gate, native approvals,
-user-operated Connector flow, verification, and publisher hard stops. The
-canonical `zotero` skill is the CSE adapter when it is installed.
+Before external discovery, publisher access, or remote acquisition, read
+`ZOTERO_ACQUISITION.md`; it owns route eligibility and publisher/browser
+boundaries. When the user specifically requests one paper by DOI or article
+URL, use the bounded acquire command:
+
+    uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
+
+The user’s specific request authorizes this route without a per-save approval.
+Keep preview and explicit approval for every other Zotero write, including
+metadata corrections, collection changes, bibliography refreshes, and Mathpix
+companion attachments. The installed `zotero` skill is the CSE adapter to the
+contract.
 
 ## Maintenance
 
