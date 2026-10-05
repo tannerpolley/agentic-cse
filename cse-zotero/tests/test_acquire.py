@@ -435,3 +435,20 @@ def test_native_metadata_operation_reserves_api_slot(runtime, monkeypatch):
     assert json.loads((path / "state.json").read_text())["last_api"] == clock[0]
     result = mod.acquire("PMID:12345678", dry_run=True)
     assert result["ok"] and clock[0] == 1000001.0
+
+
+def test_cooled_free_copy_source_is_skipped_not_fatal(runtime, monkeypatch):
+    # Regression: a PMC cooldown left by an earlier paper halted an Elsevier acquisition before its API route.
+    current, calls, root = runtime
+    current.update(doi='10.1016/test', member=78, has_pdf=False)
+    path = root / 'elsevier-api-key'
+    path.write_text('secret-test-token')
+    path.chmod(0o600)
+    original = mod.request
+    def cooled_pmc(url, **kwargs):
+        if 'idconv' in url:
+            raise mod.Cooldown('pmc.ncbi.nlm.nih.gov cooldown active for 100 seconds')
+        return original(url, **kwargs)
+    monkeypatch.setattr(mod, 'request', cooled_pmc)
+    result = mod.acquire(current['doi'])
+    assert result['ok'] and result['route'] == 'elsevier-api' and result['attachment_key'] == 'PDFKEY'

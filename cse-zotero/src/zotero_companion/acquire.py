@@ -33,6 +33,10 @@ class AcquireStop(RuntimeError):
     pass
 
 
+class Cooldown(AcquireStop):
+    """An earlier stop still cools this host; optional free-copy sources skip it."""
+
+
 def token(name):
     path = CONFIG / name
     if not path.exists():
@@ -158,7 +162,7 @@ class Safety:
         entry = self.data.get(canonical_host(pub), {})
         remaining = entry.get("cooldown_until", 0) - time.time()
         if remaining > 0:
-            raise AcquireStop(f"{pub} cooldown active for {int(remaining)} seconds")
+            raise Cooldown(f"{pub} cooldown active for {int(remaining)} seconds")
 
     def stop(self, pub, reason, *, cooldown=False, host=""):
         now = time.time()
@@ -284,6 +288,13 @@ def pmc_id(location):
                 return "PMC" + match[1]
     match = re.fullmatch(r"oai:pubmedcentral.nih.gov:(\d+)", location.get("pmh_id") or "")
     return "PMC" + match[1] if match else None
+
+
+def optional(fetch, *args, **kwargs):
+    try:
+        return fetch(*args, **kwargs)
+    except Cooldown:
+        return None
 
 
 def pmc_pdf(pmcid, doi, safety):
@@ -433,7 +444,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                         if pmcid not in seen:
                             seen.add(pmcid)
                             tried_pmc = True
-                            body = pmc_pdf(pmcid, doi, safety)
+                            body = optional(pmc_pdf, pmcid, doi, safety)
                             if body:
                                 result["route"] = "pmc-cloud"
                                 break
@@ -442,12 +453,12 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     if not url or url in seen or restricted_host(checked_url(url)):
                         continue
                     seen.add(url)
-                    body = request(url, safety=safety, pub=pub, is_pdf=True)
+                    body = optional(request, url, safety=safety, pub=pub, is_pdf=True)
                     if body:
                         result["route"] = "unpaywall"
                         break
                 if not body and not tried_pmc:
-                    body = pmc_pdf(None, doi, safety)
+                    body = optional(pmc_pdf, None, doi, safety)
                     if body:
                         result["route"] = "pmc-cloud"
             if not body and route == "auto" and pub in {"elsevier", "wiley"}:
