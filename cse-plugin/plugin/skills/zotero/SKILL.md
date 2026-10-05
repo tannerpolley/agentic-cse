@@ -1,6 +1,6 @@
 ---
 name: zotero
-description: "Find, acquire, inspect, and cite sources in Zotero through Zotero Companion, previewing and approving every library write. Use when asked to \"add this paper to Zotero\", \"cite this\", \"sync the bibliography\", or search the library. Judging which source applies goes to research."
+description: "Find and inspect Zotero sources. Use when asked to add one specified paper, cite, sync the bibliography, or search the library. Specific-paper requests use bounded acquisition; other library writes require preview and approval. Source selection goes to research."
 metadata:
   cse-kind: "tool"
   cse-family: "sources"
@@ -27,9 +27,34 @@ attachment keys plus exact locators. A project's registered Zotero collection is
 reading list; reorganize it only through a previewed, approved `project-organize` plan. Treat metadata and generated summaries as
 discovery aids, not claim support.
 
-Preview every library, collection, attachment, metadata, or bibliography
-mutation and use native approval immediately before the write, including after
-a blanket correction or deletion request. For missing papers, give exact DOI
-or official URLs for the investigator to open and save; do not automate
-publisher pages or guess PDF URLs. Return keys, locators, authority, and
-limitations to the invoking stage.
+Run `cse-zotero doctor --json` first and inspect operation readiness and
+`acquisition.tokens` for the configured token names and status. Never expose
+token values.
+
+When the user requests one specific paper and supplies its DOI or article URL,
+use the bounded acquisition route:
+
+```bash
+cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
+```
+
+That explicit request authorizes this `acquire` route without a separate
+per-save approval. Use these browser controls only as needed by the documented
+route:
+
+```bash
+cse-zotero agent-browser status --json
+cse-zotero agent-browser start --json
+cse-zotero agent-browser stop --json
+```
+
+Do not broaden acquisition into a paper search or collection task. Follow the
+canonical
+[Zotero acquisition rules](https://github.com/agentic-cse/cse-zotero/blob/main/ZOTERO_ACQUISITION.md)
+for route eligibility and publisher/browser boundaries.
+
+For corrections, collection changes, bibliography refreshes, Mathpix
+conversions, and companion attachments, preview each mutation and use native
+approval immediately before applying it, including after a blanket correction
+or deletion request. Return keys, locators, authority, and limitations to the
+invoking stage.
