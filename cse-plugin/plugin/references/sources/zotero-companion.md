@@ -83,9 +83,32 @@ fields and columns. Neither establishes scientific acceptance.
 
 ## Writes, acquisition, and bibliography
 
-Preview every Zotero, Mathpix, or bibliography write and use the native approval gate immediately before applying it. Zotero corrections, companion attachments, and paper acquisition are separate operations.
+Run `doctor --json` before operating and inspect operation readiness and
+`acquisition.tokens` without exposing token values. When the user
+requests one specific paper by DOI or article URL, use the bounded route:
 
-For a missing paper, provide a bounded set of exact DOI or official article URLs. The user opens and saves each source through the normal browser and Zotero Connector. Never automate publisher pages, bypass controls, guess PDF URLs, or claim success without live verification.
+```bash
+cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
+```
+
+The user's explicit request authorizes this `acquire` route without another
+per-save approval. Use these browser controls as needed:
+
+```bash
+cse-zotero agent-browser status --json
+cse-zotero agent-browser start --json
+cse-zotero agent-browser stop --json
+```
+
+The canonical
+[Zotero acquisition rules](https://github.com/agentic-cse/cse-zotero/blob/main/ZOTERO_ACQUISITION.md)
+owns route eligibility and publisher/browser boundaries; do not duplicate its
+safety rules here.
+
+Other writes still require a reviewed preview and native approval immediately
+before applying them. This includes Zotero corrections, collection changes,
+bibliography refreshes, Mathpix conversions, and companion attachments. Treat
+paper acquisition as its own operation, separate from those writes.
 
 The canonical full-library Better BibTeX export is reported by `doctor` and refreshed by `bibliography-export --apply`. Companion enforces omission of `file` fields. Project snapshots contain only cited records, flow one way from that export, and are never hand-edited. Do not update bibliography consumers until the new export has been verified.
 
