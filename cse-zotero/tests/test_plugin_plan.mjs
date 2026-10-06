@@ -380,6 +380,8 @@ async function agentJobFixture(response, title = "Paper", navigation = null) {
           pageHeaders(403);
           if (navigation.kind === "interactive") await Zotero.OffscreenManager.sendMessage("Translate.setDocument",
             ['<label><input type="checkbox">Verify you are human</label>', tab.url], tab, 0);
+          headersReceived({ tabId: tab.id, url: tab.url + "/favicon.ico", type: "image", statusCode: 403,
+            responseHeaders: [{ name: "cf-mitigated", value: "challenge" }] });
         }
       }, get: async () => {
         if (navigation?.clearsAfter && !cleared && clock - navigationStarted >= navigation.clearsAfter) {

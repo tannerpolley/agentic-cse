@@ -1,7 +1,7 @@
 /* Agent jobs only. The official Connector's toolbar and ordinary tabs are unchanged. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
-  const MODULE_REVISION = 3;
+  const MODULE_REVISION = 4;
   const KEY = "cseAgentJob", RULE = 900000000;
   let active = null, busy = false;
   const retiredTabs = new Set(), retiredSessions = new Set();
@@ -184,6 +184,10 @@
       if (d.type === "main_frame") {
         active.status = d.statusCode;
         pageCheck(d.url, d.statusCode, "", d.responseHeaders || []);
+      } else if (active.check && (d.responseHeaders || []).some(h =>
+        (h.name.toLowerCase() === "cf-mitigated" && h.value === "challenge") ||
+        (h.name.toLowerCase() === "x-amzn-waf-action" && ["challenge", "captcha"].includes(h.value)))) {
+        pageCheck(active.check.url, d.statusCode, "", d.responseHeaders);
       } else check(d.url, d.statusCode, "", d.responseHeaders || []);
     } catch (_) {}
   }, { urls: ["<all_urls>"] }, ["responseHeaders"]);
