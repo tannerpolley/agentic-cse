@@ -343,7 +343,7 @@ async function nativeConnectorSources() {
 async function agentJobFixture(response, title = "Paper", navigation = null, bypass = null, extra = {}) {
   const { readFileSync } = await import("node:fs");
   const vm = await import("node:vm");
-  let finish, requests = 0, saves = 0, manual = 0;
+  let finish, requests = 0, saves = 0, manual = 0, heartbeat, reloads = 0;
   const windows = [], removedWindows = [], iframeCalls = [], monitorCalls = [], requestOptions = [];
   const messageListeners = new Set();
   let tabUpdated, headersReceived, beforeRequest, beforeRedirect, navigationStarted, cleared = false;
@@ -364,6 +364,10 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
     HTTP: { _requestFetch: async (_m, url, opts) => {
       requestOptions.push(opts);
       requests++;
+      if (extra.expected_revision && url.endsWith("/paper.pdf")) {
+        await heartbeat();
+        assert.equal(reloads, 0, "an active save must not reload the worker");
+      }
       const reply = Array.isArray(response) ? response[Math.min(requestOptions.length - 1, response.length - 1)] : response;
       headersReceived({ tabId: -1, initiator: "chrome-extension://official", url, type: "xmlhttprequest",
         statusCode: reply.status, responseHeaders: Object.entries(reply.headers || {}).map(([name, value]) => ({ name, value })) });
@@ -410,19 +414,20 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
   const pageHeaders = status => headersReceived({ tabId: tab.id, url: tab.url, type: "main_frame", statusCode: status,
     responseHeaders: status === 403 ? [{ name: "cf-mitigated", value: "challenge" }] : [] });
   const context = vm.createContext({ Zotero, Date: class extends Date { static now() { return clock; } },
-    setTimeout: (fn, ms) => setTimeout(() => { clock += ms; fn(); }, 0), setInterval() {}, URL, ArrayBuffer, Uint8Array, TextDecoder, AbortSignal,
+    setTimeout: (fn, ms) => setTimeout(() => { clock += ms; fn(); }, 0), setInterval: fn => { heartbeat = fn; }, URL, ArrayBuffer, Uint8Array, TextDecoder, AbortSignal,
     fetch: async (_url, opts) => {
       const call = JSON.parse(opts.body); calls.push(call);
       if (call.action === "finish" && call.id === "OLD") return { ok: false, status: 404 };
       if (call.action === "finish") finish(call.result);
-      const data = call.action === "pickup" && !claimed ? { job } : {};
+      const data = call.action === "pickup" ? (!claimed ? { job } : { expected_revision: extra.expected_revision }) : {};
       if (call.action === "pickup") claimed = true;
       return { ok: true, json: async () => data };
     },
-    chrome: { runtime: { id: "official", getPlatformInfo() {}, onStartup: events,
+    chrome: { runtime: { id: "official", getPlatformInfo() {}, reload: () => { reloads++; }, onStartup: events,
       onMessage: { addListener: fn => messageListeners.add(fn), removeListener: fn => messageListeners.delete(fn) } },
       // Chrome restarted: tab ID 99 now belongs to the user, not the old job.
-      storage: { local: storage({ cseAgentJob: { id: "OLD", tab: 99, window: 9, session_id: "OLDSESSION" } }), session: storage() },
+      storage: { local: storage({ cseAgentJob: { id: "OLD", tab: 99, window: 9, session_id: "OLDSESSION" },
+        cseAgentReloadRevision: extra.previous_reload || 0 }), session: storage() },
       windows: { create: async options => {
         if (options.state) { assert.equal(options.focused, false); assert.equal(options.state, "minimized"); }
         windows.push(options);
@@ -479,6 +484,13 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
   for (const name of ["public-url.js", "connector-agent.js"])
     vm.runInContext(readFileSync(new URL("../zotero-plugin/" + name, import.meta.url), "utf8"), context);
   const outcome = await result;
+  if (extra.expected_revision) {
+    await new Promise(resolve => setTimeout(resolve, 0)); // Let the native job finish freeing its slot.
+    await Promise.all([heartbeat(), heartbeat()]);
+    assert.equal(reloads, extra.previous_reload ? 0 : 1, "the older idle worker reloads once, even with concurrent heartbeats");
+    await heartbeat();
+    assert.equal(reloads, extra.previous_reload ? 0 : 1, "a persisting mismatch must not start a reload loop");
+  }
   assert.equal(Zotero.HTTP._requestFetch, originalHTTP);
   assert.equal(Zotero.COHTTP.request, originalCOHTTP);
   assert.ok(removedWindows.includes(10), "startup closes marked windows even without their checkpoint");
@@ -500,6 +512,12 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
   assert.equal(manual, 2, "ordinary clicks retain their original attachment and bypass paths");
   return { outcome, calls, requests: requests - 1, saves, elapsed: clock - navigationStarted, rules };
 }
+
+test("A newer build reloads the idle worker once, deferring throughout an active save", async () => {
+  for (const previous_reload of [0, 100]) await agentJobFixture(
+    { status: 200, response: new TextEncoder().encode("%PDF-1.7").buffer },
+    "Paper", null, null, { expected_revision: 100, previous_reload });
+});
 
 test("Response observations record job and extension background checks without policing native requests", async () => {
   for (const response of [
@@ -611,9 +629,11 @@ test("Navigation guards reject non-public redirects and cooled domains cover bac
 test("Plugin jobs require a heartbeat, are claimed once, and retain sessions across timeout", async () => {
   const { readFileSync } = await import("node:fs");
   const vm = await import("node:vm");
-  let now = 1000;
-  const Zotero = { Server: { Endpoints: {} }, Notifier: { registerObserver: () => 1 } };
-  const context = vm.createContext({ Zotero, Services: {}, Components: {}, URL, Date: class extends Date { static now() { return now; } } });
+  let now = 1000, expected = null;
+  const Zotero = { Server: { Endpoints: {} }, Notifier: { registerObserver: () => 1 },
+    File: { getContentsAsync: async path => { assert.ok(path.endsWith("/zotero-connector-agent/cse-agent-build.json")); return JSON.stringify({ module_revision: expected }); } } };
+  const context = vm.createContext({ Zotero, Services: { dirsvc: { get: () => ({ path: "/home/test" }) } },
+    Components: { interfaces: { nsIFile: {} } }, URL, Date: class extends Date { static now() { return now; } } });
   for (const name of ["cleanup-plan.js", "organize-plan.js", "public-url.js", "zotero-companion.js"])
     vm.runInContext(readFileSync(new URL("../zotero-plugin/" + name, import.meta.url), "utf8"), context);
   vm.runInContext("ZoteroCompanion.start()", context);
@@ -658,4 +678,13 @@ test("Plugin jobs require a heartbeat, are claimed once, and retain sessions acr
   assert.match(orphan.result.error, /without a checkpoint; no replay/);
   await call({ action: "pickup", protocol: 1, compatible: true });
   assert.equal((await call(submit)).status, 200, "expired claim frees the channel");
+  expected = 3;
+  assert.equal((await call({ action: "pickup", protocol: 1, compatible: true, module_revision: 2 })).job, null);
+  const mismatch = await call({ action: "status" });
+  assert.equal(mismatch.ready, false);
+  assert.equal(mismatch.expected_revision, 3);
+  assert.equal(mismatch.revision_mismatch, true);
+  assert.match(mismatch.error, /running 2, expected 3/);
+  assert.equal((await call({ action: "pickup", protocol: 1, compatible: true, module_revision: 3 })).job.id, "ONE");
+  assert.equal((await call({ action: "status" })).revision_mismatch, false);
 });

@@ -435,22 +435,31 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
       connectorJob.state = connectorJob.state === "running" && connectorJob.result.checkpoint ? "stopping" : "done";
       if (connectorJob.state === "done") connectorJob.result.error = "Connector claim expired without a checkpoint; no replay";
     }
-    const ready = connectorHeartbeat && connectorHeartbeat.compatible && now - connectorHeartbeat.at < 45000;
+    let expected_revision = null;
+    try {
+      const home = services.dirsvc.get("Home", Components.interfaces.nsIFile).path;
+      expected_revision = JSON.parse(await zotero.File.getContentsAsync(home + "/.local/share/cse/zotero/zotero-connector-agent/cse-agent-build.json")).module_revision;
+    } catch (_) {}
+    const revisionMismatch = Number.isInteger(expected_revision) && connectorHeartbeat && connectorHeartbeat.module_revision !== expected_revision;
+    const ready = connectorHeartbeat && connectorHeartbeat.compatible && now - connectorHeartbeat.at < 45000 && !revisionMismatch;
     if (data.action === "status") return response(200, {
       ready: Boolean(ready), version: connectorHeartbeat && connectorHeartbeat.version,
       supported_version: connectorHeartbeat && connectorHeartbeat.supported_version,
       module_revision: connectorHeartbeat && connectorHeartbeat.module_revision,
+      expected_revision, revision_mismatch: Boolean(revisionMismatch),
       heartbeat_at: connectorHeartbeat && connectorHeartbeat.at, job: connectorJob,
-      error: ready ? null : connectorHeartbeat && !connectorHeartbeat.compatible
+      error: revisionMismatch ? "Connector module revision mismatch: running " + connectorHeartbeat.module_revision + ", expected " + expected_revision
+        : ready ? null : connectorHeartbeat && !connectorHeartbeat.compatible
         ? "Connector version mismatch: " + connectorHeartbeat.version + "; rebuild for the supported version " + connectorHeartbeat.supported_version
         : "Load ~/.local/share/cse/zotero/zotero-connector-agent in chrome://extensions and disable the official Connector; see README setup"
     });
     if (data.action === "pickup") {
       connectorHeartbeat = { at: now, version: String(data.version || ""), supported_version: data.supported_version, module_revision: data.module_revision,
         compatible: data.protocol === 1 && data.compatible === true };
-      const job = connectorJob && connectorJob.state === "queued" && connectorHeartbeat.compatible ? connectorJob : null;
+      const job = connectorJob && connectorJob.state === "queued" && connectorHeartbeat.compatible &&
+        !(expected_revision > data.module_revision) ? connectorJob : null;
       if (job) { job.state = "running"; job.deadline = now + 180000; }
-      return response(200, { job, cancelled: Boolean(connectorJob && connectorJob.state === "stopping") });
+      return response(200, { job, expected_revision, cancelled: Boolean(connectorJob && connectorJob.state === "stopping") });
     }
     if (data.action === "submit") {
       if (!ready) return response(409, { error: "agent_connector_setup_required" });

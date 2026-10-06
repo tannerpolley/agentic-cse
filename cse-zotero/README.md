@@ -244,9 +244,10 @@ The copy removes the store manifest key and uses a separate unpacked extension
 ID, with the official permissions unchanged. Keep the official Connector off
 so only the agent copy handles saves. Doctor detects the copy by its heartbeat,
 not by extension ID. Your usual toolbar saves keep their native behavior. Re-run
-the build after an official Connector update, then use **Reload** on the unpacked
-extension; a version mismatch is reported instead of silently using unverified
-native APIs. The acquisition rules and job lifecycle are owned by
+the build after an official Connector update. The agent reloads itself while
+idle when a newer module revision is built, with one attempt per revision.
+Doctor reports a persisting revision mismatch; unsupported native Connector
+versions are refused by the build. The acquisition rules and job lifecycle are owned by
 [`ZOTERO_ACQUISITION.md`](ZOTERO_ACQUISITION.md).
 
 ## Stages

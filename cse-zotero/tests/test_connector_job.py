@@ -107,6 +107,8 @@ def test_connector_build_keeps_official_files_and_rejects_version_mismatch(tmp_p
     assert (output / 'itemSaver_background.js').read_text() == native
     assert (output / 'cse-agent-job.html').is_file()
     assert (output / 'public-url.js').is_file()
+    record = json.loads((output / 'cse-agent-build.json').read_text())
+    assert record['module_revision'] == int((output / 'connector-agent.js').read_text().split('MODULE_REVISION = ')[1].split(';')[0])
     (source / 'manifest.json').write_text('{"version":"5.0.218"}')
     with pytest.raises(ValueError, match='version mismatch'):
         build(source, output)

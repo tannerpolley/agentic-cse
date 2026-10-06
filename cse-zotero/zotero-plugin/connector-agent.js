@@ -1,7 +1,7 @@
 /* Agent jobs only. The official Connector's toolbar and ordinary tabs are unchanged. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
-  const MODULE_REVISION = 6;
+  const MODULE_REVISION = 7;
   const KEY = "cseAgentJob", RULE = 900000000;
   const RULES = [RULE, ...ZoteroCompanionURL.blocked.map((_, i) => RULE + i + 1)];
   const marker = Zotero.getExtensionURL("cse-agent-job.html") + "#";
@@ -246,6 +246,17 @@
     if (!busy) await recover();
     const response = await api("pickup", { protocol: 1, version: Zotero.version, supported_version: CONNECTOR_VERSION, module_revision: MODULE_REVISION,
       compatible: Zotero.version === CONNECTOR_VERSION });
+    if (!busy && !active && !response.job && response.expected_revision > MODULE_REVISION) {
+      busy = true;
+      try {
+        const key = "cseAgentReloadRevision", revision = response.expected_revision;
+        if (((await chrome.storage.local.get(key))[key] || 0) < revision) {
+          await chrome.storage.local.set({ [key]: revision });
+          chrome.runtime.reload();
+        }
+      } finally { busy = false; }
+      return;
+    }
     if (active && response.cancelled) { try { halt("Connector attempt cancelled; no retry", active.url); } catch (_) {} }
     if (response.job && !busy) {
       busy = true;

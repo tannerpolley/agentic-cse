@@ -199,6 +199,12 @@ The user loads this unpacked extension once in `chrome://extensions` and turns
 off the official Connector to avoid conflicting saves; see README setup.
 `doctor --json` detects the copy by heartbeat, without a fixed extension ID,
 and reports its active/version status and any mismatch.
+The build publishes its module revision in `cse-agent-build.json` after writing
+the extension files. The plugin reads that record for heartbeat and status
+responses (`expected_revision`). An older idle worker calls
+`chrome.runtime.reload()` once per newer revision, remembering the attempt in
+local extension storage; active paper jobs finish before it reloads.
+Doctor reports the running and expected revisions and any persisting mismatch.
 Acquisition can start everyday Chrome with `--no-startup-window`; it never
 stops the user's browser. A missing heartbeat stops with a setup message.
 There is no dedicated browser, remote debugging, hidden display, headless

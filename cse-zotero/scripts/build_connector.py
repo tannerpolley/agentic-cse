@@ -23,6 +23,7 @@ def build(source=None, output=OUTPUT):
         raise ValueError("Connector output must be separate from the official source")
     module = (Path(__file__).resolve().parents[1] / "zotero-plugin/connector-agent.js").read_bytes()
     supported = re.search(rb'CONNECTOR_VERSION = "([^"]+)"', module)[1].decode()
+    revision = int(re.search(rb'MODULE_REVISION = (\d+)', module)[1])
     manifest = json.loads((source / "manifest.json").read_text())
     version = manifest["version"]
     if version != supported:
@@ -39,7 +40,8 @@ def build(source=None, output=OUTPUT):
     (output / "cse-agent-job.html").write_text('<!doctype html><meta charset="utf-8"><title>Saving paper to Zotero</title>\n')
     with (output / "background-worker.js").open("ab") as worker:
         worker.write(b'\nimportScripts("public-url.js", "connector-agent.js");\n')
-    return {"version": version, "output": str(output), "modified": ["manifest.json", "background-worker.js"], "added": ["connector-agent.js", "public-url.js", "cse-agent-job.html"]}
+    (output / "cse-agent-build.json").write_text(json.dumps({"module_revision": revision}) + "\n")
+    return {"version": version, "module_revision": revision, "output": str(output), "modified": ["manifest.json", "background-worker.js"], "added": ["connector-agent.js", "public-url.js", "cse-agent-job.html", "cse-agent-build.json"]}
 
 
 if __name__ == "__main__":
