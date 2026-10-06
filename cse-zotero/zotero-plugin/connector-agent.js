@@ -1,7 +1,7 @@
 /* Agent jobs only. The official Connector's toolbar and ordinary tabs are unchanged. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
-  const MODULE_REVISION = 7;
+  const MODULE_REVISION = 8;
   const KEY = "cseAgentJob", RULE = 900000000;
   const RULES = [RULE, ...ZoteroCompanionURL.blocked.map((_, i) => RULE + i + 1)];
   const marker = Zotero.getExtensionURL("cse-agent-job.html") + "#";
