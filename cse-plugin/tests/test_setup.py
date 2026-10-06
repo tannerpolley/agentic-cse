@@ -468,7 +468,8 @@ class ManagedProtocolTests(unittest.TestCase):
         (scientific / "CONTEXT.md").write_text(
             "# Scientific context\n\nrepository role: analysis\n\n## Glossary\n\n"
             "| Term | Meaning | Source | Scope |\n|---|---|---|---|\n"
-            "| escaped | a \\| b | paper §2 | analyses/* |\n\n"
+            "| escaped | a \\| b | paper §2 | analyses/* |\n"
+            "| spectral | Source: power density of the source. | paper §6 | analyses/* |\n\n"
             "| Term | Meaning | Units |\n|---|---|---|\n| area | surface area | m² |\n\n"
             "## Avoid\n\n| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |\n|---|---|---|---|---|---|\n"
             "| heat flow | flux | Heat rate per area. | engine/* | | paper §1 |\n"
@@ -482,6 +483,7 @@ class ManagedProtocolTests(unittest.TestCase):
         self.assertIn("`docs/scientific/CONTEXT.md`: | length | distance | m | — not a Glossary or Avoid table", preview)
         self.assertIn("Units", preview)
         self.assertIn("heat token", preview)
+        self.assertIn("definition starts with a glossary metadata label", preview)
         setup.apply_reconciliation(root, plan, "analysis", ROLE)
         glossary = (root / "GLOSSARY.md").read_text()
         self.assertIn("**escaped**:\na | b\nSource: paper §2\nScope: `analyses/*`", glossary)
@@ -491,6 +493,8 @@ class ManagedProtocolTests(unittest.TestCase):
         self.assertNotIn("_Avoid_: \n", glossary)
         context = self.context()
         self.assertIn("| area | surface area | m² |", context)
+        self.assertIn("| spectral | Source: power density of the source. | paper §6 | analyses/* |", context)
+        self.assertNotIn("**spectral**", glossary)
         self.assertIn("| length | distance | m |", context)
         self.assertIn("```markdown\n## Glossary\n\n| Term | Meaning | Source |", context)
         self.assertNotIn("**sample**:", glossary)
@@ -538,6 +542,8 @@ class ManagedProtocolTests(unittest.TestCase):
             path.mkdir(parents=True)
             (path / "CONTEXT.md").write_text(old.replace("flux", f"{name} flux"))
             (path / "README.md").write_text("[terms](./CONTEXT.md)\n")
+        (root / "src/empty").mkdir()
+        (root / "src/empty/CONTEXT.md").write_text("# Empty\n\n## Language\n\n## Relationships\n\nKeep this.\n")
         (root / "caller.md").write_text("[terms](./CONTEXT.md) and [map](./CONTEXT-MAP.md).\n")
         before = {path: path.read_bytes() for path in root.rglob("*") if path.is_file()}
         for existing in (False, True):
@@ -550,6 +556,7 @@ class ManagedProtocolTests(unittest.TestCase):
             self.assertIn("Matt Pocock's skills 1.3 read `GLOSSARY.md`", preview)
             self.assertIn("git mv CONTEXT.md GLOSSARY.md", preview)
             self.assertIn("git mv src/heat/CONTEXT.md src/heat/GLOSSARY.md", preview)
+            self.assertIn("git mv src/empty/CONTEXT.md src/empty/GLOSSARY.md", preview)
             self.assertIn("git mv CONTEXT-MAP.md GLOSSARY-MAP.md", preview)
             self.assertEqual(before, {path: path.read_bytes() for path in before})
             setup.apply_reconciliation(root, plan, "analysis", ROLE)
@@ -575,6 +582,14 @@ class ManagedProtocolTests(unittest.TestCase):
         self.assertEqual(1, context.count("## Prose avoid rules"))
         self.assertIn("| first token | flux |", context)
         self.assertLess(context.index("| second token | flux |"), context.index("## Numerical limits"))
+        for name, ending in (("a", ""), ("b", "\n")):
+            (root / "notes" / name).mkdir(parents=True)
+            (root / "notes" / name / "CONTEXT.md").write_text(
+                "# Notes\n\n## Avoid\n\n| Avoid | Prefer | Meaning | Scope | Exceptions | Evidence |\n"
+                f"|---|---|---|---|---|---|\n| {name} token | flux | Heat rate. | notes/* | | paper §1 |{ending}")
+        setup.apply_reconciliation(root, setup.plan_reconciliation(root, "analysis"), "analysis", ROLE)
+        rows = [line for line in self.context().splitlines() if "| a token |" in line or "| b token |" in line]
+        self.assertEqual(2, len(rows), rows)
 
     def test_reconciliation_moves_nested_latex_document_trees_together(self):
         root = self.repo

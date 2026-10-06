@@ -253,6 +253,15 @@ class ScriptBehaviorTests(unittest.TestCase):
             outside = root / "report.md"
             outside.write_text("The flow is fixed.\n")
             self.assertEqual(0, self.run_script(checker, str(outside), cwd=root).returncode)
+            # A map link through `..` still scopes its glossary to the resolved directory.
+            with (root / "GLOSSARY-MAP.md").open("a") as stream:
+                stream.write("- [Analyses](./src/heat/../../analyses/GLOSSARY.md): analyses\n")
+            (root / "analyses").mkdir()
+            (root / "analyses/GLOSSARY.md").write_text("# Analyses\n\n## Language\n\n**analysis flux**:\nMeasured transfer.\n_Avoid_: stream\nSource: paper §5\n")
+            (root / "analyses/report.md").write_text("The stream is fixed.\n")
+            mapped = self.run_script(checker, str(root / "analyses/report.md"), cwd=root)
+            self.assertEqual(1, mapped.returncode, mapped.stdout + mapped.stderr)
+            self.assertIn("analysis flux", mapped.stdout)
             # Identical rules with overlapping scopes are not conflicting authorities.
             for name in ("heat", "mass"):
                 with (root / "src" / name / "GLOSSARY.md").open("a") as stream:

@@ -182,6 +182,7 @@ def read_glossaries(root: Path) -> list[dict]:
     root = root.resolve()
     entries = []
     for path in glossary_paths(root):
+        path = path.resolve()  # a map link may contain `..`; scopes are repository-relative
         default_scope = "*" if path.parent == root else f"{path.parent.relative_to(root).as_posix()}/*"
         entries.extend(glossary_entries(path.read_text(encoding="utf-8"), str(path), default_scope))
     return entries

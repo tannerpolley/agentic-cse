@@ -404,6 +404,9 @@ def migrate_glossary(repo: Path, contexts: list[Path]) -> dict:
                 if not term or not fields["meaning"]:
                     keep(path, row, "term or definition is empty")
                     continue
+                if fields["meaning"].startswith(METADATA_LABELS):
+                    keep(path, row, "definition starts with a glossary metadata label")
+                    continue
                 entry = {"term": term, "meaning": fields["meaning"], "source": fields.get("source") or "sourceless",
                          "scope": split_scope(fields.get("scope", "")), "avoid": []}
                 key = term.casefold()
@@ -564,6 +567,14 @@ def record_target(path: Path, repo: Path, document_roots: tuple[Path, ...] = ())
     return None
 
 
+METADATA_LABELS = ("Source:", "Scope:", "_Avoid_:")
+
+
+def matt_format(text: str) -> bool:
+    """Matt Pocock's domain glossary: a `## Language` section, even before its first term."""
+    return bool(re.search(r"^## Language\s*$", text, re.MULTILINE)) or bool(glossary_entries(text, ""))
+
+
 def plan_reconciliation(repo: Path, role: str | None = None,
                         source_data_adoption: str | None = None) -> dict:
     repo = repo.resolve()
@@ -577,8 +588,7 @@ def plan_reconciliation(repo: Path, role: str | None = None,
     target = repo / "docs/scientific/CONTEXT.md"
     matt_upgrades = {relative(path, repo): relative(path.with_name(path.name.replace("CONTEXT", "GLOSSARY")), repo)
                      for path in files if path.name == "CONTEXT-MAP.md" or
-                     (path.name == "CONTEXT.md" and path != target and
-                      glossary_entries(path.read_text(encoding="utf-8"), str(path)))}
+                     (path.name == "CONTEXT.md" and path != target and matt_format(path.read_text(encoding="utf-8")))}
     contexts = sorted(path for path in files if path.name == "CONTEXT.md" and relative(path, repo) not in matt_upgrades)
     document_roots = latex_document_roots(repo, files)
     all_context_text = "\n".join(path.read_text(encoding="utf-8", errors="replace") for path in contexts)
@@ -623,7 +633,7 @@ def plan_reconciliation(repo: Path, role: str | None = None,
     prose_tables = {}
     for item in migration["prose"]:
         header = item["table"]["raw_header"]
-        prose_tables[header] = prose_tables.get(header, "") + item["raw"]
+        prose_tables[header] = prose_tables.get(header, "") + item["raw"].rstrip("\n") + "\n"
     merged = insert_section(merged, "Prose avoid rules", "\n".join(header + rows for header, rows in prose_tables.items()))
     if source_data_adoption is not None and source_data_adoption != persisted_adoption:
         merged = set_source_data_adoption(merged, source_data_adoption)
