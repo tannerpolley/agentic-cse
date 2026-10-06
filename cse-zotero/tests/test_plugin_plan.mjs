@@ -249,7 +249,7 @@ test("manifest has the fields Zotero 10 requires to install an add-on", async ()
   for (const field of ["id", "update_url", "strict_max_version"]) assert.ok(zotero[field], field);
 });
 
-test("Connector finalization moves children to the existing parent and removes only its duplicate", async () => {
+test("Connector finalization restores the existing master after automatic duplicate merging", async () => {
   const { readFileSync } = await import("node:fs");
   const vm = await import("node:vm");
   for (const duplicate of [true, false]) {
@@ -257,15 +257,17 @@ test("Connector finalization moves children to the existing parent and removes o
     const erased = [];
     const collection = { id: 9, key: "TESTCOLL", name: "Test", libraryID: 1 };
     const parent = (id, key) => ({
-      id, key, libraryID: 1, isRegularItem: () => true,
+      id, key, libraryID: 1, deleted: false, collections: [], isRegularItem: () => true,
       getField: field => field === "DOI" ? "10.1016/test" : "Paper",
       toJSON: () => ({ title: "Paper", DOI: "10.1016/test" }),
       getAttachments: () => [...items.values()].filter(i => i.parentID === id).map(i => i.id),
-      getNotes: () => [], addToCollection: target => { assert.equal(target, 9); }, save: async () => {},
+      getNotes: () => [], addToCollection(target) { this.collections.push(target); }, save: async () => {},
       erase: async () => { erased.push(key); items.delete(id); }
     });
     const fresh = parent(2, "FRESH");
     const old = parent(1, "EXISTING");
+    // Zoplicate's configured "keep" action has merged the old item into the new one.
+    old.deleted = duplicate;
     items.set(2, fresh);
     if (duplicate) items.set(1, old);
     const pdf = { id: 3, key: "PDFKEY", parentID: 2, attachmentContentType: "application/pdf", isRegularItem: () => false, save: async () => {} };
@@ -276,7 +278,15 @@ test("Connector finalization moves children to the existing parent and removes o
       DB: { queryAsync: async () => [...items.values()].filter(i => i.isRegularItem()).map(i => ({ itemID: i.id, value: "Paper" })),
         executeTransaction: async fn => fn() },
       Items: { getAsync: async id => Array.isArray(id) ? id.map(i => items.get(i)) : items.get(id),
-        getByLibraryAndKey: (_, key) => [...items.values()].find(i => i.key === key) },
+        getByLibraryAndKey: (_, key) => [...items.values()].find(i => i.key === key),
+        merge: async (master, others) => {
+          assert.equal(master, old);
+          assert.deepEqual(Array.from(others), [fresh]);
+          for (const other of others) {
+            for (const id of other.getAttachments()) items.get(id).parentID = master.id;
+            other.deleted = true;
+          }
+        } },
       Server: { Endpoints: {}, Connector: { SessionManager: { get: id => id === "SESSION" && { _items: { fakeID: fresh } } } } },
       Notifier: { registerObserver: () => 1 }
     };
@@ -285,12 +295,14 @@ test("Connector finalization moves children to the existing parent and removes o
       vm.runInContext(readFileSync(new URL(`../zotero-plugin/${name}`, import.meta.url), "utf8"), context);
     vm.runInContext("ZoteroCompanion.start()", context);
     const Endpoint = Zotero.Server.Endpoints["/zotero-companion/acquire-connector"];
-    const [status, , raw] = await new Endpoint().init({ data: { mode: "apply", session_id: "SESSION", collection: "TESTCOLL", doi: "10.1016/test" } });
+    const [status, , raw] = await new Endpoint().init({ data: { mode: "apply", session_id: "SESSION", item_key: duplicate ? old.key : null, collection: "TESTCOLL", doi: "10.1016/test" } });
     assert.equal(status, 200, raw);
     const result = JSON.parse(raw);
     assert.equal(result.item_key, duplicate ? "EXISTING" : "FRESH");
     assert.equal(result.attachment_key, "PDFKEY");
     assert.equal(pdf.parentID, duplicate ? 1 : 2);
+    assert.equal((duplicate ? old : fresh).deleted, false, "the surviving parent must be active");
+    assert.ok((duplicate ? old : fresh).collections.includes(9));
     assert.deepEqual(erased, duplicate ? ["FRESH"] : []);
     assert.equal([...items.values()].filter(i => i.isRegularItem()).length, 1);
   }

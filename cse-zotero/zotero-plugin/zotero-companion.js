@@ -388,10 +388,12 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     if (data.mode === "dry-run") return response(200, {
       collection_key: target.collection && target.collection.key || null
     });
-    const session = zotero.Server.Connector.SessionManager.get(data.session_id);
+    const session = !data.restore && zotero.Server.Connector.SessionManager.get(data.session_id);
     const parents = session && Object.values(session._items).filter(item => item.isRegularItem());
-    if (!parents || parents.length !== 1) return response(422, { error: "connector_session_requires_one_parent" });
-    const fresh = parents[0];
+    if (!data.restore && (!parents || parents.length !== 1)) return response(422, { error: "connector_session_requires_one_parent" });
+    const fresh = data.restore === true
+      ? zotero.Items.getByLibraryAndKey(libraryID(), data.item_key) : parents[0];
+    if (!fresh || !fresh.isRegularItem()) return response(422, { error: "invalid_existing_parent" });
     if (fresh.libraryID !== libraryID()) return response(422, { error: "group_library_unsupported" });
     const doi = zotero.Utilities.cleanDOI(data.doi || "");
     if (doi && fresh.toJSON().itemType === "webpage" && data.metadata) fresh.fromJSON(metadataJSON(data.metadata));
@@ -403,16 +405,15 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     if (existing && (!existing.isRegularItem() || existing.libraryID !== libraryID())) return response(422, { error: "invalid_existing_parent" });
     const parent = existing && existing.id !== fresh.id ? existing : fresh;
     await zotero.DB.executeTransaction(async () => {
-      if (parent !== fresh) {
-        for (const id of [...fresh.getAttachments(), ...fresh.getNotes()]) {
-          const child = await zotero.Items.getAsync(id);
-          child.parentID = parent.id;
-          await child.save();
-        }
-        await fresh.erase();
-      }
+      // An automatic duplicate merger may have kept the new Connector item and
+      // trashed this parent. Undeleting also removes the inverse merge relation.
+      parent.deleted = false;
       if (target.collection) parent.addToCollection(target.collection.id);
       await parent.save();
+      if (parent !== fresh) {
+        await zotero.Items.merge(parent, [fresh]);
+        await fresh.erase();
+      }
     });
     const children = await zotero.Items.getAsync(parent.getAttachments());
     const pdf = children.find(item => item.attachmentContentType === "application/pdf");
