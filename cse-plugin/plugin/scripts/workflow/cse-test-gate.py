@@ -454,7 +454,7 @@ def main() -> int:
                     groups.setdefault(owner, []).append(path)
                 for owner, paths in groups.items():
                     root = owner / prefix
-                    failures += violations(paths, context=nearest_context(root, owner) or scientific_context, root=root)
+                    failures += violations(paths, root=root)
             except (OSError, UnicodeError, ValueError, HookError, subprocess.TimeoutExpired) as exc:
                 failures = []
                 warnings.append(f"CSE prose check unavailable (not a pass): {exc}. Restart after checking installation; do not recreate prior evidence.")

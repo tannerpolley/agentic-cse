@@ -8,7 +8,7 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model]
-    conditional: [scientific-projects, github-and-git]
+    conditional: [scientific-projects, github-and-git, skill-families]
 ---
 
 # Establish or revise repository setup
@@ -18,7 +18,9 @@ Read first: [operating-model](../../references/workflow/operating-model.md).
 Inspect repository guidance, existing scientific records, terminology, inputs,
 analyses, documents, Git state, and available commands. Activate
 [scientific-projects](../../references/workflow/scientific-projects.md) for record ownership or migration and [github-and-git](../../references/workflow/github-and-git.md)
-for issue and integration rules. For a GitHub repository, reconcile its
+for issue and integration rules. When CSE and engineering skills overlap, use
+[skill families](../../references/workflow/skill-families.md) to choose by subject.
+For a GitHub repository, reconcile its
 [milestones](../../references/workflow/github-and-git.md#milestones) on every
 run: read all milestones and open issues with `gh`, then preview the exact
 milestone renames and missing descriptions, issue title-prefix removals, and a
@@ -54,8 +56,29 @@ Align only the unresolved material subset. Inspect purpose and owners, recommend
 `--reconcile` produce a complete read-only move, merge, delete, and caller/link
 plan; add `--role analysis` or `--role tool` for a confirmed preview. They
 write nothing until the same plan is rerun with `--approve --role <role>`. Merge
-every root or nested `CONTEXT.md` into the one root `CONTEXT.md`, including
-its sourced glossary and avoid table, and mark missing sources as `sourceless`.
+scientific content from CSE-format stray `CONTEXT.md` files only when those
+files will be removed. Do not copy prose from files that stay in place.
+Only CSE-owned tables under `## Glossary` and `## Avoid` are migration candidates.
+Move a glossary row only when every column maps exactly to Matt's vocabulary format:
+term, definition, required `Source:`, and optional code-span `Scope:` paths.
+Mark missing sources `sourceless`; preserve existing definitions and sources.
+A plain synonym becomes `_Avoid_:` only when its scope matches the term and
+it has no exceptions or other information to lose. All other complete avoid
+rules move, with every column, into the existing `## Prose avoid rules` section
+in `docs/scientific/CONTEXT.md`, or create that section if absent. Keep unrelated
+tables, malformed rows, and conflicting definitions in place; preview each
+retained row and the reason.
+Never delete a file that still holds unmapped vocabulary.
+
+Matt owns `GLOSSARY.md`, `GLOSSARY-MAP.md`, and Matt-format `CONTEXT.md` and
+`CONTEXT-MAP.md` files. Never move, rename, or merge them. Detect pre-1.3 files
+and report Matt's upgrade step only: `git mv <path> <same dir>/GLOSSARY.md`
+(or `GLOSSARY-MAP.md`). Leave their contents, relationships, and links untouched;
+never treat them as CSE stray contexts or create a map.
+Keep caller rewriting as on main; do not add another path matcher.
+Read existing mapped glossaries; missing ones are lazy, not configuration errors.
+Without explicit scope, a mapped glossary applies in its own directory.
+The scientific context links to vocabulary and owns project prose rules.
 Literal caller rewrites miss code-built paths and fixed parent-directory climbs;
 check those manually after approved moves.
 The scientific context owns the question, intended use, owners, one

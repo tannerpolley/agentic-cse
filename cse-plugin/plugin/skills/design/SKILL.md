@@ -1,6 +1,6 @@
 ---
 name: design
-description: "Define and publish the bounded issue for scientific work: question, model, method, reference case, tolerance, falsifier, and claim limits. Use when acting as a design sub-agent, or planning a study, model change, or tool fix before implementation (\"plan this study\")."
+description: "Define and publish a scientific issue: question, model, method, reference case, tolerance, falsifier, and claim limits. Use when acting as a scientific design sub-agent, or planning a numerical study, model change, or scientific-tool correction (\"plan this study\")."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"

@@ -1,14 +1,41 @@
 # Scientific project records
 
-Use `docs/scientific/CONTEXT.md` as the short scientific map and
-repository-specific terminology authority. It owns one investigator-confirmed
-`repository role: analysis` or `repository role: tool`; Setup recommends a role
-from purpose and owners and confirms it on every run. Record confirmed personal
-preferences in `~/.config/cse/config.toml` only after preview and approval.
-Both terminology sources use Avoid, Prefer, Meaning, Scope, Exceptions, and
-Evidence. Scope values are repository-relative POSIX globs. When personal and
-repository rules overlap for the same avoided phrase, ask the user which owner
-to retain or how to split the scopes; never choose precedence silently.
+Use `docs/scientific/CONTEXT.md` as the short scientific map. It owns one
+investigator-confirmed `repository role: analysis` or `repository role: tool`;
+Setup recommends a role from purpose and owners and confirms it on every run.
+Project vocabulary belongs in root `GLOSSARY.md`, using Matt Pocock's format:
+
+```markdown
+# Heat transfer
+
+## Language
+
+**Heat flux**:
+Heat transfer rate per unit area.
+_Avoid_: heat flow density
+Source: project-approved paper, equation 2
+Scope: `analyses/*`; `src/heat/*`
+```
+
+CSE requires `Source:`; mark a missing source `sourceless` and report it for
+review. `Scope:` is optional. A root glossary without scope applies throughout
+the repository; a map-listed glossary defaults to its own directory. Explicit
+scopes are repository-relative POSIX globs in code spans, separated by semicolons.
+The avoid list uses commas; omit an empty list. A sourced term is allowed only
+within its scope. If root `GLOSSARY-MAP.md` exists, read every present glossary
+it links, as well as any root glossary. A missing mapped file is absent because
+Matt creates glossaries lazily. CSE never creates a map or needs Matt's skills.
+
+A synonym with its own scope, exceptions, or other writing information is not
+vocabulary. Keep it in `docs/scientific/CONTEXT.md` under `## Prose avoid rules`,
+with Avoid, Prefer, Meaning, Scope, Exceptions, and Evidence columns. Separate
+scopes and exception phrases with semicolons; preserve extra columns during
+migration. This table owns project writing rules, not definitions.
+
+Record confirmed personal preferences in `~/.config/cse/config.toml` only after
+preview and approval. When personal and repository rules overlap for the same
+avoided phrase, ask the user which owner to retain or how to split the scopes;
+never choose precedence silently.
 
 The personal file uses TOML array-of-tables entries:
 
@@ -22,17 +49,17 @@ Exceptions = ["MSContactor", "contact mechanics"]
 Evidence = "confirmed user correction and task locator"
 ```
 
-The repository context table uses the same six headings. Separate multiple
-scopes or exceptions with semicolons. Matching is case-insensitive and
-phrase-bounded. An exception suppresses only the matching occurrence inside
-that exact exception phrase. Every field except Exceptions is required. A
-malformed entry or overlapping authority is a configuration error with both
-source locators, not a silent fallback.
+The personal entries require all six fields; Exceptions may be empty.
+Matching is case-insensitive and phrase-bounded. An exception suppresses only
+the matching occurrence inside that exact exception phrase. Identical behavioral
+rules are not conflicts. Different rules for the same avoided phrase are a
+configuration error only where their scopes overlap; report both locators.
 
-Run the existing `scripts/workflow/check_prose.py` with `--config` and `--context`
-for the available authorities and the files being reviewed. The checker
-reports Avoid → Prefer with the rule locator; semantic review still decides
-whether wording that depends on the scientific question is scientifically correct.
+Run `scripts/workflow/check_prose.py` from the project root, or supply `--root`;
+add `--config` for personal rules. The checker and Stop hook read glossary
+entries, scopes, synonym-avoids, and the `## Prose avoid rules` table.
+The checker reports Avoid → Prefer with the rule locator; semantic review still decides
+whether wording is scientifically correct.
 
 The shared CSE-created record owner is `docs/scientific/`. Setup always creates
 only `README.md` and `CONTEXT.md`. Optional formulation, methods, evidence,
@@ -143,6 +170,25 @@ notebook rather than replacing it.
 
 ## Migration
 
+Only `--approve` writes the previewed plan. Only CSE-owned tables under
+`## Glossary` and `## Avoid` supply migration candidates. Parse escaped pipes,
+and move a glossary row only if all columns map exactly. Preserve existing definitions and sources.
+A synonym becomes `_Avoid_:` only when its scope matches the term, it has no
+exceptions, and no other information would be lost. Otherwise retain the full
+rule in the existing `## Prose avoid rules` section, or create it if absent.
+Keep every unrelated table, unsupported row, and conflicting definition in
+place; the preview lists each retained row and why. A source file with unmapped
+rows remains, and its prose is not copied into the scientific context.
+New entries stay inside `## Language`, before any later second-level section, so repeated Setup cannot add unread duplicates.
+
+Matt owns glossary files and maps, including pre-1.3 Matt-format `CONTEXT.md`
+and `CONTEXT-MAP.md`. CSE never moves, renames, or merges them. The preview only
+reports Matt's upgrade command: `git mv <path> <same dir>/GLOSSARY.md`, or
+`GLOSSARY-MAP.md` for a map. These files stay untouched, even when the new name
+already exists, and are not CSE stray contexts. Relationships stay with Matt.
+Caller rewriting remains main's literal replacement behavior; changing it is
+outside this migration.
+
 During Setup in an established repository, detect every competing CSE-created
 record owner, including `docs/`, `docs/latex/`, alternate decision-record
 directories, central notebooks, superseded analysis metadata, generated
@@ -181,7 +227,7 @@ uncertainty, provenance, and limitations.
 
 `cse:prose` owns writing inspection; `cse:write` owns authoring and correction.
 For file-backed input, Prose runs `scripts/workflow/check_prose.py` with the
-available repository context and personal configuration before semantic
+available project glossary and personal configuration before semantic
 inspection. Pasted input without a declared repository-relative path receives
 plugin-wide and contextual inspection only; state that path-scoped project and
 personal rules were not checked, and create no surrogate file.

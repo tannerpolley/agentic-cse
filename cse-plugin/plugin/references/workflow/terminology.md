@@ -2,9 +2,11 @@
 
 This is the plugin-wide glossary for conversations, questions,
 issues, source files, figures, notebooks, manuscripts, and review reports.
-Project-specific `docs/scientific/CONTEXT.md` files may add domain terms, but
-they should not repurpose the workflow and tool terms below without an
-explicit decision.
+Project-specific `GLOSSARY.md` files may add domain terms, but they should not
+repurpose the workflow and tool terms below without an explicit decision.
+Root `GLOSSARY.md` owns project vocabulary; an existing `GLOSSARY-MAP.md` links
+additional glossaries. The scientific context links to vocabulary and owns
+scoped or exception-bearing writing rules under `## Prose avoid rules`.
 
 ## Use the glossary
 
@@ -14,7 +16,9 @@ explicit decision.
 - Preserve a quotation when exact wording matters, but use canonical language
   in the surrounding explanation and durable record.
 - Add a new term here only after the plugin-wide meaning is settled. Record
-  project-only terms in the project's `CONTEXT.md` instead.
+  project-only terms in the project's `GLOSSARY.md` instead, using Matt Pocock's
+  `**Term**:`, short definition, and `_Avoid_: a, b` format. CSE requires a
+  `Source:` line (`sourceless` when missing) and accepts optional `Scope:` paths.
 
 ## Workflow and tools
 

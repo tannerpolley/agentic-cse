@@ -9,6 +9,8 @@ from pathlib import Path
 import re
 import tomllib
 
+from cse_hook_common import CONTEXT, glossary_paths, has_source, markdown_tables, read_glossaries, split_scope
+
 TEXT_SUFFIXES = {".json", ".md", ".qmd", ".tex", ".toml", ".yaml", ".yml"}
 PRECISE_PHRASES = {"schema": ["schema version"],
                    "context": ["hashed context files", "known context"]}
@@ -72,54 +74,44 @@ def load_personal_rules(path: Path) -> list[dict]:
     ]
 
 
-def split_table_row(line: str) -> list[str]:
-    return [cell.strip().strip(chr(96)) for cell in line.strip().strip("|").split("|")]
-
-
-def load_context_rules(path: Path) -> list[dict]:
-    lines = path.read_text(encoding="utf-8").splitlines()
-    for start, line in enumerate(lines):
-        if split_table_row(line) == list(FIELDS):
-            break
-    else:
-        raise ValueError(f"{path}: terminology table with {', '.join(FIELDS)} not found")
-
-    rules: list[dict] = []
-    for number, line in enumerate(lines[start + 2 :], start + 3):
-        if not line.lstrip().startswith("|"):
-            break
-        cells = split_table_row(line)
-        if len(cells) != len(FIELDS):
-            raise ValueError(f"{path}:{number}: expected {len(FIELDS)} terminology fields")
-        entry = dict(zip(FIELDS, cells))
-        entry["Scope"] = [value.strip() for value in entry["Scope"].split(";") if value.strip()]
-        entry["Exceptions"] = [
-            value.strip() for value in entry["Exceptions"].split(";") if value.strip()
-        ]
-        rules.append(validate_rule(entry, f"{path}:{number}"))
+def project_rules(path: Path) -> list[dict]:
+    if not path.is_file():
+        return []
+    rules = []
+    for table in markdown_tables(path.read_text(encoding="utf-8")):
+        if table["section"] != "Prose avoid rules":
+            continue
+        for row in table["rows"]:
+            if len(row["cells"]) != len(table["headers"]):
+                raise ValueError(f"{path}:{row['index'] + 1}: row does not match its table headings")
+            names = {field.casefold(): field for field in FIELDS}
+            entry = {names.get(header.casefold(), header): cell for header, cell in zip(table["headers"], row["cells"])}
+            for field in ("Avoid", "Prefer"):
+                if field in entry:
+                    entry[field] = entry[field].strip("`")
+            entry["Scope"] = split_scope(entry.get("Scope", ""))
+            entry["Exceptions"] = [part.strip().strip("`") for part in entry.get("Exceptions", "").split(";") if part.strip()]
+            entry["Evidence"] = entry.get("Evidence") or "sourceless"
+            rules.append(validate_rule(entry, f"{path}:{row['index'] + 1}"))
     return rules
 
 
-def scopes_overlap(left: list[str], right: list[str]) -> bool:
-    def prefix(pattern: str) -> str:
-        return re.split(r"[*?[]", pattern, maxsplit=1)[0]
-
-    for first in left:
-        for second in right:
-            if first == second:
-                return True
-            first_prefix, second_prefix = prefix(first), prefix(second)
-            if first_prefix.startswith(second_prefix) or second_prefix.startswith(first_prefix):
-                return True
-    return False
+def glossary_rules(entries: list[dict]) -> list[dict]:
+    return [{"Avoid": term, "Prefer": entry["term"], "Meaning": entry["meaning"],
+             "Scope": entry["scope"], "Exceptions": [], "Evidence": entry["source"],
+             "source": entry["locator"]}
+            for entry in entries for term in entry["avoid"]]
 
 
 def reject_conflicts(rules: list[dict]) -> None:
+    """Check rules that actually overlap at the file being inspected."""
     for index, first in enumerate(rules):
         for second in rules[index + 1 :]:
             if (
                 first["Avoid"].casefold() == second["Avoid"].casefold()
-                and scopes_overlap(first["Scope"], second["Scope"])
+                and (first["Prefer"].casefold() != second["Prefer"].casefold()
+                     or {value.casefold() for value in first["Exceptions"]}
+                     != {value.casefold() for value in second["Exceptions"]})
             ):
                 raise ValueError(
                     f"terminology conflict for {first['Avoid']!r}: "
@@ -160,31 +152,6 @@ def banned_rules(path: Path = BANNED) -> list[dict]:
     return rules
 
 
-def sourced_terms(context: Path | None, relative: str) -> list[str]:
-    if context is None:
-        return []
-    result = []
-    in_glossary = False
-    for line in context.read_text(encoding="utf-8").splitlines():
-        cells = split_table_row(line)
-        if cells == ["Term", "Meaning", "Source", "Scope"]:
-            in_glossary = True
-            continue
-        if not in_glossary:
-            continue
-        if not line.lstrip().startswith("|"):
-            in_glossary = False
-            continue
-        if len(cells) != 4:
-            continue
-        term, meaning, source, scope = cells
-        if not meaning or not source or source.casefold().startswith("sourceless") or source.casefold() in {"none", "unknown", "-", "n/a"} or set(source) <= {"-", ":"}:
-            continue
-        if any(fnmatch.fnmatchcase(relative, pattern.strip()) for pattern in scope.split(";")):
-            result.append(term)
-    return result
-
-
 def prose_lines(text: str):
     fence = None
     for number, line in enumerate(text.splitlines(), 1):
@@ -210,24 +177,35 @@ def prose_lines(text: str):
         yield number, line
 
 
-def violations(paths: list[Path], *, context: Path | None = None,
-               rules: list[dict] | None = None, forbidden: list[str] = (),
-               root: Path | None = None) -> list[str]:
+def violations(paths: list[Path], *, rules: list[dict] | None = None,
+               forbidden: list[str] = (), root: Path | None = None) -> list[str]:
     root = root or Path.cwd()
+    entries = read_glossaries(root)
+    scientific_context = root / CONTEXT
+    rules = glossary_rules(entries) + project_rules(scientific_context) + (rules or [])
     global_rules = banned_rules() + [
         {"Avoid": term, "Prefer": "precise scientific language", "qualifier": "", "source": "--forbid"}
         for term in forbidden
     ]
     failures = []
+    # Vocabulary records configure the check; their term and avoid lists are not prose.
+    rule_files = {path.resolve() for path in glossary_paths(root)} | {BANNED.resolve(), (root / "GLOSSARY-MAP.md").resolve()}
     for path in text_files(paths):
-        if path.resolve() == BANNED.resolve():
+        if path.resolve() in rule_files:
             continue
         relative = relative_path(path, root)
-        exceptions = sourced_terms(context, relative)
-        active = [r for r in (rules or []) if any(fnmatch.fnmatchcase(relative, s) for s in r["Scope"])]
+        exceptions = [entry["term"] for entry in entries if has_source(entry)
+                      and any(fnmatch.fnmatchcase(relative, scope) for scope in entry["scope"])]
+        active = [r for r in rules if any(fnmatch.fnmatchcase(relative, s) for s in r["Scope"])]
+        reject_conflicts(active)
         text = path.read_text(encoding="utf-8")
         original_lines = text.splitlines()
         lines = dict(prose_lines(text))
+        if path.resolve() == scientific_context.resolve():
+            for table in markdown_tables(text):
+                if table["section"] == "Prose avoid rules":
+                    for row in table["rows"]:
+                        lines.pop(row["index"] + 1, None)
         for number, line in lines.items():
             for rule in global_rules + active:
                 term = rule["Avoid"]
@@ -263,24 +241,19 @@ def main() -> int:
     parser.add_argument("paths", nargs="+", type=Path)
     parser.add_argument("--forbid", action="append", default=[])
     parser.add_argument("--config", type=Path)
-    parser.add_argument("--context", type=Path)
+    parser.add_argument("--root", type=Path, default=Path.cwd(), help="project root containing GLOSSARY.md or GLOSSARY-MAP.md")
     args = parser.parse_args()
 
     try:
         rules = []
         if args.config:
             rules.extend(load_personal_rules(args.config))
-        if args.context:
-            rules.extend(load_context_rules(args.context))
-        reject_conflicts(rules)
     except (OSError, tomllib.TOMLDecodeError, ValueError) as error:
         print(f"configuration error: {error}")
         return 2
 
-    root = args.context.resolve().parents[2] if args.context else Path.cwd()
     try:
-        failures = violations(args.paths, context=args.context, rules=rules,
-                              forbidden=args.forbid, root=root)
+        failures = violations(args.paths, rules=rules, forbidden=args.forbid, root=args.root)
     except (OSError, UnicodeError, ValueError) as error:
         print(f"configuration error: {error}")
         return 2
@@ -288,7 +261,7 @@ def main() -> int:
     if failures:
         print("\n".join(failures))
         return 1
-    print(f"Prose check passed for {len(banned_rules())} plugin-wide and {len(rules)} scoped rule(s).")
+    print("Prose check passed for plugin-wide and scoped rules.")
     return 0
 
 

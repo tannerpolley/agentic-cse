@@ -147,6 +147,45 @@ or lifecycle database. The installed plugin supplies the skills and shared
 references; user repositories, local configuration, Zotero, and the separately
 installed Companion remain separate.
 
+## Coexistence with Matt Pocock's skills (2026-10-05, issue #127)
+
+CSE and Matt's engineering skills are separate plugins that share files.
+Neither absorbs the other; CSE remains self-contained without a runtime
+requirement on Matt's skills. The subject decides overlapping routes: Matt's
+skills own software work, while CSE owns scientific questions and evidence.
+See [skill families](../../plugin/references/workflow/skill-families.md).
+
+Root `GLOSSARY.md` owns project vocabulary in Matt's format, with CSE's required
+`Source:` and optional `Scope:` lines. CSE also reads every glossary linked by
+an existing root `GLOSSARY-MAP.md` but never creates a map. Setup migrates old
+vocabulary rows with approval only when all columns map exactly, preserving
+existing definitions and sources. Plain synonym-avoids share the term's scope;
+rules with their own scope, exceptions, or other writing information remain in
+`docs/scientific/CONTEXT.md` under `## Prose avoid rules`, with every column.
+Unrelated tables and unmappable rows stay in place, with reasons in the preview.
+The prose checker reads both vocabulary and those project writing rules.
+
+New entries are inserted inside `## Language`. Only CSE-owned tables migrate.
+Matt owns glossary files and maps, including Matt-format pre-1.3 `CONTEXT.md`
+and `CONTEXT-MAP.md`. Setup never moves, renames, or merges them; its preview
+only reports `git mv <path> <same dir>/GLOSSARY.md` (or `GLOSSARY-MAP.md`).
+Matt files are not CSE stray contexts; their relationships and links stay put.
+Caller rewriting is main's literal replacement code, with no new matcher.
+A CSE stray file with unmapped rows stays in place, and its prose is not copied.
+Later writing rules use the existing `## Prose avoid rules` section.
+Missing mapped files are lazy, not errors; implicit scopes cover each glossary's
+directory. Identical behavioral rules are not conflicts, and differing rules
+conflict only in overlapping scopes at the checked file. The scientific context
+retains questions, owners, roles, source/data adoption, and a glossary link.
+Absorbing and deleting `GLOSSARY.md`, as proposed in draft PR #125, is rejected.
+
+Use Matt's `/retro` for a requested retrospective, supplemented by CSE's
+[science categories](../../plugin/references/workflow/retrospective.md).
+Candidates trace to session moments, mechanical problems become checks, and
+nothing changes before the user picks a candidate. Setup adds only one
+retrospective navigation line to its always-loaded protocol, routing through
+`cse:audit` and that skill's relative link to the reference.
+
 ## Science-first and numerical-testing doctrine
 
 The plugin uses result-first Scientific Software Test-Driven Development. A
