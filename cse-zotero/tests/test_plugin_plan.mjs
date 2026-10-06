@@ -308,11 +308,12 @@ test("Connector finalization restores the existing master after automatic duplic
   }
 });
 
-async function agentJobFixture(response, title = "Paper") {
+async function agentJobFixture(response, title = "Paper", navigation = null) {
   const { readFileSync } = await import("node:fs");
   const vm = await import("node:vm");
   let finish, requests = 0, saves = 0, manual = 0;
-  let tabUpdated;
+  let tabUpdated, headersReceived, navigationStarted, cleared = false;
+  let clock = Date.now();
   const result = new Promise(resolve => { finish = resolve; });
   const events = { addListener() {}, removeListener() {} };
   const tab = { id: 5, url: "about:blank", title, status: "complete" };
@@ -320,7 +321,7 @@ async function agentJobFixture(response, title = "Paper") {
     get: async key => ({ [key]: values[key] }), set: async data => Object.assign(values, data),
     remove: async key => { delete values[key]; }
   }; };
-  const job = { id: "JOB", url: "https://publisher.example/paper", deadline: Date.now() + 10000, cooldowns: {} };
+  const job = { id: "JOB", url: "https://publisher.example/paper", deadline: clock + 180000, cooldowns: {} };
   const calls = [];
   let claimed = false;
   const Zotero = {
@@ -333,6 +334,7 @@ async function agentJobFixture(response, title = "Paper") {
     ItemSaver: { _fetchAttachment: async () => { manual++; }, _validateResponse: () => null },
     Connector: { callMethod: async () => ({}) },
     Messaging: { sendMessage() {} },
+    OffscreenManager: { sendMessage: async () => {} },
     BotBypass: { bypassAmazonCaptcha() { manual++; }, passJSDetectionViaHiddenIframe() { manual++; }, passJSDetectionViaWindowPrompt() { manual++; } },
     Connector_Browser: { getTabInfo: () => ({ translators: [{ itemType: "journalArticle" }] }),
       getAllCookies: async () => [],
@@ -351,7 +353,10 @@ async function agentJobFixture(response, title = "Paper") {
   };
   Zotero.HTTP.request = function(method, url, opts) { return Zotero.HTTP._requestFetch(method, url, opts); };
   Zotero.COHTTP = { request: Zotero.HTTP.request };
-  const context = vm.createContext({ Zotero, Date, setTimeout, setInterval() {}, URL, ArrayBuffer, Uint8Array, TextDecoder, AbortSignal,
+  const pageHeaders = status => headersReceived({ tabId: tab.id, url: tab.url, type: "main_frame", statusCode: status,
+    responseHeaders: status === 403 ? [{ name: "cf-mitigated", value: "challenge" }] : [] });
+  const context = vm.createContext({ Zotero, Date: class extends Date { static now() { return clock; } },
+    setTimeout: (fn, ms) => setTimeout(() => { clock += ms; fn(); }, 0), setInterval() {}, URL, ArrayBuffer, Uint8Array, TextDecoder, AbortSignal,
     fetch: async (_url, opts) => {
       const call = JSON.parse(opts.body); calls.push(call);
       if (call.action === "finish" && call.id === "OLD") return { ok: false, status: 404 };
@@ -367,9 +372,24 @@ async function agentJobFixture(response, title = "Paper") {
         assert.equal(options.focused, false); assert.equal(options.state, "minimized");
         return { id: 7, tabs: [tab] };
       }, remove: async () => {} },
-      tabs: { update: async (_id, update) => { tab.url = update.url; }, get: async () => tab,
+      tabs: { update: async (_id, update) => {
+        tab.url = update.url;
+        if (navigation) {
+          navigationStarted = clock;
+          tab.title = "Just a moment";
+          pageHeaders(403);
+          if (navigation.kind === "interactive") await Zotero.OffscreenManager.sendMessage("Translate.setDocument",
+            ['<label><input type="checkbox">Verify you are human</label>', tab.url], tab, 0);
+        }
+      }, get: async () => {
+        if (navigation?.clearsAfter && !cleared && clock - navigationStarted >= navigation.clearsAfter) {
+          cleared = true; tab.title = "Paper"; pageHeaders(200);
+          await Zotero.OffscreenManager.sendMessage("Translate.setDocument", ['<title>Paper</title>', tab.url], tab, 0);
+        }
+        return tab;
+      },
         onUpdated: { addListener: listener => { tabUpdated = listener; } } },
-      webRequest: { onHeadersReceived: events }, declarativeNetRequest: { updateSessionRules: async rules => {
+      webRequest: { onHeadersReceived: { addListener: fn => { headersReceived = fn; } } }, declarativeNetRequest: { updateSessionRules: async rules => {
         if (rules.addRules) tabUpdated(tab.id, {}, tab); // Blank-tab completion before publisher navigation.
       } }
     }
@@ -380,7 +400,7 @@ async function agentJobFixture(response, title = "Paper") {
   await Zotero.ItemSaver._fetchAttachment({}, { id: 99 });
   Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://publisher.example/manual", { id: 99 });
   assert.equal(manual, 3, "ordinary clicks retain their original request, attachment and bypass paths");
-  return { outcome, calls, requests, saves };
+  return { outcome, calls, requests, saves, elapsed: clock - navigationStarted };
 }
 
 test("Agent jobs stop challenges, throttling and invalid PDFs without changing ordinary saves", async () => {
@@ -414,6 +434,23 @@ test("Agent job waits for native completion and refuses a challenge title before
   assert.equal(denied.outcome.title, "Just a moment");
 });
 
+test("Navigation checks clear without replay, or time out with the appropriate cooldown", async () => {
+  const response = { status: 200, response: new TextEncoder().encode("%PDF-1.7").buffer };
+  for (const kind of ["automatic", "interactive"]) for (const clears of [true, false]) {
+    const check = await agentJobFixture(response, "Paper", { kind, clearsAfter: clears ? (kind === "automatic" ? 5000 : 20000) : null });
+    assert.equal(check.saves, clears ? 1 : 0);
+    assert.equal(check.requests, clears ? 1 : 0);
+    const notices = check.calls.filter(c => c.action === "progress" && c.result.check?.kind === "interactive");
+    assert.equal(notices.length, kind === "interactive" ? 1 : 0);
+    if (clears) assert.equal(check.outcome.stop, null);
+    else {
+      assert.equal(check.outcome.stop.cooldown, kind === "automatic");
+      assert.ok(check.elapsed >= (kind === "automatic" ? 15000 : 300000));
+    }
+    assert.equal(check.calls.filter(c => c.action === "pickup").length, 1);
+  }
+});
+
 test("Plugin jobs require a heartbeat, are claimed once, and retain sessions across timeout", async () => {
   const { readFileSync } = await import("node:fs");
   const vm = await import("node:vm");
@@ -440,4 +477,14 @@ test("Plugin jobs require a heartbeat, are claimed once, and retain sessions acr
   assert.equal((await call({ action: "status" })).job.result.session_id, "SESSION");
   await call({ action: "finish", id: "ONE", result: { session_id: "SESSION", error: "timed out" } });
   assert.equal((await call({ action: "status" })).job.state, "done");
+  await call({ action: "pickup", protocol: 1, compatible: true });
+  await call({ ...submit, job: { ...submit.job, id: "TWO" } });
+  const running = (await call({ action: "pickup", protocol: 1, compatible: true })).job;
+  const progress = { action: "progress", id: "TWO", result: { check: { kind: "interactive" } } };
+  await call(progress); await call(progress);
+  assert.equal((await call({ action: "status" })).job.deadline, running.deadline + 300000);
+  now += 180001;
+  assert.equal((await call({ action: "status" })).job.state, "running");
+  now += 300000;
+  assert.equal((await call({ action: "status" })).job.state, "stopping");
 });

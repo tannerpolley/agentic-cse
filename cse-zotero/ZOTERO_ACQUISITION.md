@@ -108,19 +108,36 @@ counts, cooldowns, and stop reasons in
 access. Browser attempts wait at least 60 seconds between single-paper visits to the
 same publisher or host, with a daily cap of 25 attempts per publisher. Native
 page resources, redirects, translation and PDF downloads belong to that one
-visit. Each attempt has a three-minute deadline; a stuck page is closed without
-reloading. Connector backoff retries and CAPTCHA/JavaScript challenge bypass
+visit. Each attempt has a three-minute deadline, extended once by up to five
+minutes for an interactive check; a stuck page is closed without reloading.
+Connector backoff retries and CAPTCHA/JavaScript challenge bypass
 methods are blocked during the attempt. CLI API/OA requests are sequential and at most one per
 second globally, with Wiley at one per 10 seconds. Interrupted requests still
 consume their recorded pacing slot. No parallel acquisition.
 
-Except for the Elsevier API configuration skip described above, publisher and
-PDF requests stop without retry for HTTP 401, 403, or 429, CAPTCHA, Cloudflare/“Just a
-moment”, human-verification or unusual-activity pages, login walls, or
-non-PDF bytes where a PDF was expected. Record the reason. A publisher 429 or
-challenge adds a 24-hour cooldown for both publisher and canonical responding
-host; acquisitions refuse either until expiry. Do not solve, bypass, probe, replay, or retry
-challenges, nor attempt another route after a hard stop. Do not remove safety
+The Connector may wait on its one navigation window for an automatic check
+(including Cloudflare “Just a moment” or a managed HTTP 403 with
+`cf-mitigated: challenge`) to clear by itself for at most 15 seconds. If it
+clears, continue the native save; otherwise stop with a 24-hour publisher and
+responding-host cooldown. An explicit interactive check (human-verification
+checkbox or CAPTCHA) keeps that same window minimized and unfocused, sends
+one desktop notification through `notify-send` when available, and waits up to
+five minutes for the user to clear it. The agent never raises the window,
+clicks, enters input, solves the check, reloads, or retries. Clearing continues
+the native save automatically. An unanswered interactive check closes the
+window and returns the paper link without a cooldown, unless the publisher
+also reports throttling or blocking. Classification uses tab titles, response
+headers and the document snapshots already sent by the official Connector.
+
+Login walls, access denied, unusual activity, HTTP 429, and other HTTP 401/403
+responses still hard-stop. Native PDF/download challenges cannot be replayed
+and hard-stop; API and direct OA requests retain their immediate challenge
+stops. Non-PDF bytes where a PDF was expected stop acquisition. Record the
+reason. Except for the Connector's unanswered interactive check and the
+Elsevier API configuration skip, a publisher challenge or 429 adds a 24-hour
+cooldown for both publisher and canonical responding host; acquisitions refuse
+either until expiry. Do not automate solving, bypass, probe, replay, or retry
+checks, nor attempt another route after a hard stop. Do not remove safety
 state to evade cooldowns. Handoff reports the exact paper URL. Agents do not sign in to publisher
 accounts; institutional browser access is through the configured VPN.
 
@@ -172,7 +189,7 @@ The CLI posts one job to the local companion plugin's `/acquire-job` endpoint.
 The added worker module picks it up every 20 seconds and uses a Chrome API
 call to reset the MV3 idle timer, without adding manifest permissions.
 A job is claimed once, checkpoints its save session, and is never replayed
-after worker interruption. A three-minute deadline closes its owned window.
+after worker interruption. Its bounded deadline closes its owned window.
 The module creates a minimized, unfocused window, tracks its tab before
 navigating to the article, and calls the native `saveWithTranslator` once.
 Native translators, HTTP/cookie handling and attachment import perform the
@@ -181,11 +198,12 @@ collection; the CLI verifies the parent and PDF through the local API.
 
 Agents never attach a debugger to publisher pages or simulate input. Tab
 URL/title, response status/headers and native completion results detect access
-stops. Job-scoped request and PDF checks block backoff retries and all
+stops and the check waits described above. Job-scoped request and PDF checks block backoff retries and all
 challenge-bypass/solve-in-tab paths; ordinary toolbar clicks retain the native
 behavior. Cooldown blocking is scoped to the job's tab. Results include final
-URL, title and observed status when available. The owned window closes on
-completion or any stop. `--route browser` forces this one-paper route for
+URL, title and observed status when available. The owned window stays minimized
+during an interactive wait, and closes on completion or a terminal stop.
+`--route browser` forces this one-paper route for
 diagnostics with all safeguards retained.
 
 ## Retention boundary

@@ -212,6 +212,8 @@ uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --rout
 
 The browser route uses a modified copy of the official Connector in your
 everyday Chrome, in a minimized window created without focus.
+See the acquisition contract for automatic-check waits and notifications when
+a check requires user input; keep the acquire command running during that wait.
 Acquire results include the route, stop reason or handoff URL, and any verified
 item, attachment, or collection keys. For other Zotero writes, retain their
 reviewed previews and explicit approval. Read

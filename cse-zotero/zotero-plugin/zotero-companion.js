@@ -466,6 +466,10 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     } else if (["progress", "finish"].includes(data.action)) {
       if (connectorJob.state === "done") return response(200, { ok: true });
       connectorJob.result = { ...connectorJob.result, ...data.result };
+      if (data.action === "progress" && data.result?.check?.kind === "interactive" && !connectorJob.interactiveWait) {
+        connectorJob.interactiveWait = true;
+        connectorJob.deadline += 300000;
+      }
       if (data.action === "finish") {
         connectorJob.state = "done";
         if (connectorJob.result.stop) connectorJob.result.stopped_at = now / 1000;

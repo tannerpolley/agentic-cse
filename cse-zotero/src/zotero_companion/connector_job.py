@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import subprocess
+import shutil
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -68,6 +69,7 @@ def connector_save(url, safety, pub, *, collection=None, doi=""):
         "cooldowns": {k: v.get("cooldown_until", 0) for k, v in safety.data.items() if isinstance(v, dict)}}})
     deadline = time.monotonic() + 225
     outcome = {}
+    notified = False
     try:
         while time.monotonic() < deadline:
             status = plugin._request("/zotero-companion/acquire-job", method="POST", payload={"action": "status"})
@@ -75,6 +77,16 @@ def connector_save(url, safety, pub, *, collection=None, doi=""):
             if job.get("id") != job_id:
                 raise AcquireStop("Connector job was lost; no retry")
             outcome = job.get("result") or {}
+            if not notified and (check := outcome.get("check") or {}).get("kind") == "interactive":
+                notified = True
+                deadline += 300
+                if notify := shutil.which("notify-send"):
+                    try:
+                        subprocess.run([notify, "CSE Zotero needs a check completed",
+                                        f"{checked_url(check['url'])} needs you to complete a check in Chrome; the save will finish automatically. Open its minimized window."],
+                                       timeout=5, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+                    except (OSError, subprocess.TimeoutExpired):
+                        pass
             if job.get("state") in {"done", "stopping"}:
                 break
             time.sleep(1)

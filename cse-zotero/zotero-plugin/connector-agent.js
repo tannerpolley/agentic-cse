@@ -1,7 +1,7 @@
 /* Agent jobs only. The official Connector's toolbar and ordinary tabs are unchanged. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
-  const MODULE_REVISION = 2;
+  const MODULE_REVISION = 3;
   const KEY = "cseAgentJob", RULE = 900000000;
   let active = null, busy = false;
   const retiredTabs = new Set(), retiredSessions = new Set();
@@ -46,6 +46,41 @@
     const amazon = headers.some(h => h.name.toLowerCase() === "x-amzn-waf-action" && ["challenge", "captcha"].includes(h.value));
     if (found || cloudflare || amazon) halt("Publisher access challenge: " + (found || (cloudflare ? "Cloudflare" : "CAPTCHA")), url, true, status);
     if ([401, 403, 429].includes(status)) halt("Publisher HTTP " + status + "; no retry", url, status === 429, status);
+  };
+  const pageCheck = (url, status, text = "", headers = []) => {
+    const a = active, lower = text.toLowerCase();
+    if (status === 429 || ["access denied", "unusual activity", "login required", "sign in to access", "log in to access"].some(s => lower.includes(s)))
+      return check(url, status, text, headers);
+    const interactive = /captcha|verify you are human|human verification/.test(lower) ||
+      headers.some(h => h.name.toLowerCase() === "x-amzn-waf-action" && h.value === "captcha");
+    const automatic = /just a moment|checking (?:your browser|if)|pow_challenge/.test(lower) ||
+      headers.some(h => h.name.toLowerCase() === "cf-mitigated" && h.value === "challenge");
+    if (interactive || automatic) {
+      if (!interactive && a.check?.kind === "interactive") return;
+      const kind = interactive ? "interactive" : "automatic";
+      if (interactive && !a.interactiveUntil) {
+        a.interactiveUntil = Date.now() + 300000;
+        a.deadline += 300000;
+        api("progress", { id: a.id, result: { check: { kind, url: safeURL(url) } } }).catch(() => {
+          try { halt("Check notification channel failed; no retry", url); } catch (_) {}
+        });
+      }
+      a.autoUntil ||= Date.now() + 15000;
+      a.check = { kind, url, status, until: interactive ? a.interactiveUntil : a.autoUntil };
+    } else if (status >= 200 && status < 400) a.check = null;
+    else if (!a.check && [401, 403].includes(status)) check(url, status, text, headers);
+  };
+  // Inspect snapshots the official Connector already sends; never inject or interact.
+  const offscreen = Zotero.OffscreenManager.sendMessage;
+  Zotero.OffscreenManager.sendMessage = function(message, payload, tab, ...args) {
+    if (agentTab(tab) && message === "Translate.setDocument") {
+      const html = payload[0].replace(/<(script|style)\b[^>]*>[\s\S]*?<\/\1>/gi, "");
+      let signal = html.match(/<title\b[^>]*>([\s\S]*?)<\/title>/i)?.[1] || "";
+      if (/\b(?:type|role)\s*=\s*["']?checkbox/i.test(html) && /verify you are human|captcha/i.test(html.replace(/<[^>]*>/g, " ")))
+        signal += " Verify you are human";
+      if (challenge(signal)) pageCheck(active.url, active.status, signal);
+    }
+    return offscreen.call(this, message, payload, tab, ...args);
   };
   const pdf = (bytes, url) => {
     if (!(bytes instanceof ArrayBuffer) || new TextDecoder().decode(new Uint8Array(bytes).slice(0, 4)) !== "%PDF")
@@ -146,15 +181,17 @@
     if (!active || active.done || d.tabId !== active.tab) return;
     try {
       valid(d.url);
-      if (d.type === "main_frame") active.status = d.statusCode;
-      check(d.url, d.statusCode, "", d.responseHeaders || []);
+      if (d.type === "main_frame") {
+        active.status = d.statusCode;
+        pageCheck(d.url, d.statusCode, "", d.responseHeaders || []);
+      } else check(d.url, d.statusCode, "", d.responseHeaders || []);
     } catch (_) {}
   }, { urls: ["<all_urls>"] }, ["responseHeaders"]);
   const inspect = tab => {
     if (tab.url === "about:blank") return;
     active.url = safeURL(tab.url || active.url); active.title = tab.title || "";
     valid(tab.url);
-    check(tab.url, active.status, active.title);
+    pageCheck(tab.url, active.status, active.title);
     if (/^(login|sign in|log in)$/i.test(active.title.trim()) || /\/(login|signin|sign-in)(?:[/?#]|$)/i.test(tab.url))
       halt("Publisher login wall", tab.url, true);
   };
@@ -193,6 +230,13 @@
       while (!a.stop && !a.finished && Date.now() < a.deadline) {
         const tab = await chrome.tabs.get(a.tab);
         inspect(tab);
+        if (a.check) {
+          if (Date.now() >= a.check.until) halt(a.check.kind === "automatic"
+            ? "Automatic publisher check did not clear within 15 seconds"
+            : "Interactive publisher check unanswered after 5 minutes", a.check.url, a.check.kind === "automatic", a.check.status);
+          await new Promise(resolve => setTimeout(resolve, 250));
+          continue;
+        }
         const info = Zotero.Connector_Browser.getTabInfo(a.tab);
         if (!saving && tab.status === "complete" && info.translators?.length) {
           if (info.translators[0].itemType === "multiple") halt("Multiple-paper page refused", a.url);
