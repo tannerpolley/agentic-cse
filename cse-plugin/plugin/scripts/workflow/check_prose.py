@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 import tomllib
 
-from cse_hook_common import CONTEXT, glossary_paths, has_source, markdown_tables, read_glossaries
+from cse_hook_common import CONTEXT, glossary_paths, has_source, markdown_tables, read_glossaries, split_scope
 
 TEXT_SUFFIXES = {".json", ".md", ".qmd", ".tex", ".toml", ".yaml", ".yml"}
 PRECISE_PHRASES = {"schema": ["schema version"],
@@ -89,7 +89,7 @@ def project_rules(path: Path) -> list[dict]:
             for field in ("Avoid", "Prefer"):
                 if field in entry:
                     entry[field] = entry[field].strip("`")
-            entry["Scope"] = [part.strip().strip("`") for part in entry.get("Scope", "").split(";") if part.strip()] or ["*"]
+            entry["Scope"] = split_scope(entry.get("Scope", ""))
             entry["Exceptions"] = [part.strip().strip("`") for part in entry.get("Exceptions", "").split(";") if part.strip()]
             entry["Evidence"] = entry.get("Evidence") or "sourceless"
             rules.append(validate_rule(entry, f"{path}:{row['index'] + 1}"))

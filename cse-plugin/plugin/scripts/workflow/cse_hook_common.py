@@ -97,6 +97,10 @@ def glossary_paths(root: Path) -> list[Path]:
     return paths
 
 
+def split_scope(value: str, default: str = "*") -> list[str]:
+    return [part.strip().strip("`") for part in value.split(";") if part.strip()] or [default]
+
+
 def split_table_row(line: str) -> list[str]:
     text = line.strip()
     text = text[1:] if text.startswith("|") else text
@@ -126,7 +130,7 @@ def markdown_tables(text: str) -> list[dict]:
         if (lines[index].lstrip().startswith("|") and lines[index + 1].lstrip().startswith("|")
                 and all(re.fullmatch(r":?-+:?", cell) for cell in split_table_row(lines[index + 1]))):
             table = {"section": section, "heading": heading, "start": index,
-                     "headers": split_table_row(lines[index]), "rows": []}
+                     "headers": split_table_row(lines[index]), "raw_header": "".join(lines[index:index + 2]), "rows": []}
             index += 2
             while index < len(lines) and lines[index].lstrip().startswith("|"):
                 table["rows"].append({"index": index, "text": lines[index], "cells": split_table_row(lines[index])})
@@ -138,18 +142,22 @@ def markdown_tables(text: str) -> list[dict]:
 
 
 def glossary_entries(text: str, locator: str, default_scope: str = "*") -> list[dict]:
-    """Read Matt's Language entries and CSE's source and optional path scope."""
+    """Read Language entries with zero-based, end-exclusive line spans."""
+    lines = text.splitlines()
     entries = []
     current = None
     language = False
-    for number, line in enumerate(text.splitlines(), 1):
-        if re.match(r"^#{1,2} ", line):
-            language = line.strip() == "## Language"
+    for number, line in enumerate(lines, 1):
+        heading = re.match(r"^#{1,6} ", line)
+        match = re.match(r"^\*\*(.+?)\*\*:\s*(.*)$", line) if language else None
+        if current is not None and (heading or match):
+            current["span"][1] = number - 1
+        if heading:
+            if len(heading[0].strip()) <= 2:
+                language = line.strip() == "## Language"
             current = None
-        elif re.match(r"^#{3,6} ", line):
-            current = None
-        elif language and (match := re.match(r"^\*\*(.+?)\*\*:\s*(.*)$", line)):
-            current = {"term": match[1], "meaning": match[2], "avoid": [],
+        elif match:
+            current = {"term": match[1], "meaning": match[2], "avoid": [], "span": [number - 1, len(lines)],
                        "source": "sourceless", "scope": [default_scope], "locator": f"{locator}:{number}"}
             entries.append(current)
         elif current is not None:
@@ -158,7 +166,7 @@ def glossary_entries(text: str, locator: str, default_scope: str = "*") -> list[
             elif line.startswith("Source:"):
                 current["source"] = line.split(":", 1)[1].strip() or "sourceless"
             elif line.startswith("Scope:"):
-                current["scope"] = [scope.strip().strip("`") for scope in line.split(":", 1)[1].split(";") if scope.strip()]
+                current["scope"] = split_scope(line.split(":", 1)[1], default_scope)
             elif line.strip():
                 current["meaning"] = (current["meaning"] + " " + line.strip()).strip()
     return entries

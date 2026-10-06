@@ -165,14 +165,18 @@ rules with their own scope, exceptions, or other writing information remain in
 Unrelated tables and unmappable rows stay in place, with reasons in the preview.
 The prose checker reads both vocabulary and those project writing rules.
 
-New entries are inserted inside `## Language`. Matt's pre-1.3 `CONTEXT.md`
-entry files and `CONTEXT-MAP.md` are upgraded with `git mv` when no glossary or
-map exists; existing glossaries receive entries without losing conflicts.
-Dot-relative callers are rewritten. Missing mapped files are lazy, not errors;
-implicit mapped scopes cover each glossary's directory. Identical behavioral
-rules are not conflicts, and differing rules conflict only in overlapping scopes.
-Setup never deletes an existing glossary or map. The scientific context retains
-questions, owners, roles, source/data adoption, and a glossary link.
+New entries are inserted inside `## Language`. Only CSE-owned tables migrate.
+Matt owns glossary files and maps, including Matt-format pre-1.3 `CONTEXT.md`
+and `CONTEXT-MAP.md`. Setup never moves, renames, or merges them; its preview
+only reports `git mv <path> <same dir>/GLOSSARY.md` (or `GLOSSARY-MAP.md`).
+Matt files are not CSE stray contexts; their relationships and links stay put.
+Caller rewriting is main's literal replacement code, with no new matcher.
+A CSE stray file with unmapped rows stays in place, and its prose is not copied.
+Later writing rules use the existing `## Prose avoid rules` section.
+Missing mapped files are lazy, not errors; implicit scopes cover each glossary's
+directory. Identical behavioral rules are not conflicts, and differing rules
+conflict only in overlapping scopes at the checked file. The scientific context
+retains questions, owners, roles, source/data adoption, and a glossary link.
 Absorbing and deleting `GLOSSARY.md`, as proposed in draft PR #125, is rejected.
 
 Use Matt's `/retro` for a requested retrospective, supplemented by CSE's

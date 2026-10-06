@@ -170,23 +170,24 @@ notebook rather than replacing it.
 
 ## Migration
 
-Only `--approve` writes the previewed plan. Only tables under `## Glossary` and
-`## Avoid` supply migration candidates. Parse escaped pipes, and move a glossary
-row only if all columns map exactly. Preserve existing definitions and sources.
+Only `--approve` writes the previewed plan. Only CSE-owned tables under
+`## Glossary` and `## Avoid` supply migration candidates. Parse escaped pipes,
+and move a glossary row only if all columns map exactly. Preserve existing definitions and sources.
 A synonym becomes `_Avoid_:` only when its scope matches the term, it has no
 exceptions, and no other information would be lost. Otherwise retain the full
-rule in `## Prose avoid rules`. Keep every unrelated table, unsupported row, and
-conflicting definition in place; the preview lists each retained row and why.
-A source file with unmapped rows remains; merge its scientific prose without
-duplicating those rows. New entries stay inside `## Language`, before any later
-second-level section, so repeated Setup cannot add unread duplicates.
+rule in the existing `## Prose avoid rules` section, or create it if absent.
+Keep every unrelated table, unsupported row, and conflicting definition in
+place; the preview lists each retained row and why. A source file with unmapped
+rows remains, and its prose is not copied into the scientific context.
+New entries stay inside `## Language`, before any later second-level section, so repeated Setup cannot add unread duplicates.
 
-Detect Matt's pre-1.3 entry format in stray `CONTEXT.md` files. With no root
-`GLOSSARY.md`, use `git mv` to rename one; otherwise merge its entries and retain
-conflicts. Mark missing sources `sourceless`. Upgrade `CONTEXT-MAP.md` with
-`git mv` only when no `GLOSSARY-MAP.md` exists; never create a map or move away
-an existing glossary or map. Rewrite callers, including `./` and `../` links,
-without matching a suffix inside an unrelated longer path.
+Matt owns glossary files and maps, including pre-1.3 Matt-format `CONTEXT.md`
+and `CONTEXT-MAP.md`. CSE never moves, renames, or merges them. The preview only
+reports Matt's upgrade command: `git mv <path> <same dir>/GLOSSARY.md`, or
+`GLOSSARY-MAP.md` for a map. These files stay untouched, even when the new name
+already exists, and are not CSE stray contexts. Relationships stay with Matt.
+Caller rewriting remains main's literal replacement behavior; changing it is
+outside this migration.
 
 During Setup in an established repository, detect every competing CSE-created
 record owner, including `docs/`, `docs/latex/`, alternate decision-record
