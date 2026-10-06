@@ -116,7 +116,7 @@ concrete `reason`. The top-level `configured_paths`, `observed_live_checks`,
 `unverified_active_host`, and `identity` fields keep configured paths, live
 probes, host uncertainty, and package/source/payload identity separate.
 The separate `acquisition` object reports configured token names and status,
-plus managed-browser status; it never includes token values.
+plus agent Connector status; it never includes token values.
 
 Data readiness checks both current normalized inventories for every declared
 registry pack and all standalone inventories outside those packs. Other nested

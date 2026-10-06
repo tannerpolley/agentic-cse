@@ -519,9 +519,9 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                 result["route"] = "connector"
                 saved = connector_save(result["handoff_url"], safety, pub,
                                        collection=result["collection_key"], doi=doi)
-                result["browser"] = {k: saved.get(k) for k in ("url", "title", "status")}
-                connector_session = saved.get("session_id")
                 stop = saved.get("stop")
+                result["browser"] = {k: (stop or {}).get(k, saved.get(k)) for k in ("url", "title", "status")}
+                connector_session = saved.get("session_id")
                 if stop:
                     try:
                         safety.stop(pub, stop["reason"], cooldown=stop.get("cooldown", False), host=stop.get("host", ""))

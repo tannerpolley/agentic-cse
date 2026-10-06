@@ -514,9 +514,12 @@ def test_connector_partial_save_is_filed_once_then_challenge_cools_host(runtime,
     monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda *a, **k: [
         {'key': 'EXISTING', 'data': {'itemType': 'journalArticle', 'DOI': current['doi']}}])
     monkeypatch.setattr('zotero_companion.connector_job.connector_save', lambda *a, **k: {
-        'session_id': 'SESSION', 'stop': {'reason': 'Publisher access challenge: CAPTCHA', 'host': 'WWW.SCIENCEDIRECT.COM.', 'cooldown': True}})
+        'session_id': 'SESSION', 'url': 'https://doi.org/10.1016/test', 'title': '', 'status': None,
+        'stop': {'reason': 'Publisher access challenge: CAPTCHA', 'host': 'WWW.SCIENCEDIRECT.COM.',
+                 'url': 'https://www.sciencedirect.com/article/test', 'status': 403, 'cooldown': True}})
     result = mod.acquire(current['doi'])
     assert not result['ok'] and result['item_key'] == 'EXISTING'
+    assert result['browser'] == {'url': 'https://www.sciencedirect.com/article/test', 'title': '', 'status': 403}
     assert ('/zotero-companion/acquire-connector', 'apply') in calls
     assert not any(path.endswith('metadata') for path, _ in calls)
     state = json.loads((root / 'state.json').read_text())
