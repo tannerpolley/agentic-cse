@@ -208,18 +208,42 @@ uv run cse-zotero doctor --json
 uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --dry-run --json
 uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
 uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --route browser --json
-uv run cse-zotero agent-browser status --json
-uv run cse-zotero agent-browser start --json
-uv run cse-zotero agent-browser stop --json
 ```
 
-The dedicated agent browser runs the official Connector on hidden Xvfb and
-does not take desktop focus; acquisition starts it automatically when needed.
+The browser route uses a modified copy of the official Connector in your
+everyday Chrome, in a minimized window created without focus.
 Acquire results include the route, stop reason or handoff URL, and any verified
 item, attachment, or collection keys. For other Zotero writes, retain their
 reviewed previews and explicit approval. Read
 [`ZOTERO_ACQUISITION.md`](ZOTERO_ACQUISITION.md) for route eligibility and
 publisher/browser boundaries.
+
+### One-time Connector setup
+
+Build the modified copy from the official Connector installed in Chrome's
+Default profile (currently 5.0.217):
+
+```bash
+agent-heavy --timeout 15m --max 4G uv run python scripts/build_connector.py
+```
+
+Then, in your everyday Chrome:
+
+1. Open `chrome://extensions` and turn on **Developer mode**.
+2. Turn **off** the existing Zotero Connector.
+3. Click **Load unpacked** and select
+   `/home/user/.local/share/cse/zotero/zotero-connector-agent/`.
+4. Keep the modified Connector enabled and Zotero Desktop running. Run
+   `cse-zotero doctor --json`; `acquisition.connector.ready` should be `true`
+   within about 20 seconds, with version `5.0.217`.
+
+The copy retains the official extension identity and permissions. Chrome may
+replace its existing listing when loading the same ID; ensure only the modified
+copy is enabled. Your usual toolbar saves keep their native behavior. Re-run
+the build after an official Connector update, then use **Reload** on the unpacked
+extension; a version mismatch is reported instead of silently using unverified
+native APIs. The acquisition rules and job lifecycle are owned by
+[`ZOTERO_ACQUISITION.md`](ZOTERO_ACQUISITION.md).
 
 ## Stages
 
@@ -496,6 +520,7 @@ loopback-only endpoints to Zotero's existing local server:
   token is supplied; limited to registered project collection trees)
 - `POST /zotero-companion/acquire-metadata` (dry-run by default; apply creates
   one Zotero parent without translator attachments)
+- `POST /zotero-companion/acquire-job` (single-paper jobs and Connector heartbeat).
 - `POST /zotero-companion/acquire-connector` (dry-run validates the target; apply
   files a native Connector session and removes its newly saved duplicate).
 - `POST /zotero-companion/acquire-attachment` (dry-run by default; apply imports

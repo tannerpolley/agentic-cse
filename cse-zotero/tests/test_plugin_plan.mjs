@@ -308,93 +308,131 @@ test("Connector finalization restores the existing master after automatic duplic
   }
 });
 
-test("Connector worker prevents native backoff, challenge bypass and later requests after a hard stop", async () => {
+async function agentJobFixture(response, title = "Paper") {
   const { readFileSync } = await import("node:fs");
   const vm = await import("node:vm");
-  const source = readFileSync(new URL("../src/zotero_companion/agent_browser.py", import.meta.url), "utf8");
-  const setup = source.split('WORKER_SETUP = r"""')[1].split('"""')[0];
-  for (const response of [
-    { status: 429, response: "quota" },
-    { status: 200, response: "<title>Just a moment</title>" },
-    { status: 200, response: new TextEncoder().encode("HTML instead of PDF").buffer },
-    { status: 200, response: new TextEncoder().encode("%PDF-1.7").buffer },
-    { status: 503, response: "Temporary", getResponseHeader: () => "5" }
-  ]) {
-    let requests = 0;
-    const event = { addListener() {}, removeListener() {} };
-    const Zotero = {
-      version: "5.0.217", initDeferred: { promise: Promise.resolve() },
-      Connector: { checkIsOnline: async () => true },
-      HTTP: { _requestFetch: async (_m, _u, options) => { requests++; assert.equal(options.maxBackoff, 0); return { ...response, responseURL: "https://cdn.publisher.example/paper.pdf" }; },
-        StatusError: class extends Error { constructor(response) { super("HTTP status error"); this.retryAfter = response.getResponseHeader?.("Retry-After"); } } },
-      ItemSaver: { saveAttachmentToZotero: async () => {} },
-      Messaging: { sendMessage() {} },
-      BotBypass: { bypassAmazonCaptcha() { throw Error("Must never run"); }, passJSDetectionViaHiddenIframe() {}, passJSDetectionViaWindowPrompt() {} }
-    };
-    const context = vm.createContext({ Zotero, URL, ArrayBuffer, Uint8Array, TextDecoder,
-      chrome: { runtime: { id: "official-connector" }, tabs: { remove: async () => {}, onUpdated: event }, webRequest: { onHeadersReceived: event, onErrorOccurred: event }, declarativeNetRequest: { updateSessionRules: async () => {} } } });
-    await vm.runInContext(setup, context);
-    await Zotero.HTTP._requestFetch("GET", "chrome-extension://official-connector/schema.json", { successCodes: false });
-    assert.equal(context.cseAcquire.stop, null);
-    requests = 0;
-    const declaredURL = response.response instanceof ArrayBuffer && new TextDecoder().decode(response.response).startsWith("%PDF") ? "http://publisher.example/paper.pdf" : "https://publisher.example/paper.pdf";
-    await Zotero.ItemSaver.saveAttachmentToZotero({ url: declaredURL, mimeType: "application/pdf" });
-    const fetch = () => Zotero.HTTP._requestFetch("GET", declaredURL, { successCodes: response.status === 503 ? null : false, maxBackoff: 10 });
-    if (response.status === 503) {
-      context.cseAcquire.pdfs.clear();
-      const error = await fetch().catch(error => error);
-      assert.equal(error.retryAfter, undefined);
-      assert.equal(context.cseAcquire.stop, null);
-      assert.equal(requests, 1);
-    } else if (response.response instanceof ArrayBuffer && new TextDecoder().decode(response.response).startsWith("%PDF")) {
-      await fetch();
-      assert.equal(context.cseAcquire.stop, null);
-      assert.throws(() => Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://publisher.example/paper.pdf"));
-      assert.equal(context.cseAcquire.stop.cooldown, true);
-    } else {
-      await assert.rejects(fetch());
-      assert.equal(context.cseAcquire.stop.host, "cdn.publisher.example");
-      assert.equal(context.cseAcquire.stop.cooldown, response.status === 429 || typeof response.response === "string");
-      await assert.rejects(fetch());
-      assert.equal(requests, 1);
-    }
-    await context.cseAcquire.clean();
-  }
-});
-
-test("Connector attempt waits for native completion after a broadcast returns early", async () => {
-  const { readFileSync } = await import("node:fs");
-  const vm = await import("node:vm");
-  const source = readFileSync(new URL("../src/zotero_companion/agent_browser.py", import.meta.url), "utf8");
-  const setup = source.split('WORKER_SETUP = r"""')[1].split('"""')[0];
-  const save = source.split('WORKER_SAVE = r"""')[1].split('"""')[0];
-  let completed = false;
-  let saves = 0;
-  const tab = { id: 5, url: "https://publisher.example/paper", status: "complete" };
-  const event = { addListener() {}, removeListener() {} };
+  let finish, requests = 0, saves = 0, manual = 0;
+  const result = new Promise(resolve => { finish = resolve; });
+  const events = { addListener() {}, removeListener() {} };
+  const tab = { id: 5, url: "about:blank", title, status: "complete" };
+  const storage = (initial = {}) => { const values = { ...initial }; return {
+    get: async key => ({ [key]: values[key] }), set: async data => Object.assign(values, data),
+    remove: async key => { delete values[key]; }
+  }; };
+  const job = { id: "JOB", url: "https://publisher.example/paper", deadline: Date.now() + 10000, cooldowns: {} };
+  const calls = [];
+  let claimed = false;
   const Zotero = {
     version: "5.0.217", initDeferred: { promise: Promise.resolve() },
-    Connector: { checkIsOnline: async () => true },
-    HTTP: { _requestFetch() {} }, ItemSaver: { saveAttachmentToZotero() {} },
-    BotBypass: {}, Messaging: { sendMessage() {} },
-    Connector_Browser: {
-      getTabInfo: () => ({ translators: [{ itemType: "journalArticle" }] }),
-      saveWithTranslator: async () => {
-        saves++;
-        // A different frame responds first; the actual save finishes later.
-        setTimeout(() => { completed = true; Zotero.Messaging.sendMessage("progressWindow.done", [true], tab); }, 20);
+    HTTP: { _requestFetch: async (_m, url, opts) => {
+      if (opts.cseJob) { requests++; assert.equal(opts.maxBackoff, 0); }
+      else manual++;
+      return { ...response, responseURL: url, getResponseHeader: name => response.headers?.[name] || null };
+    }, StatusError: class extends Error {} },
+    ItemSaver: { _fetchAttachment: async () => { manual++; }, _validateResponse: () => null },
+    Connector: { callMethod: async () => ({}) },
+    Messaging: { sendMessage() {} },
+    BotBypass: { bypassAmazonCaptcha() { manual++; }, passJSDetectionViaHiddenIframe() { manual++; }, passJSDetectionViaWindowPrompt() { manual++; } },
+    Connector_Browser: { getTabInfo: () => ({ translators: [{ itemType: "journalArticle" }] }),
+      getAllCookies: async () => [],
+      saveWithTranslator: async (source, _index, options) => {
+        saves++; assert.equal(options.fallbackOnFailure, false);
+        // Another frame resolves first; actual attachment completion arrives later.
+        setTimeout(async () => {
+          try {
+            await Zotero.Connector.callMethod({ method: "saveItems" }, { sessionID: "SESSION", items: [{}] }, source);
+            await Zotero.ItemSaver._fetchAttachment({ url: "https://publisher.example/paper.pdf", mimeType: "application/pdf" }, source);
+            Zotero.Messaging.sendMessage("progressWindow.done", [true], source);
+          } catch (_) { Zotero.Messaging.sendMessage("progressWindow.done", [false], source); }
+        }, 10);
       }
     }
   };
-  const context = vm.createContext({ Zotero, setTimeout, URL, ArrayBuffer, Uint8Array, TextDecoder,
-    chrome: { tabs: { get: async () => tab, remove: async () => {}, onUpdated: event },
-      webRequest: { onHeadersReceived: event, onErrorOccurred: event },
-      declarativeNetRequest: { updateSessionRules: async () => {} } } });
-  await vm.runInContext(setup, context);
-  context.cseAcquire.tab = 5;
-  await vm.runInContext(save, context);
-  assert.equal(completed, true);
-  assert.equal(saves, 1);
-  assert.equal(context.cseAcquire.done, true);
-  await context.cseAcquire.clean();
+  Zotero.HTTP.request = function(method, url, opts) { return Zotero.HTTP._requestFetch(method, url, opts); };
+  Zotero.COHTTP = { request: Zotero.HTTP.request };
+  const context = vm.createContext({ Zotero, Date, setTimeout, setInterval() {}, URL, ArrayBuffer, Uint8Array, TextDecoder, AbortSignal,
+    fetch: async (_url, opts) => {
+      const call = JSON.parse(opts.body); calls.push(call);
+      if (call.action === "finish" && call.id === "OLD") return { ok: false, status: 404 };
+      if (call.action === "finish") finish(call.result);
+      const data = call.action === "pickup" && !claimed ? { job } : {};
+      if (call.action === "pickup") claimed = true;
+      return { ok: true, json: async () => data };
+    },
+    chrome: { runtime: { id: "official", getPlatformInfo() {}, onStartup: events },
+      // Chrome restarted: tab ID 99 now belongs to the user, not the old job.
+      storage: { local: storage({ cseAgentJob: { id: "OLD", tab: 99, window: 9, session_id: "OLDSESSION" } }), session: storage() },
+      windows: { create: async options => {
+        assert.equal(options.focused, false); assert.equal(options.state, "minimized");
+        return { id: 7, tabs: [tab] };
+      }, remove: async () => {} },
+      tabs: { update: async (_id, update) => { tab.url = update.url; }, get: async () => tab, onUpdated: events },
+      webRequest: { onHeadersReceived: events }, declarativeNetRequest: { updateSessionRules: async () => {} }
+    }
+  });
+  vm.runInContext(readFileSync(new URL("../zotero-plugin/connector-agent.js", import.meta.url), "utf8"), context);
+  const outcome = await result;
+  await Zotero.COHTTP.request("GET", "https://publisher.example/manual", {}, { id: 99 });
+  await Zotero.ItemSaver._fetchAttachment({}, { id: 99 });
+  Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://publisher.example/manual", { id: 99 });
+  assert.equal(manual, 3, "ordinary clicks retain their original request, attachment and bypass paths");
+  return { outcome, calls, requests, saves };
+}
+
+test("Agent jobs stop challenges, throttling and invalid PDFs without changing ordinary saves", async () => {
+  for (const response of [
+    { status: 429, response: "quota" },
+    { status: 200, response: "<title>Just a moment</title>" },
+    { status: 200, response: "blocked", headers: { "cf-mitigated": "challenge" } },
+    { status: 200, response: new TextEncoder().encode("HTML instead of PDF").buffer }
+  ]) {
+    const { outcome, calls, requests } = await agentJobFixture(response);
+    assert.equal(outcome.session_id, "SESSION");
+    assert.equal(outcome.stop.host, "publisher.example");
+    assert.equal(outcome.stop.cooldown, response.status === 429 || typeof response.response === "string");
+    assert.equal(requests, 1);
+    assert.equal(calls.filter(c => c.action === "pickup").length, 1);
+    assert.equal(calls.filter(c => c.action === "finish" && c.id === "JOB").length, 1);
+  }
+});
+
+test("Agent job waits for native completion and refuses a challenge title before saving", async () => {
+  const response = { status: 200, response: new TextEncoder().encode("%PDF-1.7").buffer };
+  const success = await agentJobFixture(response);
+  assert.equal(success.outcome.stop, null);
+  assert.equal(success.outcome.error, null);
+  assert.equal(success.outcome.session_id, "SESSION");
+  assert.equal(success.saves, 1);
+  const denied = await agentJobFixture(response, "Just a moment");
+  assert.equal(denied.saves, 0);
+  assert.equal(denied.requests, 0);
+  assert.equal(denied.outcome.stop.cooldown, true);
+  assert.equal(denied.outcome.title, "Just a moment");
+});
+
+test("Plugin jobs require a heartbeat, are claimed once, and retain sessions across timeout", async () => {
+  const { readFileSync } = await import("node:fs");
+  const vm = await import("node:vm");
+  let now = 1000;
+  const Zotero = { Server: { Endpoints: {} }, Notifier: { registerObserver: () => 1 } };
+  const context = vm.createContext({ Zotero, Services: {}, Components: {}, Date: class extends Date { static now() { return now; } } });
+  for (const name of ["cleanup-plan.js", "organize-plan.js", "zotero-companion.js"])
+    vm.runInContext(readFileSync(new URL("../zotero-plugin/" + name, import.meta.url), "utf8"), context);
+  vm.runInContext("ZoteroCompanion.start()", context);
+  const endpoint = new Zotero.Server.Endpoints["/zotero-companion/acquire-job"]();
+  const call = async data => { const [status, , raw] = await endpoint.init({ data }); return { status, ...JSON.parse(raw) }; };
+  const submit = { action: "submit", job: { id: "ONE", url: "https://doi.org/10.1002/test", cooldowns: {} } };
+  assert.equal((await call(submit)).error, "agent_connector_setup_required");
+  await call({ action: "pickup", protocol: 1, version: "5.0.217", compatible: true });
+  assert.equal((await call(submit)).status, 200);
+  assert.equal((await call(submit)).error, "connector_job_busy");
+  assert.equal((await call({ action: "pickup", protocol: 1, compatible: true })).job.id, "ONE");
+  assert.equal((await call({ action: "pickup", protocol: 1, compatible: true })).job, null);
+  await call({ action: "progress", id: "ONE", result: { session_id: "SESSION" } });
+  now += 180001;
+  assert.equal((await call({ action: "pickup", protocol: 1, compatible: true })).cancelled, true);
+  assert.equal((await call(submit)).error, "connector_job_busy");
+  assert.equal((await call({ action: "status" })).job.result.session_id, "SESSION");
+  await call({ action: "finish", id: "ONE", result: { session_id: "SESSION", error: "timed out" } });
+  assert.equal((await call({ action: "status" })).job.state, "done");
 });

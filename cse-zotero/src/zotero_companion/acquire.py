@@ -169,10 +169,12 @@ class Safety:
         if remaining > 0:
             raise Cooldown(f"{pub} cooldown active for {int(remaining)} seconds")
 
-    def stop(self, pub, reason, *, cooldown=False, host=""):
-        now = time.time()
+    def stop(self, pub, reason, *, cooldown=False, host="", at=None):
+        now = time.time() if at is None else at
         for key in {canonical_host(pub), canonical_host(host)} - {""}:
             entry = self.data.setdefault(key, {})
+            if entry.get("stopped_at", 0) > now:
+                continue
             entry.update(stop_reason=reason, stopped_at=now)
             if cooldown:
                 entry["cooldown_until"] = now + 86400
@@ -408,6 +410,8 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
     with ExitStack() as stack:
         try:
             safety = stack.enter_context(Safety())
+            from .connector_job import reconcile_stop
+            reconcile_stop(safety, plugin)
             ident = identifier(value)
             if value.startswith(("http://", "https://")):
                 result["handoff_url"] = value.replace("http://", "https://", 1)
@@ -508,12 +512,14 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     if body:
                         result["route"] = pub + "-api"
             if not body and result["handoff_url"]:
-                from .agent_browser import connector_save
+                from .connector_job import connector_save
                 preflight = plugin._request("/zotero-companion/acquire-connector", method="POST",
                                             payload={"collection": collection, "mode": "dry-run"})
                 result["collection_key"] = preflight.get("collection_key")
                 result["route"] = "connector"
-                saved = connector_save(result["handoff_url"], safety, pub)
+                saved = connector_save(result["handoff_url"], safety, pub,
+                                       collection=result["collection_key"], doi=doi)
+                result["browser"] = {k: saved.get(k) for k in ("url", "title", "status")}
                 connector_session = saved.get("session_id")
                 stop = saved.get("stop")
                 if stop:

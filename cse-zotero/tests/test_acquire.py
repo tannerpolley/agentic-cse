@@ -27,6 +27,8 @@ def runtime(monkeypatch, tmp_path):
         def __init__(self, **kwargs):
             pass
         def _request(self, path, **kwargs):
+            if path.endswith('acquire-job'):
+                return {}
             calls.append((path, kwargs['payload']['mode']))
             if path.endswith('metadata'):
                 if kwargs['payload']['mode']=='apply':
@@ -53,11 +55,11 @@ def runtime(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, 'ZoteroLocalAPI', API)
     monkeypatch.setattr(mod, 'ZoteroPluginClient', Plugin)
     monkeypatch.setattr(mod, 'request', request)
-    def connector(*args):
+    def connector(*args, **kwargs):
         calls.append(('connector-visit', None))
         current['has_pdf'] = True
         return {'session_id': 'SESSION'}
-    monkeypatch.setattr('zotero_companion.agent_browser.connector_save', connector)
+    monkeypatch.setattr('zotero_companion.connector_job.connector_save', connector)
     return current, calls, tmp_path
 
 
@@ -198,6 +200,8 @@ def test_pmc_cloud_selects_declared_main_pdf_and_preserves_cooldowns(runtime, mo
     monkeypatch.setattr(mod, 'build_opener', lambda *args: Opener())
     original_plugin = mod.ZoteroPluginClient._request
     def attach(self, path, **kwargs):
+        if path.endswith('acquire-job'):
+            return original_plugin(self, path, **kwargs)
         assert path.endswith('attachment') and kwargs['payload']['item_key'] == 'EXISTING'
         assert base64.b64decode(kwargs['payload']['pdf_base64']) == main
         return original_plugin(self, path, **kwargs)
@@ -225,6 +229,8 @@ def test_existing_parent_returns_pdf_or_resumes_routes(runtime, monkeypatch, has
     original_plugin = mod.ZoteroPluginClient._request
     def plugin(self, path, **kwargs):
         result = original_plugin(self, path, **kwargs)
+        if path.endswith('acquire-job'):
+            return result
         if path.endswith('metadata'):
             result.update(existing=True, item_key='EXISTING')
         else:
@@ -507,7 +513,7 @@ def test_connector_partial_save_is_filed_once_then_challenge_cools_host(runtime,
     current.update(doi='10.1016/test', member=78, has_pdf=False)
     monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda *a, **k: [
         {'key': 'EXISTING', 'data': {'itemType': 'journalArticle', 'DOI': current['doi']}}])
-    monkeypatch.setattr('zotero_companion.agent_browser.connector_save', lambda *a: {
+    monkeypatch.setattr('zotero_companion.connector_job.connector_save', lambda *a, **k: {
         'session_id': 'SESSION', 'stop': {'reason': 'Publisher access challenge: CAPTCHA', 'host': 'WWW.SCIENCEDIRECT.COM.', 'cooldown': True}})
     result = mod.acquire(current['doi'])
     assert not result['ok'] and result['item_key'] == 'EXISTING'

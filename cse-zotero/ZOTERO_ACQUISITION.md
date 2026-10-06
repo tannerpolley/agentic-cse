@@ -46,16 +46,18 @@ Acquisition checks DOI, then translated title duplicates, and tries:
 1. Unpaywall's declared OA PDF locations, using
    `https://api.unpaywall.org/v2/<doi>?email=42780259+tannerpolley@users.noreply.github.com`.
 2. The publisher's official API with a configured token for Elsevier or Wiley.
-3. The real official Zotero Connector in dedicated agent Chrome, for all
-   publishers, including Elsevier, Wiley and ACS.
+3. The modified official Zotero Connector in the user's everyday Chrome, for
+   all publishers, including Elsevier, Wiley and ACS.
 4. Human handoff with the exact DOI or official article URL.
 
 PMC OA locations use NCBI's [official PMC Cloud dataset](https://pmc.ncbi.nlm.nih.gov/tools/pmcaws/) and its metadata-declared main PDF via Unpaywall's PMCID or the [ID Converter](https://pmc.ncbi.nlm.nih.gov/tools/id-converter-api/) fallback (`tool=cse-zotero`, maintainer email), preserving cooldowns, sequential one-request-per-second pacing, and the 50 MiB limit; PMC web PDF links and the legacy OA Web Service/compressed packages (retired August 2026) are never fetched.
 
 The first successful route wins. Hard stops end acquisition immediately. OA
 and API success create a translated parent only when attaching the PDF. The
-Connector creates its own parent; the companion endpoint moves its children
-to an existing DOI/title duplicate and deletes only that newly saved duplicate.
+Connector creates its own parent; the companion endpoint restores an existing
+DOI/title duplicate as the explicit master, merges with Zotero's native item
+merge, and deletes only the newly saved duplicate. This also handles an
+automatic duplicate add-on that initially kept the new item and trashed the old one.
 It files the surviving parent in the requested collection. Failure leaves at
 most one metadata-only parent and reports its key and the handoff URL. A PDF
 must begin with `%PDF` and fit the 50 MiB limit. The parent and PDF child are
@@ -68,7 +70,7 @@ Identify Elsevier (member 78; `10.1016`, `10.1006`), Wiley (311; `10.1002`,
 `10.1111`) and ACS (316; `10.1021`) by Crossref member and DOI prefix. Plain
 Unpaywall downloads for these publishers require explicit `host_type: repository`
 and never fetch their publisher/CDN hosts directly. Their browser fallback uses
-the official Connector, with the same limits as every other publisher.
+the modified official Connector, with the same limits as every other publisher.
 
 Elsevier's API is
 `https://api.elsevier.com/content/article/doi/<encoded-doi>` with
@@ -122,7 +124,7 @@ challenges, nor attempt another route after a hard stop. Do not remove safety
 state to evade cooldowns. Handoff reports the exact paper URL. Agents do not sign in to publisher
 accounts; institutional browser access is through the configured VPN.
 
-## Tokens and dedicated browser
+## Tokens and everyday Chrome
 
 Keep credentials out of repositories, logs, command-line arguments, and JSON.
 Create these files under `~/.config/zotero-companion/`, each mode `600`, each
@@ -138,39 +140,50 @@ access mechanism is established. API requests identify this client honestly
 as `cse-zotero/1.0 (mailto:42780259+tannerpolley@users.noreply.github.com)`. Credentials never follow
 cross-host redirects.
 
+Build the agent extension from the installed official Connector:
+
 ```bash
-cse-zotero agent-browser start --json
-cse-zotero agent-browser status --json
-cse-zotero agent-browser stop --json
+agent-heavy --timeout 15m --max 4G uv run python scripts/build_connector.py
+cse-zotero doctor --json
 cse-zotero acquire <doi> --collection <key> --route browser --json
 ```
 
-Chrome for Testing 154 uses `~/.local/share/cse/zotero/agent-chrome` on a
-managed hidden Xvfb display, with loopback-only remote debugging. Acquisition
-automatically starts it when needed; `agent-browser start|stop|status` manage
-only these owned processes. GPU rendering is disabled for Xvfb compatibility;
-Chrome is a real, non-headless browser with its sandbox enabled, no stealth
-flags, spoofed user agent, or webdriver hiding. The profile needs no login.
+The build copies the official Connector from everyday Chrome's Default profile,
+ID `ekhagklcjbdpajgpjgmbionohlpdbjgc`, to
+`~/.local/share/cse/zotero/zotero-connector-agent/`. It adds `connector-agent.js`
+and appends its import to `background-worker.js`; the manifest and all other
+application files stay byte-identical. Chrome's generated `_metadata` rules
+cache is omitted. The currently supported native API version is 5.0.217;
+a newer installed version is reported as a mismatch and requires inspection
+before rebuilding. The official installed files are never edited.
 
-The installed browser binary is
-`~/.local/share/cse/zotero/chrome-for-testing/chrome-linux64/chrome`, from
-[Google's official Chrome for Testing distribution](https://googlechromelabs.github.io/chrome-for-testing/).
-Startup copies the user's official Connector 5.0.217 files unchanged to
-`~/.local/share/cse/zotero/agent-connector/5.0.217` and loads them with
-`--load-extension`, which Chrome for Testing supports. The source is the
-ordinary Chrome profile's installed extension, ID
-`ekhagklcjbdpajgpjgmbionohlpdbjgc`.
+The user loads this unpacked extension once in `chrome://extensions` and turns
+off the official Connector to avoid conflicting saves; see README setup.
+`doctor --json` reports its heartbeat, active/version status and any mismatch.
+Acquisition can start everyday Chrome with `--no-startup-window`; it never
+stops the user's browser. A missing heartbeat stops with a setup message.
+There is no dedicated browser, remote debugging, hidden display, headless
+mode, spoofed user agent or input simulation.
 
-Remote debugging connects only to that extension's service worker. Tabs are
-opened and inspected through `chrome.tabs`; the native `saveWithTranslator`
-entry point runs the same translation and PDF save as the toolbar click.
-Agents never attach to or evaluate code in publisher page targets. Page title,
-URL, native request status and Connector results detect access stops; the
-worker checks its native HTTP responses before allowing attachment saves.
-The acquisition-scoped worker overrides suppress Connector retries and
-challenge solving without modifying the official extension files. Multiple-item
-pages are refused. `--route browser` forces this single-paper Connector route
-for diagnostics, preserving dedupe and safeguards.
+The CLI posts one job to the local companion plugin's `/acquire-job` endpoint.
+The added worker module picks it up every 20 seconds and uses a Chrome API
+call to reset the MV3 idle timer, without adding manifest permissions.
+A job is claimed once, checkpoints its save session, and is never replayed
+after worker interruption. A three-minute deadline closes its owned window.
+The module creates a minimized, unfocused window, tracks its tab before
+navigating to the article, and calls the native `saveWithTranslator` once.
+Native translators, HTTP/cookie handling and attachment import perform the
+save. The companion endpoint then preserves one parent in the requested
+collection; the CLI verifies the parent and PDF through the local API.
+
+Agents never attach a debugger to publisher pages or simulate input. Tab
+URL/title, response status/headers and native completion results detect access
+stops. Job-scoped request and PDF checks block backoff retries and all
+challenge-bypass/solve-in-tab paths; ordinary toolbar clicks retain the native
+behavior. Cooldown blocking is scoped to the job's tab. Results include final
+URL, title and observed status when available. The owned window closes on
+completion or any stop. `--route browser` forces this one-paper route for
+diagnostics with all safeguards retained.
 
 ## Retention boundary
 

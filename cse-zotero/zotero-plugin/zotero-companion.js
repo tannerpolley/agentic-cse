@@ -11,13 +11,16 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
   const ACQUIRE_METADATA_PATH = "/zotero-companion/acquire-metadata";
   const ACQUIRE_ATTACHMENT_PATH = "/zotero-companion/acquire-attachment";
   const ACQUIRE_CONNECTOR_PATH = "/zotero-companion/acquire-connector";
+  const ACQUIRE_JOB_PATH = "/zotero-companion/acquire-job";
   const CROSSREF_TRANSLATOR = "0a61e167-de9a-4f93-a68a-628b48855909";
   const registeredPaths = [STATUS_PATH, TAG_CLEANUP_PATH, SEARCHES_PATH, ORGANIZE_PATH,
-    ACQUIRE_METADATA_PATH, ACQUIRE_ATTACHMENT_PATH, ACQUIRE_CONNECTOR_PATH];
+    ACQUIRE_METADATA_PATH, ACQUIRE_ATTACHMENT_PATH, ACQUIRE_CONNECTOR_PATH, ACQUIRE_JOB_PATH];
   const SYNC_DELAY_MS = 3000;
   let observerID = null;
   let metadataInFlight = false;
   let lastSync = null;
+  let connectorHeartbeat = null;
+  let connectorJob = null;
 
   function response(status, payload) {
     return [status, "application/json", JSON.stringify(payload)];
@@ -421,6 +424,55 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
       collection_key: target.collection && target.collection.key || null, metadata: metadataJSON(parent) });
   }
 
+  function acquireJob(data) {
+    if (!data || typeof data.action !== "string") return response(400, { error: "invalid_job_action" });
+    const now = Date.now();
+    if (connectorJob && connectorJob.deadline < now && ["queued", "running"].includes(connectorJob.state)) {
+      connectorJob.result = { ...connectorJob.result, stop: { reason: "Connector attempt timed out; no reload or retry" } };
+      connectorJob.state = connectorJob.state === "queued" ? "done" : "stopping";
+    }
+    const ready = connectorHeartbeat && connectorHeartbeat.compatible && now - connectorHeartbeat.at < 45000;
+    if (data.action === "status") return response(200, {
+      ready: Boolean(ready), version: connectorHeartbeat && connectorHeartbeat.version,
+      supported_version: connectorHeartbeat && connectorHeartbeat.supported_version,
+      heartbeat_at: connectorHeartbeat && connectorHeartbeat.at, job: connectorJob,
+      error: ready ? null : connectorHeartbeat && !connectorHeartbeat.compatible
+        ? "Connector version mismatch: " + connectorHeartbeat.version + "; rebuild for the supported version " + connectorHeartbeat.supported_version
+        : "Load ~/.local/share/cse/zotero/zotero-connector-agent in chrome://extensions and disable the official Connector; see README setup"
+    });
+    if (data.action === "pickup") {
+      connectorHeartbeat = { at: now, version: String(data.version || ""), supported_version: data.supported_version,
+        compatible: data.protocol === 1 && data.compatible === true };
+      const job = connectorJob && connectorJob.state === "queued" && connectorHeartbeat.compatible ? connectorJob : null;
+      if (job) { job.state = "running"; job.deadline = now + 180000; }
+      return response(200, { job, cancelled: Boolean(connectorJob && connectorJob.state === "stopping") });
+    }
+    if (data.action === "submit") {
+      if (!ready) return response(409, { error: "agent_connector_setup_required" });
+      if (connectorJob && connectorJob.state !== "done") return response(409, { error: "connector_job_busy" });
+      const job = data.job;
+      if (!job || typeof job.id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(job.id) ||
+          typeof job.url !== "string" || !/^https:\/\/[^/@\s]+(?:[/?#]|$)/i.test(job.url))
+        return response(400, { error: "invalid_paper_job" });
+      connectorJob = { id: job.id, url: job.url, doi: job.doi, collection: job.collection, publisher: job.publisher,
+        cooldowns: job.cooldowns || {}, state: "queued", deadline: now + 45000, result: {} };
+      return response(200, { id: job.id });
+    }
+    if (!connectorJob || data.id !== connectorJob.id) return response(404, { error: "connector_job_not_found" });
+    if (data.action === "cancel") {
+      connectorJob.state = connectorJob.state === "queued" ? "done" : "stopping";
+      connectorJob.result.stop = { reason: "Connector attempt cancelled; no retry" };
+    } else if (["progress", "finish"].includes(data.action)) {
+      if (connectorJob.state === "done") return response(200, { ok: true });
+      connectorJob.result = { ...connectorJob.result, ...data.result };
+      if (data.action === "finish") {
+        connectorJob.state = "done";
+        if (connectorJob.result.stop) connectorJob.result.stopped_at = now / 1000;
+      }
+    } else return response(400, { error: "invalid_job_action" });
+    return response(200, { ok: true });
+  }
+
   function endpointError(error) {
     return response(500, { error });
   }
@@ -508,7 +560,8 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
         projectOrganize: { method: "POST", path: ORGANIZE_PATH, defaultMode: "dry-run" },
         acquireMetadata: { method: "POST", path: ACQUIRE_METADATA_PATH, defaultMode: "dry-run" },
         acquireAttachment: { method: "POST", path: ACQUIRE_ATTACHMENT_PATH, defaultMode: "dry-run" },
-        acquireConnector: { method: "POST", path: ACQUIRE_CONNECTOR_PATH, defaultMode: "dry-run" }
+        acquireConnector: { method: "POST", path: ACQUIRE_CONNECTOR_PATH, defaultMode: "dry-run" },
+        acquireJob: { method: "POST", path: ACQUIRE_JOB_PATH }
       },
       projectSync: { observing: observerID !== null, lastSync },
       config: plan.getConfig()
@@ -591,6 +644,12 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
       init(request) {
         return acquireConnector(requestData(request)).catch(() => endpointError("connector_finalization_failed"));
       }
+    };
+    zotero.Server.Endpoints[ACQUIRE_JOB_PATH] = class {
+      supportedMethods = ["POST"];
+      supportedDataTypes = ["application/json"];
+      permitBookmarklet = false;
+      init(request) { return acquireJob(requestData(request)); }
     };
     observerID = zotero.Notifier.registerObserver(observer, ["collection", "collection-item"], "zotero-companion");
   }
