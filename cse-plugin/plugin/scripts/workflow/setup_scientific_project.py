@@ -571,7 +571,11 @@ METADATA_LABELS = ("Source:", "Scope:", "_Avoid_:")
 
 
 def matt_format(text: str) -> bool:
-    """Matt Pocock's domain glossary: a `## Language` section, even before its first term."""
+    """Matt Pocock's domain glossary: a `## Language` section, even before its first term.
+
+    Fenced examples are ignored, so a scientific context that shows the format is not Matt's.
+    """
+    text = re.sub(r"^```.*?^```[^\n]*$", "", text, flags=re.MULTILINE | re.DOTALL)
     return bool(re.search(r"^## Language\s*$", text, re.MULTILINE)) or bool(glossary_entries(text, ""))
 
 

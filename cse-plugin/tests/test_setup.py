@@ -590,6 +590,14 @@ class ManagedProtocolTests(unittest.TestCase):
         setup.apply_reconciliation(root, setup.plan_reconciliation(root, "analysis"), "analysis", ROLE)
         rows = [line for line in self.context().splitlines() if "| a token |" in line or "| b token |" in line]
         self.assertEqual(2, len(rows), rows)
+        # A scientific context that only shows Matt's format in a fenced example stays CSE's.
+        (root / "notes/c").mkdir()
+        (root / "notes/c/CONTEXT.md").write_text(
+            "# Notes\n\n## Question\n\nKeep this question.\n\n```markdown\n## Language\n\n**flux**:\nExample.\n```\n")
+        plan = setup.plan_reconciliation(root, "analysis")
+        self.assertNotIn("git mv notes/c/CONTEXT.md", setup.plan_text(plan))
+        setup.apply_reconciliation(root, plan, "analysis", ROLE)
+        self.assertIn("Keep this question.", self.context())
 
     def test_reconciliation_moves_nested_latex_document_trees_together(self):
         root = self.repo
