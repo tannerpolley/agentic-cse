@@ -16,7 +16,7 @@ SETUP = "Load ~/.local/share/cse/zotero/zotero-connector-agent in chrome://exten
 def connector_status():
     try:
         status = ZoteroPluginClient()._request("/zotero-companion/acquire-job", method="POST", payload={"action": "status"})
-        return {k: status.get(k) for k in ("ready", "version", "supported_version", "heartbeat_at", "error")}
+        return {k: status.get(k) for k in ("ready", "version", "supported_version", "module_revision", "heartbeat_at", "error")}
     except PluginClientError:
         return {"ready": False, "error": "CSE Zotero plugin job endpoint is unavailable", "setup": SETUP}
 

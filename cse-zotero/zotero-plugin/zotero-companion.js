@@ -435,13 +435,14 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     if (data.action === "status") return response(200, {
       ready: Boolean(ready), version: connectorHeartbeat && connectorHeartbeat.version,
       supported_version: connectorHeartbeat && connectorHeartbeat.supported_version,
+      module_revision: connectorHeartbeat && connectorHeartbeat.module_revision,
       heartbeat_at: connectorHeartbeat && connectorHeartbeat.at, job: connectorJob,
       error: ready ? null : connectorHeartbeat && !connectorHeartbeat.compatible
         ? "Connector version mismatch: " + connectorHeartbeat.version + "; rebuild for the supported version " + connectorHeartbeat.supported_version
         : "Load ~/.local/share/cse/zotero/zotero-connector-agent in chrome://extensions and disable the official Connector; see README setup"
     });
     if (data.action === "pickup") {
-      connectorHeartbeat = { at: now, version: String(data.version || ""), supported_version: data.supported_version,
+      connectorHeartbeat = { at: now, version: String(data.version || ""), supported_version: data.supported_version, module_revision: data.module_revision,
         compatible: data.protocol === 1 && data.compatible === true };
       const job = connectorJob && connectorJob.state === "queued" && connectorHeartbeat.compatible ? connectorJob : null;
       if (job) { job.state = "running"; job.deadline = now + 180000; }

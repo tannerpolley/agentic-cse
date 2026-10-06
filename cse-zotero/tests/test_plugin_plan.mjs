@@ -312,6 +312,7 @@ async function agentJobFixture(response, title = "Paper") {
   const { readFileSync } = await import("node:fs");
   const vm = await import("node:vm");
   let finish, requests = 0, saves = 0, manual = 0;
+  let tabUpdated;
   const result = new Promise(resolve => { finish = resolve; });
   const events = { addListener() {}, removeListener() {} };
   const tab = { id: 5, url: "about:blank", title, status: "complete" };
@@ -366,8 +367,11 @@ async function agentJobFixture(response, title = "Paper") {
         assert.equal(options.focused, false); assert.equal(options.state, "minimized");
         return { id: 7, tabs: [tab] };
       }, remove: async () => {} },
-      tabs: { update: async (_id, update) => { tab.url = update.url; }, get: async () => tab, onUpdated: events },
-      webRequest: { onHeadersReceived: events }, declarativeNetRequest: { updateSessionRules: async () => {} }
+      tabs: { update: async (_id, update) => { tab.url = update.url; }, get: async () => tab,
+        onUpdated: { addListener: listener => { tabUpdated = listener; } } },
+      webRequest: { onHeadersReceived: events }, declarativeNetRequest: { updateSessionRules: async rules => {
+        if (rules.addRules) tabUpdated(tab.id, {}, tab); // Blank-tab completion before publisher navigation.
+      } }
     }
   });
   vm.runInContext(readFileSync(new URL("../zotero-plugin/connector-agent.js", import.meta.url), "utf8"), context);
@@ -423,7 +427,8 @@ test("Plugin jobs require a heartbeat, are claimed once, and retain sessions acr
   const call = async data => { const [status, , raw] = await endpoint.init({ data }); return { status, ...JSON.parse(raw) }; };
   const submit = { action: "submit", job: { id: "ONE", url: "https://doi.org/10.1002/test", cooldowns: {} } };
   assert.equal((await call(submit)).error, "agent_connector_setup_required");
-  await call({ action: "pickup", protocol: 1, version: "5.0.217", compatible: true });
+  await call({ action: "pickup", protocol: 1, version: "5.0.217", module_revision: 2, compatible: true });
+  assert.equal((await call({ action: "status" })).module_revision, 2);
   assert.equal((await call(submit)).status, 200);
   assert.equal((await call(submit)).error, "connector_job_busy");
   assert.equal((await call({ action: "pickup", protocol: 1, compatible: true })).job.id, "ONE");

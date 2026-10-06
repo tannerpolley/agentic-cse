@@ -1,6 +1,7 @@
 /* Agent jobs only. The official Connector's toolbar and ordinary tabs are unchanged. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
+  const MODULE_REVISION = 2;
   const KEY = "cseAgentJob", RULE = 900000000;
   let active = null, busy = false;
   const retiredTabs = new Set(), retiredSessions = new Set();
@@ -150,8 +151,8 @@
     } catch (_) {}
   }, { urls: ["<all_urls>"] }, ["responseHeaders"]);
   const inspect = tab => {
-    active.url = safeURL(tab.url || active.url); active.title = tab.title || "";
     if (tab.url === "about:blank") return;
+    active.url = safeURL(tab.url || active.url); active.title = tab.title || "";
     valid(tab.url);
     check(tab.url, active.status, active.title);
     if (/^(login|sign in|log in)$/i.test(active.title.trim()) || /\/(login|signin|sign-in)(?:[/?#]|$)/i.test(tab.url))
@@ -219,7 +220,7 @@
   async function poll() {
     chrome.runtime.getPlatformInfo(); // Reset MV3's idle timer without changing the official manifest.
     if (!busy) await recover();
-    const response = await api("pickup", { protocol: 1, version: Zotero.version, supported_version: CONNECTOR_VERSION,
+    const response = await api("pickup", { protocol: 1, version: Zotero.version, supported_version: CONNECTOR_VERSION, module_revision: MODULE_REVISION,
       compatible: Zotero.version === CONNECTOR_VERSION });
     if (active && response.cancelled) { try { halt("Connector attempt cancelled; no retry", active.url); } catch (_) {} }
     if (response.job && !busy) {
