@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import base64
+from contextlib import ExitStack
 import fcntl
 import json
 import os
@@ -35,6 +36,10 @@ class AcquireStop(RuntimeError):
 
 class Cooldown(AcquireStop):
     """An earlier stop still cools this host; optional free-copy sources skip it."""
+
+
+class APIConfiguration(AcquireStop):
+    """A verified API key configuration error permits Connector fall-through."""
 
 
 def token(name):
@@ -174,20 +179,21 @@ class Safety:
         self.save()
         raise AcquireStop(reason)
 
-    def check_url(self, url, *, api=False):
+    def check_url(self, url, *, api=False, browser=False):
         host = checked_url(url)
-        if host in {"pmc.ncbi.nlm.nih.gov", "www.ncbi.nlm.nih.gov", "ncbi.nlm.nih.gov"} and re.search(r"/pdf(?:/|$)", urlsplit(url).path, re.I):
+        if not browser and host in {"pmc.ncbi.nlm.nih.gov", "www.ncbi.nlm.nih.gov", "ncbi.nlm.nih.gov"} and re.search(r"/pdf(?:/|$)", urlsplit(url).path, re.I):
             raise AcquireStop("PMC web PDF links require the official PMC Cloud route")
         blocked = restricted_host(host)
-        if blocked and not api:
-            raise AcquireStop(f"{blocked} publisher sites are API-only")
+        if blocked and not (api or browser):
+            raise AcquireStop(f"{blocked} publisher sites require the Connector or official API")
         if api and host not in {"api.elsevier.com", "api.wiley.com"}:
             raise AcquireStop("Publisher API redirect outside official API host refused")
         self.available(host)
         return host
 
     def before(self, pub, url, route, *, api=False, public=False):
-        host = self.check_url(url, api=api) if url else ""
+        pub = canonical_host(pub)
+        host = self.check_url(url, api=api, browser=route == "browser") if url else ""
         self.available(pub)
         if not public:
             require_vpn()
@@ -198,8 +204,8 @@ class Safety:
             if entry.get("day") != day:
                 entry.update(day=day, count=0)
             if entry.get("count", 0) >= 25:
-                raise AcquireStop(f"{pub} daily browser request cap reached (25)")
-            last = self.data.get(host, {}).get("last_browser", 0)
+                raise AcquireStop(f"{pub} daily browser attempt cap reached (25)")
+            last = max(entry.get("last_browser", 0), self.data.get(host, {}).get("last_browser", 0))
             delay = 60 - (now - last)
         else:
             delay = (10 if pub == "wiley" else 1) - (now - self.data.get("last_api", 0))
@@ -209,17 +215,18 @@ class Safety:
             require_vpn()
         if route == "browser":
             entry["count"] = entry.get("count", 0) + 1
+            entry["last_browser"] = time.time()
             self.data.setdefault(host, {})["last_browser"] = time.time()
         else:
             self.data["last_api"] = time.time()
         self.save()
 
-    def response(self, pub, status, body=b"", *, is_pdf=False, host=""):
+    def response(self, pub, status, body=b"", *, is_pdf=False, host="", detail=""):
         reason = None if body.startswith(b"%PDF") else challenge(body[:200000].decode("utf-8", "replace"))
         if reason:
             self.stop(pub, f"Publisher access challenge: {reason} (HTTP {status})", cooldown=True, host=host)
         if status in {401, 403, 429}:
-            self.stop(pub, f"Publisher HTTP {status}; no retry", cooldown=status == 429, host=host)
+            self.stop(pub, f"Publisher HTTP {status}{': ' + detail if detail else ''}; no retry", cooldown=status == 429, host=host)
         if is_pdf and not body.startswith(b"%PDF"):
             self.stop(pub, "Non-PDF bytes where a PDF was expected", host=host)
 
@@ -256,8 +263,17 @@ def request(url, *, safety=None, pub="", route="oa", headers=None, is_pdf=False,
                 safety.check_url(response.geturl(), api=route == "api")
             status = response.code
             body = response.read(50 * 1024 * 1024 + 1)
+            detail = response.headers.get("X-ELS-Status", "")
+            if route == "api" and status >= 400:
+                detail = detail or body.decode("utf-8", "replace").strip()
+                for value in (headers or {}).values():
+                    detail = detail.replace(value, "[redacted]")
+                detail = detail.replace("\n", " ")[:240]
+            if route == "api" and pub == "elsevier" and status == 403 and not challenge(body.decode("utf-8", "replace")):
+                if "AUTHENTICATION_ERROR" in detail or "Requestor configuration settings insufficient" in body.decode("utf-8", "replace"):
+                    raise APIConfiguration("Elsevier API HTTP 403: " + (detail or "AUTHENTICATION_ERROR: Requestor configuration settings insufficient"))
             if not public:
-                safety.response(pub, status, body, host=final_host)
+                safety.response(pub, status, body, host=final_host, detail=detail)
             if status in {301, 302, 303, 307, 308}:
                 target = urljoin(url, response.headers.get("Location", ""))
                 if public and checked_url(target) not in {"api.crossref.org", "api.unpaywall.org"}:
@@ -270,7 +286,7 @@ def request(url, *, safety=None, pub="", route="oa", headers=None, is_pdf=False,
             if status == 404:
                 return None
             if status >= 400:
-                raise AcquireStop(f"Remote HTTP {status}; no retry")
+                raise AcquireStop(f"Remote HTTP {status}{': ' + detail if detail else ''}; no retry")
             if len(body) > 50 * 1024 * 1024:
                 raise AcquireStop("PDF exceeds 50 MiB limit")
             if is_pdf:
@@ -380,8 +396,18 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
               "handoff_url": None}
     api = ZoteroLocalAPI()
     plugin = ZoteroPluginClient(timeout=90)
-    try:
-        with Safety() as safety:
+    ident = ""
+    metadata = None
+    connector_session = None
+    def ensure_parent():
+        if not result["item_key"] and metadata is not None and not connector_session:
+            safety.before("metadata", None, "api", public=True)
+            created = plugin._request("/zotero-companion/acquire-metadata", method="POST",
+                                      payload={"identifier": ident, "collection": collection, "mode": "apply"})
+            result.update(item_key=created["item_key"], collection_key=created.get("collection_key"))
+    with ExitStack() as stack:
+        try:
+            safety = stack.enter_context(Safety())
             ident = identifier(value)
             if value.startswith(("http://", "https://")):
                 result["handoff_url"] = value.replace("http://", "https://", 1)
@@ -397,21 +423,21 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                 raw = request("https://api.crossref.org/works/" + quote(doi, safe=""), safety=safety)
                 crossref = json.loads(raw)["message"] if raw else {}
             pub = publisher(doi, crossref.get("member", ""))
+            if not doi and result["handoff_url"]:
+                host = checked_url(result["handoff_url"])
+                pub = restricted_host(host) or host
             result["publisher"] = pub
-            if route == "browser" and pub in RESTRICTED:
-                raise AcquireStop(f"{pub} is API-only; browser route refused")
             if existing:
                 metadata = {"metadata": api.get(f"/api/users/0/items/{existing}")["data"]}
-            else:
+            elif not ident.startswith(("http://", "https://")):
                 safety.before("metadata", None, "api", public=True)  # Reserve the native metadata operation's slot.
                 metadata = plugin._request("/zotero-companion/acquire-metadata", method="POST",
-                                           payload={"identifier": ident, "collection": collection, "mode": "dry-run" if dry_run else "apply"})
-                if not dry_run:
-                    result.update(item_key=metadata.get("item_key"), collection_key=metadata.get("collection_key"))
+                                           payload={"identifier": ident, "collection": collection, "mode": "dry-run"})
+                result["collection_key"] = metadata.get("collection_key")
                 if metadata.get("existing") and use_existing_parent(api, result, metadata["item_key"]):
                     return result
             if not doi:
-                native = metadata.get("metadata", {})
+                native = (metadata or {}).get("metadata", {})
                 doi = identifier(native.get("DOI", ""))
                 if doi:
                     result.update(doi=doi, handoff_url="https://doi.org/" + doi)
@@ -423,11 +449,12 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     target = native["url"].replace("http://", "https://", 1)
                     checked_url(target)
                     result["handoff_url"] = target
-                if route == "browser" and pub in RESTRICTED:
-                    raise AcquireStop(f"{pub} is API-only; browser route refused")
             if dry_run:
+                if metadata is None:
+                    result.update(plugin._request("/zotero-companion/acquire-connector", method="POST",
+                                                  payload={"collection": collection, "mode": "dry-run"}))
                 return {**result, "ok": True, "mode": "dry-run", "metadata": metadata,
-                        "tokens": configured_tokens(), "planned_routes": ["oa", "api", "handoff"] if pub in RESTRICTED else ["oa", "browser", "handoff"]}
+                        "tokens": configured_tokens(), "planned_routes": ["oa", "api", "connector", "handoff"]}
             body = None
             if doi and route == "auto":
                 raw = request("https://api.unpaywall.org/v2/" + quote(doi, safe="") + "?email=" + EMAIL, safety=safety)
@@ -474,19 +501,44 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     else:
                         url = "https://api.wiley.com/onlinelibrary/tdm/v1/articles/" + quote(doi, safe="")
                         headers = {"Wiley-TDM-Client-Token": credential, "Accept": "application/pdf"}
-                    body = request(url, safety=safety, pub=pub, route="api", headers=headers, is_pdf=True)
+                    try:
+                        body = request(url, safety=safety, pub=pub, route="api", headers=headers, is_pdf=True)
+                    except APIConfiguration as exc:
+                        result["skipped_routes"] = [str(exc)]
                     if body:
                         result["route"] = pub + "-api"
-            if not body and pub not in RESTRICTED and result["handoff_url"]:
-                from .agent_browser import browser_pdf
-                body = browser_pdf(result["handoff_url"] or value, safety, pub)
-                if body:
-                    result["route"] = "browser"
-            if not body:
-                raise AcquireStop("No permitted PDF route; save with the normal Zotero Connector")
-            attached = plugin._request("/zotero-companion/acquire-attachment", method="POST",
+            if not body and result["handoff_url"]:
+                from .agent_browser import connector_save
+                preflight = plugin._request("/zotero-companion/acquire-connector", method="POST",
+                                            payload={"collection": collection, "mode": "dry-run"})
+                result["collection_key"] = preflight.get("collection_key")
+                result["route"] = "connector"
+                saved = connector_save(result["handoff_url"], safety, pub)
+                connector_session = saved.get("session_id")
+                stop = saved.get("stop")
+                if stop:
+                    try:
+                        safety.stop(pub, stop["reason"], cooldown=stop.get("cooldown", False), host=stop.get("host", ""))
+                    except AcquireStop:
+                        pass  # Persist before finalization, even if Zotero filing fails.
+                if connector_session:
+                    filed = plugin._request("/zotero-companion/acquire-connector", method="POST", payload={
+                        "mode": "apply", "session_id": connector_session, "doi": doi,
+                        "item_key": result["item_key"], "collection": result["collection_key"] or collection,
+                        "metadata": (metadata or {}).get("metadata")})
+                    result.update({k: filed.get(k) for k in ("item_key", "attachment_key", "collection_key")})
+                    metadata = {"metadata": filed["metadata"]}
+                if stop:
+                    raise AcquireStop(stop["reason"])
+                if result["attachment_key"]:
+                    result["route"] = "connector"
+            if body:
+                ensure_parent()
+                attached = plugin._request("/zotero-companion/acquire-attachment", method="POST",
                                        payload={"item_key": result["item_key"], "pdf_base64": base64.b64encode(pdf_bytes(body)).decode(), "mode": "apply"})
-            result["attachment_key"] = attached["attachment_key"]
+                result["attachment_key"] = attached["attachment_key"]
+            if not result["attachment_key"]:
+                raise AcquireStop((saved.get("error") if not body and result["handoff_url"] else None) or "No PDF acquired; save with the normal Zotero Connector")
             parent = api.get(f"/api/users/0/items/{result['item_key']}")["data"]
             children = api.get(f"/api/users/0/items/{result['item_key']}/children")
             if doi and identifier(parent.get("DOI", "")) != doi:
@@ -496,6 +548,11 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
             if not any(i["key"] == result["attachment_key"] and i["data"].get("contentType") == "application/pdf" for i in children):
                 raise AcquireStop("Live verification failed: PDF child is missing")
             result.update(ok=True, verified=True, handoff_url=None)
-    except (AcquireStop, OSError, ValueError, KeyError, RuntimeError) as exc:
-        result["stop_reason"] = str(exc)
+        except (AcquireStop, OSError, ValueError, KeyError, RuntimeError) as exc:
+            result["stop_reason"] = str(exc)
+            if not dry_run:
+                try:
+                    ensure_parent()
+                except (OSError, ValueError, KeyError, RuntimeError) as error:
+                    result["stop_reason"] += "; metadata save failed: " + str(error)
     return result

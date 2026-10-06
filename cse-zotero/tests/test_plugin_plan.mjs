@@ -248,3 +248,141 @@ test("manifest has the fields Zotero 10 requires to install an add-on", async ()
   const zotero = manifest.applications.zotero;
   for (const field of ["id", "update_url", "strict_max_version"]) assert.ok(zotero[field], field);
 });
+
+test("Connector finalization moves children to the existing parent and removes only its duplicate", async () => {
+  const { readFileSync } = await import("node:fs");
+  const vm = await import("node:vm");
+  for (const duplicate of [true, false]) {
+    const items = new Map();
+    const erased = [];
+    const collection = { id: 9, key: "TESTCOLL", name: "Test", libraryID: 1 };
+    const parent = (id, key) => ({
+      id, key, libraryID: 1, isRegularItem: () => true,
+      getField: field => field === "DOI" ? "10.1016/test" : "Paper",
+      toJSON: () => ({ title: "Paper", DOI: "10.1016/test" }),
+      getAttachments: () => [...items.values()].filter(i => i.parentID === id).map(i => i.id),
+      getNotes: () => [], addToCollection: target => { assert.equal(target, 9); }, save: async () => {},
+      erase: async () => { erased.push(key); items.delete(id); }
+    });
+    const fresh = parent(2, "FRESH");
+    const old = parent(1, "EXISTING");
+    items.set(2, fresh);
+    if (duplicate) items.set(1, old);
+    const pdf = { id: 3, key: "PDFKEY", parentID: 2, attachmentContentType: "application/pdf", isRegularItem: () => false, save: async () => {} };
+    items.set(3, pdf);
+    const Zotero = {
+      Libraries: { userLibraryID: 1 }, Collections: { getByLibrary: () => [collection] },
+      Utilities: { cleanDOI: value => value }, ItemFields: { getID: field => field },
+      DB: { queryAsync: async () => [...items.values()].filter(i => i.isRegularItem()).map(i => ({ itemID: i.id, value: "Paper" })),
+        executeTransaction: async fn => fn() },
+      Items: { getAsync: async id => Array.isArray(id) ? id.map(i => items.get(i)) : items.get(id),
+        getByLibraryAndKey: (_, key) => [...items.values()].find(i => i.key === key) },
+      Server: { Endpoints: {}, Connector: { SessionManager: { get: id => id === "SESSION" && { _items: { fakeID: fresh } } } } },
+      Notifier: { registerObserver: () => 1 }
+    };
+    const context = vm.createContext({ Zotero, Services: {}, Components: {} });
+    for (const name of ["cleanup-plan.js", "organize-plan.js", "zotero-companion.js"])
+      vm.runInContext(readFileSync(new URL(`../zotero-plugin/${name}`, import.meta.url), "utf8"), context);
+    vm.runInContext("ZoteroCompanion.start()", context);
+    const Endpoint = Zotero.Server.Endpoints["/zotero-companion/acquire-connector"];
+    const [status, , raw] = await new Endpoint().init({ data: { mode: "apply", session_id: "SESSION", collection: "TESTCOLL", doi: "10.1016/test" } });
+    assert.equal(status, 200, raw);
+    const result = JSON.parse(raw);
+    assert.equal(result.item_key, duplicate ? "EXISTING" : "FRESH");
+    assert.equal(result.attachment_key, "PDFKEY");
+    assert.equal(pdf.parentID, duplicate ? 1 : 2);
+    assert.deepEqual(erased, duplicate ? ["FRESH"] : []);
+    assert.equal([...items.values()].filter(i => i.isRegularItem()).length, 1);
+  }
+});
+
+test("Connector worker prevents native backoff, challenge bypass and later requests after a hard stop", async () => {
+  const { readFileSync } = await import("node:fs");
+  const vm = await import("node:vm");
+  const source = readFileSync(new URL("../src/zotero_companion/agent_browser.py", import.meta.url), "utf8");
+  const setup = source.split('WORKER_SETUP = r"""')[1].split('"""')[0];
+  for (const response of [
+    { status: 429, response: "quota" },
+    { status: 200, response: "<title>Just a moment</title>" },
+    { status: 200, response: new TextEncoder().encode("HTML instead of PDF").buffer },
+    { status: 200, response: new TextEncoder().encode("%PDF-1.7").buffer },
+    { status: 503, response: "Temporary", getResponseHeader: () => "5" }
+  ]) {
+    let requests = 0;
+    const event = { addListener() {}, removeListener() {} };
+    const Zotero = {
+      version: "5.0.217", initDeferred: { promise: Promise.resolve() },
+      Connector: { checkIsOnline: async () => true },
+      HTTP: { _requestFetch: async (_m, _u, options) => { requests++; assert.equal(options.maxBackoff, 0); return { ...response, responseURL: "https://cdn.publisher.example/paper.pdf" }; },
+        StatusError: class extends Error { constructor(response) { super("HTTP status error"); this.retryAfter = response.getResponseHeader?.("Retry-After"); } } },
+      ItemSaver: { saveAttachmentToZotero: async () => {} },
+      Messaging: { sendMessage() {} },
+      BotBypass: { bypassAmazonCaptcha() { throw Error("Must never run"); }, passJSDetectionViaHiddenIframe() {}, passJSDetectionViaWindowPrompt() {} }
+    };
+    const context = vm.createContext({ Zotero, URL, ArrayBuffer, Uint8Array, TextDecoder,
+      chrome: { runtime: { id: "official-connector" }, tabs: { remove: async () => {}, onUpdated: event }, webRequest: { onHeadersReceived: event, onErrorOccurred: event }, declarativeNetRequest: { updateSessionRules: async () => {} } } });
+    await vm.runInContext(setup, context);
+    await Zotero.HTTP._requestFetch("GET", "chrome-extension://official-connector/schema.json", { successCodes: false });
+    assert.equal(context.cseAcquire.stop, null);
+    requests = 0;
+    const declaredURL = response.response instanceof ArrayBuffer && new TextDecoder().decode(response.response).startsWith("%PDF") ? "http://publisher.example/paper.pdf" : "https://publisher.example/paper.pdf";
+    await Zotero.ItemSaver.saveAttachmentToZotero({ url: declaredURL, mimeType: "application/pdf" });
+    const fetch = () => Zotero.HTTP._requestFetch("GET", declaredURL, { successCodes: response.status === 503 ? null : false, maxBackoff: 10 });
+    if (response.status === 503) {
+      context.cseAcquire.pdfs.clear();
+      const error = await fetch().catch(error => error);
+      assert.equal(error.retryAfter, undefined);
+      assert.equal(context.cseAcquire.stop, null);
+      assert.equal(requests, 1);
+    } else if (response.response instanceof ArrayBuffer && new TextDecoder().decode(response.response).startsWith("%PDF")) {
+      await fetch();
+      assert.equal(context.cseAcquire.stop, null);
+      assert.throws(() => Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://publisher.example/paper.pdf"));
+      assert.equal(context.cseAcquire.stop.cooldown, true);
+    } else {
+      await assert.rejects(fetch());
+      assert.equal(context.cseAcquire.stop.host, "cdn.publisher.example");
+      assert.equal(context.cseAcquire.stop.cooldown, response.status === 429 || typeof response.response === "string");
+      await assert.rejects(fetch());
+      assert.equal(requests, 1);
+    }
+    await context.cseAcquire.clean();
+  }
+});
+
+test("Connector attempt waits for native completion after a broadcast returns early", async () => {
+  const { readFileSync } = await import("node:fs");
+  const vm = await import("node:vm");
+  const source = readFileSync(new URL("../src/zotero_companion/agent_browser.py", import.meta.url), "utf8");
+  const setup = source.split('WORKER_SETUP = r"""')[1].split('"""')[0];
+  const save = source.split('WORKER_SAVE = r"""')[1].split('"""')[0];
+  let completed = false;
+  let saves = 0;
+  const tab = { id: 5, url: "https://publisher.example/paper", status: "complete" };
+  const event = { addListener() {}, removeListener() {} };
+  const Zotero = {
+    version: "5.0.217", initDeferred: { promise: Promise.resolve() },
+    Connector: { checkIsOnline: async () => true },
+    HTTP: { _requestFetch() {} }, ItemSaver: { saveAttachmentToZotero() {} },
+    BotBypass: {}, Messaging: { sendMessage() {} },
+    Connector_Browser: {
+      getTabInfo: () => ({ translators: [{ itemType: "journalArticle" }] }),
+      saveWithTranslator: async () => {
+        saves++;
+        // A different frame responds first; the actual save finishes later.
+        setTimeout(() => { completed = true; Zotero.Messaging.sendMessage("progressWindow.done", [true], tab); }, 20);
+      }
+    }
+  };
+  const context = vm.createContext({ Zotero, setTimeout, URL, ArrayBuffer, Uint8Array, TextDecoder,
+    chrome: { tabs: { get: async () => tab, remove: async () => {}, onUpdated: event },
+      webRequest: { onHeadersReceived: event, onErrorOccurred: event },
+      declarativeNetRequest: { updateSessionRules: async () => {} } } });
+  await vm.runInContext(setup, context);
+  context.cseAcquire.tab = 5;
+  await vm.runInContext(save, context);
+  assert.equal(completed, true);
+  assert.equal(saves, 1);
+  assert.equal(context.cseAcquire.done, true);
+  await context.cseAcquire.clean();
+});

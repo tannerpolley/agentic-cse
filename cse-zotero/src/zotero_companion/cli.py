@@ -210,7 +210,7 @@ def main() -> int:
     acquire_cmd.add_argument("identifier")
     acquire_cmd.add_argument("--collection", help="existing collection key or unambiguous name")
     acquire_cmd.add_argument("--dry-run", action="store_true")
-    acquire_cmd.add_argument("--route", choices=("auto", "browser"), default="auto", help="force permitted browser route for one paper")
+    acquire_cmd.add_argument("--route", choices=("auto", "browser"), default="auto", help="force native Connector route for one paper")
     acquire_cmd.add_argument("--json", action="store_true")
     browser_cmd = subparsers.add_parser("agent-browser", help="manage dedicated Chrome without taking focus")
     browser_cmd.add_argument("action", choices=("start", "stop", "status"))

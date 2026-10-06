@@ -201,7 +201,7 @@ Doctor reports names and status only, never token values.
 The command writes the requested paper by default. Its optional dry run previews
 metadata only and does not create a Zotero item, download a PDF, or start the
 browser. Use the default `auto` route for normal acquisition; force
-`--route browser` only for a permitted, non-restricted live test.
+`--route browser` only for a single-paper Connector diagnostic.
 
 ```bash
 uv run cse-zotero doctor --json
@@ -213,7 +213,8 @@ uv run cse-zotero agent-browser start --json
 uv run cse-zotero agent-browser stop --json
 ```
 
-The dedicated agent browser runs headless and does not take desktop focus.
+The dedicated agent browser runs the official Connector on hidden Xvfb and
+does not take desktop focus; acquisition starts it automatically when needed.
 Acquire results include the route, stop reason or handoff URL, and any verified
 item, attachment, or collection keys. For other Zotero writes, retain their
 reviewed previews and explicit approval. Read
@@ -495,6 +496,8 @@ loopback-only endpoints to Zotero's existing local server:
   token is supplied; limited to registered project collection trees)
 - `POST /zotero-companion/acquire-metadata` (dry-run by default; apply creates
   one Zotero parent without translator attachments)
+- `POST /zotero-companion/acquire-connector` (dry-run validates the target; apply
+  files a native Connector session and removes its newly saved duplicate).
 - `POST /zotero-companion/acquire-attachment` (dry-run by default; apply imports
   supplied PDF bytes as an attachment to the selected item)
 

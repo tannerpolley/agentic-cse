@@ -36,66 +36,58 @@ DOIs embedded in article URLs and identifiers recognized by Zotero (DOI, ISBN,
 arXiv, PMID) use Zotero's search translators. DOI translation is pinned to
 Zotero's Crossref REST translator, which does not visit publisher pages.
 Metadata lookups go to registries and library catalogs, not publishers, and keep Zotero's native request and retry handling within one CLI pacing slot.
-URLs without a recognized identifier are unsupported and return their exact
-URL for the ordinary Connector. Do not invent metadata or PDF URLs.
+URLs without a recognized identifier use the native Connector translator for
+that article page. Do not invent metadata or PDF URLs.
 
 ## Route order and publisher boundaries
 
-Acquisition saves one translated parent without automatic translator
-attachments, then tries:
+Acquisition checks DOI, then translated title duplicates, and tries:
 
 1. Unpaywall's declared OA PDF locations, using
    `https://api.unpaywall.org/v2/<doi>?email=42780259+tannerpolley@users.noreply.github.com`.
 2. The publisher's official API with a configured token for Elsevier or Wiley.
-3. Dedicated agent Chrome for other publishers, reading only the page-declared
-   `citation_pdf_url` and fetching it in page context with credentials.
+3. The real official Zotero Connector in dedicated agent Chrome, for all
+   publishers, including Elsevier, Wiley and ACS.
 4. Human handoff with the exact DOI or official article URL.
 
 PMC OA locations use NCBI's [official PMC Cloud dataset](https://pmc.ncbi.nlm.nih.gov/tools/pmcaws/) and its metadata-declared main PDF via Unpaywall's PMCID or the [ID Converter](https://pmc.ncbi.nlm.nih.gov/tools/id-converter-api/) fallback (`tool=cse-zotero`, maintainer email), preserving cooldowns, sequential one-request-per-second pacing, and the 50 MiB limit; PMC web PDF links and the legacy OA Web Service/compressed packages (retired August 2026) are never fetched.
 
-The first successful route wins. Hard stops end the acquisition immediately;
-they never trigger another route. Parent metadata may remain if a PDF route
-fails; output reports its key and the handoff URL. A PDF must begin with `%PDF`
-and fit the 50 MiB transfer limit. Attachments are imported by the companion
-plugin, then parent DOI and PDF child are verified through Zotero's local API.
-JSON reports `item_key`, `attachment_key`, `collection_key`, `route`,
-`verified`, `stop_reason`, and `handoff_url`; incomplete acquisition exits nonzero.
+The first successful route wins. Hard stops end acquisition immediately. OA
+and API success create a translated parent only when attaching the PDF. The
+Connector creates its own parent; the companion endpoint moves its children
+to an existing DOI/title duplicate and deletes only that newly saved duplicate.
+It files the surviving parent in the requested collection. Failure leaves at
+most one metadata-only parent and reports its key and the handoff URL. A PDF
+must begin with `%PDF` and fit the 50 MiB limit. The parent and PDF child are
+verified through Zotero's local API. JSON reports `item_key`, `attachment_key`,
+`collection_key`, `route`, `verified`, `stop_reason`, and `handoff_url`; incomplete
+acquisition exits nonzero. A skipped API configuration error appears in
+`skipped_routes`.
 
-Identify restricted publishers by Crossref member and DOI prefix: Elsevier
-(member 78; `10.1016`, `10.1006`), Wiley (311; `10.1002`, `10.1111`), ACS
-(316; `10.1021`). Their publisher sites, including redirects and OA publisher
-PDFs, are never fetched. Unpaywall locations must explicitly report
-`host_type: repository` for these publishers; unknown provenance is skipped. Do not call
-Zotero DOI/URL attachment resolvers for these publishers. This implementation
-uses Unpaywall rather than Zotero attachment resolvers, avoiding their implicit
-page requests and retries. Explicit browser routing is refused for all three.
-Unknown publishers still pass host checks on every redirect.
+Identify Elsevier (member 78; `10.1016`, `10.1006`), Wiley (311; `10.1002`,
+`10.1111`) and ACS (316; `10.1021`) by Crossref member and DOI prefix. Plain
+Unpaywall downloads for these publishers require explicit `host_type: repository`
+and never fetch their publisher/CDN hosts directly. Their browser fallback uses
+the official Connector, with the same limits as every other publisher.
 
-Elsevier uses only
+Elsevier's API is
 `https://api.elsevier.com/content/article/doi/<encoded-doi>` with
 `Accept: application/pdf`, `X-ELS-APIKey`, and optional `X-ELS-Insttoken`.
-Never automate ScienceDirect or other Elsevier article pages. See the official
-[Article Retrieval API](https://dev.elsevier.com/documentation/ArticleRetrievalAPI.wadl),
-[API authentication](https://dev.elsevier.com/tecdoc_api_authentication.html), and
-[TDM license](https://www.elsevier.com/about/policies-and-standards/text-and-data-mining/license).
+An API HTTP 403 with `X-ELS-Status: AUTHENTICATION_ERROR` or the equivalent
+“Requestor configuration settings insufficient” error is a key configuration
+skip, allowing Connector fall-through; a challenge response or HTTP 429 still
+hard-stops. Other 401/403 responses also stop. Error messages retain
+`X-ELS-Status` when supplied. See the official
+[Article Retrieval API](https://dev.elsevier.com/documentation/ArticleRetrievalAPI.wadl)
+and [API authentication](https://dev.elsevier.com/tecdoc_api_authentication.html).
 
-Wiley uses only
+Wiley's API is
 `https://api.wiley.com/onlinelibrary/tdm/v1/articles/<encoded-doi>` with
 `Wiley-TDM-Client-Token`. Obtain a token through Wiley Online Library's account
-and click-through TDM agreement; institutional entitlement requires the
-institution network. Wiley publishes caps of 3 articles/second and 60 requests
-per 10 minutes, and asks ongoing requests to be 10 seconds apart. The client
-uses the stricter 10-second interval. See [Wiley's TDM documentation](https://onlinelibrary.wiley.com/library-info/resources/text-and-datamining).
-
-No public ACS token API was verified. After permitted repository OA attempts,
-ACS goes to human handoff. ACS says TDM is outside standard agreements and
-must be negotiated into the institution's license or a separate agreement.
-Ask the institution's library or ACS for the applicable permission and access
-method. A Crossref PDF link is not permission or a token API. For example,
-`10.1021/bi00728a004` has a `similarity-checking` link, not a `text-mining`
-link. See [ACS licensing FAQ](https://solutions.acs.org/access-options/corp-gov-np/),
-[ACS academic agreement](https://solutions.acs.org/wp-content/uploads/2021/04/ACS-Publications-Institutional-Access-Agreement-Academic.pdf),
-and [Crossref's TDM guidance](https://www.crossref.org/documentation/retrieve-metadata/text-and-data-mining/).
+and TDM agreement; institutional entitlement requires the institution network.
+The client uses Wiley's stricter 10-second interval. See
+[Wiley's TDM documentation](https://onlinelibrary.wiley.com/library-info/resources/text-and-datamining).
+No public ACS token API was verified; ACS uses OA then the normal Connector.
 
 ## VPN, pacing, and hard stops
 
@@ -111,20 +103,24 @@ Never discover or report the public IP.
 A nonblocking process lock serializes acquisition. Persist pacing, daily
 counts, cooldowns, and stop reasons in
 `~/.local/state/cse-zotero/acquire.json`. An unreadable state refuses remote
-access. Browser requests wait at least 60 seconds between requests to the
-same host, including redirects and PDF fetches, and have a daily cap of 25
-requests per publisher. CLI API/OA requests are sequential and at most one per
+access. Browser attempts wait at least 60 seconds between single-paper visits to the
+same publisher or host, with a daily cap of 25 attempts per publisher. Native
+page resources, redirects, translation and PDF downloads belong to that one
+visit. Each attempt has a three-minute deadline; a stuck page is closed without
+reloading. Connector backoff retries and CAPTCHA/JavaScript challenge bypass
+methods are blocked during the attempt. CLI API/OA requests are sequential and at most one per
 second globally, with Wiley at one per 10 seconds. Interrupted requests still
 consume their recorded pacing slot. No parallel acquisition.
 
-Publisher and PDF requests stop without retry for HTTP 401, 403, or 429, CAPTCHA, Cloudflare/“Just a
+Except for the Elsevier API configuration skip described above, publisher and
+PDF requests stop without retry for HTTP 401, 403, or 429, CAPTCHA, Cloudflare/“Just a
 moment”, human-verification or unusual-activity pages, login walls, or
 non-PDF bytes where a PDF was expected. Record the reason. A publisher 429 or
 challenge adds a 24-hour cooldown for both publisher and canonical responding
 host; acquisitions refuse either until expiry. Do not solve, bypass, probe, replay, or retry
 challenges, nor attempt another route after a hard stop. Do not remove safety
-state to evade cooldowns. The user can complete ordinary login or Connector
-saving manually.
+state to evade cooldowns. Handoff reports the exact paper URL. Agents do not sign in to publisher
+accounts; institutional browser access is through the configured VPN.
 
 ## Tokens and dedicated browser
 
@@ -146,27 +142,35 @@ cross-host redirects.
 cse-zotero agent-browser start --json
 cse-zotero agent-browser status --json
 cse-zotero agent-browser stop --json
-cse-zotero acquire <permitted-OA-doi> --collection <key> --route browser --json
+cse-zotero acquire <doi> --collection <key> --route browser --json
 ```
 
-Chrome uses `~/.local/share/cse/zotero/agent-chrome`, loopback remote debugging,
-and native headless mode to avoid creating or focusing desktop windows. It
-uses no stealth flags, spoofed user agent, or webdriver hiding. It starts only
-on explicit `agent-browser start`, not during acquisition. Navigation and PDF
-requests are intercepted for VPN, host restrictions, pacing, status, and
-challenge checks. Unneeded page resources are blocked; browser fallback may
-therefore be unsupported on pages requiring scripts. It never activates a tab.
-`--route browser` skips OA/API solely to exercise a permitted single-paper
-browser route; duplicate checks and every safeguard remain active.
+Chrome for Testing 154 uses `~/.local/share/cse/zotero/agent-chrome` on a
+managed hidden Xvfb display, with loopback-only remote debugging. Acquisition
+automatically starts it when needed; `agent-browser start|stop|status` manage
+only these owned processes. GPU rendering is disabled for Xvfb compatibility;
+Chrome is a real, non-headless browser with its sandbox enabled, no stealth
+flags, spoofed user agent, or webdriver hiding. The profile needs no login.
 
-For a one-time manual sign-in, stop agent Chrome, then the user can launch:
+The installed browser binary is
+`~/.local/share/cse/zotero/chrome-for-testing/chrome-linux64/chrome`, from
+[Google's official Chrome for Testing distribution](https://googlechromelabs.github.io/chrome-for-testing/).
+Startup copies the user's official Connector 5.0.217 files unchanged to
+`~/.local/share/cse/zotero/agent-connector/5.0.217` and loads them with
+`--load-extension`, which Chrome for Testing supports. The source is the
+ordinary Chrome profile's installed extension, ID
+`ekhagklcjbdpajgpjgmbionohlpdbjgc`.
 
-```bash
-google-chrome --user-data-dir="$HOME/.local/share/cse/zotero/agent-chrome" --no-first-run
-```
-
-After the user closes that window, restart agent Chrome. Agents do not launch
-that visible window, click, type, or control the user's ordinary browser.
+Remote debugging connects only to that extension's service worker. Tabs are
+opened and inspected through `chrome.tabs`; the native `saveWithTranslator`
+entry point runs the same translation and PDF save as the toolbar click.
+Agents never attach to or evaluate code in publisher page targets. Page title,
+URL, native request status and Connector results detect access stops; the
+worker checks its native HTTP responses before allowing attachment saves.
+The acquisition-scoped worker overrides suppress Connector retries and
+challenge solving without modifying the official extension files. Multiple-item
+pages are refused. `--route browser` forces this single-paper Connector route
+for diagnostics, preserving dedupe and safeguards.
 
 ## Retention boundary
 
