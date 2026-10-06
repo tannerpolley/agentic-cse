@@ -5,7 +5,8 @@ issues, source files, figures, notebooks, manuscripts, and review reports.
 Project-specific `GLOSSARY.md` files may add domain terms, but they should not
 repurpose the workflow and tool terms below without an explicit decision.
 Root `GLOSSARY.md` owns project vocabulary; an existing `GLOSSARY-MAP.md` links
-additional glossaries. The scientific context links to vocabulary, not tables.
+additional glossaries. The scientific context links to vocabulary and owns
+scoped or exception-bearing writing rules under `## Prose avoid rules`.
 
 ## Use the glossary
 

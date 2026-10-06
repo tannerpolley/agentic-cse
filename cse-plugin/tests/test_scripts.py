@@ -234,6 +234,48 @@ class ScriptBehaviorTests(unittest.TestCase):
             self.assertIn("classification token", avoided_stop["reason"])
             self.assertIn("GLOSSARY.md", avoided_stop["reason"])
 
+    def test_mapped_avoids_use_context_scopes_and_keep_plugin_checks_available(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.hook_fixture(root, "tool")
+            (root / "GLOSSARY-MAP.md").write_text("# Glossary Map\n\n## Contexts\n\n- [Heat](./src/heat/GLOSSARY.md): heat\n- [Mass](./src/mass/GLOSSARY.md): mass\n- [Lazy](./src/lazy/GLOSSARY.md): not written yet\n")
+            for name, term in (("heat", "heat flux"), ("mass", "mass flux")):
+                path = root / "src" / name
+                path.mkdir(parents=True)
+                (path / "GLOSSARY.md").write_text(f"# {name}\n\n## Language\n\n**{term}**:\nTransfer per area.\n_Avoid_: flow\nSource: paper §2\n")
+                (path / "report.md").write_text("The flow is fixed.\n")
+            checker = "plugin/scripts/workflow/check_prose.py"
+            for name, term in (("heat", "heat flux"), ("mass", "mass flux")):
+                checked = self.run_script(checker, str(root / "src" / name / "report.md"), cwd=root)
+                self.assertEqual(1, checked.returncode, checked.stdout + checked.stderr)
+                self.assertIn(term, checked.stdout)
+                self.assertNotIn("configuration error", checked.stdout)
+            outside = root / "report.md"
+            outside.write_text("The flow is fixed.\n")
+            self.assertEqual(0, self.run_script(checker, str(outside), cwd=root).returncode)
+            # Identical rules with overlapping scopes are not conflicting authorities.
+            for name in ("heat", "mass"):
+                with (root / "src" / name / "GLOSSARY.md").open("a") as stream:
+                    stream.write("\n**Common term**:\nShared name.\n_Avoid_: old name\nSource: paper §3\nScope: `reports/*`\n")
+            for name, suffix in (("heat", "md"), ("mass", "qmd")):
+                with (root / "src" / name / "GLOSSARY.md").open("a") as stream:
+                    stream.write(f"\n**{name} report**:\nReport type.\n_Avoid_: report token\nSource: paper §4\nScope: `reports/*.{suffix}`\n")
+            (root / "reports").mkdir()
+            for suffix in ("md", "qmd"):
+                report = root / "reports" / f"study.{suffix}"
+                report.write_text("The report token is fixed.\n")
+                checked = self.run_script(checker, str(report), cwd=root)
+                self.assertEqual(1, checked.returncode, checked.stdout + checked.stderr)
+                self.assertNotIn("configuration error", checked.stdout)
+            self.run_hook(root, "SessionStart", source="startup")
+            outside.write_text("The schema is fixed.\n")
+            checked = self.run_script(checker, str(outside), cwd=root)
+            self.assertEqual(1, checked.returncode, checked.stdout + checked.stderr)
+            self.assertIn("avoid 'schema'", checked.stdout)
+            stop = self.run_hook(root, "Stop", stop_hook_active=True)
+            self.assertIn("avoid 'schema'", stop["reason"])
+            self.assertNotIn("unavailable", json.dumps(stop))
+
     def test_user_registration_is_added_and_removed_without_touching_other_settings(self):
         with tempfile.TemporaryDirectory() as directory:
             home = Path(directory)

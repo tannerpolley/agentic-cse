@@ -56,14 +56,27 @@ Align only the unresolved material subset. Inspect purpose and owners, recommend
 `--reconcile` produce a complete read-only move, merge, delete, and caller/link
 plan; add `--role analysis` or `--role tool` for a confirmed preview. They
 write nothing until the same plan is rerun with `--approve --role <role>`. Merge
-the non-glossary content of every stray root or nested `CONTEXT.md` into
-`docs/scientific/CONTEXT.md`. Migrate glossary and avoid rows from those files
-and the scientific context into root `GLOSSARY.md`, in Matt Pocock's entry
-format with required `Source:` and optional `Scope:` lines. Mark missing
-sources `sourceless`; add only missing terms and leave existing entries intact.
-Never delete, rename, or merge away `GLOSSARY.md` or `GLOSSARY-MAP.md`. Read
-every glossary linked by an existing map; never create a map.
-The scientific context links to the glossary and no longer holds vocabulary tables.
+the non-glossary content of stray `CONTEXT.md` files into the scientific records.
+Only tables under `## Glossary` and `## Avoid` are migration candidates. Move a
+glossary row only when every column maps exactly to Matt's vocabulary format:
+term, definition, required `Source:`, and optional code-span `Scope:` paths.
+Mark missing sources `sourceless`; preserve existing definitions and sources.
+A plain synonym becomes `_Avoid_:` only when its scope matches the term and
+it has no exceptions or other information to lose. All other complete avoid
+rules move, with every column, to `## Prose avoid rules` in
+`docs/scientific/CONTEXT.md`. Keep unrelated tables, malformed rows, and
+conflicting definitions in place; preview each retained row and the reason.
+Never delete a file that still holds unmapped vocabulary.
+
+Detect Matt-format stray `CONTEXT.md` files with the glossary entry reader.
+When no root glossary exists, rename the file to `GLOSSARY.md` with `git mv`;
+otherwise merge its entries without losing conflicts. Likewise upgrade
+`CONTEXT-MAP.md` to `GLOSSARY-MAP.md` only when no glossary map exists.
+Rewrite callers, including dot-relative links. Never delete, rename, or merge
+away an existing `GLOSSARY.md` or `GLOSSARY-MAP.md`, and never create a map.
+Read existing mapped glossaries; missing ones are lazy, not configuration errors.
+Without explicit scope, a mapped glossary applies in its own directory.
+The scientific context links to vocabulary and owns project prose rules.
 Literal caller rewrites miss code-built paths and fixed parent-directory climbs;
 check those manually after approved moves.
 The scientific context owns the question, intended use, owners, one

@@ -14,15 +14,23 @@ Project vocabulary belongs in root `GLOSSARY.md`, using Matt Pocock's format:
 Heat transfer rate per unit area.
 _Avoid_: heat flow density
 Source: project-approved paper, equation 2
-Scope: analyses/*; src/heat/*
+Scope: `analyses/*`; `src/heat/*`
 ```
 
 CSE requires `Source:`; mark a missing source `sourceless` and report it for
-review. `Scope:` is optional; without it the term applies throughout the
-repository. Scopes are repository-relative POSIX globs, separated by semicolons.
-The avoid list uses commas. A sourced term is allowed only within its scope.
-If root `GLOSSARY-MAP.md` exists, read every `GLOSSARY.md` it links, as well as
-any root glossary. CSE never creates a map or needs Matt's skills installed.
+review. `Scope:` is optional. A root glossary without scope applies throughout
+the repository; a map-listed glossary defaults to its own directory. Explicit
+scopes are repository-relative POSIX globs in code spans, separated by semicolons.
+The avoid list uses commas; omit an empty list. A sourced term is allowed only
+within its scope. If root `GLOSSARY-MAP.md` exists, read every present glossary
+it links, as well as any root glossary. A missing mapped file is absent because
+Matt creates glossaries lazily. CSE never creates a map or needs Matt's skills.
+
+A synonym with its own scope, exceptions, or other writing information is not
+vocabulary. Keep it in `docs/scientific/CONTEXT.md` under `## Prose avoid rules`,
+with Avoid, Prefer, Meaning, Scope, Exceptions, and Evidence columns. Separate
+scopes and exception phrases with semicolons; preserve extra columns during
+migration. This table owns project writing rules, not definitions.
 
 Record confirmed personal preferences in `~/.config/cse/config.toml` only after
 preview and approval. When personal and repository rules overlap for the same
@@ -43,13 +51,14 @@ Evidence = "confirmed user correction and task locator"
 
 The personal entries require all six fields; Exceptions may be empty.
 Matching is case-insensitive and phrase-bounded. An exception suppresses only
-the matching occurrence inside that exact exception phrase. Overlapping
-terminology authority is a configuration error with both source locators.
+the matching occurrence inside that exact exception phrase. Identical behavioral
+rules are not conflicts. Different rules for the same avoided phrase are a
+configuration error only where their scopes overlap; report both locators.
 
 Run `scripts/workflow/check_prose.py` from the project root, or supply `--root`;
 add `--config` for personal rules. The checker and Stop hook read glossary
-entries, scopes, and avoid lists, never scientific context tables. The checker
-reports Avoid → Prefer with the glossary locator; semantic review still decides
+entries, scopes, synonym-avoids, and the `## Prose avoid rules` table.
+The checker reports Avoid → Prefer with the rule locator; semantic review still decides
 whether wording is scientifically correct.
 
 The shared CSE-created record owner is `docs/scientific/`. Setup always creates
@@ -161,14 +170,23 @@ notebook rather than replacing it.
 
 ## Migration
 
-Setup previews migration of glossary and avoid rows from
-`docs/scientific/CONTEXT.md` and every stray root or nested `CONTEXT.md` into
-root `GLOSSARY.md`.
-Only `--approve` writes the plan. Create the glossary when needed, add only
-missing terms, keep sources, and mark missing sources `sourceless`. Existing
-glossary entries and `GLOSSARY-MAP.md` stay untouched. Merge the remaining
-scientific content into `docs/scientific/CONTEXT.md`, remove the old vocabulary
-tables, and rewrite callers of removed `CONTEXT.md` files.
+Only `--approve` writes the previewed plan. Only tables under `## Glossary` and
+`## Avoid` supply migration candidates. Parse escaped pipes, and move a glossary
+row only if all columns map exactly. Preserve existing definitions and sources.
+A synonym becomes `_Avoid_:` only when its scope matches the term, it has no
+exceptions, and no other information would be lost. Otherwise retain the full
+rule in `## Prose avoid rules`. Keep every unrelated table, unsupported row, and
+conflicting definition in place; the preview lists each retained row and why.
+A source file with unmapped rows remains; merge its scientific prose without
+duplicating those rows. New entries stay inside `## Language`, before any later
+second-level section, so repeated Setup cannot add unread duplicates.
+
+Detect Matt's pre-1.3 entry format in stray `CONTEXT.md` files. With no root
+`GLOSSARY.md`, use `git mv` to rename one; otherwise merge its entries and retain
+conflicts. Mark missing sources `sourceless`. Upgrade `CONTEXT-MAP.md` with
+`git mv` only when no `GLOSSARY-MAP.md` exists; never create a map or move away
+an existing glossary or map. Rewrite callers, including `./` and `../` links,
+without matching a suffix inside an unrelated longer path.
 
 During Setup in an established repository, detect every competing CSE-created
 record owner, including `docs/`, `docs/latex/`, alternate decision-record

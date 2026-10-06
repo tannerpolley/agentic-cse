@@ -1,6 +1,6 @@
 ---
 name: diagnose
-description: "Establish the cause of an unexpected numerical result or failure through reproduction and bounded probes, before any code change. Use when asked \"why does my solver diverge\", \"why doesn't this match the reference\", or about NaNs, non-convergence, or a result that looks wrong."
+description: "Diagnose unexpected scientific or numerical results through reproduction and bounded probes before changing a calculation. Use when asked \"why does my solver diverge\" or \"why doesn't this match the reference\", or about numerical NaNs and non-convergence. Software bugs go to diagnosing-bugs."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"

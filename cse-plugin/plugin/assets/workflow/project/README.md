@@ -25,6 +25,7 @@ not to ask questions does not change the general project doctrine.
 - `CONTEXT.md` owns the question, intended use, owners, source/data adoption
   choice, one confirmed repository role (`analysis` or `tool`), and the
   confirmed agent role with its responsibilities; it links to project vocabulary.
+  Scoped or exception-bearing writing rules live under `## Prose avoid rules`.
 - Root `GLOSSARY.md` owns vocabulary in Matt Pocock's format, with CSE's
   required `Source:` and optional `Scope:` lines. Read every glossary linked by
   an existing `GLOSSARY-MAP.md`; CSE never creates a map or requires Matt's skills.

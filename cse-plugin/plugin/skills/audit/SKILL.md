@@ -7,14 +7,19 @@ metadata:
   cse-tags: "audit"
   cse-routing:
     direct: [operating-model, BANNED]
-    conditional: []
+    conditional: [retrospective]
 ---
 
 # Audit CSE practice
 
 Read first: [operating-model](../../references/workflow/operating-model.md), [BANNED](../../BANNED.md).
 
-Inspect the requested repository or folder read-only. This is a CSE-practice
+For a requested session retrospective, read [retrospective](../../references/workflow/retrospective.md)
+and use its session-based science categories with Matt's `/retro` when available.
+Report candidates only; change nothing until the user picks one. CSE needs no
+other plugin to read the reference.
+
+For an ordinary audit, inspect the requested repository or folder read-only. This is a CSE-practice
 audit, not scientific Review: judge whether the work stays centered on the
 question, model, method, calculation, retained values, numerical behavior, and
 interpretation. Do not grade scientific truth or apply edits.
@@ -23,8 +28,9 @@ Inspect active source, tests, instructions, configuration, analyses, and documen
 unless the user includes them. Use `rg`, file and row counts, callers, and Git
 history when ownership or origin is unclear. Project vocabulary belongs in
 root `GLOSSARY.md` or the glossaries linked by `GLOSSARY-MAP.md`,
-not scientific context tables. Inspect `Source:` lines; missing or `sourceless` sources remain
-findings. Shared glossary files are not duplicate CSE records to remove.
+not glossary tables in the scientific context. Scoped or exception-bearing
+writing rules belong in `CONTEXT.md` under `## Prose avoid rules`.
+Inspect `Source:` lines; missing or `sourceless` sources remain findings. Shared glossary files are not duplicate CSE records to remove.
 
 Hunt for:
 

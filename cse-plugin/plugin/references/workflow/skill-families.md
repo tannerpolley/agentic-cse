@@ -12,7 +12,7 @@ When names overlap, choose by subject:
 
 | Subject | CSE | Matt's engineering skills |
 |---|---|---|
-| Scientific sources or software investigation | `research` | engineering research |
+| Scientific sources or software investigation | `research` | `research` |
 | Numerical disagreement or software bug | `diagnose` | `diagnosing-bugs` |
 | Scientific support or code quality | `review` | `code-review` |
 | Model and method or software specification | `design` | `to-spec`, `grill-with-docs` |
@@ -20,9 +20,13 @@ When names overlap, choose by subject:
 
 Root `GLOSSARY.md` owns project vocabulary. If `GLOSSARY-MAP.md` exists, read
 its linked glossaries too. CSE uses Matt's entry format with `Source:` and
-optional `Scope:` lines; `docs/scientific/CONTEXT.md` links to the glossary and
-keeps scientific questions and owners. See [scientific projects](scientific-projects.md).
+optional `Scope:` lines. Plain synonym-avoids use `_Avoid_:`; a rule with its
+own scope, exceptions, or other writing information stays in
+`docs/scientific/CONTEXT.md` under `## Prose avoid rules`. Setup moves only rows that map exactly
+and previews every retained row and its reason.
+`docs/scientific/CONTEXT.md` links to vocabulary and keeps scientific questions,
+owners, and project writing rules. See [scientific projects](scientific-projects.md).
 
 Use Matt's `/retro` for a requested session retrospective, with the
-[science categories](retrospective.md). CSE supplies those categories, not a
+[science categories](retrospective.md) linked by `cse:audit`. CSE supplies those categories, not a
 second retrospective skill.

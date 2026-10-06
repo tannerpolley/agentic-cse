@@ -158,16 +158,29 @@ See [skill families](../../plugin/references/workflow/skill-families.md).
 Root `GLOSSARY.md` owns project vocabulary in Matt's format, with CSE's required
 `Source:` and optional `Scope:` lines. CSE also reads every glossary linked by
 an existing root `GLOSSARY-MAP.md` but never creates a map. Setup migrates old
-scientific-context vocabulary tables with approval, keeps existing glossary
-entries intact, and never deletes either glossary file. The scientific context
-retains questions, owners, roles, and source/data adoption, with a glossary link.
+vocabulary rows with approval only when all columns map exactly, preserving
+existing definitions and sources. Plain synonym-avoids share the term's scope;
+rules with their own scope, exceptions, or other writing information remain in
+`docs/scientific/CONTEXT.md` under `## Prose avoid rules`, with every column.
+Unrelated tables and unmappable rows stay in place, with reasons in the preview.
+The prose checker reads both vocabulary and those project writing rules.
+
+New entries are inserted inside `## Language`. Matt's pre-1.3 `CONTEXT.md`
+entry files and `CONTEXT-MAP.md` are upgraded with `git mv` when no glossary or
+map exists; existing glossaries receive entries without losing conflicts.
+Dot-relative callers are rewritten. Missing mapped files are lazy, not errors;
+implicit mapped scopes cover each glossary's directory. Identical behavioral
+rules are not conflicts, and differing rules conflict only in overlapping scopes.
+Setup never deletes an existing glossary or map. The scientific context retains
+questions, owners, roles, source/data adoption, and a glossary link.
 Absorbing and deleting `GLOSSARY.md`, as proposed in draft PR #125, is rejected.
 
 Use Matt's `/retro` for a requested retrospective, supplemented by CSE's
 [science categories](../../plugin/references/workflow/retrospective.md).
 Candidates trace to session moments, mechanical problems become checks, and
 nothing changes before the user picks a candidate. Setup adds only one
-retrospective navigation line to its always-loaded protocol.
+retrospective navigation line to its always-loaded protocol, routing through
+`cse:audit` and that skill's relative link to the reference.
 
 ## Science-first and numerical-testing doctrine
 

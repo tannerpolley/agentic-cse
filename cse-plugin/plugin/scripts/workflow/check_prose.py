@@ -9,7 +9,7 @@ from pathlib import Path
 import re
 import tomllib
 
-from cse_hook_common import glossary_paths, has_source, read_glossaries
+from cse_hook_common import CONTEXT, glossary_paths, has_source, markdown_tables, read_glossaries
 
 TEXT_SUFFIXES = {".json", ".md", ".qmd", ".tex", ".toml", ".yaml", ".yml"}
 PRECISE_PHRASES = {"schema": ["schema version"],
@@ -74,6 +74,28 @@ def load_personal_rules(path: Path) -> list[dict]:
     ]
 
 
+def project_rules(path: Path) -> list[dict]:
+    if not path.is_file():
+        return []
+    rules = []
+    for table in markdown_tables(path.read_text(encoding="utf-8")):
+        if table["section"] != "Prose avoid rules":
+            continue
+        for row in table["rows"]:
+            if len(row["cells"]) != len(table["headers"]):
+                raise ValueError(f"{path}:{row['index'] + 1}: row does not match its table headings")
+            names = {field.casefold(): field for field in FIELDS}
+            entry = {names.get(header.casefold(), header): cell for header, cell in zip(table["headers"], row["cells"])}
+            for field in ("Avoid", "Prefer"):
+                if field in entry:
+                    entry[field] = entry[field].strip("`")
+            entry["Scope"] = [part.strip().strip("`") for part in entry.get("Scope", "").split(";") if part.strip()] or ["*"]
+            entry["Exceptions"] = [part.strip().strip("`") for part in entry.get("Exceptions", "").split(";") if part.strip()]
+            entry["Evidence"] = entry.get("Evidence") or "sourceless"
+            rules.append(validate_rule(entry, f"{path}:{row['index'] + 1}"))
+    return rules
+
+
 def glossary_rules(entries: list[dict]) -> list[dict]:
     return [{"Avoid": term, "Prefer": entry["term"], "Meaning": entry["meaning"],
              "Scope": entry["scope"], "Exceptions": [], "Evidence": entry["source"],
@@ -81,26 +103,15 @@ def glossary_rules(entries: list[dict]) -> list[dict]:
             for entry in entries for term in entry["avoid"]]
 
 
-def scopes_overlap(left: list[str], right: list[str]) -> bool:
-    def prefix(pattern: str) -> str:
-        return re.split(r"[*?[]", pattern, maxsplit=1)[0]
-
-    for first in left:
-        for second in right:
-            if first == second:
-                return True
-            first_prefix, second_prefix = prefix(first), prefix(second)
-            if first_prefix.startswith(second_prefix) or second_prefix.startswith(first_prefix):
-                return True
-    return False
-
-
 def reject_conflicts(rules: list[dict]) -> None:
+    """Check rules that actually overlap at the file being inspected."""
     for index, first in enumerate(rules):
         for second in rules[index + 1 :]:
             if (
                 first["Avoid"].casefold() == second["Avoid"].casefold()
-                and scopes_overlap(first["Scope"], second["Scope"])
+                and (first["Prefer"].casefold() != second["Prefer"].casefold()
+                     or {value.casefold() for value in first["Exceptions"]}
+                     != {value.casefold() for value in second["Exceptions"]})
             ):
                 raise ValueError(
                     f"terminology conflict for {first['Avoid']!r}: "
@@ -170,8 +181,8 @@ def violations(paths: list[Path], *, rules: list[dict] | None = None,
                forbidden: list[str] = (), root: Path | None = None) -> list[str]:
     root = root or Path.cwd()
     entries = read_glossaries(root)
-    rules = glossary_rules(entries) + (rules or [])
-    reject_conflicts(rules)
+    scientific_context = root / CONTEXT
+    rules = glossary_rules(entries) + project_rules(scientific_context) + (rules or [])
     global_rules = banned_rules() + [
         {"Avoid": term, "Prefer": "precise scientific language", "qualifier": "", "source": "--forbid"}
         for term in forbidden
@@ -186,9 +197,15 @@ def violations(paths: list[Path], *, rules: list[dict] | None = None,
         exceptions = [entry["term"] for entry in entries if has_source(entry)
                       and any(fnmatch.fnmatchcase(relative, scope) for scope in entry["scope"])]
         active = [r for r in rules if any(fnmatch.fnmatchcase(relative, s) for s in r["Scope"])]
+        reject_conflicts(active)
         text = path.read_text(encoding="utf-8")
         original_lines = text.splitlines()
         lines = dict(prose_lines(text))
+        if path.resolve() == scientific_context.resolve():
+            for table in markdown_tables(text):
+                if table["section"] == "Prose avoid rules":
+                    for row in table["rows"]:
+                        lines.pop(row["index"] + 1, None)
         for number, line in lines.items():
             for rule in global_rules + active:
                 term = rule["Avoid"]
@@ -231,7 +248,6 @@ def main() -> int:
         rules = []
         if args.config:
             rules.extend(load_personal_rules(args.config))
-        reject_conflicts(rules)
     except (OSError, tomllib.TOMLDecodeError, ValueError) as error:
         print(f"configuration error: {error}")
         return 2

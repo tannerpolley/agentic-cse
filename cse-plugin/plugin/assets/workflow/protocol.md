@@ -19,7 +19,7 @@ evidence-justified route.
 
 {skill_routing}
 
-For a requested retrospective, read CSE `references/workflow/retrospective.md`.
+For a requested retrospective, invoke `cse:audit` and use its retrospective reference.
 
 Report the engineering result or capability, supporting evidence, meaning,
 and limits before software provenance. Do not invent physical results.
