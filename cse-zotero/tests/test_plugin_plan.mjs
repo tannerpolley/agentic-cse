@@ -308,11 +308,29 @@ test("Connector finalization restores the existing master after automatic duplic
   }
 });
 
-async function agentJobFixture(response, title = "Paper", navigation = null) {
+let nativeConnector;
+async function nativeConnectorSources() {
+  if (nativeConnector) return nativeConnector;
+  const { mkdtempSync, readFileSync, rmSync } = await import("node:fs");
+  const { tmpdir } = await import("node:os");
+  const { spawnSync } = await import("node:child_process");
+  const output = mkdtempSync(tmpdir() + "/cse-connector-test-");
+  try {
+    const built = spawnSync("python", ["scripts/build_connector.py", "--source", "tests/fixtures/connector-5.0.217", "--output", output],
+      { cwd: new URL("..", import.meta.url), encoding: "utf8" });
+    assert.equal(built.status, 0, built.stderr);
+    nativeConnector = ["itemSaver_background.js", "botBypass.js"].map(name => readFileSync(output + "/" + name, "utf8"));
+    return nativeConnector;
+  } finally { rmSync(output, { recursive: true, force: true }); }
+}
+
+async function agentJobFixture(response, title = "Paper", navigation = null, bypass = null, diagnostic = false) {
   const { readFileSync } = await import("node:fs");
   const vm = await import("node:vm");
   let finish, requests = 0, saves = 0, manual = 0;
-  let tabUpdated, headersReceived, navigationStarted, cleared = false;
+  const windows = [], removedWindows = [], iframeCalls = [], monitorCalls = [], requestOptions = [];
+  const messageListeners = new Set();
+  let tabUpdated, headersReceived, navigationStarted, cleared = false, windowState = "minimized";
   let clock = Date.now();
   const result = new Promise(resolve => { finish = resolve; });
   const events = { addListener() {}, removeListener() {} };
@@ -321,17 +339,36 @@ async function agentJobFixture(response, title = "Paper", navigation = null) {
     get: async key => ({ [key]: values[key] }), set: async data => Object.assign(values, data),
     remove: async key => { delete values[key]; }
   }; };
-  const job = { id: "JOB", url: "https://publisher.example/paper", deadline: clock + 180000, cooldowns: {} };
+  const job = { id: "JOB", url: diagnostic ? "https://nowsecure.nl/" : "https://publisher.example/paper",
+    publisher: diagnostic ? "connector-window-diagnostic" : undefined, deadline: clock + 180000, cooldowns: {} };
   const calls = [];
   let claimed = false;
   const Zotero = {
     version: "5.0.217", initDeferred: { promise: Promise.resolve() },
     HTTP: { _requestFetch: async (_m, url, opts) => {
+      requestOptions.push(opts);
       if (opts.cseJob) { requests++; assert.equal(opts.maxBackoff, 0); }
       else manual++;
-      return { ...response, responseURL: url, getResponseHeader: name => response.headers?.[name] || null };
+      const reply = Array.isArray(response) ? response[Math.min(requestOptions.length - 1, response.length - 1)] : response;
+      return { ...reply, responseURL: url, getResponseHeader: name => reply.headers?.[name.toLowerCase()] || null };
     }, StatusError: class extends Error {} },
-    ItemSaver: { _fetchAttachment: async () => { manual++; }, _validateResponse: () => null },
+    ItemSaver: { _fetchAttachment: async (attachment, source) => {
+      if (source.id !== tab.id) { manual++; return; }
+      const opts = Zotero.CSEAgent?.attachmentOptions(attachment, source, true) || {};
+      return (await Zotero.HTTP.request("GET", attachment.url, { ...opts, successCodes: false })).response;
+    }, _validateResponse: () => null },
+    debug() {}, getExtensionURL: path => "chrome-extension://official/" + path,
+    Proxies: { getPotentialProxies: url => ({ [url]: null }) },
+    Utilities: { deepCopy: obj => JSON.parse(JSON.stringify(obj)), Connector: {
+      getContentTypeFromXHR: xhr => ({ contentType: xhr.getResponseHeader("content-type") || "text/html" })
+    } },
+    BrowserAttachmentMonitor: { _isMonitorPageSender: () => true, waitForAttachment: async (id, url, timeout = 60000) => {
+      monitorCalls.push({ id, url, timeout });
+      if (id === tab.id && !["hidden", "repeated"].includes(bypass)) throw Error("Needs a human check");
+      if (bypass === "timeout" && timeout === 300000) { clock += timeout; throw Error("Attachment monitor timed out"); }
+      if (bypass === "throttled") headersReceived({ tabId: id, url, type: "main_frame", statusCode: 429, responseHeaders: [] });
+      return "https://pdf.sciencedirectassets.com/captured.pdf";
+    } },
     Connector: { callMethod: async () => ({}) },
     Messaging: { sendMessage() {} },
     OffscreenManager: { sendMessage: async () => {} },
@@ -344,7 +381,7 @@ async function agentJobFixture(response, title = "Paper", navigation = null) {
         setTimeout(async () => {
           try {
             await Zotero.Connector.callMethod({ method: "saveItems" }, { sessionID: "SESSION", items: [{}] }, source);
-            await Zotero.ItemSaver._fetchAttachment({ url: "https://publisher.example/paper.pdf", mimeType: "application/pdf" }, source);
+            await Zotero.ItemSaver._fetchAttachment({ url: bypass ? "https://www.sciencedirect.com/paper.pdf" : "https://publisher.example/paper.pdf", mimeType: "application/pdf" }, source);
             Zotero.Messaging.sendMessage("progressWindow.done", [true], source);
           } catch (_) { Zotero.Messaging.sendMessage("progressWindow.done", [false], source); }
         }, 10);
@@ -365,13 +402,26 @@ async function agentJobFixture(response, title = "Paper", navigation = null) {
       if (call.action === "pickup") claimed = true;
       return { ok: true, json: async () => data };
     },
-    chrome: { runtime: { id: "official", getPlatformInfo() {}, onStartup: events },
+    chrome: { runtime: { id: "official", getPlatformInfo() {}, onStartup: events,
+      onMessage: { addListener: fn => messageListeners.add(fn), removeListener: fn => messageListeners.delete(fn) } },
       // Chrome restarted: tab ID 99 now belongs to the user, not the old job.
       storage: { local: storage({ cseAgentJob: { id: "OLD", tab: 99, window: 9, session_id: "OLDSESSION" } }), session: storage() },
       windows: { create: async options => {
-        assert.equal(options.focused, false); assert.equal(options.state, "minimized");
-        return { id: 7, tabs: [tab] };
-      }, remove: async () => {} },
+        if (options.state) { assert.equal(options.focused, false); assert.equal(options.state, "minimized"); }
+        windows.push(options);
+        return windows.length === 1 ? { id: 7, tabs: [tab] } : { id: 8, tabs: [{ id: 6 }] };
+      }, update: async (_id, options) => { assert.equal(options.focused, false); windowState = options.state; },
+        get: async () => ({ state: windowState, focused: false }),
+        getLastFocused: async () => ({ id: 99 }), remove: async id => { removedWindows.push(id); } },
+      scripting: { executeScript: async options => {
+        iframeCalls.push(options.func.toString());
+        if (options.func.toString().includes("document.createElement")) {
+          headersReceived({ tabId: tab.id, url: "https://www.sciencedirect.com/paper.pdf", type: "sub_frame", statusCode: 403,
+            responseHeaders: [{ name: "cf-mitigated", value: "challenge" }] });
+          for (const fn of [...messageListeners]) fn({ type: "attachment-monitor-loaded", success: false }, { tab });
+        }
+        return [{ result: { width: 1000, height: 800, left: 0, top: 0 } }];
+      } },
       tabs: { update: async (_id, update) => {
         tab.url = update.url;
         if (navigation) {
@@ -396,8 +446,20 @@ async function agentJobFixture(response, title = "Paper", navigation = null) {
       } }
     }
   });
+  context.browser = context.chrome;
+  if (bypass) {
+    for (const source of await nativeConnectorSources()) vm.runInContext(source, context);
+  }
   vm.runInContext(readFileSync(new URL("../zotero-plugin/connector-agent.js", import.meta.url), "utf8"), context);
   const outcome = await result;
+  if (bypass) {
+    await Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://publisher.example/manual", { id: 99 });
+    const manualWindow = windows.at(-1);
+    assert.equal(manualWindow.width, 800);
+    assert.equal(manualWindow.state, undefined);
+    assert.equal(manualWindow.focused, undefined);
+    return { outcome, calls, requests, saves, windows: windows.filter(w => w.state), removedWindows, iframeCalls, monitorCalls, requestOptions };
+  }
   await Zotero.COHTTP.request("GET", "https://publisher.example/manual", {}, { id: 99 });
   await Zotero.ItemSaver._fetchAttachment({}, { id: 99 });
   Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://publisher.example/manual", { id: 99 });
@@ -419,6 +481,50 @@ test("Agent jobs stop challenges, throttling and invalid PDFs without changing o
     assert.equal(requests, 1);
     assert.equal(calls.filter(c => c.action === "pickup").length, 1);
     assert.equal(calls.filter(c => c.action === "finish" && c.id === "JOB").length, 1);
+  }
+});
+
+test("Agent attachments reach the shipped automatic checks and an unfocused human-check monitor", async () => {
+  const pdf = { status: 200, response: new TextEncoder().encode("%PDF-1.7").buffer, headers: { "content-type": "application/pdf" } };
+  for (const kind of ["hidden", "amazon", "prompt", "timeout", "throttled", "repeated"]) {
+    const challenge = { status: 403, response: new TextEncoder().encode("<title>Just a moment</title>").buffer,
+      headers: { "content-type": "text/html", ...(kind === "amazon" ? { "x-amzn-waf-action": "challenge" } : {}) } };
+    const result = await agentJobFixture(kind === "repeated" ? [challenge, challenge, pdf] : [challenge, pdf], "Paper", null, kind);
+    assert.equal(result.windows.length, ["prompt", "timeout", "throttled"].includes(kind) ? 2 : 1, kind);
+    const notices = result.calls.filter(c => c.action === "progress" && c.result.check?.kind === "interactive");
+    assert.equal(notices.length, ["prompt", "timeout", "throttled"].includes(kind) ? 1 : 0, kind);
+    if (kind === "amazon") {
+      assert.equal(result.requestOptions[1].headers["Sec-Fetch-Site"], "same-origin");
+      assert.equal(result.iframeCalls.some(code => code.includes("document.createElement")), false);
+    } else {
+      assert.ok(result.monitorCalls.length > 0, "agent attachment must reach the native hidden-iframe check");
+      assert.equal(result.monitorCalls[0].timeout, 5000);
+      assert.ok(result.iframeCalls.some(code => code.includes("iframe.style.display = 'none'")));
+      if (result.windows.length === 2) {
+        assert.equal(result.monitorCalls[1].timeout, 300000);
+        assert.ok(result.removedWindows.includes(8));
+      }
+    }
+    if (["timeout", "throttled", "repeated"].includes(kind)) {
+      assert.equal(result.outcome.stop.cooldown, kind !== "timeout");
+      assert.equal(result.requests, kind === "repeated" ? 2 : 1);
+    } else {
+      assert.equal(result.outcome.stop, null, kind);
+      assert.equal(result.outcome.error, null, kind);
+      assert.equal(result.requests, 2, kind);
+    }
+    assert.equal(result.calls.filter(c => c.action === "pickup").length, 1);
+  }
+  for (const blocked of [
+    { status: 429, response: "quota" },
+    { status: 401, response: "login required" },
+    { status: 403, response: "Access denied" }
+  ]) {
+    const result = await agentJobFixture(blocked, "Paper", null, "hidden");
+    assert.ok(result.outcome.stop);
+    assert.equal(result.requests, 1);
+    assert.equal(result.windows.length, 1);
+    assert.equal(result.iframeCalls.some(code => code.includes("document.createElement")), false);
   }
 });
 
@@ -450,6 +556,19 @@ test("Navigation checks clear without replay, or time out with the appropriate c
       assert.ok(check.elapsed >= (kind === "automatic" ? 15000 : 300000));
     }
     assert.equal(check.calls.filter(c => c.action === "pickup").length, 1);
+  }
+});
+
+test("Window diagnostics observe one load without translation, then compare the same unfocused window", async () => {
+  const response = { status: 200, response: new TextEncoder().encode("%PDF-1.7").buffer };
+  for (const clearsAfter of [5000, 20000, null]) {
+    const result = await agentJobFixture(response, "Paper", { kind: "automatic", clearsAfter }, null, true);
+    assert.equal(result.saves, 0);
+    assert.equal(result.requests, 0);
+    assert.equal(result.outcome.diagnostic.phases.length, clearsAfter === 5000 ? 1 : 2);
+    assert.equal(result.outcome.diagnostic.phases.at(-1).cleared, clearsAfter !== null);
+    assert.equal(result.outcome.diagnostic.focus_unchanged, true);
+    for (const phase of result.outcome.diagnostic.phases) assert.equal(phase.observed_state, phase.state);
   }
 });
 

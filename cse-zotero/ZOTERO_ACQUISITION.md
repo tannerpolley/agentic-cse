@@ -110,8 +110,11 @@ same publisher or host, with a daily cap of 25 attempts per publisher. Native
 page resources, redirects, translation and PDF downloads belong to that one
 visit. Each attempt has a three-minute deadline, extended once by up to five
 minutes for an interactive check; a stuck page is closed without reloading.
-Connector backoff retries and CAPTCHA/JavaScript challenge bypass
-methods are blocked during the attempt. CLI API/OA requests are sequential and at most one per
+Connector backoff retries are blocked during the attempt. The Connector's
+shipped automatic-check handling is allowed: its domain-whitelisted hidden
+iframe and its Amazon WAF request with `Sec-Fetch-Site: same-origin`. Each
+attachment gets one native fallback sequence; captured attachment URLs are
+validated and downloaded without another fallback sequence. CLI API/OA requests are sequential and at most one per
 second globally, with Wiley at one per 10 seconds. Interrupted requests still
 consume their recorded pacing slot. No parallel acquisition.
 
@@ -128,16 +131,22 @@ the native save automatically. An unanswered interactive check closes the
 window and returns the paper link without a cooldown, unless the publisher
 also reports throttling or blocking. Classification uses tab titles, response
 headers and the document snapshots already sent by the official Connector.
+When the Connector requests a human-check attachment window, the agent creates
+its native attachment-monitor page minimized and unfocused, sends the same
+notification, and keeps the native attachment wait active for at most five
+minutes. It closes the window on completion or handoff. Ordinary toolbar saves
+keep the Connector's original popup behavior.
 
 Login walls, access denied, unusual activity, HTTP 429, and other HTTP 401/403
-responses still hard-stop. Native PDF/download challenges cannot be replayed
-and hard-stop; API and direct OA requests retain their immediate challenge
-stops. Non-PDF bytes where a PDF was expected stop acquisition. Record the
+responses still hard-stop. The native attachment fallbacks above may handle
+eligible PDF/download check responses; API and direct OA requests retain their
+immediate challenge stops. Non-PDF bytes after native handling stop acquisition. Record the
 reason. Except for the Connector's unanswered interactive check and the
 Elsevier API configuration skip, a publisher challenge or 429 adds a 24-hour
 cooldown for both publisher and canonical responding host; acquisitions refuse
-either until expiry. Do not automate solving, bypass, probe, replay, or retry
-checks, nor attempt another route after a hard stop. Do not remove safety
+either until expiry. Beyond the Connector's shipped automatic handling above,
+do not automate solving, bypass, probe, replay, or retry checks, nor attempt
+another route after a hard stop. Do not remove safety
 state to evade cooldowns. Handoff reports the exact paper URL. Agents do not sign in to publisher
 accounts; institutional browser access is through the configured VPN.
 
@@ -170,8 +179,10 @@ ID `ekhagklcjbdpajgpjgmbionohlpdbjgc`, to
 `~/.local/share/cse/zotero/zotero-connector-agent/`. It adds `connector-agent.js`
 and appends its import to `background-worker.js`; the copied manifest removes
 the store `key` and sets the name to `Zotero Connector (agent)` for a separate
-unpacked identity, with permissions unchanged. All other application files
-stay byte-identical. Chrome's generated `_metadata` rules
+unpacked identity, with permissions unchanged. A single request-options hook
+in the copied `itemSaver_background.js` tags agent attachment requests; its
+native download and fallback logic is retained. Other application files stay
+byte-identical. Chrome's generated `_metadata` rules
 cache is omitted. The currently supported native API version is 5.0.217;
 a newer installed version is reported as a mismatch and requires inspection
 before rebuilding. The official installed files are never edited.
@@ -190,17 +201,21 @@ The added worker module picks it up every 20 seconds and uses a Chrome API
 call to reset the MV3 idle timer, without adding manifest permissions.
 A job is claimed once, checkpoints its save session, and is never replayed
 after worker interruption. Its bounded deadline closes its owned window.
-The module creates a minimized, unfocused window, tracks its tab before
+The module creates an unfocused window, tracks its tab before
 navigating to the article, and calls the native `saveWithTranslator` once.
+It starts minimized unless the public challenge diagnostic has confirmed that
+a normal but unfocused window clears the check without changing focus.
 Native translators, HTTP/cookie handling and attachment import perform the
 save. The companion endpoint then preserves one parent in the requested
 collection; the CLI verifies the parent and PDF through the local API.
 
 Agents never attach a debugger to publisher pages or simulate input. Tab
 URL/title, response status/headers and native completion results detect access
-stops and the check waits described above. Job-scoped request and PDF checks block backoff retries and all
-challenge-bypass/solve-in-tab paths; ordinary toolbar clicks retain the native
-behavior. Cooldown blocking is scoped to the job's tab. Results include final
+stops and the check waits described above. Job-scoped request and PDF checks
+block backoff retries and preserve the bounded native automatic handling above;
+agents never solve checks or simulate input. Ordinary toolbar clicks retain
+the native behavior. Cooldown blocking covers the article and attachment-check
+tabs. Results include final
 URL, title and observed status when available. The owned window stays minimized
 during an interactive wait, and closes on completion or a terminal stop.
 `--route browser` forces this one-paper route for

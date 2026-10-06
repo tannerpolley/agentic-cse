@@ -211,7 +211,8 @@ uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --rout
 ```
 
 The browser route uses a modified copy of the official Connector in your
-everyday Chrome, in a minimized window created without focus.
+everyday Chrome, in a window created without focus. The acquisition contract
+describes its initial window state and the public challenge diagnostic.
 See the acquisition contract for automatic-check waits and notifications when
 a check requires user input; keep the acquire command running during that wait.
 Acquire results include the route, stop reason or handoff URL, and any verified

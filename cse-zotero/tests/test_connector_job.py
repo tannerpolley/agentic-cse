@@ -63,6 +63,8 @@ def test_connector_build_keeps_official_files_and_rejects_version_mismatch(tmp_p
     (source / 'manifest.json').write_text(json.dumps({'version': '5.0.217', 'permissions': ['tabs'], 'key': 'official-key'}))
     (source / 'background-worker.js').write_bytes(b'official worker\n')
     (source / 'native.js').write_bytes(b'official save logic\n')
+    native = 'let options = { responseType: "arraybuffer", timeout: 60000, successCodes: false };'
+    (source / 'itemSaver_background.js').write_text(native)
     build(source, output)
     manifest = json.loads((output / 'manifest.json').read_text())
     assert manifest == {'version': '5.0.217', 'permissions': ['tabs'], 'name': 'Zotero Connector (agent)'}
@@ -70,6 +72,11 @@ def test_connector_build_keeps_official_files_and_rejects_version_mismatch(tmp_p
     assert (source / 'native.js').read_bytes() == (output / 'native.js').read_bytes()
     assert (output / 'background-worker.js').read_bytes() == b'official worker\n\nimportScripts("connector-agent.js");\n'
     assert (source / 'background-worker.js').read_bytes() == b'official worker\n'
+    assert (source / 'itemSaver_background.js').read_text() == native
+    assert 'attachmentOptions(attachment, tab, attemptBotProtectionBypass)' in (output / 'itemSaver_background.js').read_text()
+    (source / 'itemSaver_background.js').write_text('changed upstream API')
+    with pytest.raises(ValueError, match='request hook changed'):
+        build(source, output)
     (source / 'manifest.json').write_text('{"version":"5.0.218"}')
     with pytest.raises(ValueError, match='version mismatch'):
         build(source, output)
