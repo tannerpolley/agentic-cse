@@ -93,7 +93,13 @@ The installer writes the stable runtime under
 `.claude/settings.json`. It preserves unrelated configuration, removes only
 recognized CSE registrations, keeps each handler's `statusMessage`, remains
 safe to repeat, and keeps the four `SessionStart`, `SubagentStart`,
-`UserPromptSubmit`, and `Stop` events. A changed installed runtime requires
+`UserPromptSubmit`, and `Stop` events. `SessionStart` supplies the full stance
+and skill routing on startup, resume, clear, and compaction. User prompts and
+subagent entry retain prompt-specific skill routing without repeating that
+paragraph. The semantic Stop review applies to stated quantities with units
+or scientific notation, explicit review verdicts, and completed deliveries;
+question-only turns and plain progress reports pass it. Prose checks and the
+test-file advisory still run at every Stop. A changed installed runtime requires
 the explicit `--replace-runtime` guard. Plugin discovery, native registration,
 enabled state, active-session loading, trust, and observed hook execution are
 separate claims; installed files and registrations do not prove host trust or

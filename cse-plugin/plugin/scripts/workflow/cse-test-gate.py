@@ -32,7 +32,6 @@ OPTIONAL_START = "[["
 OPTIONAL_END = "]]"
 ROLE_SLOT = "{repository_role}"
 AGENT_ROLE_CLAUSE = "{agent_role_clause}"
-PROMPT_REMINDER = "Answer the scientific question: outcome, evidence, physical meaning, limits, and unresolved decisions. For analysis work, distinguish prediction, numerical verification, and physical validation; software status is provenance."
 ROLE_CORRECTION = ("Repository role is not confirmed in docs/scientific/CONTEXT.md; ask the investigator to run "
                    "cse:setup. Route every other stage to its skill as usual.")
 AGENT_ROLE_CORRECTION = "Setup diagnostic: agent role not confirmed; cse:setup records it."
@@ -57,7 +56,7 @@ def context(event: str, message: str) -> dict[str, object]:
     return {"hookSpecificOutput": {"hookEventName": event, "additionalContext": message}}
 
 
-def render_stance(scientific_context: Path, *, diagnostics: bool = True) -> str:
+def render_stance(scientific_context: Path) -> str:
     template = STANCE.read_text(encoding="utf-8").strip()
     if template.count(OPTIONAL_START) != 1 or template.count(OPTIONAL_END) != 1:
         raise HookError("scientific stance has an invalid optional clause")
@@ -75,8 +74,8 @@ def render_stance(scientific_context: Path, *, diagnostics: bool = True) -> str:
             f"; confirmed agent role: {agent}" if agent else "",
         )
     rendered = template[:start] + clause + template[end + len(OPTIONAL_END):]
-    # Setup diagnostics appear once per session (start and stop), not on every prompt and subagent.
-    notes = [] if not diagnostics else [
+    # Setup diagnostics accompany the session stance.
+    notes = [
         *([ROLE_CORRECTION] if role is None else []), *([AGENT_ROLE_CORRECTION] if agent is None else [])]
     return f"{rendered}{(' ' + ' '.join(notes)) if notes else ''}"
 
@@ -116,8 +115,34 @@ def prompt_route(event: dict[str, object]) -> str:
             "(Claude Code: the Skill tool; Codex: open its SKILL.md).")
 
 
+def substantive_answer(message: object) -> bool:
+    """Review stated quantities, explicit verdicts, and completed deliveries."""
+    if not isinstance(message, str) or not (text := message.strip()):
+        return False
+    if (all(line.rstrip().endswith("?") for line in text.splitlines() if line.strip())
+            and not re.search(r"[.!](?:\s|$)", text)):
+        return False
+    quantities = (
+        r"\b(?:\d+(?:\.\d+)?[eE][+−-]?\d+|10(?:[⁺⁻]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+|\^\{?[+−-]?\d+\}?))"
+        r"|(?<![\w#])[-+−]?(?:\d+(?:\.\d*)?|\.\d+)\s*"
+        r"(?:°[CF]|%|(?:[kMmunµμ]?Pa|bar|[munµμk]?mol|[kM]?J|[kM]?W|kg|g|K|m|s|h|GB|MB|Å)\b)"
+    )
+    verdicts = (
+        r"\b(?:verdict|review)\s*(?:is|:|returned|came back)?\s*[*`]*"
+        r"(?:ready|revise|block|(?:not\s+)?supported|pass(?:ed)?|fail(?:ed)?)\b"
+        r"|(?:^|\n)\s*[*#` ]*(?:Ready|Revise|Block|Supported|Not supported|Pass|Fail)\b(?=\s*[:.*`]|$)"
+    )
+    delivery = re.sub(r"\b(?:not|never|hasn't|haven't|isn't|wasn't|will|would|could|should)\b[^.!?\n]*",
+                      "", text, flags=re.IGNORECASE)
+    return bool(re.search(quantities, text) or re.search(verdicts, text, re.IGNORECASE) or re.search(
+        r"\b(?:committed|merged)\b|\b(?:opened|created)\s+(?:(?:a|the)\s+)?(?:draft\s+)?(?:PR|pull request)\b"
+        r"|\bcommit\s+[`*]*[0-9a-f]{7,40}\b|https://github\.com/[^/\s]+/[^/\s]+/pull/\d+",
+        delivery, re.IGNORECASE))
+
+
 def answer_review(event: dict[str, object], role: str | None) -> str | None:
-    if role not in {"analysis", "tool"} or event.get("stop_hook_active") is True:
+    if (role not in {"analysis", "tool"} or event.get("stop_hook_active") is True
+            or not substantive_answer(event.get("last_assistant_message"))):
         return None
     result = (
         "result review: check the outcome; supported quantities, units, and conditions; interpretation; "
@@ -480,20 +505,17 @@ def main() -> int:
                 payload["systemMessage"] = "\n".join(warnings)
             if payload:
                 emit(payload)
-        elif event_name == "UserPromptSubmit":
-            try:  # a session that moved into another checkout gets that checkout's test snapshot now
-                state, _ = load_state(event, repository, project)
-                if str(repository) not in state["tests"]:
-                    note_checkout(state, repository, project)
-                    save(state_path(event, repository, project), state)
-            except (OSError, UnicodeError, HookError, subprocess.TimeoutExpired):
-                pass  # the Stop check reports its own failure; the prompt context still goes out
-            route = prompt_route(event)
-            emit(context(event_name, " ".join(filter(None, (
-                render_stance(scientific_context, diagnostics=False), PROMPT_REMINDER, route)))))
         else:
-            emit(context(event_name, " ".join(filter(None, (render_stance(scientific_context, diagnostics=False),
-                                                             routing_table())))))
+            if event_name == "UserPromptSubmit":
+                try:  # a session that moved into another checkout gets that checkout's test snapshot now
+                    state, _ = load_state(event, repository, project)
+                    if str(repository) not in state["tests"]:
+                        note_checkout(state, repository, project)
+                        save(state_path(event, repository, project), state)
+                except (OSError, UnicodeError, HookError, subprocess.TimeoutExpired):
+                    pass  # the Stop check reports its own failure; the prompt route still goes out
+            if route := prompt_route(event):
+                emit(context(event_name, route))
     except (HookError, OSError, subprocess.TimeoutExpired) as exc:
         emit({"systemMessage": f"CSE hook skipped safely: {exc}"})
     return 0
