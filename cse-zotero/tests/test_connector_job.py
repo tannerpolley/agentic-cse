@@ -64,7 +64,9 @@ def test_connector_build_keeps_official_files_and_rejects_version_mismatch(tmp_p
     (source / 'background-worker.js').write_bytes(b'official worker\n')
     (source / 'native.js').write_bytes(b'official save logic\n')
     build(source, output)
-    assert (source / 'manifest.json').read_bytes() == (output / 'manifest.json').read_bytes()
+    manifest = json.loads((output / 'manifest.json').read_text())
+    assert manifest == {'version': '5.0.217', 'permissions': ['tabs'], 'name': 'Zotero Connector (agent)'}
+    assert json.loads((source / 'manifest.json').read_text())['key'] == 'official-key'
     assert (source / 'native.js').read_bytes() == (output / 'native.js').read_bytes()
     assert (output / 'background-worker.js').read_bytes() == b'official worker\n\nimportScripts("connector-agent.js");\n'
     assert (source / 'background-worker.js').read_bytes() == b'official worker\n'

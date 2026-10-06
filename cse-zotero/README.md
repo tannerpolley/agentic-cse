@@ -233,13 +233,15 @@ Then, in your everyday Chrome:
 2. Turn **off** the existing Zotero Connector.
 3. Click **Load unpacked** and select
    `/home/user/.local/share/cse/zotero/zotero-connector-agent/`.
-4. Keep the modified Connector enabled and Zotero Desktop running. Run
+4. Confirm **Zotero Connector (agent)** is enabled and has no errors; keep
+   Zotero Desktop running. Run
    `cse-zotero doctor --json`; `acquisition.connector.ready` should be `true`
    within about 20 seconds, with version `5.0.217`.
 
-The copy retains the official extension identity and permissions. Chrome may
-replace its existing listing when loading the same ID; ensure only the modified
-copy is enabled. Your usual toolbar saves keep their native behavior. Re-run
+The copy removes the store manifest key and uses a separate unpacked extension
+ID, with the official permissions unchanged. Keep the official Connector off
+so only the agent copy handles saves. Doctor detects the copy by its heartbeat,
+not by extension ID. Your usual toolbar saves keep their native behavior. Re-run
 the build after an official Connector update, then use **Reload** on the unpacked
 extension; a version mismatch is reported instead of silently using unverified
 native APIs. The acquisition rules and job lifecycle are owned by

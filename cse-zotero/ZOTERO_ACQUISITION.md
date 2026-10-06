@@ -151,15 +151,18 @@ cse-zotero acquire <doi> --collection <key> --route browser --json
 The build copies the official Connector from everyday Chrome's Default profile,
 ID `ekhagklcjbdpajgpjgmbionohlpdbjgc`, to
 `~/.local/share/cse/zotero/zotero-connector-agent/`. It adds `connector-agent.js`
-and appends its import to `background-worker.js`; the manifest and all other
-application files stay byte-identical. Chrome's generated `_metadata` rules
+and appends its import to `background-worker.js`; the copied manifest removes
+the store `key` and sets the name to `Zotero Connector (agent)` for a separate
+unpacked identity, with permissions unchanged. All other application files
+stay byte-identical. Chrome's generated `_metadata` rules
 cache is omitted. The currently supported native API version is 5.0.217;
 a newer installed version is reported as a mismatch and requires inspection
 before rebuilding. The official installed files are never edited.
 
 The user loads this unpacked extension once in `chrome://extensions` and turns
 off the official Connector to avoid conflicting saves; see README setup.
-`doctor --json` reports its heartbeat, active/version status and any mismatch.
+`doctor --json` detects the copy by heartbeat, without a fixed extension ID,
+and reports its active/version status and any mismatch.
 Acquisition can start everyday Chrome with `--no-startup-window`; it never
 stops the user's browser. A missing heartbeat stops with a setup message.
 There is no dedicated browser, remote debugging, hidden display, headless
