@@ -240,7 +240,7 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     return String(title || "").normalize("NFKC").toLowerCase().replace(/\s+/g, " ").trim();
   }
 
-  async function existingItem(metadata, excludeID = null) {
+  async function existingItem(metadata) {
     const doi = zotero.Utilities.cleanDOI(metadata.DOI || "");
     const fields = zotero.ItemFields;
     const queries = doi ? [{
@@ -263,7 +263,6 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
         ? await zotero.DB.queryAsync(query.sql, [libraryID(), query.fieldID])
         : await zotero.DB.queryAsync(query.sql, [libraryID(), query.fieldID, query.value]);
       for (const row of rows) {
-        if (row.itemID === excludeID) continue;
         if (query.title && normalizedTitle(row.value) !== title) continue;
         const item = await zotero.Items.getAsync(row.itemID, { noCache: true });
         if (item && item.isRegularItem()) return item;
@@ -404,7 +403,11 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     if (doi && actual && doi.toLowerCase() !== actual.toLowerCase()) return response(422, { error: "connector_doi_differs" });
     if (doi && !actual) fresh.setField("DOI", doi);
     const metadata = metadataJSON(fresh);
-    const existing = data.item_key ? zotero.Items.getByLibraryAndKey(libraryID(), data.item_key) : await existingItem(metadata, fresh.id);
+    const pinned = session && "cseExistingKey" in session ? session.cseExistingKey :
+      connectorJob && connectorJob.result.session_id === data.session_id && "existing_key" in connectorJob
+        ? connectorJob.existing_key : data.item_key;
+    const existing = pinned ? zotero.Items.getByLibraryAndKey(libraryID(), pinned) : null;
+    if (pinned && !existing) return response(422, { error: "pinned_parent_missing" });
     if (existing && (!existing.isRegularItem() || existing.libraryID !== libraryID())) return response(422, { error: "invalid_existing_parent" });
     const parent = existing && existing.id !== fresh.id ? existing : fresh;
     await zotero.DB.executeTransaction(async () => {
@@ -424,12 +427,13 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
       collection_key: target.collection && target.collection.key || null, metadata: metadataJSON(parent) });
   }
 
-  function acquireJob(data) {
+  async function acquireJob(data) {
     if (!data || typeof data.action !== "string") return response(400, { error: "invalid_job_action" });
     const now = Date.now();
     if (connectorJob && connectorJob.deadline < now && ["queued", "running"].includes(connectorJob.state)) {
       connectorJob.result = { ...connectorJob.result, stop: { reason: "Connector attempt timed out; no reload or retry" } };
-      connectorJob.state = connectorJob.state === "queued" ? "done" : "stopping";
+      connectorJob.state = connectorJob.state === "running" && connectorJob.result.checkpoint ? "stopping" : "done";
+      if (connectorJob.state === "done") connectorJob.result.error = "Connector claim expired without a checkpoint; no replay";
     }
     const ready = connectorHeartbeat && connectorHeartbeat.compatible && now - connectorHeartbeat.at < 45000;
     if (data.action === "status") return response(200, {
@@ -455,11 +459,21 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
       if (!job || typeof job.id !== "string" || !/^[a-zA-Z0-9-]{1,64}$/.test(job.id) ||
           typeof job.url !== "string" || !/^https:\/\/[^/@\s]+(?:[/?#]|$)/i.test(job.url))
         return response(400, { error: "invalid_paper_job" });
+      try { ZoteroCompanionURL.parse(job.url); } catch (_) { return response(400, { error: "non_public_paper_url" }); }
       connectorJob = { id: job.id, url: job.url, doi: job.doi, collection: job.collection, publisher: job.publisher,
         cooldowns: job.cooldowns || {}, state: "queued", deadline: now + 45000, result: {} };
       return response(200, { id: job.id });
     }
     if (!connectorJob || data.id !== connectorJob.id) return response(404, { error: "connector_job_not_found" });
+    if (data.action === "prepare") {
+      if (connectorJob.state !== "running" || typeof data.session_id !== "string") return response(409, { error: "connector_job_not_running" });
+      const job = connectorJob;
+      const existing = await existingItem({ ...data.metadata, DOI: job.doi || data.metadata?.DOI });
+      if (connectorJob !== job || job.state !== "running") return response(409, { error: "connector_job_expired" });
+      job.existing_key = existing && existing.key;
+      job.result.session_id = data.session_id;
+      return response(200, { existing_key: job.existing_key });
+    }
     if (data.action === "cancel") {
       connectorJob.state = connectorJob.state === "queued" ? "done" : "stopping";
       connectorJob.result.stop = { reason: "Connector attempt cancelled; no retry" };
@@ -475,6 +489,9 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
         if (connectorJob.result.stop) connectorJob.result.stopped_at = now / 1000;
       }
     } else return response(400, { error: "invalid_job_action" });
+    const sessionID = connectorJob.result.session_id;
+    const session = sessionID && zotero.Server.Connector?.SessionManager.get(sessionID);
+    if (session && "existing_key" in connectorJob) session.cseExistingKey = connectorJob.existing_key;
     return response(200, { ok: true });
   }
 

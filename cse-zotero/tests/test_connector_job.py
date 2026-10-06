@@ -20,6 +20,37 @@ def test_missing_extension_stops_before_pacing_or_publisher_visit(monkeypatch, t
         assert 'wiley' not in safety.data
 
 
+@pytest.mark.parametrize('url', [
+    'http://public.example/a', 'file:///tmp/paper', 'https://localhost/a', 'https://127.1/a',
+    'https://0x7f000001/a', 'https://10.0.0.1/a', 'https://172.16.1.1/a', 'https://192.168.1.1/a',
+    'https://169.254.1.1/a', 'https://[::1]/a', 'https://[fc00::1]/a', 'https://[fe80::1]/a',
+    'https://host.local/a', 'https://host.internal/a', 'https://singlelabel/a',
+])
+def test_non_public_job_stops_before_browser_or_submission(monkeypatch, tmp_path, url):
+    def forbidden():
+        pytest.fail('invalid destination reached Chrome startup')
+    monkeypatch.setattr(bridge, 'ensure_chrome', forbidden)
+    with acquisition.Safety(tmp_path / 'state.json') as safety:
+        with pytest.raises(acquisition.AcquireStop):
+            bridge.connector_save(url, safety, 'publisher')
+        assert not safety.data
+
+
+def test_response_observations_cool_publisher_and_each_host_even_after_success(tmp_path):
+    now = bridge.time.time()
+    outcome = {'observations': [
+        {'host': 'cdn.example', 'reason': 'Publisher HTTP 429', 'cooldown': True, 'at': now - 10},
+        {'host': 'publisher.example', 'reason': 'Publisher access check: cf-mitigated', 'cooldown': True, 'at': now - 5},
+    ]}
+    with acquisition.Safety(tmp_path / 'state.json') as safety:
+        bridge.record_observations(safety, 'publisher', outcome)
+        assert safety.data['cdn.example']['cooldown_until'] == now - 10 + 86400
+        assert safety.data['publisher.example']['cooldown_until'] == now - 5 + 86400
+        assert safety.data['publisher']['cooldown_until'] == now - 5 + 86400
+        bridge.record_observations(safety, 'publisher', {'observations': outcome['observations'][:1]})
+        assert safety.data['publisher']['cooldown_until'] == now - 5 + 86400
+
+
 def test_job_roundtrip_counts_one_visit_and_preserves_session_and_refusal(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(bridge, 'ensure_chrome', lambda: None)
@@ -70,13 +101,12 @@ def test_connector_build_keeps_official_files_and_rejects_version_mismatch(tmp_p
     assert manifest == {'version': '5.0.217', 'permissions': ['tabs'], 'name': 'Zotero Connector (agent)'}
     assert json.loads((source / 'manifest.json').read_text())['key'] == 'official-key'
     assert (source / 'native.js').read_bytes() == (output / 'native.js').read_bytes()
-    assert (output / 'background-worker.js').read_bytes() == b'official worker\n\nimportScripts("connector-agent.js");\n'
+    assert (output / 'background-worker.js').read_bytes() == b'official worker\n\nimportScripts("public-url.js", "connector-agent.js");\n'
     assert (source / 'background-worker.js').read_bytes() == b'official worker\n'
     assert (source / 'itemSaver_background.js').read_text() == native
-    assert 'attachmentOptions(attachment, tab, attemptBotProtectionBypass)' in (output / 'itemSaver_background.js').read_text()
-    (source / 'itemSaver_background.js').write_text('changed upstream API')
-    with pytest.raises(ValueError, match='request hook changed'):
-        build(source, output)
+    assert (output / 'itemSaver_background.js').read_text() == native
+    assert (output / 'cse-agent-job.html').is_file()
+    assert (output / 'public-url.js').is_file()
     (source / 'manifest.json').write_text('{"version":"5.0.218"}')
     with pytest.raises(ValueError, match='version mismatch'):
         build(source, output)

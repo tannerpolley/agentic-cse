@@ -23,21 +23,14 @@ def connector_status():
 
 
 def reconcile_stop(safety, plugin):
-    """Retain a reported cooldown even if the previous CLI died before receiving it."""
+    """Retain cooldown observations even if the previous CLI died before receiving them."""
     try:
         job = plugin._request("/zotero-companion/acquire-job", method="POST", payload={"action": "status"}).get("job") or {}
     except PluginClientError:
         return
     if job.get("state") in {"queued", "running", "stopping"}:
         raise AcquireStop("Another Connector acquisition is running; no parallel paper visits")
-    try:
-        outcome = job.get("result") or {}
-        stop = outcome.get("stop") or {}
-        at = outcome.get("stopped_at", 0)
-        if stop.get("cooldown") and job.get("publisher") and at + 86400 > time.time():
-            safety.stop(job["publisher"], stop["reason"], host=stop.get("host", ""), cooldown=True, at=at)
-    except AcquireStop:
-        pass
+    record_observations(safety, job.get("publisher"), job.get("result") or {})
 
 
 def ensure_chrome():
@@ -51,6 +44,20 @@ def ensure_chrome():
         pass
     subprocess.Popen(["/usr/bin/google-chrome", "--no-startup-window", "--no-first-run", "--no-default-browser-check"],
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
+
+
+def record_observations(safety, pub, outcome):
+    events = list(outcome.get("observations") or [])
+    if stop := outcome.get("stop"):
+        events.append({**stop, "at": outcome.get("stopped_at", time.time())})
+    for event in sorted(events, key=lambda e: e.get("at", 0)):
+        at = event.get("at", 0)
+        if pub and at + 86400 > time.time():
+            try:
+                safety.stop(pub, event["reason"], host=event.get("host", ""),
+                            cooldown=event.get("cooldown", False), at=at)
+            except AcquireStop:
+                pass
 
 
 def connector_save(url, safety, pub, *, collection=None, doi=""):

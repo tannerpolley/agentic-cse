@@ -1,13 +1,15 @@
-"""Single-paper acquisition; all remote requests pass the persisted safety gate."""
+"""Single-paper acquisition with persisted CLI pacing and native Connector saves."""
 from __future__ import annotations
 
 import base64
 from contextlib import ExitStack
 import fcntl
 import json
+import ipaddress
 import os
 import re
 import stat
+import socket
 import subprocess
 import time
 from pathlib import Path
@@ -112,7 +114,20 @@ def checked_url(url):
     parsed = urlsplit(url)
     if parsed.scheme != "https" or not parsed.hostname or parsed.username or parsed.password:
         raise AcquireStop("Remote URL must use HTTPS without embedded credentials")
-    return canonical_host(parsed.hostname)
+    host = canonical_host(unquote(parsed.hostname))
+    try:
+        address = ipaddress.ip_address(host)
+    except ValueError:
+        try:
+            address = ipaddress.ip_address(socket.inet_ntoa(socket.inet_aton(host)))
+        except OSError:
+            address = None
+    if address:
+        if not address.is_global or address.is_multicast or address.is_reserved:
+            raise AcquireStop("Remote URL must use a public destination")
+    elif "." not in host or host.endswith((".local", ".internal", ".localhost", ".localdomain")) or not re.fullmatch(r"[a-z0-9-]+(?:\.[a-z0-9-]+)+", host):
+        raise AcquireStop("Remote URL must use a public destination")
+    return host
 
 
 def challenge(text):
@@ -177,7 +192,7 @@ class Safety:
                 continue
             entry.update(stop_reason=reason, stopped_at=now)
             if cooldown:
-                entry["cooldown_until"] = now + 86400
+                entry["cooldown_until"] = max(entry.get("cooldown_until", 0), now + 86400)
         self.save()
         raise AcquireStop(reason)
 
@@ -361,7 +376,7 @@ def identifier(value):
     value = value.strip()
     if value.startswith(("http://", "https://")):
         parsed = urlsplit(value)
-        host = checked_url(value.replace("http://", "https://", 1))
+        host = checked_url(value)
         candidates = parse_qs(parsed.query)
         candidate = next((v for key in ("doi", "id") for v in candidates.get(key, [])
                           if re.match(r"10\.\d{4,9}/", v, re.I)), None)
@@ -410,11 +425,13 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
     with ExitStack() as stack:
         try:
             safety = stack.enter_context(Safety())
+            if re.match(r"^[a-z][a-z0-9+.-]*:", value, re.I) and not re.match(r"^(?:doi|isbn|arxiv|pmid|pmcid):", value, re.I):
+                checked_url(value)
             from .connector_job import reconcile_stop
             reconcile_stop(safety, plugin)
             ident = identifier(value)
             if value.startswith(("http://", "https://")):
-                result["handoff_url"] = value.replace("http://", "https://", 1)
+                result["handoff_url"] = value
             doi = ident if ident.startswith("10.") else ""
             result["doi"] = doi or None
             if doi:
@@ -512,21 +529,17 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     if body:
                         result["route"] = pub + "-api"
             if not body and result["handoff_url"]:
-                from .connector_job import connector_save
+                from .connector_job import connector_save, record_observations
                 preflight = plugin._request("/zotero-companion/acquire-connector", method="POST",
                                             payload={"collection": collection, "mode": "dry-run"})
                 result["collection_key"] = preflight.get("collection_key")
                 result["route"] = "connector"
                 saved = connector_save(result["handoff_url"], safety, pub,
                                        collection=result["collection_key"], doi=doi)
+                record_observations(safety, pub, saved)
                 stop = saved.get("stop")
                 result["browser"] = {k: (stop or {}).get(k, saved.get(k)) for k in ("url", "title", "status")}
                 connector_session = saved.get("session_id")
-                if stop:
-                    try:
-                        safety.stop(pub, stop["reason"], cooldown=stop.get("cooldown", False), host=stop.get("host", ""))
-                    except AcquireStop:
-                        pass  # Persist before finalization, even if Zotero filing fails.
                 if connector_session:
                     filed = plugin._request("/zotero-companion/acquire-connector", method="POST", payload={
                         "mode": "apply", "session_id": connector_session, "doi": doi,

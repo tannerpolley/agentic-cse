@@ -508,6 +508,14 @@ def test_elsevier_configuration_error_falls_through_but_bans_stop(runtime, monke
     assert bool(state.get('elsevier', {}).get('cooldown_until')) == (status == 429 or b'CAPTCHA' in body)
 
 
+@pytest.mark.parametrize('url', ['https://127.0.0.1/a', 'https://private.internal/a', 'http://public.example/10.1002/test', 'file:///tmp/paper'])
+def test_acquire_rejects_non_public_url_before_remote_metadata(runtime, url):
+    _, calls, _ = runtime
+    result = mod.acquire(url)
+    assert not result['ok'] and result['stop_reason']
+    assert not calls
+
+
 def test_connector_partial_save_is_filed_once_then_challenge_cools_host(runtime, monkeypatch):
     current, calls, root = runtime
     current.update(doi='10.1016/test', member=78, has_pdf=False)

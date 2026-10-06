@@ -10,9 +10,11 @@ var ZoteroCompanionBootstrap = {
       ({ Services } = Components.utils.import("resource://gre/modules/Services.jsm"));
     }
 
-    this.scope = { Zotero, Services, Components };
+    Components.utils.importGlobalProperties(["URL"]);
+    this.scope = { Zotero, Services, Components, URL };
     Services.scriptloader.loadSubScript(rootURI + "cleanup-plan.js", this.scope);
     Services.scriptloader.loadSubScript(rootURI + "organize-plan.js", this.scope);
+    Services.scriptloader.loadSubScript(rootURI + "public-url.js", this.scope);
     Services.scriptloader.loadSubScript(rootURI + "zotero-companion.js", this.scope);
     this.scope.ZoteroCompanion.start(this.scope.ZoteroCompanionPlan);
   },
