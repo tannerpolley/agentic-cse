@@ -252,7 +252,8 @@ test("manifest has the fields Zotero 10 requires to install an add-on", async ()
 test("Pre-save title match pins the master before Zoplicate trashes it, ignoring prior trash", async () => {
   const { readFileSync } = await import("node:fs");
   const vm = await import("node:vm");
-  for (const duplicate of [true, false]) {
+  for (const scenario of ["duplicate", "no_duplicate", "local_recovery"]) {
+    const duplicate = scenario !== "no_duplicate";
     const items = new Map();
     const erased = [];
     const collection = { id: 9, key: "TESTCOLL", name: "Test", libraryID: 1 };
@@ -261,8 +262,8 @@ test("Pre-save title match pins the master before Zoplicate trashes it, ignoring
       getField: field => field === "DOI" ? "" : "  Ｐaper   TITLE ",
       toJSON: () => ({ title: "  Ｐaper   TITLE ", DOI: "" }),
       getAttachments: () => [...items.values()].filter(i => i.parentID === id).map(i => i.id),
-      getNotes: () => [], addToCollection(target) { this.collections.push(target); }, save: async () => {},
-      erase: async () => { erased.push(key); items.delete(id); }
+      getNotes: () => [], addToCollection(target) { this.collections.push(target); }, save: async () => {}, saveTx: async () => {},
+      eraseTx: async () => { erased.push(key); items.delete(id); }
     });
     const fresh = parent(2, "FRESH");
     const old = parent(1, "EXISTING");
@@ -271,7 +272,7 @@ test("Pre-save title match pins the master before Zoplicate trashes it, ignoring
     items.set(4, priorTrash);
     if (duplicate) items.set(1, old);
     const pdf = { id: 3, key: "PDFKEY", parentID: 2, attachmentContentType: "application/pdf", isRegularItem: () => false, save: async () => {} };
-    let session;
+    let session, inTransaction = false;
     const Zotero = {
       Libraries: { userLibraryID: 1 }, Collections: { getByLibrary: () => [collection] },
       Utilities: { cleanDOI: value => value }, ItemFields: { getID: field => field },
@@ -279,10 +280,15 @@ test("Pre-save title match pins the master before Zoplicate trashes it, ignoring
           assert.match(sql, /NOT IN \(SELECT itemID FROM deletedItems\)/);
           return [...items.values()].filter(i => i.isRegularItem() && !i.deleted).map(i => ({ itemID: i.id, value: i.getField("title") }));
         },
-        executeTransaction: async fn => fn() },
+        executeTransaction: async fn => {
+          assert.equal(inTransaction, false, "Zotero waits for an existing transaction instead of nesting");
+          inTransaction = true;
+          try { return await fn(); } finally { inTransaction = false; }
+        } },
       Items: { getAsync: async id => Array.isArray(id) ? id.map(i => items.get(i)) : items.get(id),
         getByLibraryAndKey: (_, key) => [...items.values()].find(i => i.key === key),
         merge: async (master, others) => {
+          assert.equal(inTransaction, false, "native merge starts its own transaction");
           assert.equal(master, old);
           assert.deepEqual(Array.from(others), [fresh]);
           for (const other of others) {
@@ -304,14 +310,20 @@ test("Pre-save title match pins the master before Zoplicate trashes it, ignoring
     await call({ action: "pickup", protocol: 1, compatible: true });
     const prepared = await call({ action: "prepare", id: "JOB", session_id: "SESSION", metadata: { title: "paper title" } });
     assert.equal(prepared.existing_key, duplicate ? "EXISTING" : null);
+    const Endpoint = Zotero.Server.Endpoints["/zotero-companion/acquire-connector"];
+    session = { _items: {} };
+    const [emptyStatus, , emptyRaw] = await new Endpoint().init({ data: { mode: "apply", session_id: "SESSION", collection: "TESTCOLL" } });
+    assert.equal(emptyStatus, 200);
+    assert.match(JSON.parse(emptyRaw).error, /saved no parent item/);
+    assert.deepEqual(erased, []);
     // The new native save now arrives, and Zoplicate keeps it and trashes the old master.
     items.set(2, fresh); items.set(3, pdf); old.deleted = duplicate;
     session = { _items: { fakeID: fresh } };
     await call({ action: "finish", id: "JOB", result: {} });
     assert.equal(session.cseExistingKey, duplicate ? "EXISTING" : null);
     await call({ action: "submit", job: { id: "NEXT", url: "https://publisher.example/next" } });
-    const Endpoint = Zotero.Server.Endpoints["/zotero-companion/acquire-connector"];
-    const [status, , raw] = await new Endpoint().init({ data: { mode: "apply", session_id: "SESSION", collection: "TESTCOLL" } });
+    const [status, , raw] = await new Endpoint().init({ data: { mode: "apply", session_id: "SESSION", collection: "TESTCOLL",
+      ...(scenario === "local_recovery" ? { restore: true, item_key: "FRESH", existing_key: "EXISTING" } : {}) } });
     assert.equal(status, 200, raw);
     const result = JSON.parse(raw);
     assert.equal(result.item_key, duplicate ? "EXISTING" : "FRESH");
@@ -343,12 +355,13 @@ async function nativeConnectorSources() {
 async function agentJobFixture(response, title = "Paper", navigation = null, bypass = null, extra = {}) {
   const { readFileSync } = await import("node:fs");
   const vm = await import("node:vm");
-  let finish, requests = 0, saves = 0, manual = 0, heartbeat, reloads = 0;
+  let finish, requests = 0, saves = 0, manual = 0, heartbeat, reloads = 0, fallbacks = 0;
   const windows = [], removedWindows = [], iframeCalls = [], monitorCalls = [], requestOptions = [];
   const messageListeners = new Set();
   let tabUpdated, headersReceived, beforeRequest, beforeRedirect, navigationStarted, cleared = false, blankReads = 0;
   const rules = [];
   let clock = Date.now();
+  const started = clock;
   const result = new Promise(resolve => { finish = resolve; });
   const events = { addListener() {}, removeListener() {} };
   const tab = { id: 5, url: "about:blank", title, status: "complete" };
@@ -359,7 +372,7 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
   const job = { id: "JOB", url: "https://publisher.example/paper", deadline: clock + 180000, cooldowns: extra.cooldowns || {} };
   const calls = [];
   let claimed = false;
-  const Zotero = {
+    const Zotero = {
     version: "5.0.217", initDeferred: { promise: Promise.resolve() },
     HTTP: { _requestFetch: async (_m, url, opts) => {
       requestOptions.push(opts);
@@ -389,18 +402,23 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
       if (bypass === "throttled") headersReceived({ tabId: id, url, type: "main_frame", statusCode: 429, responseHeaders: [] });
       return "https://pdf.sciencedirectassets.com/captured.pdf";
     } },
-    Connector: { callMethod: async () => ({}) },
+    Connector: { callMethod: async () => { if (extra.save_failure) throw Object.assign(Error("save failed"), { status: 500 }); return {}; } },
     Messaging: { sendMessage() {} },
-    OffscreenManager: { sendMessage: async () => {} },
+    OffscreenManager: { sendMessage: async () => extra.translation },
     BotBypass: { bypassAmazonCaptcha() { manual++; }, passJSDetectionViaHiddenIframe() { manual++; }, passJSDetectionViaWindowPrompt() { manual++; } },
-    Connector_Browser: { getTabInfo: () => ({ translators: [{ itemType: "journalArticle" }] }),
+    Connector_Browser: { getTabInfo: () => ({ translators: extra.translators || [{ translatorID: "SILVERCHAIR", label: "Silverchair", itemType: "journalArticle" }] }),
       getAllCookies: async () => [],
       saveWithTranslator: async (source, _index, options) => {
-        saves++; assert.equal(options.fallbackOnFailure, false);
+        saves++; assert.equal(tab.title, "Paper", "never save a transient SSO page");
         // Another frame resolves first; actual attachment completion arrives later.
         setTimeout(async () => {
           try {
-            await Zotero.Connector.callMethod({ method: "saveItems" }, { sessionID: "SESSION", items: [{}] }, source);
+            let fallback = false;
+            // Native PageSaving falls back when Translate.translate rejects.
+            if (extra.translation) try { await Zotero.OffscreenManager.sendMessage("Translate.translate", [], source); }
+            catch (error) { if (!options.fallbackOnFailure) throw error; fallbacks++; fallback = true; }
+            await Zotero.Connector.callMethod({ method: fallback ? "saveSnapshot" : "saveItems" },
+              fallback ? { sessionID: "SESSION", title: "Paper", url: source.url } : { sessionID: "SESSION", items: [{}] }, source);
             await Zotero.ItemSaver._fetchAttachment({ url: bypass ? "https://www.sciencedirect.com/paper.pdf" : "https://publisher.example/paper.pdf", mimeType: "application/pdf" }, source);
             Zotero.Messaging.sendMessage("progressWindow.done", [true], source);
           } catch (_) { Zotero.Messaging.sendMessage("progressWindow.done", [false], source); }
@@ -455,17 +473,18 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
         if (extra.redirect) beforeRedirect({ tabId: tab.id, url: tab.url, redirectUrl: extra.redirect, type: "main_frame" });
         if (navigation) {
           navigationStarted = clock;
-          tab.title = "Just a moment";
-          pageHeaders(403);
+          tab.title = navigation.kind === "sso" ? "Sign in" : "Just a moment";
+          if (navigation.kind === "sso") tab.url = "https://id.elsevier.com/as/authorization.oauth2?prompt=none";
+          pageHeaders(navigation.kind === "sso" ? 200 : 403);
           if (navigation.kind === "interactive") await Zotero.OffscreenManager.sendMessage("Translate.setDocument",
             ['<label><input type="checkbox">Verify you are human</label>', tab.url], tab, 0);
-          headersReceived({ tabId: tab.id, url: tab.url + "/favicon.ico", type: "image", statusCode: 403,
+          if (navigation.kind !== "sso") headersReceived({ tabId: tab.id, url: tab.url + "/favicon.ico", type: "image", statusCode: 403,
             responseHeaders: [{ name: "cf-mitigated", value: "challenge" }] });
         }
       }, get: async () => {
         if (blankReads) { blankReads--; return { ...tab, url: "about:blank" }; }
         if (navigation?.clearsAfter && !cleared && clock - navigationStarted >= navigation.clearsAfter) {
-          cleared = true; tab.title = "Paper"; pageHeaders(200);
+          cleared = true; tab.title = "Paper"; if (navigation.kind === "sso") tab.url = job.url; pageHeaders(200);
           await Zotero.OffscreenManager.sendMessage("Translate.setDocument", ['<title>Paper</title>', tab.url], tab, 0);
         }
         return tab;
@@ -512,7 +531,7 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
   await Zotero.ItemSaver._fetchAttachment({}, { id: 99 });
   Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://publisher.example/manual", { id: 99 });
   assert.equal(manual, 2, "ordinary clicks retain their original attachment and bypass paths");
-  return { outcome, calls, requests: requests - 1, saves, elapsed: clock - navigationStarted, rules };
+  return { outcome, calls, requests: requests - 1, saves, fallbacks, elapsed: clock - started, rules };
 }
 
 test("A newer build reloads the idle worker once, deferring throughout an active save", async () => {
@@ -585,6 +604,41 @@ test("Agent job waits for native completion and refuses a challenge title before
   assert.equal(denied.outcome.title, "Just a moment");
 });
 
+test("A silent SSO hop returns to the article; only a settled login page stops", async () => {
+  const response = { status: 200, response: new TextEncoder().encode("%PDF-1.7").buffer };
+  const hop = await agentJobFixture(response, "Paper", { kind: "sso", clearsAfter: 5000 });
+  assert.equal(hop.outcome.stop, null);
+  assert.equal(hop.saves, 1);
+  assert.equal(hop.outcome.url, "https://publisher.example/paper");
+  const login = await agentJobFixture(response, "Sign in");
+  assert.equal(login.saves, 0);
+  assert.match(login.outcome.stop.reason, /login wall/);
+  assert.ok(login.elapsed >= 3000);
+});
+
+test("Empty translation uses native fallback; failed saves and missing translators hand off clearly", async () => {
+  const response = { status: 200, response: new TextEncoder().encode("%PDF-1.7").buffer };
+  const valid = await agentJobFixture(response, "Paper", null, null, { translation: [{}] });
+  assert.equal(valid.fallbacks, 0);
+  assert.equal(valid.outcome.translation_error, null);
+  const empty = await agentJobFixture(response, "Paper", null, null, { translation: [] });
+  assert.equal(empty.outcome.stop, null);
+  assert.equal(empty.outcome.error, null);
+  assert.equal(empty.outcome.translation_error, "Zotero translator returned no items");
+  assert.equal(empty.fallbacks, 1);
+  assert.equal(empty.outcome.session_id, "SESSION");
+  assert.equal(empty.outcome.native_save.method, "saveSnapshot");
+  assert.equal(empty.outcome.native_save.state, "saved");
+  const failed = await agentJobFixture(response, "Paper", null, null, { save_failure: true });
+  assert.equal(failed.outcome.session_id, null);
+  assert.match(failed.outcome.error, /saveItems failed.*500/);
+  assert.equal(failed.outcome.native_save.state, "failed");
+  const missing = await agentJobFixture(response, "Paper", null, null, { translators: [] });
+  assert.equal(missing.saves, 0);
+  assert.equal(missing.outcome.session_id, null);
+  assert.match(missing.outcome.stop.reason, /no Zotero translator for this page/);
+});
+
 test("Navigation checks clear without replay, or time out with the appropriate cooldown", async () => {
   const response = { status: 200, response: new TextEncoder().encode("%PDF-1.7").buffer };
   for (const kind of ["automatic", "interactive"]) for (const clears of [true, false]) {
@@ -622,6 +676,10 @@ test("Navigation guards reject non-public redirects and cooled domains cover bac
     signals: [event(5, "tab.example"), event(-1, "background.example"), event(99, "user.example"), event(-1, "other.example", "chrome-extension://other")]
   });
   assert.deepEqual(Array.from(result.outcome.observations, e => e.host).sort(), ["background.example", "tab.example"]);
+  const background = result.outcome.observations.find(e => e.host === "background.example");
+  assert.equal(background.source, "extension background");
+  assert.equal(background.type, "xmlhttprequest");
+  assert.equal(background.url, "https://background.example/pdf");
   assert.equal(result.saves, 1);
   const cooled = result.rules.find(r => r.addRules)?.addRules.find(r => r.id === 900000000);
   assert.deepEqual(Array.from(cooled.condition.tabIds), [5, -1]);

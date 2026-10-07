@@ -392,7 +392,8 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     });
     const session = !data.restore && zotero.Server.Connector.SessionManager.get(data.session_id);
     const parents = session && Object.values(session._items).filter(item => item.isRegularItem());
-    if (!data.restore && (!parents || parents.length !== 1)) return response(422, { error: "connector_session_requires_one_parent" });
+    if (!data.restore && !parents?.length) return response(200, { error: "Zotero Connector saved no parent item; save with the normal Zotero Connector" });
+    if (!data.restore && parents.length !== 1) return response(422, { error: "connector_session_requires_one_parent" });
     const fresh = data.restore === true
       ? zotero.Items.getByLibraryAndKey(libraryID(), data.item_key) : parents[0];
     if (!fresh || !fresh.isRegularItem()) return response(422, { error: "invalid_existing_parent" });
@@ -403,24 +404,23 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     if (doi && actual && doi.toLowerCase() !== actual.toLowerCase()) return response(422, { error: "connector_doi_differs" });
     if (doi && !actual) fresh.setField("DOI", doi);
     const metadata = metadataJSON(fresh);
-    const pinned = session && "cseExistingKey" in session ? session.cseExistingKey :
+    const pinned = data.restore === true ? data.existing_key || data.item_key :
+      session && "cseExistingKey" in session ? session.cseExistingKey :
       connectorJob && connectorJob.result.session_id === data.session_id && "existing_key" in connectorJob
         ? connectorJob.existing_key : data.item_key;
     const existing = pinned ? zotero.Items.getByLibraryAndKey(libraryID(), pinned) : null;
     if (pinned && !existing) return response(422, { error: "pinned_parent_missing" });
     if (existing && (!existing.isRegularItem() || existing.libraryID !== libraryID())) return response(422, { error: "invalid_existing_parent" });
     const parent = existing && existing.id !== fresh.id ? existing : fresh;
-    await zotero.DB.executeTransaction(async () => {
-      // An automatic duplicate merger may have kept the new Connector item and
-      // trashed this parent. Undeleting also removes the inverse merge relation.
-      parent.deleted = false;
-      if (target.collection) parent.addToCollection(target.collection.id);
-      await parent.save();
-      if (parent !== fresh) {
-        await zotero.Items.merge(parent, [fresh]);
-        await fresh.erase();
-      }
-    });
+    // Native merge owns its transaction; nesting it waits on itself for 30 s.
+    // Undeleting the pinned parent also removes the inverse merge relation.
+    parent.deleted = false;
+    if (target.collection) parent.addToCollection(target.collection.id);
+    await parent.saveTx();
+    if (parent !== fresh) {
+      await zotero.Items.merge(parent, [fresh]);
+      await fresh.eraseTx();
+    }
     const children = await zotero.Items.getAsync(parent.getAttachments());
     const pdf = children.find(item => item.attachmentContentType === "application/pdf");
     return response(200, { item_key: parent.key, attachment_key: pdf && pdf.key || null,

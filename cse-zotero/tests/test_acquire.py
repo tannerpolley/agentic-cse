@@ -532,3 +532,20 @@ def test_connector_partial_save_is_filed_once_then_challenge_cools_host(runtime,
     assert not any(path.endswith('metadata') for path, _ in calls)
     state = json.loads((root / 'state.json').read_text())
     assert state['elsevier']['cooldown_until'] == state['www.sciencedirect.com']['cooldown_until']
+
+
+def test_connector_empty_session_hands_off_without_losing_existing_parent(runtime, monkeypatch):
+    current, calls, _ = runtime
+    current.update(doi='10.1021/test', member=316, has_pdf=False)
+    monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda *a, **k: [
+        {'key': 'EXISTING', 'data': {'itemType': 'journalArticle', 'DOI': current['doi']}}])
+    original = mod.ZoteroPluginClient._request
+    def empty_session(self, path, **kwargs):
+        if path.endswith('acquire-connector') and kwargs['payload']['mode'] == 'apply':
+            return {'error': 'Zotero Connector saved no parent item; save with the normal Zotero Connector'}
+        return original(self, path, **kwargs)
+    monkeypatch.setattr(mod.ZoteroPluginClient, '_request', empty_session)
+    result = mod.acquire(current['doi'])
+    assert not result['ok'] and result['item_key'] == 'EXISTING'
+    assert 'saved no parent item' in result['stop_reason'] and '422' not in result['stop_reason']
+    assert result['handoff_url'] == 'https://doi.org/' + current['doi']

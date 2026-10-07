@@ -539,12 +539,15 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                 record_observations(safety, pub, saved)
                 stop = saved.get("stop")
                 result["browser"] = {k: (stop or {}).get(k, saved.get(k)) for k in ("url", "title", "status")}
+                result["browser"].update({k: saved[k] for k in ("translators", "translation_error", "native_save", "observations") if k in saved})
                 connector_session = saved.get("session_id")
                 if connector_session:
                     filed = plugin._request("/zotero-companion/acquire-connector", method="POST", payload={
                         "mode": "apply", "session_id": connector_session, "doi": doi,
                         "item_key": result["item_key"], "collection": result["collection_key"] or collection,
                         "metadata": (metadata or {}).get("metadata")})
+                    if filed.get("error"):
+                        raise AcquireStop(saved.get("error") or filed["error"])
                     result.update({k: filed.get(k) for k in ("item_key", "attachment_key", "collection_key")})
                     metadata = {"metadata": filed["metadata"]}
                 if stop:

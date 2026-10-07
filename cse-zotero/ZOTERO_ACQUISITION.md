@@ -142,12 +142,18 @@ minutes. It closes the window on completion or handoff. Ordinary toolbar saves
 keep the Connector's original popup behavior.
 
 Login walls, access denied, unusual activity, HTTP 429, and other HTTP 401/403
-responses still hard-stop. These stops apply to the job page. Native attachment
-handling may process eligible PDF/download check responses as on a toolbar
+responses still hard-stop. These stops apply to the job page.
+Login detection waits until the tab is complete and its URL has remained
+stable for three seconds. Silent OAuth/SSO hops carrying `prompt=none` are
+never classified as login walls or saved as article pages.
+Native attachment handling may process eligible PDF/download check responses as on a toolbar
 click; API and direct OA requests retain their immediate challenge stops.
 Record the reason. An observe-only browser response listener records HTTP 429,
 `cf-mitigated: challenge` and `x-amzn-waf-action: challenge/captcha` from the job
-tabs and background requests initiated by this extension. The CLI writes a
+tabs and background requests initiated by this extension. The observation
+retains the URL path, request type, and whether it came from
+the article tab, attachment tab, or extension background; query strings are
+omitted to avoid recording signed download credentials. The CLI writes a
 24-hour cooldown for the publisher and every canonical responding host, even
 if native handling completes the save. An unanswered interactive check alone
 has no cooldown; a recorded response signal still does. Except for that
@@ -158,6 +164,14 @@ retry behavior to the native Connector, nor attempts another route after a
 hard stop. Do not remove safety state to evade cooldowns. Handoff reports the
 exact paper URL. Agents do not sign in to publisher accounts; institutional
 browser access is through the configured VPN.
+
+Native translation keeps toolbar-click fallback enabled. An empty translation
+is treated as a failure before saving, so the Connector can use its own next
+translator or webpage fallback. Its native `saveItems` and `saveSnapshot`
+sessions are pinned and finalized into the existing parent. Failed saves and
+empty sessions hand off with a clear reason; a settled page with no detected
+translator reports "no Zotero translator for this page". Job results retain
+the detected translators, empty-result failure, and native save count/outcome.
 
 ## Tokens and everyday Chrome
 

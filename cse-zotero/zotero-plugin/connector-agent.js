@@ -1,7 +1,7 @@
 /* Agent jobs only. The official Connector's toolbar and ordinary tabs are unchanged. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
-  const MODULE_REVISION = 9;
+  const MODULE_REVISION = 11;
   const KEY = "cseAgentJob", RULE = 900000000;
   const RULES = [RULE, ...ZoteroCompanionURL.blocked.map((_, i) => RULE + i + 1)];
   const marker = Zotero.getExtensionURL("cse-agent-job.html") + "#";
@@ -47,7 +47,7 @@
   };
   const pageCheck = (url, status, text = "", headers = []) => {
     const a = active, lower = text.toLowerCase();
-    if (status === 429 || ["access denied", "unusual activity", "login required", "sign in to access", "log in to access"].some(s => lower.includes(s)))
+    if (status === 429 || ["access denied", "unusual activity"].some(s => lower.includes(s)))
       return check(url, status, text, headers);
     const interactive = /captcha|verify you are human|human verification/.test(lower) ||
       headers.some(h => h.name.toLowerCase() === "x-amzn-waf-action" && h.value === "captcha");
@@ -79,7 +79,17 @@
         signal += " Verify you are human";
       if (challenge(signal)) pageCheck(active.url, active.status, signal);
     }
-    return offscreen.call(this, message, payload, tab, ...args);
+    const a = agentTab(tab) && active;
+    const result = offscreen.call(this, message, payload, tab, ...args);
+    if (a && message === "Translate.translate") return Promise.resolve(result).then(result => {
+      live(a);
+      if (Array.isArray(result) && !result.length) {
+        a.translation_error = "Zotero translator returned no items";
+        throw Error(a.translation_error); // Enter PageSaving's native fallback before saveItems([]).
+      }
+      return result;
+    });
+    return result;
   };
   const checkpoint = async a => {
     await chrome.storage.local.set({ [KEY]: { id: a.id, window: a.window, tab: a.tab, prompt: a.prompt, session_id: a.session_id } });
@@ -88,11 +98,24 @@
   };
   const callMethod = Zotero.Connector.callMethod;
   Zotero.Connector.callMethod = async function(options, data, tab) {
-    if (agentTab(tab) && (typeof options === "string" ? options : options.method) === "saveItems") {
+    const method = typeof options === "string" ? options : options.method;
+    if (agentTab(tab) && ["saveItems", "saveSnapshot"].includes(method)) {
       const a = active;
+      a.native_save = { method, session_id: data.sessionID, count: method === "saveSnapshot" ? 1 : data.items?.length || 0, state: "pending" };
+      if (!a.native_save.count) throw Error(a.error = "Zotero translator returned no items");
       a.session_id = data.sessionID;
-      await api("prepare", { id: a.id, session_id: a.session_id, metadata: data.items?.[0] || {} });
-      await checkpoint(a);
+      try {
+        await api("prepare", { id: a.id, session_id: a.session_id, metadata: data.items?.[0] || { title: data.title, url: data.url } });
+        await checkpoint(a);
+        const result = await callMethod.call(this, options, data, tab);
+        a.native_save.state = "saved";
+        return result;
+      } catch (error) {
+        a.native_save.state = "failed";
+        a.session_id = null;
+        a.error = "Zotero " + method + " failed" + (error.status ? " (HTTP " + error.status + ")" : "");
+        throw error;
+      }
     }
     return callMethod.call(this, options, data, tab);
   };
@@ -120,9 +143,9 @@
   };
   const sendMessage = Zotero.Messaging.sendMessage;
   Zotero.Messaging.sendMessage = function(name, args, tab, ...rest) {
-    if (agentTab(tab) && name === "progressWindow.done") {
+    if (agentTab(tab) && name === "progressWindow.done" && (!args[0] || active.native_save?.state === "saved")) {
       active.finished = true;
-      if (!args[0]) active.error = "Connector reported translation failure";
+      if (!args[0]) active.error ||= "Connector reported translation failure";
       if (args[1] === "siteAccessLimits") halt("Connector reported publisher access limits", active.url, true);
     }
     return sendMessage.call(this, name, args, tab, ...rest);
@@ -139,7 +162,9 @@
     if (d.statusCode === 429 || signal) {
       const responding = host(d.url), reason = d.statusCode === 429 ? "Publisher HTTP 429" : "Publisher access check: " + signal.name;
       if (!a.observations[responding] || d.statusCode === 429) {
-        a.observations[responding] = { host: responding, status: d.statusCode, reason, cooldown: true, at: Date.now() / 1000 };
+        const url = new URL(d.url);
+        a.observations[responding] = { host: responding, status: d.statusCode, reason, cooldown: true, at: Date.now() / 1000,
+          url: url.origin + url.pathname, type: d.type, source: background ? "extension background" : d.tabId === a.tab ? "article tab" : "attachment tab" };
         api("progress", { id: a.id, result: { observations: Object.values(a.observations) } }).catch(() => {});
       }
     }
@@ -160,8 +185,14 @@
     if (tab.id === active.tab) { active.url = safeURL(tab.url || active.url); active.title = tab.title || ""; }
     valid(tab.url);
     pageCheck(tab.url, tab.id === active.tab ? active.status : active.prompt.status, tab.title || "", tab.id === active.tab ? active.headers || [] : []);
-    if (/^(login|sign in|log in)$/i.test((tab.title || "").trim()) || /\/(login|signin|sign-in)(?:[/?#]|$)/i.test(tab.url))
+    const owner = tab.id === active.tab ? active : active.prompt;
+    if (owner.page?.url !== tab.url || tab.status !== "complete") owner.page = { url: tab.url, at: Date.now() };
+    const settled = tab.status === "complete" && Date.now() - owner.page.at >= 3000;
+    const silentSSO = new URL(tab.url).searchParams.get("prompt") === "none";
+    if (settled && !silentSSO && (/^(login|sign in|log in)$/i.test((tab.title || "").trim()) ||
+        /login required|sign in to access|log in to access/i.test(tab.title || "") || /\/(login|signin|sign-in)(?:[/?#]|$)/i.test(tab.url)))
       halt("Publisher login wall", tab.url, true);
+    return settled && !silentSSO;
   };
   chrome.tabs.onUpdated.addListener((id, _change, tab) => {
     if (!active || active.done || !agentTab({ id })) return;
@@ -209,7 +240,7 @@
       while (!a.stop && !a.finished && Date.now() < a.deadline) {
         const tab = await chrome.tabs.get(a.tab);
         if (tab.url === "about:blank") { await new Promise(resolve => setTimeout(resolve, 250)); continue; }
-        inspect(tab);
+        const settled = inspect(tab);
         if (a.check) {
           if (Date.now() >= a.check.until) halt(a.check.kind === "automatic"
             ? "Automatic publisher check did not clear within 15 seconds"
@@ -218,11 +249,14 @@
           continue;
         }
         const info = Zotero.Connector_Browser.getTabInfo(a.tab);
-        if (!saving && tab.status === "complete" && info.translators?.length) {
+        if (!saving && settled && Array.isArray(info.translators) && !info.translators.length)
+          halt("no Zotero translator for this page", a.url);
+        if (!saving && settled && info.translators?.length) {
           if (info.translators[0].itemType === "multiple") halt("Multiple-paper page refused", a.url);
+          a.translators = info.translators.map(({ translatorID, label, itemType }) => ({ translatorID, label, itemType }));
           saving = true;
-          Zotero.Connector_Browser.saveWithTranslator(tab, 0, { fallbackOnFailure: false })
-            .catch(() => { a.error = "Connector could not save this paper"; a.finished = true; });
+          Zotero.Connector_Browser.saveWithTranslator(tab, 0, { fallbackOnFailure: true })
+            .catch(() => { a.error ||= "Connector could not save this paper"; a.finished = true; });
         }
         await new Promise(resolve => setTimeout(resolve, 250));
       }
@@ -235,7 +269,8 @@
       if (a.prompt) await chrome.windows.remove(a.prompt.window).catch(() => {});
       await chrome.declarativeNetRequest.updateSessionRules({ removeRuleIds: RULES });
       const result = { session_id: a.session_id, stop: a.stop || null, error: a.error || null,
-        url: a.url, title: a.title, status: a.stop?.status ?? a.status, observations: Object.values(a.observations) };
+        url: a.url, title: a.title, status: a.stop?.status ?? a.status, observations: Object.values(a.observations),
+        translators: a.translators || [], translation_error: a.translation_error || null, native_save: a.native_save || null };
       await chrome.storage.local.set({ [KEY]: { id: a.id, result } });
       active = null;
       await recover();
