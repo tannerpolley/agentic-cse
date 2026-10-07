@@ -1,7 +1,7 @@
 /* Agent jobs only. The official Connector's toolbar and ordinary tabs are unchanged. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
-  const MODULE_REVISION = 8;
+  const MODULE_REVISION = 9;
   const KEY = "cseAgentJob", RULE = 900000000;
   const RULES = [RULE, ...ZoteroCompanionURL.blocked.map((_, i) => RULE + i + 1)];
   const marker = Zotero.getExtensionURL("cse-agent-job.html") + "#";
@@ -156,7 +156,7 @@
     try { valid(url); } catch (_) {}
   }, { urls: ["<all_urls>"] });
   const inspect = tab => {
-    if ((!active.navigated && tab.url === "about:blank") || (tab.id === active.prompt?.tab && monitorURL(tab.url))) return;
+    if (tab.url === "about:blank" || (tab.id === active.prompt?.tab && monitorURL(tab.url))) return;
     if (tab.id === active.tab) { active.url = safeURL(tab.url || active.url); active.title = tab.title || ""; }
     valid(tab.url);
     pageCheck(tab.url, tab.id === active.tab ? active.status : active.prompt.status, tab.title || "", tab.id === active.tab ? active.headers || [] : []);
@@ -204,11 +204,11 @@
       await checkpoint(a);
       await blockCooldowns(a);
       live(a); valid(a.url);
-      a.navigated = true;
       await chrome.tabs.update(a.tab, { url: a.url, active: true });
       let saving = false;
       while (!a.stop && !a.finished && Date.now() < a.deadline) {
         const tab = await chrome.tabs.get(a.tab);
+        if (tab.url === "about:blank") { await new Promise(resolve => setTimeout(resolve, 250)); continue; }
         inspect(tab);
         if (a.check) {
           if (Date.now() >= a.check.until) halt(a.check.kind === "automatic"

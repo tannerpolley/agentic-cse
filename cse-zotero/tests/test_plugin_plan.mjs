@@ -346,7 +346,7 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
   let finish, requests = 0, saves = 0, manual = 0, heartbeat, reloads = 0;
   const windows = [], removedWindows = [], iframeCalls = [], monitorCalls = [], requestOptions = [];
   const messageListeners = new Set();
-  let tabUpdated, headersReceived, beforeRequest, beforeRedirect, navigationStarted, cleared = false;
+  let tabUpdated, headersReceived, beforeRequest, beforeRedirect, navigationStarted, cleared = false, blankReads = 0;
   const rules = [];
   let clock = Date.now();
   const result = new Promise(resolve => { finish = resolve; });
@@ -449,6 +449,7 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
       tabs: { update: async (_id, update) => {
         if (!update.url) return;
         tab.url = update.url;
+        blankReads = 1; // Chrome still reports about:blank right after tabs.update resolves.
         beforeRequest({ tabId: tab.id, url: tab.url, type: "main_frame" });
         for (const signal of extra.signals || []) headersReceived(signal);
         if (extra.redirect) beforeRedirect({ tabId: tab.id, url: tab.url, redirectUrl: extra.redirect, type: "main_frame" });
@@ -462,6 +463,7 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
             responseHeaders: [{ name: "cf-mitigated", value: "challenge" }] });
         }
       }, get: async () => {
+        if (blankReads) { blankReads--; return { ...tab, url: "about:blank" }; }
         if (navigation?.clearsAfter && !cleared && clock - navigationStarted >= navigation.clearsAfter) {
           cleared = true; tab.title = "Paper"; pageHeaders(200);
           await Zotero.OffscreenManager.sendMessage("Translate.setDocument", ['<title>Paper</title>', tab.url], tab, 0);
