@@ -56,14 +56,22 @@ The first successful route wins. Hard stops end acquisition immediately. OA
 and API success create a translated parent only when attaching the PDF. The
 Connector creates its own parent. Before the native save, the companion plugin
 finds the pre-existing DOI match, or normalized title match, excluding trash,
-and pins its key on the job and save session. Finalization restores that pinned
-parent as the explicit master, merges with Zotero's native item merge, and
-deletes only the newly saved duplicate. This also handles an
-automatic duplicate add-on that initially kept the new item and trashed the old one.
+and pins its key on the save session. Agent sessions save their items with
+`skipSelect` and notifier `skipRenameFile` set before the add notification.
+Zoplicate 5.1.1 recognizes those flags and never queues these additions for
+automatic merging or its progress popup. Each created parent is marked in memory
+with its save-session ID before notifications commit. The installed Linter,
+Actions & Tags and Attanger hooks exclude that session's parents and attachments
+before their automatic queues; this exclusion ends when finalization completes.
+Ordinary sessions retain their native options and add-on behavior. No global
+prefs or progress-window suppression are used. Finalization merges into the pinned parent with Zotero's native merge
+and deletes only the newly saved duplicate.
 It files the surviving parent in the requested collection. Failure leaves at
 most one metadata-only parent and reports its key and the handoff URL. CLI
 OA/API downloads and companion PDF imports must begin with `%PDF` and fit the
 50 MiB limit; native Connector and desktop imports keep Zotero's validation.
+Agent translation discards a purported ScienceDirect PDF that points back to an
+article path; an article redirect is not a PDF.
 The parent and PDF child are
 verified through Zotero's local API. JSON reports `item_key`, `attachment_key`,
 `collection_key`, `route`, `verified`, `stop_reason`, and `handoff_url`; incomplete
@@ -114,6 +122,10 @@ same publisher or host, with a daily cap of 25 attempts per publisher. Native
 page resources, redirects, translation and PDF downloads belong to that one
 visit. Each attempt has a three-minute deadline, extended once by up to five
 minutes for an interactive check; a stuck page is closed without reloading.
+Article windows are created in normal state with `focused: false`; this keeps
+the page visible to its JavaScript. The local GNOME/X11 fixture measured no
+focus transition through create, native save, finalization or close. Human-check
+windows start minimized and unfocused. No job raises or focuses a window.
 Agent jobs use the Connector's shipped request, retry, attachment fallback and
 automatic-check handling, including its domain-whitelisted hidden iframe and
 Amazon WAF request with `Sec-Fetch-Site: same-origin`. These internal requests
@@ -132,8 +144,8 @@ one desktop notification through `notify-send` when available, and waits up to
 five minutes for the user to clear it. The agent never raises the window,
 clicks, enters input, solves the check, reloads, or retries. Clearing continues
 the native save automatically. An unanswered interactive check closes the
-window and returns the paper link without a cooldown, unless the publisher
-also reports throttling or blocking. Classification uses tab titles, response
+window, returns the paper link, and records a 24-hour cooldown for the publisher
+and responding host. Classification uses tab titles, response
 headers and the document snapshots already sent by the official Connector.
 When the Connector requests a human-check attachment window, the agent creates
 its native attachment-monitor page minimized and unfocused, sends the same
@@ -142,7 +154,12 @@ minutes. It closes the window on completion or handoff. Ordinary toolbar saves
 keep the Connector's original popup behavior.
 
 Login walls, access denied, unusual activity, HTTP 429, and other HTTP 401/403
-responses still hard-stop. These stops apply to the job page.
+responses still hard-stop. A 429 on any job request (main frame, subresource,
+or this extension's background request) immediately closes the job windows.
+The cancellation guard stops native HTTP backoff from sending again; after
+persisting the result the worker reloads to terminate remaining background
+work. This is worker cancellation, never a page reload or another attempt.
+The other page stops apply to the job page.
 Login detection waits until the tab is complete and its URL has remained
 stable for three seconds. Silent OAuth/SSO hops carrying `prompt=none` are
 never classified as login walls or saved as article pages.
@@ -155,10 +172,9 @@ retains the URL path, request type, and whether it came from
 the article tab, attachment tab, or extension background; query strings are
 omitted to avoid recording signed download credentials. The CLI writes a
 24-hour cooldown for the publisher and every canonical responding host, even
-if native handling completes the save. An unanswered interactive check alone
-has no cooldown; a recorded response signal still does. Except for that
-unanswered check and the Elsevier API configuration skip, direct-route access
-challenges also cool the publisher and responding host. Acquisitions refuse
+if native handling completes the save. Unanswered interactive checks and
+direct-route access challenges also cool the publisher and responding host;
+the Elsevier API configuration skip remains exempt. Acquisitions refuse
 either until expiry. The agent never adds solving, bypass, probe, replay or
 retry behavior to the native Connector, nor attempts another route after a
 hard stop. Do not remove safety state to evade cooldowns. Handoff reports the
@@ -231,8 +247,8 @@ A job is claimed once, checkpoints its owned window and save session, and is
 never replayed after worker interruption. A claim without a window checkpoint
 is finished as failed at its deadline, freeing the slot for new submissions.
 Worker startup closes windows carrying this extension's job marker, including
-ones created before a checkpoint. Every agent window is created minimized and
-unfocused, with a marker tab and a target tab tracked before article navigation.
+ones created before a checkpoint. Windows follow the unfocused mode rule above,
+with a marker tab and a target tab tracked before article navigation.
 The module calls the native `saveWithTranslator` once.
 Native translators, HTTP/cookie handling and attachment import perform the
 save. The companion endpoint then preserves one parent in the requested
@@ -247,8 +263,9 @@ Loopback, private and link-local address literals, local names (`.local`,
 schemes are refused. The local job channel uses its fixed port 23119 endpoint.
 During a job, a declarative block rule covers cooled domains for the job tabs
 and extension background requests (`tabId: -1`); the rule is removed at job end.
-The worker does not wrap HTTP/COHTTP requests or police the Connector's internal
-requests. Its native save-method hook only captures the pre-save parent and
+The worker's HTTP entry guard enforces job cancellation, including native
+backoff re-entry. It does not tag requests or classify internal destinations;
+COHTTP and desktop resolver requests retain their native handling. Its native save-method hook only captures the pre-save parent and
 session; its completion hook observes save progress. Zotero desktop's resolver
 path (`saveAttachmentFromResolver` to `Attachments.addFileFromURLs`) remains
 native, as on a user click, and is outside browser response observation.

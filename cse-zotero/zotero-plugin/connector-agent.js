@@ -1,7 +1,7 @@
 /* Agent jobs only. The official Connector's toolbar and ordinary tabs are unchanged. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
-  const MODULE_REVISION = 11;
+  const MODULE_REVISION = 14;
   const KEY = "cseAgentJob", RULE = 900000000;
   const RULES = [RULE, ...ZoteroCompanionURL.blocked.map((_, i) => RULE + i + 1)];
   const marker = Zotero.getExtensionURL("cse-agent-job.html") + "#";
@@ -24,6 +24,12 @@
   const live = a => {
     if (!a || a !== active || a.done || a.stop || Date.now() >= a.deadline)
       throw Error("Agent attempt stopped; no retry");
+  };
+  // Native backoff re-enters HTTP.request. A stopped job cannot send again.
+  const request = Zotero.HTTP.request;
+  Zotero.HTTP.request = function(...args) {
+    if (active) live(active);
+    return request.apply(this, args);
   };
   const halt = (reason, url, cooldown = false, status = null) => {
     const a = active;
@@ -87,6 +93,18 @@
         a.translation_error = "Zotero translator returned no items";
         throw Error(a.translation_error); // Enter PageSaving's native fallback before saveItems([]).
       }
+      for (const item of Array.isArray(result) ? result : []) {
+        const article = new URL(item.url || a.url);
+        item.attachments = item.attachments?.filter(attachment => {
+          const url = new URL(attachment.url || article.href, article);
+          if (attachment.url && attachment.mimeType === "application/pdf" && /(^|\.)sciencedirect\.com$/i.test(url.hostname) &&
+              /^\/science\/article\/(?:pii\/)?[^/]+\/?$/i.test(url.pathname)) {
+            a.error = "Zotero translator returned an article page as a PDF";
+            return false;
+          }
+          return true;
+        });
+      }
       return result;
     });
     return result;
@@ -134,7 +152,7 @@
       return await Zotero.BrowserAttachmentMonitor.waitForAttachment(a.prompt.tab, url, Math.max(1, a.interactiveUntil - Date.now()));
     } catch (_) {
       if (!a.stop) halt(Date.now() >= a.interactiveUntil ? "Interactive publisher check unanswered after 5 minutes"
-        : "Interactive publisher check closed or failed; no retry", url);
+        : "Interactive publisher check closed or failed; no retry", url, true);
       throw Error("Agent attempt stopped; no retry");
     } finally {
       await chrome.windows.remove(window.id).catch(() => {});
@@ -167,6 +185,7 @@
           url: url.origin + url.pathname, type: d.type, source: background ? "extension background" : d.tabId === a.tab ? "article tab" : "attachment tab" };
         api("progress", { id: a.id, result: { observations: Object.values(a.observations) } }).catch(() => {});
       }
+      if (d.statusCode === 429) { try { halt(reason + "; no retry", a.observations[responding].url, true, 429); } catch (_) {} }
     }
     // Observe the navigation response; the job loop owns waits and handoff.
     if (owned && d.type === "main_frame" && !monitorURL(d.url)) {
@@ -230,7 +249,7 @@
     try {
       valid(a.url);
       await checkpoint(a);
-      const window = await chrome.windows.create({ url: [marker + a.id, "about:blank"], state: "minimized", focused: false });
+      const window = await chrome.windows.create({ url: [marker + a.id, "about:blank"], state: "normal", focused: false });
       a.window = window.id; a.tab = window.tabs[1].id;
       await checkpoint(a);
       await blockCooldowns(a);
@@ -244,7 +263,7 @@
         if (a.check) {
           if (Date.now() >= a.check.until) halt(a.check.kind === "automatic"
             ? "Automatic publisher check did not clear within 15 seconds"
-            : "Interactive publisher check unanswered after 5 minutes", a.check.url, a.check.kind === "automatic", a.check.status);
+            : "Interactive publisher check unanswered after 5 minutes", a.check.url, true, a.check.status);
           await new Promise(resolve => setTimeout(resolve, 250));
           continue;
         }
@@ -272,8 +291,9 @@
         url: a.url, title: a.title, status: a.stop?.status ?? a.status, observations: Object.values(a.observations),
         translators: a.translators || [], translation_error: a.translation_error || null, native_save: a.native_save || null };
       await chrome.storage.local.set({ [KEY]: { id: a.id, result } });
-      active = null;
       await recover();
+      if (a.stop?.status === 429) chrome.runtime.reload(); // Terminate native in-flight background work too.
+      else active = null;
     }
   }
   async function poll() {

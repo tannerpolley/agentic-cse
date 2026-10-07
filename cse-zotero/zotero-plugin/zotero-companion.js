@@ -21,6 +21,67 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
   let lastSync = null;
   let connectorHeartbeat = null;
   let connectorJob = null;
+  const nativeMethods = [];
+
+  function replace(object, name, wrap) {
+    if (!object?.[name]) return;
+    const original = object[name];
+    nativeMethods.push(() => { object[name] = original; });
+    object[name] = wrap(original);
+  }
+
+  function excludeAgentItems() {
+    if (nativeMethods.length) return;
+    const connector = zotero.Server.Connector, saver = zotero.Translate?.ItemSaver;
+    if (!connector?.SaveSession || !saver) return;
+    replace(connector.SessionManager, "create", original => function(id, ...args) {
+      const session = original.call(this, id, ...args);
+      if (connectorJob && connectorJob.result.session_id === id) session.cseExistingKey = connectorJob.existing_key;
+      return session;
+    });
+    replace(saver.prototype, "_saveItem", original => async function(...args) {
+      const session = [...connector.SessionManager._sessions.values()].find(s => "cseExistingKey" in s && s.itemSaver === this);
+      if (session) this._saveOptions = { ...this._saveOptions, skipSelect: true,
+        notifierData: { ...this._saveOptions?.notifierData, skipRenameFile: true } };
+      const item = await original.apply(this, args);
+      if (session) item.cseAgentSession = session.id; // Before ItemSaver's transaction commits its notifications.
+      return item;
+    });
+    replace(connector.SaveSession.prototype, "saveSnapshot", original => async function(target) {
+      if (!("cseExistingKey" in this)) return original.call(this, target);
+      // Use native ItemSaver for the same webpage, with this session's notifier options.
+      const { library, collection } = connector.resolveTarget(target), data = this._requestData.data;
+      this.itemSaver = new saver({ libraryID: library.libraryID, collections: collection ? [collection.id] : undefined,
+        attachmentMode: saver.ATTACHMENT_MODE_IGNORE });
+      const [item] = await this.itemSaver.saveItems([{ itemType: "webpage", title: data.title || data.url,
+        url: data.url, accessDate: "CURRENT_TIMESTAMP" }], () => 0, () => 0);
+      await this.addItem(data.url, item);
+      return item;
+    });
+  }
+
+  let addonMethodsInstalled = false;
+  function excludeAddonItems() {
+    if (addonMethodsInstalled) return;
+    addonMethodsInstalled = true;
+    const owned = id => {
+      const item = id && zotero.Items.get(id), parent = item?.parentID && zotero.Items.get(item.parentID);
+      const session = zotero.Server.Connector.SessionManager.get(item?.cseAgentSession || parent?.cseAgentSession);
+      return session && !session.cseFinalized && "cseExistingKey" in session;
+    };
+    replace(zotero.Linter?.hooks, "onNotify", original => function(event, type, ids, ...args) {
+      if (type === "item") ids = ids.filter(id => !owned(id));
+      if (ids.length) return original.call(this, event, type, ids, ...args);
+    });
+    replace(zotero.ActionsTags?.api?.actionManager, "dispatchActionByEvent", original => function(event, data) {
+      if (!owned(data?.itemID)) return original.call(this, event, data);
+    });
+    const menu = zotero.ZoteroAttanger?.data?.menu;
+    replace(menu && Object.getPrototypeOf(menu), "queueAddedItems", original => function(ids) {
+      ids = ids.filter(id => !owned(id));
+      if (ids.length) return original.call(this, ids);
+    });
+  }
 
   function response(status, payload) {
     return [status, "application/json", JSON.stringify(payload)];
@@ -390,12 +451,11 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     if (data.mode === "dry-run") return response(200, {
       collection_key: target.collection && target.collection.key || null
     });
-    const session = !data.restore && zotero.Server.Connector.SessionManager.get(data.session_id);
+    const session = zotero.Server.Connector.SessionManager.get(data.session_id);
     const parents = session && Object.values(session._items).filter(item => item.isRegularItem());
-    if (!data.restore && !parents?.length) return response(200, { error: "Zotero Connector saved no parent item; save with the normal Zotero Connector" });
-    if (!data.restore && parents.length !== 1) return response(422, { error: "connector_session_requires_one_parent" });
-    const fresh = data.restore === true
-      ? zotero.Items.getByLibraryAndKey(libraryID(), data.item_key) : parents[0];
+    if (!parents?.length) return response(200, { error: "Zotero Connector saved no parent item; save with the normal Zotero Connector" });
+    if (parents.length !== 1) return response(422, { error: "connector_session_requires_one_parent" });
+    const fresh = parents[0];
     if (!fresh || !fresh.isRegularItem()) return response(422, { error: "invalid_existing_parent" });
     if (fresh.libraryID !== libraryID()) return response(422, { error: "group_library_unsupported" });
     const doi = zotero.Utilities.cleanDOI(data.doi || "");
@@ -403,24 +463,18 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     const actual = zotero.Utilities.cleanDOI(fresh.getField("DOI") || "");
     if (doi && actual && doi.toLowerCase() !== actual.toLowerCase()) return response(422, { error: "connector_doi_differs" });
     if (doi && !actual) fresh.setField("DOI", doi);
-    const metadata = metadataJSON(fresh);
-    const pinned = data.restore === true ? data.existing_key || data.item_key :
-      session && "cseExistingKey" in session ? session.cseExistingKey :
-      connectorJob && connectorJob.result.session_id === data.session_id && "existing_key" in connectorJob
-        ? connectorJob.existing_key : data.item_key;
+    const pinned = session.cseExistingKey;
     const existing = pinned ? zotero.Items.getByLibraryAndKey(libraryID(), pinned) : null;
     if (pinned && !existing) return response(422, { error: "pinned_parent_missing" });
     if (existing && (!existing.isRegularItem() || existing.libraryID !== libraryID())) return response(422, { error: "invalid_existing_parent" });
     const parent = existing && existing.id !== fresh.id ? existing : fresh;
-    // Native merge owns its transaction; nesting it waits on itself for 30 s.
-    // Undeleting the pinned parent also removes the inverse merge relation.
-    parent.deleted = false;
     if (target.collection) parent.addToCollection(target.collection.id);
     await parent.saveTx();
     if (parent !== fresh) {
       await zotero.Items.merge(parent, [fresh]);
       await fresh.eraseTx();
     }
+    session.cseFinalized = true;
     const children = await zotero.Items.getAsync(parent.getAttachments());
     const pdf = children.find(item => item.attachmentContentType === "application/pdf");
     return response(200, { item_key: parent.key, attachment_key: pdf && pdf.key || null,
@@ -481,6 +535,7 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
       if (connectorJob !== job || job.state !== "running") return response(409, { error: "connector_job_expired" });
       job.existing_key = existing && existing.key;
       job.result.session_id = data.session_id;
+      excludeAddonItems();
       return response(200, { existing_key: job.existing_key });
     }
     if (data.action === "cancel") {
@@ -498,9 +553,6 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
         if (connectorJob.result.stop) connectorJob.result.stopped_at = now / 1000;
       }
     } else return response(400, { error: "invalid_job_action" });
-    const sessionID = connectorJob.result.session_id;
-    const session = sessionID && zotero.Server.Connector?.SessionManager.get(sessionID);
-    if (session && "existing_key" in connectorJob) session.cseExistingKey = connectorJob.existing_key;
     return response(200, { ok: true });
   }
 
@@ -686,6 +738,8 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
   }
 
   function unregister() {
+    for (const restore of nativeMethods.splice(0).reverse()) restore();
+    addonMethodsInstalled = false;
     for (const path of registeredPaths) {
       if (zotero.Server.Endpoints[path]) delete zotero.Server.Endpoints[path];
     }
@@ -694,7 +748,7 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
   }
 
   return {
-    start: register,
+    start() { excludeAgentItems(); register(); },
     stop: unregister,
     paths: registeredPaths
   };

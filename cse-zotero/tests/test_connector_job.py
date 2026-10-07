@@ -49,6 +49,11 @@ def test_response_observations_cool_publisher_and_each_host_even_after_success(t
         assert safety.data['publisher']['cooldown_until'] == now - 5 + 86400
         bridge.record_observations(safety, 'publisher', {'observations': outcome['observations'][:1]})
         assert safety.data['publisher']['cooldown_until'] == now - 5 + 86400
+        bridge.record_observations(safety, 'publisher', {'stop': {
+            'host': 'check.example', 'reason': 'Interactive publisher check unanswered after 5 minutes',
+            'cooldown': True}, 'stopped_at': now})
+        assert safety.data['check.example']['cooldown_until'] == now + 86400
+        assert safety.data['publisher']['cooldown_until'] == now + 86400
 
 
 def test_job_roundtrip_counts_one_visit_and_preserves_session_and_refusal(monkeypatch, tmp_path):
