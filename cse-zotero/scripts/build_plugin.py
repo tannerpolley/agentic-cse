@@ -11,7 +11,7 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "zotero-plugin"
 DIST = ROOT / "dist"
 OUTPUT = DIST / "cse-zotero-1.0.0.xpi"
-FILES = ("manifest.json", "bootstrap.js", "cleanup-plan.js", "organize-plan.js", "public-url.js", "zotero-companion.js")
+FILES = ("manifest.json", "bootstrap.js", "cleanup-plan.js", "organize-plan.js", "zotero-companion.js")
 
 
 def main() -> None:

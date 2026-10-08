@@ -427,8 +427,6 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
             safety = stack.enter_context(Safety())
             if re.match(r"^[a-z][a-z0-9+.-]*:", value, re.I) and not re.match(r"^(?:doi|isbn|arxiv|pmid|pmcid):", value, re.I):
                 checked_url(value)
-            from .connector_job import reconcile_stop
-            reconcile_stop(safety, plugin)
             ident = identifier(value)
             if value.startswith(("http://", "https://")):
                 result["handoff_url"] = value
@@ -529,29 +527,28 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     if body:
                         result["route"] = pub + "-api"
             if not body and result["handoff_url"]:
-                from .connector_job import connector_save, record_observations
+                from .connector_job import connector_save
                 preflight = plugin._request("/zotero-companion/acquire-connector", method="POST",
                                             payload={"collection": collection, "mode": "dry-run"})
                 result["collection_key"] = preflight.get("collection_key")
                 result["route"] = "connector"
                 saved = connector_save(result["handoff_url"], safety, pub,
-                                       collection=result["collection_key"], doi=doi)
-                record_observations(safety, pub, saved)
+                                       collection=result["collection_key"], doi=doi, existing_key=result["item_key"])
                 stop = saved.get("stop")
                 result["browser"] = {k: (stop or {}).get(k, saved.get(k)) for k in ("url", "title", "status")}
-                result["browser"].update({k: saved[k] for k in ("translators", "translation_error", "native_save", "observations") if k in saved})
                 connector_session = saved.get("session_id")
                 if connector_session:
                     filed = plugin._request("/zotero-companion/acquire-connector", method="POST", payload={
                         "mode": "apply", "session_id": connector_session, "doi": doi,
-                        "item_key": result["item_key"], "collection": result["collection_key"] or collection,
-                        "metadata": (metadata or {}).get("metadata")})
+                        "existing_key": result["item_key"], "collection": result["collection_key"] or collection})
                     result.update({k: filed[k] for k in ("item_key", "attachment_key", "collection_key") if k in filed})
-                    if filed.get("error"):
-                        raise AcquireStop(saved.get("error") or filed["error"])
+                    if filed.get("handoff"):
+                        raise AcquireStop(filed["handoff"])
                     metadata = {"metadata": filed["metadata"]}
                 if stop:
                     raise AcquireStop(stop["reason"])
+                if saved.get("handoff") or saved.get("error"):
+                    raise AcquireStop(saved.get("handoff") or saved["error"])
                 if result["attachment_key"]:
                     result["route"] = "connector"
             if body:

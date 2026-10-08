@@ -23,17 +23,6 @@ def connector_status():
         return {"ready": False, "error": "CSE Zotero plugin job endpoint is unavailable", "setup": SETUP}
 
 
-def reconcile_stop(safety, plugin):
-    """Retain cooldown observations even if the previous CLI died before receiving them."""
-    try:
-        job = plugin._request("/zotero-companion/acquire-job", method="POST", payload={"action": "status"}).get("job") or {}
-    except PluginClientError:
-        return
-    if job.get("state") in {"queued", "running", "stopping"}:
-        raise AcquireStop("Another Connector acquisition is running; no parallel paper visits")
-    record_observations(safety, job.get("publisher"), job.get("result") or {})
-
-
 def ensure_chrome():
     # Default Chrome's singleton lock identifies its browser PID; never control its windows.
     lock = Path.home() / ".config/google-chrome/SingletonLock"
@@ -47,21 +36,7 @@ def ensure_chrome():
                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, start_new_session=True)
 
 
-def record_observations(safety, pub, outcome):
-    events = list(outcome.get("observations") or [])
-    if stop := outcome.get("stop"):
-        events.append({**stop, "at": outcome.get("stopped_at", time.time())})
-    for event in sorted(events, key=lambda e: e.get("at", 0)):
-        at = event.get("at", 0)
-        if pub and at + 86400 > time.time():
-            try:
-                safety.stop(pub, event["reason"], host=event.get("host", ""),
-                            cooldown=event.get("cooldown", False), at=at)
-            except AcquireStop:
-                pass
-
-
-def connector_save(url, safety, pub, *, collection=None, doi=""):
+def connector_save(url, safety, pub, *, collection=None, doi="", existing_key=None):
     checked_url(url)
     ensure_chrome()
     plugin = ZoteroPluginClient()
@@ -73,11 +48,9 @@ def connector_save(url, safety, pub, *, collection=None, doi=""):
     safety.before(pub, url, "browser")
     job_id = uuid4().hex
     plugin._request("/zotero-companion/acquire-job", method="POST", payload={"action": "submit", "job": {
-        "id": job_id, "url": url, "doi": doi, "collection": collection, "publisher": pub,
-        "cooldowns": {k: v.get("cooldown_until", 0) for k, v in safety.data.items() if isinstance(v, dict)}}})
+        "id": job_id, "url": url, "doi": doi, "collection": collection, "existing_key": existing_key, "publisher": pub}})
     deadline = time.monotonic() + 225
     outcome = {}
-    notified = False
     try:
         while time.monotonic() < deadline:
             status = plugin._request("/zotero-companion/acquire-job", method="POST", payload={"action": "status"})
@@ -85,29 +58,16 @@ def connector_save(url, safety, pub, *, collection=None, doi=""):
             if job.get("id") != job_id:
                 raise AcquireStop("Connector job was lost; no retry")
             outcome = job.get("result") or {}
-            if not notified and (check := outcome.get("check") or {}).get("kind") in {"interactive", "handoff"}:
-                notified = True
-                if check["kind"] == "interactive":
-                    deadline += 300
-                    title = "CSE Zotero needs a check completed"
-                    message = f"{checked_url(check['url'])} needs you to complete a check in Chrome; the save will finish automatically. Open its minimized window."
-                else:
-                    title = "CSE Zotero needs a manual save"
-                    message = f"{pub or checked_url(check['url'])} needs you to save this paper; link in the agent's result"
-                if notify := shutil.which("notify-send"):
-                    try:
-                        subprocess.run([notify, title, message],
-                                       timeout=5, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-                    except (OSError, subprocess.TimeoutExpired):
-                        pass
-            if job.get("state") in {"done", "stopping"}:
+            if job.get("state") == "done":
+                break
+            if job.get("deadline") and time.time() * 1000 >= job["deadline"]:
+                outcome = {"error": "Connector attempt timed out; no retry"}
                 break
             time.sleep(1)
         else:
-            plugin._request("/zotero-companion/acquire-job", method="POST", payload={"action": "cancel", "id": job_id})
-            outcome["stop"] = {"reason": "Connector attempt timed out; no reload or retry", "host": checked_url(url)}
-    except (PluginClientError, AcquireStop):
-        outcome["stop"] = {"reason": "Connector job disconnected; no retry", "host": checked_url(url)}
+            outcome = {"error": "Connector attempt timed out; no retry"}
+    except (PluginClientError, AcquireStop) as error:
+        outcome = {"error": str(error)}
     # Pickup may lag submission by 20 seconds: space the next visit from completion.
     hosts = {canonical_host(pub), checked_url(url)}
     final = outcome.get("url")
@@ -116,4 +76,18 @@ def connector_save(url, safety, pub, *, collection=None, doi=""):
     for host in hosts:
         safety.data.setdefault(host, {})["last_browser"] = time.time()
     safety.save()
+    # ponytail: if the CLI dies mid-job, its cooldown is not recorded.
+    if (stop := outcome.get("stop") or {}).get("cooldown"):
+        try:
+            safety.stop(pub, stop["reason"], host=checked_url(outcome.get("handoff") if
+                        str(outcome.get("handoff", "")).startswith("https://") else final or url), cooldown=True)
+        except AcquireStop:
+            pass
+        if outcome.get("handoff") and (notify := shutil.which("notify-send")):
+            try:
+                subprocess.run([notify, "CSE Zotero needs a manual save",
+                                f"{pub} needs you to save this paper; link in the agent's result"],
+                               timeout=5, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            except (OSError, subprocess.TimeoutExpired):
+                pass
     return outcome

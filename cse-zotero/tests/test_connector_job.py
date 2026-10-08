@@ -36,26 +36,6 @@ def test_non_public_job_stops_before_browser_or_submission(monkeypatch, tmp_path
         assert not safety.data
 
 
-def test_response_observations_cool_publisher_and_each_host_even_after_success(tmp_path):
-    now = bridge.time.time()
-    outcome = {'observations': [
-        {'host': 'cdn.example', 'reason': 'Publisher HTTP 429', 'cooldown': True, 'at': now - 10},
-        {'host': 'publisher.example', 'reason': 'Publisher access check: cf-mitigated', 'cooldown': True, 'at': now - 5},
-    ]}
-    with acquisition.Safety(tmp_path / 'state.json') as safety:
-        bridge.record_observations(safety, 'publisher', outcome)
-        assert safety.data['cdn.example']['cooldown_until'] == now - 10 + 86400
-        assert safety.data['publisher.example']['cooldown_until'] == now - 5 + 86400
-        assert safety.data['publisher']['cooldown_until'] == now - 5 + 86400
-        bridge.record_observations(safety, 'publisher', {'observations': outcome['observations'][:1]})
-        assert safety.data['publisher']['cooldown_until'] == now - 5 + 86400
-        bridge.record_observations(safety, 'publisher', {'stop': {
-            'host': 'check.example', 'reason': 'Interactive publisher check unanswered after 5 minutes',
-            'cooldown': True}, 'stopped_at': now})
-        assert safety.data['check.example']['cooldown_until'] == now + 86400
-        assert safety.data['publisher']['cooldown_until'] == now + 86400
-
-
 def test_job_roundtrip_counts_one_visit_and_preserves_session_and_refusal(monkeypatch, tmp_path):
     calls = []
     monkeypatch.setattr(bridge, 'ensure_chrome', lambda: None)
@@ -63,33 +43,27 @@ def test_job_roundtrip_counts_one_visit_and_preserves_session_and_refusal(monkey
     monkeypatch.setattr(bridge.time, 'sleep', lambda seconds: None)
     class Plugin:
         job_id = None
-        running = False
         def _request(self, path, *, payload, **kwargs):
             calls.append(payload['action'])
             if payload['action'] == 'submit':
                 self.job_id = payload['job']['id']
                 assert payload['job']['doi'] == '10.1002/test'
                 assert payload['job']['collection'] == 'COLL'
+                assert payload['job']['existing_key'] == 'OLD'
                 return {'id': self.job_id}
             if self.job_id:
-                return {'job': {'id': self.job_id, 'publisher': 'wiley', 'state': 'running' if self.running else 'done', 'result': {
-                    'stopped_at': bridge.time.time() - 20,
+                return {'job': {'id': self.job_id, 'publisher': 'wiley', 'state': 'done', 'result': {
                     'session_id': 'SESSION', 'url': 'https://WILEY.COM./paper', 'title': 'Just a moment', 'status': 403,
                     'stop': {'reason': 'Publisher access challenge: Cloudflare', 'host': 'wiley.com', 'cooldown': True}}}}
             return {'ready': True, 'version': '5.0.217'}
     plugin = Plugin()
     monkeypatch.setattr(bridge, 'ZoteroPluginClient', lambda *a, **k: plugin)
     with acquisition.Safety(tmp_path / 'state.json') as safety:
-        result = bridge.connector_save('https://doi.org/10.1002/test', safety, 'wiley', collection='COLL', doi='10.1002/test')
+        result = bridge.connector_save('https://doi.org/10.1002/test', safety, 'wiley', collection='COLL', doi='10.1002/test', existing_key='OLD')
         assert result['session_id'] == 'SESSION' and result['status'] == 403
         assert safety.data['wiley']['count'] == 1
         assert safety.data['wiley.com']['last_browser'] > 0
-        bridge.reconcile_stop(safety, plugin)
         assert safety.data['wiley']['cooldown_until'] == safety.data['wiley.com']['cooldown_until']
-        assert safety.data['wiley']['cooldown_until'] < bridge.time.time() + 86400
-        plugin.running = True
-        with pytest.raises(acquisition.AcquireStop, match='no parallel paper visits'):
-            bridge.reconcile_stop(safety, plugin)
     assert calls.count('submit') == 1
 
 
@@ -106,48 +80,16 @@ def test_connector_build_keeps_official_files_and_rejects_version_mismatch(tmp_p
     assert manifest == {'version': '5.0.217', 'permissions': ['tabs'], 'name': 'Zotero Connector (agent)'}
     assert json.loads((source / 'manifest.json').read_text())['key'] == 'official-key'
     assert (source / 'native.js').read_bytes() == (output / 'native.js').read_bytes()
-    assert (output / 'background-worker.js').read_bytes() == b'official worker\n\nimportScripts("public-url.js", "connector-agent.js");\n'
+    assert (output / 'background-worker.js').read_bytes() == b'official worker\n\nimportScripts("connector-agent.js");\n'
     assert (source / 'background-worker.js').read_bytes() == b'official worker\n'
     assert (source / 'itemSaver_background.js').read_text() == native
     assert (output / 'itemSaver_background.js').read_text() == native
     assert (output / 'cse-agent-job.html').is_file()
-    assert (output / 'public-url.js').is_file()
     record = json.loads((output / 'cse-agent-build.json').read_text())
     assert record['module_revision'] == int((output / 'connector-agent.js').read_text().split('MODULE_REVISION = ')[1].split(';')[0])
     (source / 'manifest.json').write_text('{"version":"5.0.218"}')
     with pytest.raises(ValueError, match='version mismatch'):
         build(source, output)
-
-
-def test_interactive_check_notifies_once_and_keeps_the_same_job_alive(monkeypatch, tmp_path):
-    clock, notices = [0], []
-    monkeypatch.setattr(bridge, 'ensure_chrome', lambda: None)
-    monkeypatch.setattr(acquisition, 'require_vpn', lambda: None)
-    monkeypatch.setattr(bridge.time, 'monotonic', lambda: clock[0])
-    monkeypatch.setattr(bridge.time, 'sleep', lambda seconds: clock.__setitem__(0, clock[0] + 160))
-    monkeypatch.setattr(bridge.shutil, 'which', lambda name: '/usr/bin/notify-send')
-    monkeypatch.setattr(bridge.subprocess, 'run', lambda command, **kwargs: notices.append((command, kwargs['timeout'])))
-    class Plugin:
-        job_id = None
-        polls = 0
-        def _request(self, path, *, payload, **kwargs):
-            if payload['action'] == 'submit':
-                assert self.job_id is None
-                self.job_id = payload['job']['id']
-                return {}
-            if not self.job_id:
-                return {'ready': True}
-            self.polls += 1
-            return {'job': {'id': self.job_id, 'state': 'done' if self.polls == 3 else 'running',
-                            'result': {'session_id': 'SESSION', 'check': {'kind': 'interactive', 'url': 'https://wiley.com/check'}}}}
-    plugin = Plugin()
-    monkeypatch.setattr(bridge, 'ZoteroPluginClient', lambda: plugin)
-    with acquisition.Safety(tmp_path / 'state.json') as safety:
-        result = bridge.connector_save('https://doi.org/10.1002/test', safety, 'wiley')
-    assert clock[0] > 225 and result['session_id'] == 'SESSION'
-    assert len(notices) == 1 and notices[0][1] == 5
-    assert notices[0][0][0] == '/usr/bin/notify-send'
-    assert 'wiley.com needs you to complete a check' in notices[0][0][2]
 
 
 def test_attachment_check_hands_off_notifies_once_and_cools_publisher_and_host(monkeypatch, tmp_path):
@@ -167,12 +109,12 @@ def test_attachment_check_hands_off_notifies_once_and_cools_publisher_and_host(m
             if not self.job_id:
                 return {'ready': True}
             return {'job': {'id': self.job_id, 'state': 'done', 'result': {
-                'check': {'kind': 'handoff', 'url': 'https://publisher.example/paper'},
+                'handoff': 'https://pdf.example/check', 'url': 'https://publisher.example/paper',
                 'stop': {'reason': 'Publisher requires a human save', 'host': 'pdf.example', 'cooldown': True}}}}
     monkeypatch.setattr(bridge, 'ZoteroPluginClient', Plugin)
     with acquisition.Safety(tmp_path / 'state.json') as safety:
         result = bridge.connector_save('https://publisher.example/paper', safety, 'elsevier')
-        bridge.record_observations(safety, 'elsevier', result)
+        assert result['handoff'] == 'https://pdf.example/check'
         assert safety.data['elsevier']['cooldown_until'] == safety.data['pdf.example']['cooldown_until']
         assert safety.data['elsevier']['cooldown_until'] == safety.data['elsevier']['stopped_at'] + 86400
     assert calls == ['status', 'submit', 'status']

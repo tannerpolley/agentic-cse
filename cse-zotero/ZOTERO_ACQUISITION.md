@@ -1,297 +1,114 @@
 # Zotero acquisition and external discovery
 
-This contract owns external discovery and single-paper acquisition safeguards.
-Zotero owns bibliographic records and retained attachments. Discovery metadata,
-service summaries, and acquired PDFs do not establish scientific claims.
+This contract owns single-paper acquisition. Zotero owns bibliographic records
+and retained attachments; discovery metadata and acquired PDFs do not establish
+scientific claims. Search retained evidence and the live library before external
+discovery, name the unanswered gap, and reuse completed searches when relevant.
+External workspace changes and uploads retain their own authorization rules.
 
-## Authority and interface
+## One requested paper
 
-Search retained evidence and the live library before external discovery. Name
-an unanswered literature gap before commissioning a new discovery search.
-Reuse relevant completed Undermind searches when available; external workspace
-changes and uploads retain their own authorization requirements.
-
-An agent asked to get a specific paper may run:
+A request for one specific paper authorizes its parent and PDF child:
 
 ```bash
 cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
 cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --dry-run --json
 ```
 
-The request for that paper authorizes its parent and PDF child. This route has
-no separate per-save approval, `--apply`, or native question gate. It accepts
-one paper, never a crawl or batch. Metadata corrections, collection
-reorganization, companion attachment writes, paid conversion, corpus refresh,
-and bibliography export remain separate operations with their existing gates.
+Acquisition is sequential and accepts one paper. The dry run checks metadata,
+duplicates and the collection without creating items, downloading PDFs or
+starting Chrome. The collection must exist in the personal library; selected
+group libraries are refused. Deduplication uses DOI, then normalized exact title,
+ignoring trash. An existing PDF returns its keys immediately. Other library
+writes keep their existing previews and approvals.
 
-The dry run translates metadata, checks duplicates and the collection, and
-reports planned routes without creating a parent or downloading a PDF. The
-collection must already exist and be an unambiguous name or key in the personal
-library. Without it, use Zotero's selected collection; a selected group library
-is refused. A duplicate with a PDF returns both keys without moving or attaching
-anything; one missing a PDF continues the permitted routes for its existing
-parent. Deduplication checks DOI first, then normalized exact title.
+## Routes
 
-DOIs embedded in article URLs and identifiers recognized by Zotero (DOI, ISBN,
-arXiv, PMID) use Zotero's search translators. DOI translation is pinned to
-Zotero's Crossref REST translator, which does not visit publisher pages.
-Metadata lookups go to registries and library catalogs, not publishers, and keep Zotero's native request and retry handling within one CLI pacing slot.
-URLs without a recognized identifier use the native Connector translator for
-that article page. Do not invent metadata or PDF URLs.
+Try Unpaywall's declared open-access PDF locations, PMC Cloud, an official
+Elsevier/Wiley API when configured, then the everyday-Chrome Connector. The
+first PDF wins; an incomplete acquisition hands back the DOI or article link.
+DOI metadata uses Zotero's Crossref translator. Do not invent PDF URLs.
 
-## Route order and publisher boundaries
+Unattended acquisition works for open access and official APIs with working
+tokens and entitlement. Springer is verified through the Connector. Elsevier,
+Wiley, AIP and ACS web routes commonly need a human. The current Elsevier key is
+refused for Article Retrieval (support ticket **261006-005015**); the Wiley token
+is not yet configured. Elsevier's explicit key-configuration error skips that
+API; challenge responses and 429 still stop acquisition.
 
-Acquisition checks DOI, then translated title duplicates, and tries:
+PMC uses its official Cloud dataset and metadata-declared PDF, with the ID
+Converter as a fallback. Do not fetch PMC web PDF links or legacy OA packages.
+Elsevier/Wiley/ACS direct OA downloads require a declared repository location,
+excluding their publisher/CDN hosts. CLI PDF downloads and imports require a
+`%PDF` prefix and fit the 50 MiB limit. Native Connector downloads stay native.
 
-1. Unpaywall's declared OA PDF locations, using
-   `https://api.unpaywall.org/v2/<doi>?email=42780259+tannerpolley@users.noreply.github.com`.
-2. The publisher's official API with a configured token for Elsevier or Wiley.
-3. The modified official Zotero Connector in the user's everyday Chrome, for
-   article pages without blocking checks.
-4. Human handoff with the exact DOI or official article URL.
+Tokens live in mode-0600 files under `~/.config/zotero-companion/`:
+`elsevier-api-key`, optional `elsevier-insttoken`, and `wiley-tdm-token`.
+Never expose token values in logs, arguments or JSON; doctor reports names and
+status only. Credentials do not follow cross-host redirects.
 
-Unattended acquisition works for open access through Unpaywall and PMC Cloud,
-and through the official Elsevier/Wiley APIs when the user's token and
-entitlement work. The everyday-Chrome Connector route is verified for Springer.
-Elsevier, Wiley, AIP and ACS web routes commonly require a human; the job
-returns the paper link rather than spending further publisher attempts.
+## CLI limits
 
-PMC OA locations use NCBI's [official PMC Cloud dataset](https://pmc.ncbi.nlm.nih.gov/tools/pmcaws/) and its metadata-declared main PDF via Unpaywall's PMCID or the [ID Converter](https://pmc.ncbi.nlm.nih.gov/tools/id-converter-api/) fallback (`tool=cse-zotero`, maintainer email), preserving cooldowns, sequential one-request-per-second pacing, and the 50 MiB limit; PMC web PDF links and the legacy OA Web Service/compressed packages (retired August 2026) are never fetched.
+The CLI is the single trust boundary for agent input: require HTTPS and public
+hosts; reject loopback, private, link-local, `.local`, `.internal` and single-label
+hosts. Require `CAEDM IKEv2 VPN` for publisher/API/repository access. Its existing
+NetworkManager connection may be activated and checked automatically; do not
+rotate or reconfigure networks, discover public IPs, or change browser identity.
+Crossref and Unpaywall metadata do not require the VPN.
 
-The first successful route wins. Hard stops end acquisition immediately. OA
-and API success create a translated parent only when attaching the PDF. The
-Connector creates its own parent. Before the native save, the companion plugin
-finds the pre-existing DOI match, or normalized title match, excluding trash,
-and pins its key on the save session. Connector, metadata and PDF-import paths
-record each created item's exact library and item key before its add notification.
-Only creation events receive `skipSelect` and notifier `skipRenameFile`;
-Zoplicate 5.1.1 recognizes these flags and never queues these additions for
-automatic merging or its progress popup. Linter, Actions & Tags and Attanger
-filter only those keys' add/create events. Other items and later edit/open events
-retain their native behavior. Terminal finally blocks release the exclusions
-on success, failure or stop; the acquisition deadline also ends an exclusion
-if its worker disappears. No global prefs or progress-window suppression are used.
-Finalization uses Zotero's native merge into the pinned parent and deletes only
-the newly saved duplicate. A pinned parent now in the trash is refused before
-any mutation; the fresh item and PDF are kept and their keys are reported.
-Successful finalization files the surviving parent in the requested collection.
-Failure preserves the saved item and any PDF and returns their keys and the handoff URL. CLI
-OA/API downloads and companion PDF imports must begin with `%PDF` and fit the
-50 MiB limit; native Connector and desktop imports keep Zotero's validation.
-Agent translation discards a purported ScienceDirect PDF that points back to an
-article path; an article redirect is not a PDF.
-The parent and PDF child are
-verified through Zotero's local API. JSON reports `item_key`, `attachment_key`,
-`collection_key`, `route`, `verified`, `stop_reason`, and `handoff_url`; incomplete
-acquisition exits nonzero. A skipped API configuration error appears in
-`skipped_routes`.
+A process lock serializes acquisition. Persist pacing, daily counts and
+cooldowns in `~/.local/state/cse-zotero/acquire.json`; unreadable state refuses
+remote access. Space browser visits by at least 60 seconds per publisher/host,
+with a 25-attempt daily publisher cap. CLI API/OA requests are sequential, at
+most one per second globally and one per 10 seconds for Wiley. A stop marked
+`cooldown` records 24 hours for the publisher and responding host. Do not clear
+state to evade it. If the CLI dies mid-job, its cooldown is not recorded.
 
-Identify Elsevier (member 78; `10.1016`, `10.1006`), Wiley (311; `10.1002`,
-`10.1111`) and ACS (316; `10.1021`) by Crossref member and DOI prefix. Plain
-Unpaywall downloads for these publishers require explicit `host_type: repository`
-and never fetch their publisher/CDN hosts directly. Their browser fallback uses
-the modified official Connector, with the same limits as every other publisher.
+## Everyday-Chrome Connector
 
-Elsevier's API is
-`https://api.elsevier.com/content/article/doi/<encoded-doi>` with
-`Accept: application/pdf`, `X-ELS-APIKey`, and optional `X-ELS-Insttoken`.
-An API HTTP 403 with `X-ELS-Status: AUTHENTICATION_ERROR` or the equivalent
-“Requestor configuration settings insufficient” error is a key configuration
-skip, allowing Connector fall-through; a challenge response or HTTP 429 still
-hard-stops. Other 401/403 responses also stop. Error messages retain
-`X-ELS-Status` when supplied. The user's current key is refused for Article
-Retrieval; support ticket **261006-005015** is open. See the official
-[Article Retrieval API](https://dev.elsevier.com/documentation/ArticleRetrievalAPI.wadl)
-and [API authentication](https://dev.elsevier.com/tecdoc_api_authentication.html).
+An agent job is a native Connector click in a normal, unfocused window, with
+one marker tab and one active paper tab. The worker polls every 20 seconds and
+runs one job for at most three minutes. It skips blank/loading tabs and waits
+for the complete page's URL to stay unchanged for three seconds before saving.
+No translator produces a clear handoff; a multiple-item page is refused.
+Otherwise call native `saveWithTranslator(tab, 0)`, capture its save session,
+and wait for that tab's `progressWindow.done` before closing the window.
 
-Wiley's API is
-`https://api.wiley.com/onlinelibrary/tdm/v1/articles/<encoded-doi>` with
-`Wiley-TDM-Client-Token`. Obtain a token through Wiley Online Library's account
-and TDM agreement; institutional entitlement requires the institution network.
-The user's Wiley token is not yet configured. The client uses Wiley's stricter
-10-second interval. See
-[Wiley's TDM documentation](https://onlinelibrary.wiley.com/library-info/resources/text-and-datamining).
-No public ACS token API was verified; ACS uses OA then the normal Connector.
+Only main-frame 429, `cf-mitigated: challenge`, or titles matching “just a
+moment”, “checking your browser”, “verify you are human” or “captcha” trigger
+the page-check wait. Allow 15 seconds to clear without interaction; if it
+persists, close the window, hand back the link and record the cooldown.
 
-## VPN, pacing, and hard stops
+For agent tabs, the Connector's human-check window prompt and `openWindow`
+create no window: stop with a handoff and cooldown. The CLI sends one
+`notify-send` notification when available: “<publisher> needs you to save this
+paper; link in the agent's result”. Never click, solve, reload or retry a check.
+Ordinary tabs keep native popup behavior. Agent tab IDs remain marked for
+60 seconds after the job ends; later native work is left to the Connector.
 
-Require the NetworkManager connection `CAEDM IKEv2 VPN` to be active before
-each publisher-site, repository-PDF, or publisher-API request. Crossref and
-Unpaywall metadata queries do not require it. When inactive, acquisition runs
-`nmcli --wait 25 con up 'CAEDM IKEv2 VPN'` with a 30-second process limit,
-then re-checks the active connection. Failed activation or unverifiable status
-stops publisher access. This existing connection may be activated without
-another approval. Never stop, reconfigure, rotate, or chain VPNs or proxies.
-Never discover or report the public IP.
+Everything else in the Connector stays native, including retries, hidden
+iframes, the Amazon path and Zotero desktop's attachment resolver. Subresources
+and extension background requests are not policed or attributed to the job.
+There is no separate login-wall detector or five-minute human-check wait.
+The worker never raises or focuses a window.
 
-A nonblocking process lock serializes acquisition. Persist pacing, daily
-counts, cooldowns, and stop reasons in
-`~/.local/state/cse-zotero/acquire.json`. An unreadable state refuses remote
-access. Browser attempts wait at least 60 seconds between single-paper visits to the
-same publisher or host, with a daily cap of 25 attempts per publisher. Native
-page resources, redirects, translation and PDF downloads belong to that one
-visit. Each attempt has a three-minute deadline, extended once by up to five
-minutes for an interactive check; a stuck page is closed without reloading.
-Article windows are created in normal state with `focused: false`; this keeps
-the page visible to its JavaScript. The local GNOME/X11 fixture measured no
-focus transition through create, native save, finalization or close. Agent jobs
-never create human-check attachment popups. No job raises or focuses a window.
-Agent jobs use the Connector's shipped request, retry, attachment fallback and
-automatic-check handling, including its domain-whitelisted hidden iframe and
-Amazon WAF request with `Sec-Fetch-Site: same-origin`. These internal requests
-are part of one paper visit, as on a user toolbar click. CLI API/OA requests
-are sequential and at most one per second globally, with Wiley at one per
-10 seconds. Interrupted requests still
-consume their recorded pacing slot. No parallel acquisition.
+The plugin channel has only submit, pickup, finish and status, with queued,
+running and done states. A running job past its deadline becomes done with an
+error. Worker startup closes windows whose first tab carries its marker.
+Finalization merges the fresh parent into the CLI's existing parent when that
+parent is alive, then erases the fresh duplicate. A missing or trashed existing
+parent leaves the fresh item intact. A session without a parent hands off; a
+DOI mismatch is refused. Return the surviving item/PDF keys and file the parent
+in the requested collection; the CLI verifies them through Zotero's local API.
 
-The Connector may wait on its one navigation window for an automatic check
-(including Cloudflare “Just a moment” or a managed HTTP 403 with
-`cf-mitigated: challenge`) to clear by itself for at most 15 seconds. If it
-clears, continue the native save; otherwise stop with a 24-hour publisher and
-responding-host cooldown. An explicit interactive check (human-verification
-checkbox or CAPTCHA) keeps that same window minimized and unfocused, sends
-one desktop notification through `notify-send` when available, and waits up to
-five minutes for the user to clear it. The agent never raises the window,
-clicks, enters input, solves the check, reloads, or retries. Clearing continues
-the native save automatically. An unanswered interactive check closes the
-window, returns the paper link, and records a 24-hour cooldown for the publisher
-and responding host. Classification uses tab titles, response
-headers and the document snapshots already sent by the official Connector.
-When the Connector requests a human-check attachment popup, the agent never
-creates that window. It immediately closes the job window, returns the paper
-link, and records a 24-hour cooldown for the publisher and responding host.
-The CLI sends one desktop notification when `notify-send` is available:
-`<publisher> needs you to save this paper; link in the agent's result`.
-Ordinary toolbar saves keep the Connector's original popup behavior.
+One quiet time window suppresses Zoplicate creation handling, Linter add hooks,
+Actions & Tags events and Attanger's added-item queue. It lasts until the
+Connector job deadline plus 30 seconds, or through metadata/PDF import plus
+30 seconds. The user's own saves during that window also skip these add-ons.
+Wrappers are installed once at startup and restored at shutdown.
 
-Login walls, access denied, unusual activity, HTTP 429, and other HTTP 401/403
-responses still hard-stop. A 429 from an owned tab (main frame or subresource)
-immediately closes the job window and records the cooldown. Job cancellation
-never reloads the extension or stops an ordinary save. Extension background
-requests without a reliable originating tab are not attributed to the job;
-their native retries/backoff remain the Connector's responsibility, as on a
-user's click. The worker neither globally guards HTTP nor blocks these requests.
-The other page stops apply to the job page.
-Login detection waits until the tab is complete and its URL has remained
-stable for three seconds. Silent OAuth/SSO hops carrying `prompt=none` are
-never classified as login walls or saved as article pages.
-Native attachment handling may process automatic PDF/download checks as on a
-toolbar click; a request for a human-check popup ends the agent job with a
-handoff. API and direct OA requests retain their immediate challenge stops.
-Record the reason. An observe-only browser response listener records HTTP 429,
-`cf-mitigated: challenge` and `x-amzn-waf-action: challenge/captcha` from the job
-tabs. Sharing the extension's initiator does not establish job ownership.
-The observation retains the URL path and request type; query strings are
-omitted to avoid recording signed download credentials. The CLI writes a
-24-hour cooldown for the publisher and every canonical responding host, even
-if native handling completes the save. Unanswered interactive checks and
-direct-route access challenges also cool the publisher and responding host;
-the Elsevier API configuration skip remains exempt. Acquisitions refuse
-either until expiry. The agent never adds solving, bypass, probe, replay or
-retry behavior to the native Connector, nor attempts another route after a
-hard stop. Do not remove safety state to evade cooldowns. Handoff reports the
-exact paper URL. Agents do not sign in to publisher accounts; institutional
-browser access is through the configured VPN.
-
-Native translation keeps toolbar-click fallback enabled. An empty translation
-is treated as a failure before saving, so the Connector can use its own next
-translator or webpage fallback. Its native `saveItems` and `saveSnapshot`
-sessions are pinned and finalized into the existing parent. Failed saves and
-empty sessions hand off with a clear reason; a settled page with no detected
-translator reports "no Zotero translator for this page". Job results retain
-the detected translators, empty-result failure, and native save count/outcome.
-
-## Tokens and everyday Chrome
-
-Keep credentials out of repositories, logs, command-line arguments, and JSON.
-Create these files under `~/.config/zotero-companion/`, each mode `600`, each
-containing only the token on one line (an ending newline is allowed):
-
-- `elsevier-api-key`: the user's registered Elsevier API key.
-- `elsevier-insttoken`: optional institutional token paired with that key.
-- `wiley-tdm-token`: Wiley click-through TDM client token.
-
-`cse-zotero doctor --json` reports token names and configured/missing/invalid
-status, never their values. ACS has no token file until an official supported
-access mechanism is established. API requests identify this client honestly
-as `cse-zotero/1.0 (mailto:42780259+tannerpolley@users.noreply.github.com)`. Credentials never follow
-cross-host redirects.
-
-Build the agent extension from the installed official Connector:
-
-```bash
-agent-heavy --timeout 15m --max 4G uv run python scripts/build_connector.py
-cse-zotero doctor --json
-cse-zotero acquire <doi> --collection <key> --route browser --json
-```
-
-The build copies the official Connector from everyday Chrome's Default profile,
-ID `ekhagklcjbdpajgpjgmbionohlpdbjgc`, to
-`~/.local/share/cse/zotero/zotero-connector-agent/`. It adds the job worker,
-shared public-URL validator and an empty job-marker page, and appends the
-worker imports to `background-worker.js`; the copied manifest removes
-the store `key` and sets the name to `Zotero Connector (agent)` for a separate
-unpacked identity, with permissions unchanged. Other official application files,
-including `itemSaver_background.js`, stay byte-identical. Chrome's generated `_metadata` rules
-cache is omitted. The currently supported native API version is 5.0.217;
-a newer installed version is reported as a mismatch and requires inspection
-before rebuilding. The official installed files are never edited.
-
-The user loads this unpacked extension once in `chrome://extensions` and turns
-off the official Connector to avoid conflicting saves; see README setup.
-`doctor --json` detects the copy by heartbeat, without a fixed extension ID,
-and reports its active/version status and any mismatch.
-The build publishes its module revision in `cse-agent-build.json` after writing
-the extension files. The plugin reads that record for heartbeat and status
-responses (`expected_revision`). An older idle worker calls
-`chrome.runtime.reload()` once per newer revision, remembering the attempt in
-local extension storage; active paper jobs finish before it reloads.
-Doctor reports the running and expected revisions and any persisting mismatch.
-Acquisition can start everyday Chrome with `--no-startup-window`; it never
-stops the user's browser. A missing heartbeat stops with a setup message.
-There is no dedicated browser, remote debugging, hidden display, headless
-mode, spoofed user agent or input simulation.
-
-The CLI posts one job to the local companion plugin's `/acquire-job` endpoint.
-The added worker module picks it up every 20 seconds and uses a Chrome API
-call to reset the MV3 idle timer, without adding manifest permissions.
-A job is claimed once, checkpoints its owned window and save session, and is
-never replayed after worker interruption. A claim without a window checkpoint
-is finished as failed at its deadline, freeing the slot for new submissions.
-Worker startup closes windows carrying this extension's job marker, including
-ones created before a checkpoint. Windows follow the unfocused mode rule above,
-with a marker tab and a target tab tracked before article navigation.
-The module calls the native `saveWithTranslator` once.
-Native translators, HTTP/cookie handling and attachment import perform the
-save. The companion endpoint then preserves one parent in the requested
-collection; the CLI verifies the parent and PDF through the local API.
-
-Agents never attach a debugger to publisher pages or simulate input. Tab
-URL/title, response status/headers and native completion results detect the page
-stops and check waits described above. Public HTTPS destinations are required
-at CLI and plugin submission and on owned main-frame navigation/redirects.
-Loopback, private and link-local address literals, local names (`.local`,
-`.internal`, `.localhost`, `.localdomain` and single-label hosts), and other
-schemes are refused. The local job channel uses its fixed port 23119 endpoint.
-During a job, a declarative block rule covers cooled domains only for owned tabs;
-the rule is removed at job end. The job's window and tab ownership remains in a
-settling set until native calls identified by its tabs or save-session ID settle,
-plus a five-second grace. Late owned calls cannot start saves, fetch attachments,
-inject check frames or create any Connector popup after cleanup. HTTP and COHTTP
-remain native; unattributable background retries are outside this boundary.
-The native save-method hook captures the pre-save parent and
-session; its completion hook observes save progress. Zotero desktop's resolver
-path (`saveAttachmentFromResolver` to `Attachments.addFileFromURLs`) remains
-native, as on a user click, and is outside browser response observation.
-Ordinary toolbar clicks retain their native behavior. Results include final
-URL, title and observed status when available. The owned window stays minimized
-during an interactive wait, and closes on completion or a terminal stop.
-`--route browser` forces this one-paper route for
-diagnostics with all safeguards retained.
-
-## Retention boundary
-
-Zotero attachments and project-selected data authorities remain external,
-user-owned state. Git commits do not back them up. Corpus refresh does not
-promote summaries or claims; retain exact source locators and the project's
-chosen recovery policy.
+Build the agent copy with `agent-heavy uv run python scripts/build_connector.py`.
+Follow README's one-time unpacked-extension setup and keep the official copy
+disabled. Official application files stay unchanged. The plugin reads the
+installed build revision; the idle worker reloads once per newer revision.
+`cse-zotero doctor --json` reports readiness and any persistent mismatch.

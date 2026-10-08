@@ -36,12 +36,11 @@ def build(source=None, output=OUTPUT):
     manifest["name"] = "Zotero Connector (agent)"
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (output / "connector-agent.js").write_bytes(module)
-    shutil.copyfile(Path(__file__).resolve().parents[1] / "zotero-plugin/public-url.js", output / "public-url.js")
     (output / "cse-agent-job.html").write_text('<!doctype html><meta charset="utf-8"><title>Saving paper to Zotero</title>\n')
     with (output / "background-worker.js").open("ab") as worker:
-        worker.write(b'\nimportScripts("public-url.js", "connector-agent.js");\n')
+        worker.write(b'\nimportScripts("connector-agent.js");\n')
     (output / "cse-agent-build.json").write_text(json.dumps({"module_revision": revision}) + "\n")
-    return {"version": version, "module_revision": revision, "output": str(output), "modified": ["manifest.json", "background-worker.js"], "added": ["connector-agent.js", "public-url.js", "cse-agent-job.html", "cse-agent-build.json"]}
+    return {"version": version, "module_revision": revision, "output": str(output), "modified": ["manifest.json", "background-worker.js"], "added": ["connector-agent.js", "cse-agent-job.html", "cse-agent-build.json"]}
 
 
 if __name__ == "__main__":

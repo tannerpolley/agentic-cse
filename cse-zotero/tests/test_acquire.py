@@ -39,7 +39,7 @@ def runtime(monkeypatch, tmp_path):
             if path.endswith('connector'):
                 if kwargs['payload']['mode']=='dry-run':
                     return {'collection_key': 'COLL'}
-                return {'item_key': kwargs['payload'].get('item_key') or 'PARENT', 'attachment_key': 'PDFKEY', 'metadata': {'DOI': current['doi'], 'title': 'Regression paper'}, 'collection_key': 'COLL'}
+                return {'item_key': kwargs['payload'].get('existing_key') or 'PARENT', 'attachment_key': 'PDFKEY', 'metadata': {'DOI': current['doi'], 'title': 'Regression paper'}, 'collection_key': 'COLL'}
             current['has_pdf'] = True
             return {'attachment_key': 'PDFKEY'}
     def request(url, **kwargs):
@@ -516,7 +516,7 @@ def test_acquire_rejects_non_public_url_before_remote_metadata(runtime, url):
     assert not calls
 
 
-def test_connector_partial_save_is_filed_once_then_challenge_cools_host(runtime, monkeypatch):
+def test_connector_partial_save_is_filed_once_then_hands_off(runtime, monkeypatch):
     current, calls, root = runtime
     current.update(doi='10.1016/test', member=78, has_pdf=False)
     monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda *a, **k: [
@@ -530,12 +530,9 @@ def test_connector_partial_save_is_filed_once_then_challenge_cools_host(runtime,
     assert result['browser'] == {'url': 'https://www.sciencedirect.com/article/test', 'title': '', 'status': 403}
     assert ('/zotero-companion/acquire-connector', 'apply') in calls
     assert not any(path.endswith('metadata') for path, _ in calls)
-    state = json.loads((root / 'state.json').read_text())
-    assert state['elsevier']['cooldown_until'] == state['www.sciencedirect.com']['cooldown_until']
 
 
-@pytest.mark.parametrize('kept', [{}, {'item_key': 'FRESH', 'attachment_key': 'KEPTPDF'}])
-def test_connector_refusal_hands_off_without_losing_existing_or_fresh_keys(runtime, monkeypatch, kept):
+def test_connector_empty_session_hands_off_without_losing_existing_key(runtime, monkeypatch):
     current, calls, _ = runtime
     current.update(doi='10.1021/test', member=316, has_pdf=False)
     monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda *a, **k: [
@@ -543,12 +540,11 @@ def test_connector_refusal_hands_off_without_losing_existing_or_fresh_keys(runti
     original = mod.ZoteroPluginClient._request
     def empty_session(self, path, **kwargs):
         if path.endswith('acquire-connector') and kwargs['payload']['mode'] == 'apply':
-            return {'error': 'Pinned parent is in the trash; fresh item and PDF kept' if kept else
-                    'Zotero Connector saved no parent item; save with the normal Zotero Connector', **kept}
+            return {'handoff': 'Zotero Connector saved no parent item; save with the normal Zotero Connector'}
         return original(self, path, **kwargs)
     monkeypatch.setattr(mod.ZoteroPluginClient, '_request', empty_session)
     result = mod.acquire(current['doi'])
-    assert not result['ok'] and result['item_key'] == kept.get('item_key', 'EXISTING')
-    assert result['attachment_key'] == kept.get('attachment_key')
-    assert ('trash' if kept else 'saved no parent item') in result['stop_reason'] and '422' not in result['stop_reason']
+    assert not result['ok'] and result['item_key'] == 'EXISTING'
+    assert result['attachment_key'] == None
+    assert 'saved no parent item' in result['stop_reason'] and '422' not in result['stop_reason']
     assert result['handoff_url'] == 'https://doi.org/' + current['doi']

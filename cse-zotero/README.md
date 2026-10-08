@@ -215,21 +215,22 @@ and through the official Elsevier/Wiley APIs when your token and entitlement
 work. The current Elsevier key is refused for Article Retrieval; support ticket
 **261006-005015** is open. The Wiley token is not yet configured.
 
-The browser route uses a modified copy of the official Connector in your
-everyday Chrome, in a normal window created without focus so its page JavaScript
-remains visible. This route is verified for Springer. Elsevier, Wiley, AIP and
-ACS web routes commonly require a human; the job hands back the paper link.
-If the Connector requests a human-check attachment popup, the agent creates
-no popup: it sends one desktop notification when available, closes the job
-window, returns the link, and records a 24-hour publisher and responding-host
-cooldown. Ordinary user saves keep their native popup behavior.
-See the acquisition contract for automatic-check waits and notifications for
-checks in the existing article window; keep the command running during that wait.
-Acquire results include the route, stop reason or handoff URL, and any verified
-item, attachment, or collection keys. For other Zotero writes, retain their
-reviewed previews and explicit approval. Read
-[`ZOTERO_ACQUISITION.md`](ZOTERO_ACQUISITION.md) for route eligibility and
-publisher/browser boundaries.
+The browser route uses the official Connector in everyday Chrome, with one
+normal window created unfocused. Springer is verified; Elsevier, Wiley, AIP and
+ACS commonly need a human. A page check gets 15 seconds to clear by itself.
+A persistent check or a requested human-check popup closes the job window,
+returns the link, records a 24-hour cooldown and sends one desktop notification
+when available. Agent tabs create no popup. Other Connector requests, retries,
+iframes and attachment handling stay native.
+
+The job waits for a settled page, calls the native single-paper save and closes
+within three minutes. Finalization merges into an alive existing parent and
+keeps the fresh item when the old parent is absent or trashed. A short quiet
+window skips acquisition add-ons, including the user's own saves during that
+window. Results include the route, handoff/stop reason and any verified keys.
+See [`ZOTERO_ACQUISITION.md`](ZOTERO_ACQUISITION.md) for the CLI's public-HTTPS
+input boundary, pacing, caps, cooldowns and the exact job behavior. Other
+Zotero writes retain their reviewed previews and explicit approval.
 
 ### One-time Connector setup
 
@@ -536,9 +537,9 @@ loopback-only endpoints to Zotero's existing local server:
   token is supplied; limited to registered project collection trees)
 - `POST /zotero-companion/acquire-metadata` (dry-run by default; apply creates
   one Zotero parent without translator attachments)
-- `POST /zotero-companion/acquire-job` (single-paper jobs and Connector heartbeat).
+- `POST /zotero-companion/acquire-job` (submit, pickup/heartbeat, finish and status).
 - `POST /zotero-companion/acquire-connector` (dry-run validates the target; apply
-  files a native Connector session and removes its newly saved duplicate).
+  files a native save session, merging into an alive `existing_key` when supplied).
 - `POST /zotero-companion/acquire-attachment` (dry-run by default; apply imports
   supplied PDF bytes as an attachment to the selected item)
 
