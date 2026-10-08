@@ -546,9 +546,9 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                         "mode": "apply", "session_id": connector_session, "doi": doi,
                         "item_key": result["item_key"], "collection": result["collection_key"] or collection,
                         "metadata": (metadata or {}).get("metadata")})
+                    result.update({k: filed[k] for k in ("item_key", "attachment_key", "collection_key") if k in filed})
                     if filed.get("error"):
                         raise AcquireStop(saved.get("error") or filed["error"])
-                    result.update({k: filed.get(k) for k in ("item_key", "attachment_key", "collection_key")})
                     metadata = {"metadata": filed["metadata"]}
                 if stop:
                     raise AcquireStop(stop["reason"])

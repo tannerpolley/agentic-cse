@@ -62,18 +62,20 @@ The first successful route wins. Hard stops end acquisition immediately. OA
 and API success create a translated parent only when attaching the PDF. The
 Connector creates its own parent. Before the native save, the companion plugin
 finds the pre-existing DOI match, or normalized title match, excluding trash,
-and pins its key on the save session. Agent sessions save their items with
-`skipSelect` and notifier `skipRenameFile` set before the add notification.
-Zoplicate 5.1.1 recognizes those flags and never queues these additions for
-automatic merging or its progress popup. Each created parent is marked in memory
-with its save-session ID before notifications commit. The installed Linter,
-Actions & Tags and Attanger hooks exclude that session's parents and attachments
-before their automatic queues; this exclusion ends when finalization completes.
-Ordinary sessions retain their native options and add-on behavior. No global
-prefs or progress-window suppression are used. Finalization merges into the pinned parent with Zotero's native merge
-and deletes only the newly saved duplicate.
-It files the surviving parent in the requested collection. Failure leaves at
-most one metadata-only parent and reports its key and the handoff URL. CLI
+and pins its key on the save session. Connector, metadata and PDF-import paths
+record each created item's exact library and item key before its add notification.
+Only creation events receive `skipSelect` and notifier `skipRenameFile`;
+Zoplicate 5.1.1 recognizes these flags and never queues these additions for
+automatic merging or its progress popup. Linter, Actions & Tags and Attanger
+filter only those keys' add/create events. Other items and later edit/open events
+retain their native behavior. Terminal finally blocks release the exclusions
+on success, failure or stop; the acquisition deadline also ends an exclusion
+if its worker disappears. No global prefs or progress-window suppression are used.
+Finalization uses Zotero's native merge into the pinned parent and deletes only
+the newly saved duplicate. A pinned parent now in the trash is refused before
+any mutation; the fresh item and PDF are kept and their keys are reported.
+Successful finalization files the surviving parent in the requested collection.
+Failure preserves the saved item and any PDF and returns their keys and the handoff URL. CLI
 OA/API downloads and companion PDF imports must begin with `%PDF` and fit the
 50 MiB limit; native Connector and desktop imports keep Zotero's validation.
 Agent translation discards a purported ScienceDirect PDF that points back to an
@@ -163,11 +165,12 @@ The CLI sends one desktop notification when `notify-send` is available:
 Ordinary toolbar saves keep the Connector's original popup behavior.
 
 Login walls, access denied, unusual activity, HTTP 429, and other HTTP 401/403
-responses still hard-stop. A 429 on any job request (main frame, subresource,
-or this extension's background request) immediately closes the job windows.
-The cancellation guard stops native HTTP backoff from sending again; after
-persisting the result the worker reloads to terminate remaining background
-work. This is worker cancellation, never a page reload or another attempt.
+responses still hard-stop. A 429 from an owned tab (main frame or subresource)
+immediately closes the job window and records the cooldown. Job cancellation
+never reloads the extension or stops an ordinary save. Extension background
+requests without a reliable originating tab are not attributed to the job;
+their native retries/backoff remain the Connector's responsibility, as on a
+user's click. The worker neither globally guards HTTP nor blocks these requests.
 The other page stops apply to the job page.
 Login detection waits until the tab is complete and its URL has remained
 stable for three seconds. Silent OAuth/SSO hops carrying `prompt=none` are
@@ -177,9 +180,8 @@ toolbar click; a request for a human-check popup ends the agent job with a
 handoff. API and direct OA requests retain their immediate challenge stops.
 Record the reason. An observe-only browser response listener records HTTP 429,
 `cf-mitigated: challenge` and `x-amzn-waf-action: challenge/captcha` from the job
-tabs and background requests initiated by this extension. The observation
-retains the URL path, request type, and whether it came from
-the article tab or extension background; query strings are
+tabs. Sharing the extension's initiator does not establish job ownership.
+The observation retains the URL path and request type; query strings are
 omitted to avoid recording signed download credentials. The CLI writes a
 24-hour cooldown for the publisher and every canonical responding host, even
 if native handling completes the save. Unanswered interactive checks and
@@ -271,11 +273,13 @@ at CLI and plugin submission and on owned main-frame navigation/redirects.
 Loopback, private and link-local address literals, local names (`.local`,
 `.internal`, `.localhost`, `.localdomain` and single-label hosts), and other
 schemes are refused. The local job channel uses its fixed port 23119 endpoint.
-During a job, a declarative block rule covers cooled domains for the job tabs
-and extension background requests (`tabId: -1`); the rule is removed at job end.
-The worker's HTTP entry guard enforces job cancellation, including native
-backoff re-entry. It does not tag requests or classify internal destinations;
-COHTTP and desktop resolver requests retain their native handling. Its native save-method hook only captures the pre-save parent and
+During a job, a declarative block rule covers cooled domains only for owned tabs;
+the rule is removed at job end. The job's window and tab ownership remains in a
+settling set until its tab-bearing native save and attachment calls settle,
+plus a five-second grace. Late owned calls cannot start saves, fetch attachments,
+inject check frames or create any Connector popup after cleanup. HTTP and COHTTP
+remain native; unattributable background retries are outside this boundary.
+The native save-method hook captures the pre-save parent and
 session; its completion hook observes save progress. Zotero desktop's resolver
 path (`saveAttachmentFromResolver` to `Attachments.addFileFromURLs`) remains
 native, as on a user click, and is outside browser response observation.
