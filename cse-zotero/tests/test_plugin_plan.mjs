@@ -559,6 +559,7 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
       saveWithTranslator: async (source, _index, options) => {
         saves++; assert.equal(tab.title, "Paper", "never save a transient SSO page");
         if (extra.late) {
+          await Zotero.Connector.callMethod("saveItems", { sessionID: "SESSION", items: [{}] }, source);
           Zotero.ItemSaver._fetchAttachment({ url: "https://www.sciencedirect.com/paper.pdf", mimeType: "application/pdf" }, source).catch(() => {});
           return; // A frame's save reply settles before its native attachment fetch.
         }
@@ -672,6 +673,8 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
     for (const name of ["passJSDetectionViaWindowPrompt", "passJSDetectionViaHiddenIframe"])
       await assert.rejects(() => Zotero.BotBypass[name]("https://www.sciencedirect.com/late.pdf", tab), /stopped/);
     await assert.rejects(() => Zotero.Connector_Browser.openWindow("chrome-extension://official/itemSelector.html", {}, tab), /stopped/);
+    for (const source of [tab, undefined])
+      await assert.rejects(() => Zotero.Connector.callMethod("saveAttachmentFromResolver", { sessionID: "SESSION" }, source), /stopped/);
     await assert.rejects(() => Zotero.ItemSaver._fetchAttachment({ url: "https://www.sciencedirect.com/late.pdf" }, tab), /stopped/);
     settleNative();
   }

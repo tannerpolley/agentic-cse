@@ -275,7 +275,7 @@ Loopback, private and link-local address literals, local names (`.local`,
 schemes are refused. The local job channel uses its fixed port 23119 endpoint.
 During a job, a declarative block rule covers cooled domains only for owned tabs;
 the rule is removed at job end. The job's window and tab ownership remains in a
-settling set until its tab-bearing native save and attachment calls settle,
+settling set until native calls identified by its tabs or save-session ID settle,
 plus a five-second grace. Late owned calls cannot start saves, fetch attachments,
 inject check frames or create any Connector popup after cleanup. HTTP and COHTTP
 remain native; unattributable background retries are outside this boundary.

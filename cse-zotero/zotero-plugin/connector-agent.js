@@ -1,7 +1,7 @@
 /* Agent jobs only. The official Connector's toolbar and ordinary tabs are unchanged. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
-  const MODULE_REVISION = 16;
+  const MODULE_REVISION = 17;
   const KEY = "cseAgentJob", RULE = 900000000;
   const RULES = [RULE, ...ZoteroCompanionURL.blocked.map((_, i) => RULE + i + 1)];
   const marker = Zotero.getExtensionURL("cse-agent-job.html") + "#";
@@ -9,7 +9,7 @@
   const settling = new Set();
   const host = url => new URL(url).hostname.toLowerCase().replace(/\.+$/, "");
   const safeURL = url => { const u = new URL(url); u.username = u.password = ""; return u.href; };
-  const agentTab = tab => [...settling].find(a => a.tabs.includes(tab?.id));
+  const agentTab = (tab, session) => [...settling].find(a => a.tabs.includes(tab?.id) || session && a.session_id === session);
   const challenge = text => ["just a moment", "captcha", "cf-chl-", "unusual activity", "access denied",
     "verify you are human", "pow_challenge", "sign in to access", "log in to access", "login required"]
     .find(s => text.toLowerCase().includes(s));
@@ -127,7 +127,7 @@
   const callMethod = Zotero.Connector.callMethod;
   Zotero.Connector.callMethod = async function(options, data, tab) {
     const method = typeof options === "string" ? options : options.method;
-    const a = agentTab(tab);
+    const a = agentTab(tab, data?.sessionID);
     if (a && ["saveItems", "saveSnapshot"].includes(method)) {
       return ownedWork(a, async () => {
         a.native_save = { method, session_id: data.sessionID, count: method === "saveSnapshot" ? 1 : data.items?.length || 0, state: "pending" };
@@ -147,6 +147,7 @@
         }
       });
     }
+    if (a) return ownedWork(a, () => callMethod.call(this, options, data, tab));
     return callMethod.call(this, options, data, tab);
   };
   for (const [object, name] of [[Zotero.BotBypass, "passJSDetectionViaWindowPrompt"], [Zotero.Connector_Browser, "openWindow"]]) {
