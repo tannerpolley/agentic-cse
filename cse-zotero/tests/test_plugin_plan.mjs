@@ -473,8 +473,6 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
     BrowserAttachmentMonitor: { _isMonitorPageSender: () => true, waitForAttachment: async (id, url, timeout = 60000) => {
       monitorCalls.push({ id, url, timeout });
       if (id === tab.id && !["hidden", "repeated"].includes(bypass)) throw Error("Needs a human check");
-      if (bypass === "timeout" && timeout === 300000) { clock += timeout; throw Error("Attachment monitor timed out"); }
-      if (bypass === "throttled") headersReceived({ tabId: id, url, type: "main_frame", statusCode: 429, responseHeaders: [] });
       return "https://pdf.sciencedirectassets.com/captured.pdf";
     } },
     Connector: { callMethod: async () => { if (extra.save_failure) throw Object.assign(Error("save failed"), { status: 500 }); return {}; } },
@@ -522,7 +520,8 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
       storage: { local: storage({ cseAgentJob: { id: "OLD", tab: 99, window: 9, session_id: "OLDSESSION" },
         cseAgentReloadRevision: extra.previous_reload || 0 }), session: storage() },
       windows: { create: async options => {
-        if (options.state) { assert.equal(options.focused, false); assert.equal(options.state, windows.length ? "minimized" : "normal"); }
+        if (options.state) assert.equal(options.focused, false);
+        if (!windows.length) assert.equal(options.state, "normal");
         windows.push(options);
         const target = windows.length === 1 ? tab : { id: 6, url: Zotero.getExtensionURL("browserAttachmentMonitor/browserAttachmentMonitor.html") };
         return { id: windows.length === 1 ? 7 : 8, tabs: Array.isArray(options.url) ? [{ id: 4, url: options.url[0] }, target] : [target] };
@@ -601,12 +600,13 @@ async function agentJobFixture(response, title = "Paper", navigation = null, byp
   for (const rule of rules.find(r => r.addRules).addRules) assert.ok(removedRuleIds.includes(rule.id));
   assert.ok(removedRuleIds.includes(900000000));
   if (bypass) {
+    const agentWindows = windows.slice();
     await Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://publisher.example/manual", { id: 99 });
     const manualWindow = windows.at(-1);
     assert.equal(manualWindow.width, 800);
     assert.equal(manualWindow.state, undefined);
     assert.equal(manualWindow.focused, undefined);
-    return { outcome, calls, requests, saves, windows: windows.filter(w => w.state), removedWindows, iframeCalls, monitorCalls, requestOptions, rules };
+    return { outcome, calls, requests, saves, windows: agentWindows, removedWindows, iframeCalls, monitorCalls, requestOptions, rules };
   }
   await Zotero.COHTTP.request("GET", "https://publisher.example/manual", {}, { id: 99 });
   await Zotero.ItemSaver._fetchAttachment({}, { id: 99 });
@@ -655,15 +655,13 @@ test("Any job 429 closes its window; shipped HTTP backoff cannot send its next a
   }
 });
 
-test("Agent attachments reach the shipped automatic checks and an unfocused human-check monitor", async () => {
+test("Agent window prompts hand off without a popup; automatic checks and ordinary popups remain native", async () => {
   const pdf = { status: 200, response: new TextEncoder().encode("%PDF-1.7").buffer, headers: { "content-type": "application/pdf" } };
-  for (const kind of ["hidden", "amazon", "prompt", "timeout", "throttled"]) {
+  for (const kind of ["hidden", "amazon", "prompt"]) {
     const challenge = { status: 403, response: new TextEncoder().encode("<title>Just a moment</title>").buffer,
       headers: { "content-type": "text/html", ...(kind === "amazon" ? { "x-amzn-waf-action": "challenge" } : {}) } };
     const result = await agentJobFixture([challenge, pdf], "Paper", null, kind);
-    assert.equal(result.windows.length, ["prompt", "timeout", "throttled"].includes(kind) ? 2 : 1, kind);
-    const notices = result.calls.filter(c => c.action === "progress" && c.result.check?.kind === "interactive");
-    assert.equal(notices.length, ["prompt", "timeout", "throttled"].includes(kind) ? 1 : 0, kind);
+    assert.equal(result.windows.length, 1, "an agent prompt must not create another window");
     if (kind === "amazon") {
       assert.equal(result.requestOptions[1].headers["Sec-Fetch-Site"], "same-origin");
       assert.equal(result.iframeCalls.some(code => code.includes("document.createElement")), false);
@@ -671,14 +669,16 @@ test("Agent attachments reach the shipped automatic checks and an unfocused huma
       assert.ok(result.monitorCalls.length > 0, "agent attachment must reach the native hidden-iframe check");
       assert.equal(result.monitorCalls[0].timeout, 5000);
       assert.ok(result.iframeCalls.some(code => code.includes("iframe.style.display = 'none'")));
-      if (result.windows.length === 2) {
-        assert.equal(result.monitorCalls[1].timeout, 300000);
-        assert.ok(result.removedWindows.includes(8));
-      }
     }
-    if (["timeout", "throttled"].includes(kind)) {
+    if (kind === "prompt") {
+      assert.equal(result.outcome.check.kind, "handoff");
+      assert.equal(result.outcome.check.url, "https://publisher.example/paper");
+      assert.match(result.outcome.stop.reason, /human save/);
       assert.equal(result.outcome.stop.cooldown, true);
+      assert.equal(result.outcome.stop.host, "www.sciencedirect.com");
+      assert.ok(result.removedWindows.includes(7));
       assert.equal(result.requests, 1);
+      assert.equal(result.monitorCalls.length, 2, "only the hidden iframe and ordinary popup wait for attachments");
     } else {
       assert.equal(result.outcome.stop, null, kind);
       assert.equal(result.outcome.error, null, kind);

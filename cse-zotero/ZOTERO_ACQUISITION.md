@@ -47,8 +47,14 @@ Acquisition checks DOI, then translated title duplicates, and tries:
    `https://api.unpaywall.org/v2/<doi>?email=42780259+tannerpolley@users.noreply.github.com`.
 2. The publisher's official API with a configured token for Elsevier or Wiley.
 3. The modified official Zotero Connector in the user's everyday Chrome, for
-   all publishers, including Elsevier, Wiley and ACS.
+   article pages without blocking checks.
 4. Human handoff with the exact DOI or official article URL.
+
+Unattended acquisition works for open access through Unpaywall and PMC Cloud,
+and through the official Elsevier/Wiley APIs when the user's token and
+entitlement work. The everyday-Chrome Connector route is verified for Springer.
+Elsevier, Wiley, AIP and ACS web routes commonly require a human; the job
+returns the paper link rather than spending further publisher attempts.
 
 PMC OA locations use NCBI's [official PMC Cloud dataset](https://pmc.ncbi.nlm.nih.gov/tools/pmcaws/) and its metadata-declared main PDF via Unpaywall's PMCID or the [ID Converter](https://pmc.ncbi.nlm.nih.gov/tools/id-converter-api/) fallback (`tool=cse-zotero`, maintainer email), preserving cooldowns, sequential one-request-per-second pacing, and the 50 MiB limit; PMC web PDF links and the legacy OA Web Service/compressed packages (retired August 2026) are never fetched.
 
@@ -91,7 +97,8 @@ An API HTTP 403 with `X-ELS-Status: AUTHENTICATION_ERROR` or the equivalent
 “Requestor configuration settings insufficient” error is a key configuration
 skip, allowing Connector fall-through; a challenge response or HTTP 429 still
 hard-stops. Other 401/403 responses also stop. Error messages retain
-`X-ELS-Status` when supplied. See the official
+`X-ELS-Status` when supplied. The user's current key is refused for Article
+Retrieval; support ticket **261006-005015** is open. See the official
 [Article Retrieval API](https://dev.elsevier.com/documentation/ArticleRetrievalAPI.wadl)
 and [API authentication](https://dev.elsevier.com/tecdoc_api_authentication.html).
 
@@ -99,7 +106,8 @@ Wiley's API is
 `https://api.wiley.com/onlinelibrary/tdm/v1/articles/<encoded-doi>` with
 `Wiley-TDM-Client-Token`. Obtain a token through Wiley Online Library's account
 and TDM agreement; institutional entitlement requires the institution network.
-The client uses Wiley's stricter 10-second interval. See
+The user's Wiley token is not yet configured. The client uses Wiley's stricter
+10-second interval. See
 [Wiley's TDM documentation](https://onlinelibrary.wiley.com/library-info/resources/text-and-datamining).
 No public ACS token API was verified; ACS uses OA then the normal Connector.
 
@@ -124,8 +132,8 @@ visit. Each attempt has a three-minute deadline, extended once by up to five
 minutes for an interactive check; a stuck page is closed without reloading.
 Article windows are created in normal state with `focused: false`; this keeps
 the page visible to its JavaScript. The local GNOME/X11 fixture measured no
-focus transition through create, native save, finalization or close. Human-check
-windows start minimized and unfocused. No job raises or focuses a window.
+focus transition through create, native save, finalization or close. Agent jobs
+never create human-check attachment popups. No job raises or focuses a window.
 Agent jobs use the Connector's shipped request, retry, attachment fallback and
 automatic-check handling, including its domain-whitelisted hidden iframe and
 Amazon WAF request with `Sec-Fetch-Site: same-origin`. These internal requests
@@ -147,11 +155,12 @@ the native save automatically. An unanswered interactive check closes the
 window, returns the paper link, and records a 24-hour cooldown for the publisher
 and responding host. Classification uses tab titles, response
 headers and the document snapshots already sent by the official Connector.
-When the Connector requests a human-check attachment window, the agent creates
-its native attachment-monitor page minimized and unfocused, sends the same
-notification, and keeps the native attachment wait active for at most five
-minutes. It closes the window on completion or handoff. Ordinary toolbar saves
-keep the Connector's original popup behavior.
+When the Connector requests a human-check attachment popup, the agent never
+creates that window. It immediately closes the job window, returns the paper
+link, and records a 24-hour cooldown for the publisher and responding host.
+The CLI sends one desktop notification when `notify-send` is available:
+`<publisher> needs you to save this paper; link in the agent's result`.
+Ordinary toolbar saves keep the Connector's original popup behavior.
 
 Login walls, access denied, unusual activity, HTTP 429, and other HTTP 401/403
 responses still hard-stop. A 429 on any job request (main frame, subresource,
@@ -163,13 +172,14 @@ The other page stops apply to the job page.
 Login detection waits until the tab is complete and its URL has remained
 stable for three seconds. Silent OAuth/SSO hops carrying `prompt=none` are
 never classified as login walls or saved as article pages.
-Native attachment handling may process eligible PDF/download check responses as on a toolbar
-click; API and direct OA requests retain their immediate challenge stops.
+Native attachment handling may process automatic PDF/download checks as on a
+toolbar click; a request for a human-check popup ends the agent job with a
+handoff. API and direct OA requests retain their immediate challenge stops.
 Record the reason. An observe-only browser response listener records HTTP 429,
 `cf-mitigated: challenge` and `x-amzn-waf-action: challenge/captcha` from the job
 tabs and background requests initiated by this extension. The observation
 retains the URL path, request type, and whether it came from
-the article tab, attachment tab, or extension background; query strings are
+the article tab or extension background; query strings are
 omitted to avoid recording signed download credentials. The CLI writes a
 24-hour cooldown for the publisher and every canonical responding host, even
 if native handling completes the save. Unanswered interactive checks and

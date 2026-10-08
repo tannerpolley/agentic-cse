@@ -85,13 +85,18 @@ def connector_save(url, safety, pub, *, collection=None, doi=""):
             if job.get("id") != job_id:
                 raise AcquireStop("Connector job was lost; no retry")
             outcome = job.get("result") or {}
-            if not notified and (check := outcome.get("check") or {}).get("kind") == "interactive":
+            if not notified and (check := outcome.get("check") or {}).get("kind") in {"interactive", "handoff"}:
                 notified = True
-                deadline += 300
+                if check["kind"] == "interactive":
+                    deadline += 300
+                    title = "CSE Zotero needs a check completed"
+                    message = f"{checked_url(check['url'])} needs you to complete a check in Chrome; the save will finish automatically. Open its minimized window."
+                else:
+                    title = "CSE Zotero needs a manual save"
+                    message = f"{pub or checked_url(check['url'])} needs you to save this paper; link in the agent's result"
                 if notify := shutil.which("notify-send"):
                     try:
-                        subprocess.run([notify, "CSE Zotero needs a check completed",
-                                        f"{checked_url(check['url'])} needs you to complete a check in Chrome; the save will finish automatically. Open its minimized window."],
+                        subprocess.run([notify, title, message],
                                        timeout=5, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
                     except (OSError, subprocess.TimeoutExpired):
                         pass

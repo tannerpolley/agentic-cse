@@ -148,3 +148,33 @@ def test_interactive_check_notifies_once_and_keeps_the_same_job_alive(monkeypatc
     assert len(notices) == 1 and notices[0][1] == 5
     assert notices[0][0][0] == '/usr/bin/notify-send'
     assert 'wiley.com needs you to complete a check' in notices[0][0][2]
+
+
+def test_attachment_check_hands_off_notifies_once_and_cools_publisher_and_host(monkeypatch, tmp_path):
+    notices, calls = [], []
+    monkeypatch.setattr(bridge, 'ensure_chrome', lambda: None)
+    monkeypatch.setattr(acquisition, 'require_vpn', lambda: None)
+    monkeypatch.setattr(bridge.shutil, 'which', lambda name: '/usr/bin/notify-send')
+    monkeypatch.setattr(bridge.subprocess, 'run', lambda command, **kwargs: notices.append(command))
+    monkeypatch.setattr(bridge.time, 'sleep', lambda seconds: pytest.fail('a handoff must not wait or retry'))
+    class Plugin:
+        job_id = None
+        def _request(self, path, *, payload, **kwargs):
+            calls.append(payload['action'])
+            if payload['action'] == 'submit':
+                self.job_id = payload['job']['id']
+                return {}
+            if not self.job_id:
+                return {'ready': True}
+            return {'job': {'id': self.job_id, 'state': 'done', 'result': {
+                'check': {'kind': 'handoff', 'url': 'https://publisher.example/paper'},
+                'stop': {'reason': 'Publisher requires a human save', 'host': 'pdf.example', 'cooldown': True}}}}
+    monkeypatch.setattr(bridge, 'ZoteroPluginClient', Plugin)
+    with acquisition.Safety(tmp_path / 'state.json') as safety:
+        result = bridge.connector_save('https://publisher.example/paper', safety, 'elsevier')
+        bridge.record_observations(safety, 'elsevier', result)
+        assert safety.data['elsevier']['cooldown_until'] == safety.data['pdf.example']['cooldown_until']
+        assert safety.data['elsevier']['cooldown_until'] == safety.data['elsevier']['stopped_at'] + 86400
+    assert calls == ['status', 'submit', 'status']
+    assert len(notices) == 1
+    assert notices[0][2] == "elsevier needs you to save this paper; link in the agent's result"

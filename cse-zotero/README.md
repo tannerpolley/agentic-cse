@@ -210,11 +210,21 @@ uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
 uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --route browser --json
 ```
 
+Unattended acquisition works for open access through Unpaywall and PMC Cloud,
+and through the official Elsevier/Wiley APIs when your token and entitlement
+work. The current Elsevier key is refused for Article Retrieval; support ticket
+**261006-005015** is open. The Wiley token is not yet configured.
+
 The browser route uses a modified copy of the official Connector in your
 everyday Chrome, in a normal window created without focus so its page JavaScript
-remains visible. Human-check windows start minimized and unfocused.
-See the acquisition contract for automatic-check waits and notifications when
-a check requires user input; keep the acquire command running during that wait.
+remains visible. This route is verified for Springer. Elsevier, Wiley, AIP and
+ACS web routes commonly require a human; the job hands back the paper link.
+If the Connector requests a human-check attachment popup, the agent creates
+no popup: it sends one desktop notification when available, closes the job
+window, returns the link, and records a 24-hour publisher and responding-host
+cooldown. Ordinary user saves keep their native popup behavior.
+See the acquisition contract for automatic-check waits and notifications for
+checks in the existing article window; keep the command running during that wait.
 Acquire results include the route, stop reason or handoff URL, and any verified
 item, attachment, or collection keys. For other Zotero writes, retain their
 reviewed previews and explicit approval. Read
