@@ -491,6 +491,7 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     if (!connectorJob || data.id !== connectorJob.id) return response(404, { error: "connector_job_not_found" });
     connectorJob.state = "done";
     connectorJob.result = data.result;
+    quietUntil = Date.now() + 30000;
     return response(200, { ok: true });
   }
 
@@ -664,7 +665,7 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
       permitBookmarklet = false;
       async init(request) {
         const data = requestData(request);
-        try { return await acquireConnector(data); }
+        try { return await quietAcquisition(acquireConnector, data); }
         catch (_) { return endpointError("connector_finalization_failed"); }
       }
     };
