@@ -116,7 +116,7 @@ concrete `reason`. The top-level `configured_paths`, `observed_live_checks`,
 `unverified_active_host`, and `identity` fields keep configured paths, live
 probes, host uncertainty, and package/source/payload identity separate.
 The separate `acquisition` object reports configured token names and status,
-plus managed-browser status; it never includes token values.
+plus agent Connector status; it never includes token values.
 
 Data readiness checks both current normalized inventories for every declared
 registry pack and all standalone inventories outside those packs. Other nested
@@ -201,24 +201,66 @@ Doctor reports names and status only, never token values.
 The command writes the requested paper by default. Its optional dry run previews
 metadata only and does not create a Zotero item, download a PDF, or start the
 browser. Use the default `auto` route for normal acquisition; force
-`--route browser` only for a permitted, non-restricted live test.
+`--route browser` only for a single-paper Connector diagnostic.
 
 ```bash
 uv run cse-zotero doctor --json
 uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --dry-run --json
 uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
 uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --route browser --json
-uv run cse-zotero agent-browser status --json
-uv run cse-zotero agent-browser start --json
-uv run cse-zotero agent-browser stop --json
 ```
 
-The dedicated agent browser runs headless and does not take desktop focus.
-Acquire results include the route, stop reason or handoff URL, and any verified
-item, attachment, or collection keys. For other Zotero writes, retain their
-reviewed previews and explicit approval. Read
-[`ZOTERO_ACQUISITION.md`](ZOTERO_ACQUISITION.md) for route eligibility and
-publisher/browser boundaries.
+Unattended acquisition works for open access through Unpaywall and PMC Cloud,
+and through the official Elsevier/Wiley APIs when your token and entitlement
+work. The current Elsevier key is refused for Article Retrieval; support ticket
+**261006-005015** is open. The Wiley token is not yet configured.
+
+The browser route uses the official Connector in everyday Chrome, with one
+normal window created unfocused. Springer is verified; Elsevier, Wiley, AIP and
+ACS commonly need a human. A page check gets 15 seconds to clear by itself.
+A persistent check or a requested human-check popup closes the job window,
+returns the link, records a 24-hour cooldown and sends one desktop notification
+when available. Agent tabs create no popup. Other Connector requests, retries,
+iframes and attachment handling stay native.
+
+The job waits for a settled page, calls the native single-paper save and closes
+within three minutes. Finalization merges into an alive existing parent and
+keeps the fresh item when the old parent is absent or trashed. A short quiet
+window skips acquisition add-ons, including the user's own saves during that
+window. Results include the route, handoff/stop reason and any verified keys.
+See [`ZOTERO_ACQUISITION.md`](ZOTERO_ACQUISITION.md) for the CLI's public-HTTPS
+input boundary, pacing, caps, cooldowns and the exact job behavior. Other
+Zotero writes retain their reviewed previews and explicit approval.
+
+### One-time Connector setup
+
+Build the modified copy from the official Connector installed in Chrome's
+Default profile (currently 5.0.217):
+
+```bash
+agent-heavy --timeout 15m --max 4G uv run python scripts/build_connector.py
+```
+
+Then, in your everyday Chrome:
+
+1. Open `chrome://extensions` and turn on **Developer mode**.
+2. Turn **off** the existing Zotero Connector.
+3. Click **Load unpacked** and select
+   `/home/user/.local/share/cse/zotero/zotero-connector-agent/`.
+4. Confirm **Zotero Connector (agent)** is enabled and has no errors; keep
+   Zotero Desktop running. Run
+   `cse-zotero doctor --json`; `acquisition.connector.ready` should be `true`
+   within about 20 seconds, with version `5.0.217`.
+
+The copy removes the store manifest key and uses a separate unpacked extension
+ID, with the official permissions unchanged. Keep the official Connector off
+so only the agent copy handles saves. Doctor detects the copy by its heartbeat,
+not by extension ID. Your usual toolbar saves keep their native behavior. Re-run
+the build after an official Connector update. The agent reloads itself while
+idle when a newer module revision is built, with one attempt per revision.
+Doctor reports a persisting revision mismatch; unsupported native Connector
+versions are refused by the build. The acquisition rules and job lifecycle are owned by
+[`ZOTERO_ACQUISITION.md`](ZOTERO_ACQUISITION.md).
 
 ## Stages
 
@@ -495,6 +537,9 @@ loopback-only endpoints to Zotero's existing local server:
   token is supplied; limited to registered project collection trees)
 - `POST /zotero-companion/acquire-metadata` (dry-run by default; apply creates
   one Zotero parent without translator attachments)
+- `POST /zotero-companion/acquire-job` (submit, pickup/heartbeat, finish and status).
+- `POST /zotero-companion/acquire-connector` (dry-run validates the target; apply
+  files a native save session, merging into an alive `existing_key` when supplied).
 - `POST /zotero-companion/acquire-attachment` (dry-run by default; apply imports
   supplied PDF bytes as an attachment to the selected item)
 

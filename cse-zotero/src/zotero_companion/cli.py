@@ -9,7 +9,7 @@ from pathlib import Path
 import shutil
 
 from .acquire import AcquireStop, acquire, configured_tokens
-from .agent_browser import agent_browser
+from .connector_job import connector_status
 from .better_bibtex import BetterBibTeXClient, BetterBibTeXError, configure_export, export_plan
 from .config import (
     ConfigError,
@@ -210,11 +210,8 @@ def main() -> int:
     acquire_cmd.add_argument("identifier")
     acquire_cmd.add_argument("--collection", help="existing collection key or unambiguous name")
     acquire_cmd.add_argument("--dry-run", action="store_true")
-    acquire_cmd.add_argument("--route", choices=("auto", "browser"), default="auto", help="force permitted browser route for one paper")
+    acquire_cmd.add_argument("--route", choices=("auto", "browser"), default="auto", help="force native Connector route for one paper")
     acquire_cmd.add_argument("--json", action="store_true")
-    browser_cmd = subparsers.add_parser("agent-browser", help="manage dedicated Chrome without taking focus")
-    browser_cmd.add_argument("action", choices=("start", "stop", "status"))
-    browser_cmd.add_argument("--json", action="store_true")
     doctor = subparsers.add_parser("doctor", help="report installed protocol and capability readiness")
     doctor.add_argument("--config", type=Path, default=default_config_path())
     doctor.add_argument("--json", action="store_true")
@@ -630,10 +627,9 @@ def main() -> int:
             help="project registry path (the Zotero add-on always reads the default one)",
         )
     args = parser.parse_args()
-    if args.command in {"acquire", "agent-browser"}:
+    if args.command == "acquire":
         try:
-            payload = (acquire(args.identifier, collection=args.collection, dry_run=args.dry_run, route=args.route)
-                       if args.command == "acquire" else agent_browser(args.action))
+            payload = acquire(args.identifier, collection=args.collection, dry_run=args.dry_run, route=args.route)
         except (AcquireStop, OSError, ValueError) as exc:
             payload = {"ok": False, "stop_reason": str(exc)}
         emit_json(payload)
@@ -753,7 +749,7 @@ def main() -> int:
                         better_bibtex={"ok": bbt_ok, "error": bbt_error, **bbt_version},
                         mathpix={"mpx_on_path": shutil.which("mpx") is not None},
                     )
-                    payload["acquisition"] = {"tokens": configured_tokens(), "agent_browser": agent_browser("status"),
+                    payload["acquisition"] = {"tokens": configured_tokens(), "connector": connector_status(),
                                               "contract": "ZOTERO_ACQUISITION.md"}
         except (ConfigError, CorpusMigrationError, BetterBibTeXError, OSError, ValueError) as exc:
             parser.error(str(exc))

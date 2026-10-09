@@ -248,3 +248,159 @@ test("manifest has the fields Zotero 10 requires to install an add-on", async ()
   const zotero = manifest.applications.zotero;
   for (const field of ["id", "update_url", "strict_max_version"]) assert.ok(zotero[field], field);
 });
+
+import { readFileSync } from "node:fs";
+import vm from "node:vm";
+const load = (context, name) => vm.runInContext(readFileSync(new URL(`../zotero-plugin/${name}`, import.meta.url), "utf8"), context);
+function desktopFixture() {
+  let clock = 0;
+  const calls = [], collection = { id: 2, key: "COLL", libraryID: 1 };
+  class Item {
+    constructor(key = "FRESH") { this.id = key === "OLD" ? 1 : 2; this.key = key; this.libraryID = 1; this.children = key === "OLD" ? [] : [3]; }
+    isRegularItem() { return true; }
+    toJSON() { return { itemType: "journalArticle", DOI: "10.1234/test", title: "Paper" }; }
+    getField() { return "10.1234/test"; }
+    fromJSON() {}
+    setCollections() {}
+    addToCollection(id) { calls.push(["collection", this.key, id]); }
+    getAttachments() { return this.children; }
+    _saveData(env) { return env.notifierData; }
+    async saveTx() { this._saveData({ isNew: true, notifierData: {} }); }
+    async eraseTx() { calls.push(["erase", this.key]); }
+  }
+  const fresh = new Item(), old = new Item("OLD"), pdf = { key: "PDF", attachmentContentType: "application/pdf" };
+  const hooks = { onNotify: (...args) => calls.push(["linter", ...args]) };
+  const actionManager = { dispatchActionByEvent: (...args) => calls.push(["actions", ...args]) };
+  class Menu { queueAddedItems(ids) { calls.push(["attanger", ...ids]); } }
+  const menu = new Menu();
+  const Zotero = {
+    Libraries: { userLibraryID: 1 }, Server: { Endpoints: {}, Connector: { SessionManager: { get: () => ({ _items: { fresh } }) } } },
+    Notifier: { registerObserver: () => 1, unregisterObserver() {} }, Item,
+    Collections: { getByLibrary: () => [collection] },
+    getActiveZoteroPane: () => ({ getSelectedLibraryIDs: () => [1], getSelectedCollections: () => [collection] }),
+    Utilities: { cleanDOI: s => s, extractIdentifiers: () => [{ DOI: "10.1234/test" }] },
+    Translate: { Search: class { setSearch() {} setTranslator() {} async translate() { return [fresh]; } } },
+    ItemFields: { getID: () => 1 }, DB: { queryAsync: async () => [] },
+    Items: { getByLibraryAndKey: (_, key) => key === "OLD" ? old : null, getAsync: async () => [pdf],
+      merge: async (parent, items) => { calls.push(["merge", parent.key, items[0].key]); parent.children.push(...items[0].children); } },
+    Linter: { hooks }, ActionsTags: { api: { actionManager } }, ZoteroAttanger: { data: { menu } },
+    File: { getContentsAsync: async () => '{"module_revision":19}' }
+  };
+  const context = vm.createContext({ Zotero, Services: { dirsvc: { get: () => ({ path: "/home/test" }) } }, Components: { interfaces: {} },
+    Date: class extends Date { static now() { return clock; } }, atob });
+  for (const name of ["cleanup-plan.js", "organize-plan.js", "zotero-companion.js"]) load(context, name);
+  context.ZoteroCompanion.start();
+  const call = async (path, data) => JSON.parse((await new Zotero.Server.Endpoints["/zotero-companion/" + path]().init({ data }))[2]);
+  const heartbeat = () => call("acquire-job", { action: "pickup", protocol: 1, compatible: true, version: "5.0.217", module_revision: 19 });
+  return { call, heartbeat, calls, Zotero, fresh, old, context, now: () => clock, advance: ms => { clock += ms; } };
+}
+async function browserFixture(mode = "success") {
+  const desktop = desktopFixture(), created = [], closed = [], native = [];
+  await desktop.heartbeat();
+  await desktop.call("acquire-job", { action: "submit", job: { id: "JOB", url: "https://paper.example/article" } });
+  let headers, reads = 0, finish;
+  const finished = new Promise(resolve => { finish = resolve; });
+  const tab = { id: 2, url: "https://paper.example/article", status: "complete", title: "Paper" };
+  const chrome = {
+    windows: { getAll: async () => [], create: async options => { created.push(options); return { id: 10, tabs: [{ id: 1 }, tab] }; },
+      remove: async id => { closed.push(id); } },
+    tabs: { update: async (id, options) => { assert.equal(id, 2); assert.deepEqual({ ...options }, { active: true }); }, get: async () => {
+      reads++;
+      if (reads === 1) return { ...tab, url: "about:blank" };
+      if (reads === 2) return { ...tab, status: "loading" };
+      const challenge = mode === "persist" || mode === "clear" && desktop.now() < 5000;
+      headers({ tabId: 2, type: "main_frame", statusCode: challenge ? 403 : 200,
+        responseHeaders: challenge ? [{ name: "cf-mitigated", value: "challenge" }] : [] });
+      return { ...tab, title: challenge ? "Just a moment" : "Paper" };
+    } },
+    webRequest: { onHeadersReceived: { addListener: fn => { headers = fn; } } },
+    runtime: { getPlatformInfo: async () => ({}), reload: () => assert.fail("unexpected reload") },
+    storage: { local: { get: async () => ({}), set: async () => {} } }
+  };
+  const Zotero = {
+    version: "5.0.217", getExtensionURL: path => "chrome-extension://test/" + path, initDeferred: { promise: Promise.resolve() },
+    logError: error => assert.fail(String(error)), Messaging: { sendMessage: async () => native.push("done") },
+    Connector: { callMethod: async () => { native.push("saveItems"); return "native-result"; } },
+    BotBypass: { passJSDetectionViaWindowPrompt: async () => { native.push("prompt"); return "native-popup"; } },
+    API: { authorize: async () => { native.push("authorize"); return "native-auth"; } },
+    Connector_Browser: { openWindow: async () => { native.push("window"); return "native-window"; },
+      getTabInfo: () => ({ translators: mode === "none" ? [] : [{ itemType: mode === "multiple" ? "multiple" : "journalArticle" }] }),
+      saveWithTranslator: async (t, index, ...options) => {
+        assert.equal(index, 0); assert.equal(options.length, 0);
+        assert.equal(await Zotero.Connector.callMethod("saveItems", { sessionID: "SESSION" }, t), "native-result");
+        if (mode === "prompt") await Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://pdf.example/check", t);
+        else if (mode === "window") await Zotero.Connector_Browser.openWindow("https://pdf.example/check", {}, t);
+        else if (mode === "auth") return Zotero.API.authorize().catch(() => Zotero.Messaging.sendMessage("progressWindow.done", [false], t));
+        await Zotero.Messaging.sendMessage("progressWindow.done", [true], t);
+      } }
+  };
+  const context = vm.createContext({ Zotero, chrome, AbortSignal, Date: class extends Date { static now() { return desktop.now(); } },
+    setInterval() {}, setTimeout: (fn, ms) => { if (ms === 500) { desktop.advance(ms); queueMicrotask(fn); } },
+    fetch: async (_, request) => {
+      const data = JSON.parse(request.body), result = await desktop.call("acquire-job", data);
+      if (data.action === "finish") finish(data.result);
+      return { ok: true, json: async () => result };
+    } });
+  load(context, "connector-agent.js");
+  return { outcome: await finished, desktop, created, closed, native, Zotero };
+}
+
+test("native save finishes with its session, closes the window and merges into the alive parent", async () => {
+  const r = await browserFixture();
+  assert.equal(r.outcome.ok, true); assert.equal(r.outcome.session_id, "SESSION");
+  assert.deepEqual(r.native, ["saveItems", "done"]); assert.deepEqual(r.closed, [10]);
+  assert.equal(r.created[0].state, "normal"); assert.equal(r.created[0].focused, false);
+  assert.equal(r.created[0].url[1], "https://paper.example/article");
+  const final = await r.desktop.call("acquire-connector", { mode: "apply", session_id: "SESSION", existing_key: "OLD", doi: "10.1234/test", collection: "COLL" });
+  assert.equal(final.item_key, "OLD"); assert.equal(final.attachment_key, "PDF");
+  assert.ok(r.desktop.calls.some(c => c.join() === "merge,OLD,FRESH"));
+  assert.ok(r.desktop.calls.some(c => c.join() === "erase,FRESH"));
+});
+
+test("a check gets 15 seconds: persistent checks stop; cleared checks continue the native save", async () => {
+  const stopped = await browserFixture("persist"), cleared = await browserFixture("clear");
+  assert.equal(stopped.outcome.stop.cooldown, true); assert.ok(stopped.desktop.now() >= 16000);
+  assert.deepEqual(stopped.native, []); assert.deepEqual(stopped.closed, [10]);
+  assert.equal(cleared.outcome.ok, true); assert.equal(cleared.outcome.stop, null);
+});
+
+test("unsupported and multiple-item pages hand off without saving", async () => {
+  for (const mode of ["none", "multiple"]) {
+    const r = await browserFixture(mode);
+    assert.match(r.outcome.handoff, mode === "none" ? /no Zotero translator for this page/ : /Multiple-item/);
+    assert.deepEqual(r.native, []); assert.equal(r.outcome.stop, null);
+  }
+});
+
+test("agent window prompts hand off and cool down without a popup; ordinary calls stay native", async () => {
+  for (const mode of ["prompt", "window"]) {
+    const r = await browserFixture(mode);
+    assert.equal(r.created.length, 1); assert.equal(r.outcome.stop.cooldown, true);
+    assert.equal(r.outcome.handoff, "https://pdf.example/check"); assert.deepEqual(r.native, ["saveItems"]);
+    assert.equal(await r.Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://pdf.example", { id: 99 }), "native-popup");
+    assert.equal(await r.Zotero.Connector_Browser.openWindow("https://paper.example", {}, { id: 99 }), "native-window");
+  }
+});
+
+test("the quiet window skips add-on hooks, expires and restores the native methods on shutdown", async () => {
+  const r = desktopFixture(), z = r.Zotero;
+  const dispatch = () => { z.Linter.hooks.onNotify("add", "item", [2]);
+    z.ActionsTags.api.actionManager.dispatchActionByEvent(2, {}); z.ZoteroAttanger.data.menu.queueAddedItems([2]); };
+  await r.heartbeat();
+  await r.call("acquire-job", { action: "submit", job: { id: "JOB" } }); await r.heartbeat();
+  dispatch(); assert.deepEqual(r.calls, []);
+  assert.equal(r.fresh._saveData({ isNew: true, notifierData: {} }).skipSelect, true);
+  r.advance(210001); dispatch(); assert.equal(r.calls.length, 3);
+  assert.equal(r.fresh._saveData({ isNew: true, notifierData: {} }).skipSelect, undefined);
+  await r.call("acquire-metadata", { identifier: "10.1234/test", mode: "apply" });
+  dispatch(); assert.equal(r.calls.length, 3);
+  r.advance(30001); dispatch(); assert.equal(r.calls.length, 6);
+  r.context.ZoteroCompanion.stop(); dispatch(); assert.equal(r.calls.length, 9);
+});
+
+test("Zotero sign-in fallback during a job hands off without a window; outside a job it stays native", async () => {
+  const r = await browserFixture("auth");
+  assert.equal(r.outcome.ok, false); assert.match(r.outcome.handoff, /Zotero desktop was unreachable/);
+  assert.ok(!r.native.includes("authorize")); assert.equal(r.created.length, 1);
+  assert.equal(await r.Zotero.API.authorize(), "native-auth");
+});

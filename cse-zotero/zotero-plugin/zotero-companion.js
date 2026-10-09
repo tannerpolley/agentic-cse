@@ -10,13 +10,51 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
   const ORGANIZE_PATH = "/zotero-companion/project-organize";
   const ACQUIRE_METADATA_PATH = "/zotero-companion/acquire-metadata";
   const ACQUIRE_ATTACHMENT_PATH = "/zotero-companion/acquire-attachment";
+  const ACQUIRE_CONNECTOR_PATH = "/zotero-companion/acquire-connector";
+  const ACQUIRE_JOB_PATH = "/zotero-companion/acquire-job";
   const CROSSREF_TRANSLATOR = "0a61e167-de9a-4f93-a68a-628b48855909";
   const registeredPaths = [STATUS_PATH, TAG_CLEANUP_PATH, SEARCHES_PATH, ORGANIZE_PATH,
-    ACQUIRE_METADATA_PATH, ACQUIRE_ATTACHMENT_PATH];
+    ACQUIRE_METADATA_PATH, ACQUIRE_ATTACHMENT_PATH, ACQUIRE_CONNECTOR_PATH, ACQUIRE_JOB_PATH];
   const SYNC_DELAY_MS = 3000;
   let observerID = null;
   let metadataInFlight = false;
   let lastSync = null;
+  let connectorHeartbeat = null;
+  let connectorJob = null;
+  const nativeMethods = [];
+  let quietUntil = 0;
+
+  function replace(object, name, wrap) {
+    if (!object?.[name]) return;
+    const original = object[name];
+    nativeMethods.push(() => { object[name] = original; });
+    object[name] = wrap(original);
+  }
+
+  function quietAddons() {
+    // ponytail: the user's own saves during this window also skip these add-ons.
+    replace(zotero.Item?.prototype, "_saveData", original => function(env) {
+      if (env.isNew && Date.now() < quietUntil)
+        Object.assign(env.notifierData, { skipSelect: true, skipRenameFile: true });
+      return original.call(this, env);
+    });
+    replace(zotero.Linter?.hooks, "onNotify", original => function(event, ...args) {
+      if (event !== "add" || Date.now() >= quietUntil) return original.call(this, event, ...args);
+    });
+    replace(zotero.ActionsTags?.api?.actionManager, "dispatchActionByEvent", original => function(...args) {
+      if (Date.now() >= quietUntil) return original.apply(this, args);
+    });
+    const menu = zotero.ZoteroAttanger?.data?.menu;
+    replace(menu && Object.getPrototypeOf(menu), "queueAddedItems", original => function(...args) {
+      if (Date.now() >= quietUntil) return original.apply(this, args);
+    });
+  }
+
+  async function quietAcquisition(run, data) {
+    quietUntil = Infinity;
+    try { return await run(data); }
+    finally { quietUntil = Date.now() + 30000; }
+  }
 
   function response(status, payload) {
     return [status, "application/json", JSON.stringify(payload)];
@@ -375,6 +413,88 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     }
   }
 
+  async function acquireConnector(data) {
+    if (!data || !["dry-run", "apply"].includes(data.mode)) return response(400, { error: "invalid_mode" });
+    const target = acquisitionCollection(data.collection);
+    if (target.error) return response(422, { error: target.error });
+    // Native Connector initially saves to the selected library. Refuse groups
+    // before opening a publisher, even with an explicit personal collection.
+    const selected = acquisitionCollection(null);
+    if (selected.error) return response(422, { error: selected.error });
+    if (data.mode === "dry-run") return response(200, {
+      collection_key: target.collection && target.collection.key || null
+    });
+    const session = zotero.Server.Connector.SessionManager.get(data.session_id);
+    const parents = session && Object.values(session._items).filter(item => item.isRegularItem());
+    if (!parents?.length) return response(200, { handoff: "Zotero Connector saved no parent item; save with the normal Zotero Connector" });
+    if (parents.length !== 1) return response(422, { error: "connector_session_requires_one_parent" });
+    const fresh = parents[0];
+    if (!fresh || !fresh.isRegularItem()) return response(422, { error: "invalid_existing_parent" });
+    if (fresh.libraryID !== libraryID()) return response(422, { error: "group_library_unsupported" });
+    const existing = data.existing_key ? zotero.Items.getByLibraryAndKey(libraryID(), data.existing_key) : null;
+    const doi = zotero.Utilities.cleanDOI(data.doi || "");
+    const actual = zotero.Utilities.cleanDOI(fresh.getField("DOI") || "");
+    if (doi && actual && doi.toLowerCase() !== actual.toLowerCase()) return response(422, { error: "connector_doi_differs" });
+    const parent = existing && !existing.deleted ? existing : fresh;
+    if (target.collection) parent.addToCollection(target.collection.id);
+    await parent.saveTx();
+    if (parent !== fresh) {
+      await zotero.Items.merge(parent, [fresh]);
+      await fresh.eraseTx();
+    }
+    const children = await zotero.Items.getAsync(parent.getAttachments());
+    const pdf = children.find(item => item.attachmentContentType === "application/pdf");
+    return response(200, { item_key: parent.key, attachment_key: pdf && pdf.key || null,
+      collection_key: target.collection && target.collection.key || null, metadata: metadataJSON(parent) });
+  }
+
+  async function acquireJob(data) {
+    if (!data || typeof data.action !== "string") return response(400, { error: "invalid_job_action" });
+    const now = Date.now();
+    if (connectorJob?.state === "running" && connectorJob.deadline < now) {
+      connectorJob.state = "done";
+      connectorJob.result = { error: "Connector attempt timed out; no retry" };
+    }
+    let expected_revision = null;
+    try {
+      const home = services.dirsvc.get("Home", Components.interfaces.nsIFile).path;
+      expected_revision = JSON.parse(await zotero.File.getContentsAsync(home + "/.local/share/cse/zotero/zotero-connector-agent/cse-agent-build.json")).module_revision;
+    } catch (_) {}
+    const revisionMismatch = Number.isInteger(expected_revision) && connectorHeartbeat && connectorHeartbeat.module_revision !== expected_revision;
+    const ready = connectorHeartbeat && connectorHeartbeat.compatible && now - connectorHeartbeat.at < 45000 && !revisionMismatch;
+    if (data.action === "status") return response(200, {
+      ready: Boolean(ready), version: connectorHeartbeat && connectorHeartbeat.version,
+      supported_version: connectorHeartbeat && connectorHeartbeat.supported_version,
+      module_revision: connectorHeartbeat && connectorHeartbeat.module_revision,
+      expected_revision, revision_mismatch: Boolean(revisionMismatch),
+      heartbeat_at: connectorHeartbeat && connectorHeartbeat.at, job: connectorJob,
+      error: revisionMismatch ? "Connector module revision mismatch: running " + connectorHeartbeat.module_revision + ", expected " + expected_revision
+        : ready ? null : connectorHeartbeat && !connectorHeartbeat.compatible
+        ? "Connector version mismatch: " + connectorHeartbeat.version + "; rebuild for the supported version " + connectorHeartbeat.supported_version
+        : "Load ~/.local/share/cse/zotero/zotero-connector-agent in chrome://extensions and disable the official Connector; see README setup"
+    });
+    if (data.action === "pickup") {
+      connectorHeartbeat = { at: now, version: String(data.version || ""), supported_version: data.supported_version, module_revision: data.module_revision,
+        compatible: data.protocol === 1 && data.compatible === true };
+      const job = connectorJob && connectorJob.state === "queued" && connectorHeartbeat.compatible &&
+        !(expected_revision > data.module_revision) ? connectorJob : null;
+      if (job) { job.state = "running"; job.deadline = now + 180000; quietUntil = job.deadline + 30000; }
+      return response(200, { job, expected_revision });
+    }
+    if (data.action === "submit") {
+      if (!ready) return response(409, { error: "agent_connector_setup_required" });
+      if (connectorJob && connectorJob.state !== "done") return response(409, { error: "connector_job_busy" });
+      connectorJob = { ...data.job, state: "queued", result: {} };
+      return response(200, { id: connectorJob.id });
+    }
+    if (data.action !== "finish") return response(400, { error: "invalid_job_action" });
+    if (!connectorJob || data.id !== connectorJob.id) return response(404, { error: "connector_job_not_found" });
+    connectorJob.state = "done";
+    connectorJob.result = data.result;
+    quietUntil = Date.now() + 30000;
+    return response(200, { ok: true });
+  }
+
   function endpointError(error) {
     return response(500, { error });
   }
@@ -461,7 +581,9 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
         savedSearches: { method: "POST", path: SEARCHES_PATH, defaultMode: "dry-run" },
         projectOrganize: { method: "POST", path: ORGANIZE_PATH, defaultMode: "dry-run" },
         acquireMetadata: { method: "POST", path: ACQUIRE_METADATA_PATH, defaultMode: "dry-run" },
-        acquireAttachment: { method: "POST", path: ACQUIRE_ATTACHMENT_PATH, defaultMode: "dry-run" }
+        acquireAttachment: { method: "POST", path: ACQUIRE_ATTACHMENT_PATH, defaultMode: "dry-run" },
+        acquireConnector: { method: "POST", path: ACQUIRE_CONNECTOR_PATH, defaultMode: "dry-run" },
+        acquireJob: { method: "POST", path: ACQUIRE_JOB_PATH }
       },
       projectSync: { observing: observerID !== null, lastSync },
       config: plan.getConfig()
@@ -523,7 +645,7 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
         if (data === null) return response(400, { error: "invalid_json" });
         if (metadataInFlight) return response(409, { error: "metadata_acquisition_busy" });
         metadataInFlight = true;
-        return acquireMetadata(data).catch(() => endpointError("metadata_acquisition_failed"))
+        return quietAcquisition(acquireMetadata, data).catch(() => endpointError("metadata_acquisition_failed"))
           .finally(() => { metadataInFlight = false; });
       }
     };
@@ -534,13 +656,31 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
       init(request) {
         const data = requestData(request);
         if (data === null) return response(400, { error: "invalid_json" });
-        return acquireAttachment(data).catch(() => endpointError("attachment_import_failed"));
+        return quietAcquisition(acquireAttachment, data).catch(() => endpointError("attachment_import_failed"));
       }
+    };
+    zotero.Server.Endpoints[ACQUIRE_CONNECTOR_PATH] = class {
+      supportedMethods = ["POST"];
+      supportedDataTypes = ["application/json"];
+      permitBookmarklet = false;
+      async init(request) {
+        const data = requestData(request);
+        try { return await quietAcquisition(acquireConnector, data); }
+        catch (_) { return endpointError("connector_finalization_failed"); }
+      }
+    };
+    zotero.Server.Endpoints[ACQUIRE_JOB_PATH] = class {
+      supportedMethods = ["POST"];
+      supportedDataTypes = ["application/json"];
+      permitBookmarklet = false;
+      init(request) { return acquireJob(requestData(request)); }
     };
     observerID = zotero.Notifier.registerObserver(observer, ["collection", "collection-item"], "zotero-companion");
   }
 
   function unregister() {
+    for (const restore of nativeMethods.splice(0).reverse()) restore();
+    quietUntil = 0;
     for (const path of registeredPaths) {
       if (zotero.Server.Endpoints[path]) delete zotero.Server.Endpoints[path];
     }
@@ -549,7 +689,7 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
   }
 
   return {
-    start: register,
+    start() { quietAddons(); register(); },
     stop: unregister,
     paths: registeredPaths
   };

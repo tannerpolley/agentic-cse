@@ -27,9 +27,19 @@ def runtime(monkeypatch, tmp_path):
         def __init__(self, **kwargs):
             pass
         def _request(self, path, **kwargs):
+            if path.endswith('acquire-job'):
+                return {}
             calls.append((path, kwargs['payload']['mode']))
             if path.endswith('metadata'):
+                if kwargs['payload']['mode']=='apply':
+                    with pytest.raises(mod.AcquireStop, match='Another acquisition'):
+                        with mod.Safety():
+                            pass
                 return {'metadata': {'title': 'Regression paper', 'DOI': current['doi']}, 'item_key': 'PARENT', 'collection_key': 'COLL'}
+            if path.endswith('connector'):
+                if kwargs['payload']['mode']=='dry-run':
+                    return {'collection_key': 'COLL'}
+                return {'item_key': kwargs['payload'].get('existing_key') or 'PARENT', 'attachment_key': 'PDFKEY', 'metadata': {'DOI': current['doi'], 'title': 'Regression paper'}, 'collection_key': 'COLL'}
             current['has_pdf'] = True
             return {'attachment_key': 'PDFKEY'}
     def request(url, **kwargs):
@@ -45,9 +55,11 @@ def runtime(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, 'ZoteroLocalAPI', API)
     monkeypatch.setattr(mod, 'ZoteroPluginClient', Plugin)
     monkeypatch.setattr(mod, 'request', request)
-    def forbidden(*args):
-        pytest.fail('Restricted publisher reached the browser')
-    monkeypatch.setattr('zotero_companion.agent_browser.browser_pdf', forbidden)
+    def connector(*args, **kwargs):
+        calls.append(('connector-visit', None))
+        current['has_pdf'] = True
+        return {'session_id': 'SESSION'}
+    monkeypatch.setattr('zotero_companion.connector_job.connector_save', connector)
     return current, calls, tmp_path
 
 
@@ -57,7 +69,7 @@ def runtime(monkeypatch, tmp_path):
     ('10.1021/test', 316, 'acs', None),
     ('10.5555/test', 78, 'elsevier', 'elsevier-api-key'),
 ])
-def test_api_only_publishers_never_reach_browser(runtime, doi, member, name, tokenfile):
+def test_api_precedes_connector_for_all_publishers(runtime, doi, member, name, tokenfile):
     current, calls, root = runtime
     current.update(doi=doi, member=member)
     if tokenfile:
@@ -66,11 +78,12 @@ def test_api_only_publishers_never_reach_browser(runtime, doi, member, name, tok
         path.chmod(0o600)
     result = mod.acquire(doi)
     assert result['publisher'] == name
-    assert result['ok'] == bool(tokenfile)
-    assert result['route'] == (name + '-api' if tokenfile else None)
-    assert result['attachment_key'] == ('PDFKEY' if tokenfile else None)
+    assert result['ok']
+    assert result['route'] == (name + '-api' if tokenfile else 'connector')
+    assert result['attachment_key'] == 'PDFKEY'
+    assert ('connector-visit', None) not in calls if tokenfile else ('connector-visit', None) in calls
     forced = mod.acquire(doi, route='browser')
-    assert not forced['ok'] and 'API-only' in forced['stop_reason']
+    assert forced['ok'] and forced['route'] == 'connector'
     assert all('secret-test-token' not in str(call) for call in calls)
 
 
@@ -114,7 +127,7 @@ def test_pacing_daily_cap_and_lock_persist(monkeypatch, tmp_path):
         state.before('wiley', 'https://api.wiley.com/article', 'api', api=True)
         state.before('wiley', 'https://api.wiley.com/article', 'api', api=True)
         assert clock[0] == 1000070
-        with pytest.raises(mod.AcquireStop, match='API-only'):
+        with pytest.raises(mod.AcquireStop, match='Connector or official API'):
             state.before('elsevier', 'https://www.sciencedirect.com/pdf', 'oa')
 
 
@@ -187,6 +200,8 @@ def test_pmc_cloud_selects_declared_main_pdf_and_preserves_cooldowns(runtime, mo
     monkeypatch.setattr(mod, 'build_opener', lambda *args: Opener())
     original_plugin = mod.ZoteroPluginClient._request
     def attach(self, path, **kwargs):
+        if path.endswith('acquire-job'):
+            return original_plugin(self, path, **kwargs)
         assert path.endswith('attachment') and kwargs['payload']['item_key'] == 'EXISTING'
         assert base64.b64decode(kwargs['payload']['pdf_base64']) == main
         return original_plugin(self, path, **kwargs)
@@ -214,6 +229,8 @@ def test_existing_parent_returns_pdf_or_resumes_routes(runtime, monkeypatch, has
     original_plugin = mod.ZoteroPluginClient._request
     def plugin(self, path, **kwargs):
         result = original_plugin(self, path, **kwargs)
+        if path.endswith('acquire-job'):
+            return result
         if path.endswith('metadata'):
             result.update(existing=True, item_key='EXISTING')
         else:
@@ -326,13 +343,13 @@ def test_restricted_oa_requires_explicit_repository(runtime, monkeypatch, doi, m
     assert not any("alternate-publisher" in url or "unverified" in url for url in fetched)
 
 
-def test_native_identifier_discovered_doi_still_blocks_browser(runtime):
+def test_native_identifier_discovered_doi_uses_connector(runtime):
     current, calls, _ = runtime
     current.update(doi="10.1016/test", member=78)
     result = mod.acquire("PMID:12345678", route="browser")
-    assert not result["ok"] and "API-only" in result["stop_reason"]
+    assert result["ok"] and result["route"] == "connector"
     assert result["item_key"] == "PARENT" and result["doi"] == current["doi"]
-    assert not result["attachment_key"]
+    assert result["attachment_key"] == "PDFKEY"
 
 
 def test_public_api_pacing_and_credential_redirect(monkeypatch, tmp_path):
@@ -381,7 +398,7 @@ def test_redirect_final_url_trailing_dot_and_cdn_hosts_are_refused(monkeypatch, 
                     return response
             monkeypatch.setattr(mod, 'build_opener', lambda *args: Opener())
             with mod.Safety(tmp_path / 'state.json') as safety:
-                with pytest.raises(mod.AcquireStop, match='API-only'):
+                with pytest.raises(mod.AcquireStop, match='Connector or official API'):
                     mod.request('https://repository.example/paper.pdf', safety=safety, pub='unknown', is_pdf=True)
             assert urls == ['https://repository.example/paper.pdf']
 
@@ -411,7 +428,7 @@ def test_vpn_activation_is_bounded_and_rechecked(monkeypatch, outcome):
 
 
 def test_non_doi_parent_identity_is_verified(runtime, monkeypatch):
-    monkeypatch.setattr("zotero_companion.agent_browser.browser_pdf", lambda *args: b"%PDF-1.7")
+
     original = mod.ZoteroPluginClient._request
     def metadata(self, path, **kwargs):
         result = original(self, path, **kwargs)
@@ -422,6 +439,7 @@ def test_non_doi_parent_identity_is_verified(runtime, monkeypatch):
     result = mod.acquire("arXiv:1234.5678")
     assert not result["ok"] and "parent title" in result["stop_reason"]
     assert result["attachment_key"] == "PDFKEY"
+    assert not any(path.endswith('metadata') and mode=='apply' for path, mode in runtime[1])
 
 
 
@@ -452,3 +470,81 @@ def test_cooled_free_copy_source_is_skipped_not_fatal(runtime, monkeypatch):
     monkeypatch.setattr(mod, 'request', cooled_pmc)
     result = mod.acquire(current['doi'])
     assert result['ok'] and result['route'] == 'elsevier-api' and result['attachment_key'] == 'PDFKEY'
+
+
+@pytest.mark.parametrize('status,detail,body', [
+    (403, 'AUTHENTICATION_ERROR', b'{"error":"Requestor configuration settings insufficient"}'),
+    (403, '', b'{"error":"Requestor configuration settings insufficient: private-test-key"}'),
+    (429, 'RATE_LIMIT_EXCEEDED', b'quota'),
+    (500, 'INTERNAL_SERVER_ERROR', b'server error'),
+    (403, 'AUTHENTICATION_ERROR', b'<html>CAPTCHA</html>'),
+])
+def test_elsevier_configuration_error_falls_through_but_bans_stop(runtime, monkeypatch, status, detail, body):
+    import io
+    current, calls, root = runtime
+    current.update(doi='10.1016/test', member=78, has_pdf=False)
+    key = root / 'elsevier-api-key'
+    key.write_text('private-test-key')
+    key.chmod(0o600)
+    class Opener:
+        def open(self, req, **kwargs):
+            response = io.BytesIO(body)
+            response.code, response.headers = status, {'X-ELS-Status': detail}
+            response.geturl = lambda: req.full_url
+            return response
+    monkeypatch.setattr(mod, 'build_opener', lambda *args: Opener())
+    original = mod.request
+    def response(url, **kwargs):
+        return http_request(url, **kwargs) if 'api.elsevier' in url else original(url, **kwargs)
+    monkeypatch.setattr(mod, 'request', response)
+    result = mod.acquire(current['doi'])
+    skipped = status == 403 and b'CAPTCHA' not in body
+    assert result['ok'] == skipped
+    assert bool(('connector-visit', None) in calls) == skipped
+    assert (detail or 'Requestor configuration settings insufficient') in str(result.get('skipped_routes') or result['stop_reason']) or b'CAPTCHA' in body
+    assert 'private-test-key' not in json.dumps(result)
+    assert not any(path.endswith('metadata') and mode == 'apply' for path, mode in calls) if skipped else result['item_key'] == 'PARENT'
+    state = json.loads((root / 'state.json').read_text())
+    assert bool(state.get('elsevier', {}).get('cooldown_until')) == (status == 429 or b'CAPTCHA' in body)
+
+
+@pytest.mark.parametrize('url', ['https://127.0.0.1/a', 'https://private.internal/a', 'http://public.example/10.1002/test', 'file:///tmp/paper'])
+def test_acquire_rejects_non_public_url_before_remote_metadata(runtime, url):
+    _, calls, _ = runtime
+    result = mod.acquire(url)
+    assert not result['ok'] and result['stop_reason']
+    assert not calls
+
+
+def test_connector_partial_save_is_filed_once_then_hands_off(runtime, monkeypatch):
+    current, calls, root = runtime
+    current.update(doi='10.1016/test', member=78, has_pdf=False)
+    monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda *a, **k: [
+        {'key': 'EXISTING', 'data': {'itemType': 'journalArticle', 'DOI': current['doi']}}])
+    monkeypatch.setattr('zotero_companion.connector_job.connector_save', lambda *a, **k: {
+        'session_id': 'SESSION', 'url': 'https://doi.org/10.1016/test', 'title': '', 'status': None,
+        'stop': {'reason': 'Publisher access challenge: CAPTCHA', 'host': 'WWW.SCIENCEDIRECT.COM.',
+                 'url': 'https://www.sciencedirect.com/article/test', 'status': 403, 'cooldown': True}})
+    result = mod.acquire(current['doi'])
+    assert not result['ok'] and result['item_key'] == 'EXISTING'
+    assert result['browser'] == {'url': 'https://www.sciencedirect.com/article/test', 'title': '', 'status': 403}
+    assert ('/zotero-companion/acquire-connector', 'apply') in calls
+    assert not any(path.endswith('metadata') for path, _ in calls)
+
+
+def test_connector_empty_session_hands_off_without_losing_existing_key(runtime, monkeypatch):
+    current, calls, _ = runtime
+    current.update(doi='10.1021/test', member=316, has_pdf=False)
+    monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda *a, **k: [
+        {'key': 'EXISTING', 'data': {'itemType': 'journalArticle', 'DOI': current['doi']}}])
+    original = mod.ZoteroPluginClient._request
+    def empty_session(self, path, **kwargs):
+        if path.endswith('acquire-connector') and kwargs['payload']['mode'] == 'apply':
+            return {'handoff': 'Zotero Connector saved no parent item; save with the normal Zotero Connector'}
+        return original(self, path, **kwargs)
+    monkeypatch.setattr(mod.ZoteroPluginClient, '_request', empty_session)
+    result = mod.acquire(current['doi'])
+    assert not result['ok'] and result['item_key'] == 'EXISTING'
+    assert result['attachment_key'] == None
+    assert 'saved no parent item' in result['stop_reason'] and '422' not in result['stop_reason']
+    assert result['handoff_url'] == 'https://doi.org/' + current['doi']
