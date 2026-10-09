@@ -322,6 +322,7 @@ async function browserFixture(mode = "success") {
     logError: error => assert.fail(String(error)), Messaging: { sendMessage: async () => native.push("done") },
     Connector: { callMethod: async () => { native.push("saveItems"); return "native-result"; } },
     BotBypass: { passJSDetectionViaWindowPrompt: async () => { native.push("prompt"); return "native-popup"; } },
+    API: { authorize: async () => { native.push("authorize"); return "native-auth"; } },
     Connector_Browser: { openWindow: async () => { native.push("window"); return "native-window"; },
       getTabInfo: () => ({ translators: mode === "none" ? [] : [{ itemType: mode === "multiple" ? "multiple" : "journalArticle" }] }),
       saveWithTranslator: async (t, index, ...options) => {
@@ -329,6 +330,7 @@ async function browserFixture(mode = "success") {
         assert.equal(await Zotero.Connector.callMethod("saveItems", { sessionID: "SESSION" }, t), "native-result");
         if (mode === "prompt") await Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://pdf.example/check", t);
         else if (mode === "window") await Zotero.Connector_Browser.openWindow("https://pdf.example/check", {}, t);
+        else if (mode === "auth") return Zotero.API.authorize().catch(() => Zotero.Messaging.sendMessage("progressWindow.done", [false], t));
         await Zotero.Messaging.sendMessage("progressWindow.done", [true], t);
       } }
   };
@@ -394,4 +396,11 @@ test("the quiet window skips add-on hooks, expires and restores the native metho
   dispatch(); assert.equal(r.calls.length, 3);
   r.advance(30001); dispatch(); assert.equal(r.calls.length, 6);
   r.context.ZoteroCompanion.stop(); dispatch(); assert.equal(r.calls.length, 9);
+});
+
+test("Zotero sign-in fallback during a job hands off without a window; outside a job it stays native", async () => {
+  const r = await browserFixture("auth");
+  assert.equal(r.outcome.ok, false); assert.match(r.outcome.handoff, /Zotero desktop was unreachable/);
+  assert.ok(!r.native.includes("authorize")); assert.equal(r.created.length, 1);
+  assert.equal(await r.Zotero.API.authorize(), "native-auth");
 });

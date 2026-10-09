@@ -1,7 +1,7 @@
 /* Agent jobs use the native Connector; ordinary tabs keep its ordinary behavior. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
-  const MODULE_REVISION = 19;
+  const MODULE_REVISION = 20;
   const marker = Zotero.getExtensionURL("cse-agent-job.html") + "#";
   const agentTabs = new Set();
   let active = null, busy = false;
@@ -36,6 +36,12 @@
       throw Error("Publisher requires a human save");
     };
   }
+  // ponytail: during a job, Zotero being unreachable hands off instead of opening the zotero.org sign-in window; a user save in that minute does too.
+  const authorize = Zotero.API.authorize;
+  Zotero.API.authorize = async function(...args) {
+    if (!active) return authorize.apply(this, args);
+    throw Error(active.handoff = "Zotero desktop was unreachable; save with the normal Zotero Connector");
+  };
   chrome.webRequest.onHeadersReceived.addListener(d => {
     if (active?.tab !== d.tabId || d.type !== "main_frame") return;
     active.status = d.statusCode;
