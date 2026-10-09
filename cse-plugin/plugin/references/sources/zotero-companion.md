@@ -92,13 +92,9 @@ cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
 ```
 
 The user's explicit request authorizes this `acquire` route without another
-per-save approval. Use these browser controls as needed:
-
-```bash
-cse-zotero agent-browser status --json
-cse-zotero agent-browser start --json
-cse-zotero agent-browser stop --json
-```
+per-save approval. Its browser route runs only when `doctor --json` shows `acquisition.connector.ready`;
+otherwise, and whenever a publisher needs a person, `acquire` returns a hand-off
+link. Give that link to the user instead of retrying.
 
 The canonical
 [Zotero acquisition rules](https://github.com/agentic-cse/cse-zotero/blob/main/ZOTERO_ACQUISITION.md)
