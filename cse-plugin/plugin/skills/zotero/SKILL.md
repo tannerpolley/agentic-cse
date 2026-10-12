@@ -1,6 +1,6 @@
 ---
 name: zotero
-description: "Find and inspect Zotero sources. Use when asked to add one specified paper, cite, sync the bibliography, or search the library. Specific-paper requests use bounded acquisition; other library writes require preview and approval. Source selection goes to research."
+description: "Find, inspect, and add Zotero sources. Use when asked to cite, sync the bibliography, or search the library, or to add a paper the user named or the work found relevant. Paper additions use bounded acquisition; other library writes require preview and approval. Source selection goes to research."
 metadata:
   cse-kind: "tool"
   cse-family: "sources"
@@ -31,20 +31,11 @@ Run `cse-zotero doctor --json` first and inspect operation readiness and
 `acquisition.tokens` for the configured token names and status. Never expose
 token values.
 
-When the user requests one specific paper and supplies its DOI or article URL,
-use the bounded acquisition route:
-
-```bash
-cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
-```
-
-That explicit request authorizes this `acquire` route without a separate
-per-save approval. Its browser route runs only when `doctor --json` shows `acquisition.connector.ready`;
-otherwise, and whenever a publisher needs a person, `acquire` returns a hand-off
-link. Give that link to the user instead of retrying.
-
-Do not broaden acquisition into a paper search or collection task. Follow the
-canonical
+Add a paper the user requests, or a relevant paper the work finds missing from
+the library, without asking, through `cse-zotero acquire` as the
+[acquisition section](../../references/sources/zotero-companion.md#writes-acquisition-and-bibliography)
+directs. Each call adds one identified paper; finding papers belongs to
+`cse:research`. Follow the canonical
 [Zotero acquisition rules](https://github.com/agentic-cse/cse-zotero/blob/main/ZOTERO_ACQUISITION.md)
 for route eligibility and publisher/browser boundaries.
 
