@@ -6,9 +6,12 @@ scientific claims. Search retained evidence and the live library before external
 discovery, name the unanswered gap, and reuse completed searches when relevant.
 External workspace changes and uploads retain their own authorization rules.
 
-## One requested paper
+## One paper
 
-A request for one specific paper authorizes its parent and PDF child:
+Each paper is identified by DOI or article URL. Either the user's request or an
+agent's finding that a relevant paper is missing from the library authorizes
+its parent and PDF child. An agent-found paper goes to the project's registered
+collection; without one, report the paper instead of acquiring it.
 
 ```bash
 cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json

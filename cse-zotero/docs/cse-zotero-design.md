@@ -642,8 +642,8 @@ The system is mature enough when:
   creating isolated summaries;
 - stale, unsupported, orphaned, contradictory, and unvalidated records are
   reported by routine lint;
-- a specifically requested paper can use the bounded `acquire` route without
-  per-save approval; all other Zotero writes and important
+- a requested paper, or a relevant one an agent finds missing, can use the
+  bounded `acquire` route without per-save approval; all other Zotero writes and important
   promotion/synthesis decisions retain their approval requirements;
 - measured performance evidence, rather than fashion, justifies any additional
   retrieval or service infrastructure.

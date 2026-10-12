@@ -129,12 +129,13 @@ print, commit, or copy Mathpix authentication tokens.
 
 Before external discovery, publisher access, or remote acquisition, read
 `ZOTERO_ACQUISITION.md`; it owns route eligibility and publisher/browser
-boundaries. When the user specifically requests one paper by DOI or article
-URL, use the bounded acquire command:
+boundaries. When the user requests one paper by DOI or article URL, or your work
+finds a relevant paper missing from the library, use the bounded acquire command:
 
     uv run cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
 
-The user’s specific request authorizes this route without a per-save approval.
+Either case authorizes this route without a per-save approval; file an
+agent-found paper in the project's registered collection.
 Keep preview and explicit approval for every other Zotero write, including
 metadata corrections, collection changes, bibliography refreshes, and Mathpix
 companion attachments. The installed `zotero` skill is the CSE adapter to the

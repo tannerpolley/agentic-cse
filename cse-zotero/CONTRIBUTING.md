@@ -14,8 +14,8 @@
 The configured `wiki/` and `data/` trees represent retained or generated
 corpus state. They are not package fixtures. Zotero remains the bibliographic
 authority, and no software check should require a personal library or corpus.
-The user's request for one specific paper routes through the bounded
-`cse-zotero acquire` command; the contract documents that workflow and its
+A paper the user requests, or one an agent finds relevant and missing, routes
+through the bounded `cse-zotero acquire` command; the contract documents that workflow and its
 eligibility rules.
 
 ## Offline checks
