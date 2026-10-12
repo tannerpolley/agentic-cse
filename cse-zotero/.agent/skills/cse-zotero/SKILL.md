@@ -39,11 +39,12 @@ thermophysical-data-registry is optional, not a runtime requirement.
    the live library is newer than the materialized corpus.
 8. When retained evidence leaves a named literature gap, read the
    [acquisition contract](../../../ZOTERO_ACQUISITION.md) before any external
-   discovery. When the user specifically requests one paper by DOI or article
-   URL, check `doctor --json` acquisition readiness and use
+   discovery. For a user-requested paper or a relevant paper the work finds
+   missing, follow that contract's eligibility and collection rules, check
+   `doctor --json` acquisition readiness, and use
    `cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json`.
-   That bounded route needs no per-save approval; do not use it to broaden the
-   request into a literature search.
+   That bounded route needs no per-save approval; acquire one identified paper
+   per call.
 
 ## Evidence and authority
 
@@ -63,8 +64,8 @@ thermophysical-data-registry is optional, not a runtime requirement.
 Use `wiki-coverage`, `wiki-triage`, and the read-only templates to choose a
 bounded curation task. Update an existing page or record before creating a
 near-duplicate. Repository refreshes are explicit and never mutate Zotero.
-Zotero writes remain separate `local-*` commands, dry-run by default, and
-require a later explicit user approval.
+Zotero writes other than eligible `acquire` calls remain separate, dry-run by
+default, and require a later explicit user approval.
 
 For deterministic periodic repository maintenance, run
 `cse-zotero wiki-maintain --apply --json`. It refreshes source metadata,
@@ -118,8 +119,8 @@ exists, read `.agent/skills/mathpix/SKILL.md` and follow its explicit
 credentials. The [acquisition contract](../../../ZOTERO_ACQUISITION.md) is the
 repository-owned authority for external discovery, publisher access, and every
 route that can add a paper to Zotero. Follow its eligibility and browser
-boundaries; all Zotero writes other than the specifically requested `acquire`
-route retain their reviewed-preview and approval steps.
+boundaries; all Zotero writes other than eligible `acquire` calls retain their
+reviewed-preview and approval steps.
 
 ## Validation
 
