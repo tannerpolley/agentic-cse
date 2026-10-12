@@ -188,17 +188,18 @@ Markdown child, and never mutates Zotero. `zotero-attach-companion` is a
 separate dry-run-first authenticated write for making an approved generated
 Markdown file visible as a linked Zotero child.
 
-## Acquire one requested paper
+## Acquire one paper
 
-Use this route only when the user has identified one specific paper by DOI or
-article URL; that request authorizes acquisition without a separate per-save
-approval. `doctor --json` reports configured token names and their status under
+Use this route for one paper identified by DOI or article URL, either requested
+by the user or found by an agent to be relevant and missing from the library.
+Either authorizes acquisition without a separate per-save approval; an
+agent-found paper goes to the project's registered collection. `doctor --json` reports configured token names and their status under
 `acquisition.tokens`. Token files live under
 `~/.config/zotero-companion/` as one token per mode-0600 file:
 `elsevier-api-key`, optional `elsevier-insttoken`, and `wiley-tdm-token`.
 Doctor reports names and status only, never token values.
 
-The command writes the requested paper by default. Its optional dry run previews
+The command writes the paper by default. Its optional dry run previews
 metadata only and does not create a Zotero item, download a PDF, or start the
 browser. Use the default `auto` route for normal acquisition; force
 `--route browser` only for a single-paper Connector diagnostic.

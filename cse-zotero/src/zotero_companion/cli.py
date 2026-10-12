@@ -206,7 +206,7 @@ def _project_doctor(config, zotero_ok: bool) -> dict:
 def main() -> int:
     parser = argparse.ArgumentParser(prog="cse-zotero")
     subparsers = parser.add_subparsers(dest="command", required=True)
-    acquire_cmd = subparsers.add_parser("acquire", help="add one requested paper, with publisher safeguards")
+    acquire_cmd = subparsers.add_parser("acquire", help="add one paper, with publisher safeguards")
     acquire_cmd.add_argument("identifier")
     acquire_cmd.add_argument("--collection", help="existing collection key or unambiguous name")
     acquire_cmd.add_argument("--dry-run", action="store_true")
