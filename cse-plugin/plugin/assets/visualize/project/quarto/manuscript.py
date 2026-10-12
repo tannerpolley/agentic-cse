@@ -35,6 +35,10 @@ SITE_CONFIG = {
     "execute": {"enabled": False},
 }
 PRESENTATION_PRE_RENDER = "python3 manuscript.py prepare"
+# Set by preview for Quarto's own renders: their pre-render skips a workflow whose files are
+# unchanged since its last successful present, so present output cannot re-trigger a render.
+PREVIEW_STAMPS_ENV = "CSE_PREVIEW_PRESENT_STAMPS"
+PRESENT_STAMP = Path(".snakemake") / "cse-present-stamp.json"
 WATCH_INTERVAL_SECONDS = 0.25
 WATCH_SETTLE_SECONDS = 0.25
 IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "site_libs", "_freeze", "__pycache__", ".ipynb_checkpoints"}
@@ -613,7 +617,11 @@ def prepare(root: Path) -> int:
     if requested and root / "index.qmd" not in requested:
         workflows = [workflow for workflow in workflows
                      if any(path == workflow or path.is_relative_to(workflow) for path in requested)]
+    use_stamps = os.environ.get(PREVIEW_STAMPS_ENV) == "1"
     for workflow in workflows:
+        stamp = workflow / PRESENT_STAMP
+        if use_stamps and stamp.is_file() and json.loads(stamp.read_text()) == present_snapshot(workflow):
+            continue
         status = check_presentation_plan(workflow)
         if status:
             return status
@@ -621,7 +629,13 @@ def prepare(root: Path) -> int:
         if result.returncode:
             print(f"presentation failed in {workflow}; retained view is stale", file=sys.stderr)
             return result.returncode
+        stamp.parent.mkdir(exist_ok=True)
+        stamp.write_text(json.dumps(present_snapshot(workflow)))
     return 0
+
+
+def present_snapshot(workflow: Path) -> dict[str, list[int]]:
+    return {path.relative_to(workflow).as_posix(): list(value) for path, value in sorted(watch_snapshot(workflow).items())}
 
 
 def is_watchable(path: Path, root: Path) -> bool:
@@ -758,7 +772,9 @@ def preview(root: Path, host: str, port: int) -> int:
                 root, f"port {port} is already in use; pass --port with a free port")
     command = ["quarto", "preview", "--to", "html", "--profile", "presentation", "--no-browser",
                "--host", host, "--port", str(port)]
-    process = subprocess.Popen(command, cwd=root, start_new_session=True)
+    for workflow in presentation_workflows(root):
+        (workflow / PRESENT_STAMP).unlink(missing_ok=True)  # the first render checks every workflow in full
+    process = subprocess.Popen(command, cwd=root, start_new_session=True, env={**os.environ, PREVIEW_STAMPS_ENV: "1"})
     def handle_sigterm(signum, frame):
         raise KeyboardInterrupt
 
