@@ -11,7 +11,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTED_ZOTERO_COMMIT = "e5c23cba2c34c516751fac935b5eae9f26686663"
+EXPECTED_ZOTERO_COMMIT = "5d43da5c25752cc0a5525477bf1eabf4e9418094"
 
 
 class InstallationBehaviorTests(unittest.TestCase):
@@ -55,6 +55,9 @@ class InstallationBehaviorTests(unittest.TestCase):
             old_runtime = home / ".local/share/cse/zotero"
             old_runtime.mkdir(parents=True)
             (old_runtime / "previous.txt").write_text("previous runtime\n")
+            agent_build = old_runtime / "zotero-connector-agent/cse-agent-build.json"
+            agent_build.parent.mkdir()
+            agent_build.write_text('{"module_revision": 20}\n')
             old_bin = home / ".local/bin"
             old_bin.mkdir(parents=True)
             for command in ("cse-zotero", "zotero-companion"):
@@ -122,7 +125,7 @@ class InstallationBehaviorTests(unittest.TestCase):
                 args = sys.argv[1:]
                 real_git = os.environ["CSE_REAL_GIT"]
                 runtime = Path(os.environ["CSE_TEST_ZOTERO_ROOT"]).resolve()
-                expected = "e5c23cba2c34c516751fac935b5eae9f26686663"
+                expected = "5d43da5c25752cc0a5525477bf1eabf4e9418094"
                 if args[:2] == ["-C", str(runtime)]:
                     if args[2:] == ["rev-parse", "HEAD"]:
                         print(expected)
@@ -202,6 +205,7 @@ class InstallationBehaviorTests(unittest.TestCase):
             self.assertEqual({"cse": str(source.resolve())}, state["marketplaces"])
             self.assertEqual(["cse@cse"], [item["pluginId"] for item in state["installed"]])
             self.assertTrue((home / ".codex/plugins/cache/cse/cse/local/skills").is_dir())
+            self.assertEqual('{"module_revision": 20}\n', agent_build.read_text())
             self.assertFalse((home / ".codex/plugins/cse").exists())
             self.assertFalse((home / ".agents/plugins/marketplace.json").exists())
             for command in ("cse-zotero", "zotero-companion"):

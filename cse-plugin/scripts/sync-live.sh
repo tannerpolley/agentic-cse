@@ -5,7 +5,7 @@ repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 runtime_target="$HOME/.local/share/cse/zotero"
 runtime_bin_dir="$HOME/.local/bin"
 runtime_commands=(cse-zotero zotero-companion)
-expected_zotero_commit="e5c23cba2c34c516751fac935b5eae9f26686663"
+expected_zotero_commit="5d43da5c25752cc0a5525477bf1eabf4e9418094"
 codex_bin="${CSE_CODEX_BIN:-codex}"
 
 usage() {
@@ -259,6 +259,10 @@ done
 
 runtime_installed=1
 uv venv "$runtime_target" >/dev/null
+# Chrome loads the unpacked agent Connector from inside the runtime; keep it.
+if [[ -d "$previous/runtime/zotero-connector-agent" ]]; then
+  cp -a -- "$previous/runtime/zotero-connector-agent" "$runtime_target/"
+fi
 uv pip install --python "$runtime_target/bin/python" "$runtime_wheels"/*.whl >/dev/null
 for command in "${runtime_commands[@]}"; do
   [[ -x "$runtime_target/bin/$command" ]] || {
