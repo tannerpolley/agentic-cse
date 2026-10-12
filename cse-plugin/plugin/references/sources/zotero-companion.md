@@ -99,9 +99,12 @@ Either case authorizes `acquire` without asking or a per-save approval. File an
 agent-found paper in the collection that `cse-zotero project-list --json`
 registers for the current repository; when none is registered, do not acquire
 it and list its DOI or link in the report. Acquire one paper per call, in
-sequence; the command deduplicates against the library. Its browser route runs
-only when `doctor --json` shows `acquisition.connector.ready`; otherwise, and
-whenever a publisher needs a person, `acquire` returns a hand-off link. Never
+sequence; the command deduplicates against the library. Its browser route starts
+everyday Chrome without a startup window when needed, then waits for the agent
+Connector before submitting the paper. An idle `doctor` result with
+`acquisition.connector.ready: false` does not block an eligible `acquire` call.
+If startup cannot make the Connector ready, or a publisher needs a person,
+`acquire` returns a hand-off link. Never
 retry; continue the task and report acquired item keys and hand-off links. An
 acquired paper is evidence to assess, not claim support.
 

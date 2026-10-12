@@ -11,7 +11,7 @@ import unittest
 
 
 ROOT = Path(__file__).resolve().parents[2]
-EXPECTED_ZOTERO_COMMIT = "5d43da5c25752cc0a5525477bf1eabf4e9418094"
+EXPECTED_ZOTERO_COMMIT = "bc479cde3690490aa25469fee88a3b920b3346b7"
 
 
 class InstallationBehaviorTests(unittest.TestCase):
@@ -125,7 +125,7 @@ class InstallationBehaviorTests(unittest.TestCase):
                 args = sys.argv[1:]
                 real_git = os.environ["CSE_REAL_GIT"]
                 runtime = Path(os.environ["CSE_TEST_ZOTERO_ROOT"]).resolve()
-                expected = "5d43da5c25752cc0a5525477bf1eabf4e9418094"
+                expected = "bc479cde3690490aa25469fee88a3b920b3346b7"
                 if args[:2] == ["-C", str(runtime)]:
                     if args[2:] == ["rev-parse", "HEAD"]:
                         print(expected)
