@@ -43,8 +43,9 @@ thermophysical-data-registry is optional, not a runtime requirement.
    missing, follow that contract's eligibility and collection rules, check
    `doctor --json` acquisition readiness, and use
    `cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json`.
-   That bounded route needs no per-save approval; acquire one identified paper
-   per call.
+   That bounded route needs no per-save approval and starts Chrome without a
+   startup window when needed. An idle not-ready status does not block an
+   eligible call; acquire one identified paper per call.
 
 ## Evidence and authority
 

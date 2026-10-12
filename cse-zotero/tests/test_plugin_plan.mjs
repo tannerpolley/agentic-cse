@@ -314,7 +314,8 @@ async function browserFixture(mode = "success") {
       return { ...tab, title: challenge ? "Just a moment" : "Paper" };
     } },
     webRequest: { onHeadersReceived: { addListener: fn => { headers = fn; } } },
-    runtime: { getPlatformInfo: async () => ({}), reload: () => assert.fail("unexpected reload") },
+    runtime: { onStartup: { addListener: fn => { assert.equal(typeof fn, "function"); } },
+      getPlatformInfo: async () => ({}), reload: () => assert.fail("unexpected reload") },
     storage: { local: { get: async () => ({}), set: async () => {} } }
   };
   const Zotero = {
