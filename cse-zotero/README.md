@@ -239,7 +239,7 @@ Build the modified copy from the official Connector installed in Chrome's
 Default profile (currently 5.0.217):
 
 ```bash
-agent-heavy --timeout 15m --max 4G uv run python scripts/build_connector.py
+nice -n 10 uv run python scripts/build_connector.py
 ```
 
 Then, in your everyday Chrome:
@@ -254,7 +254,12 @@ Then, in your everyday Chrome:
    within about 20 seconds, with version `5.0.217`.
 
 The copy removes the store manifest key and uses a separate unpacked extension
-ID, with the official permissions unchanged. Keep the official Connector off
+ID. It adds Chrome's `background` permission so the browser can stay available
+with no windows open, and registers a startup event to wake the agent worker.
+Keep Chrome's **Continue running background apps when Google Chrome is closed**
+setting enabled. `acquire` starts Chrome without opening a startup window when
+needed; you do not need to open Chrome before asking an agent to get a paper.
+The paper save still uses one normal, unfocused window. Keep the official Connector off
 so only the agent copy handles saves. Doctor detects the copy by its heartbeat,
 not by extension ID. Your usual toolbar saves keep their native behavior. Re-run
 the build after an official Connector update. The agent reloads itself while

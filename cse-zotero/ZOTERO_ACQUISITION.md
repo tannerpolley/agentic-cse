@@ -93,7 +93,11 @@ Everything else in the Connector stays native, including retries, hidden
 iframes, the Amazon path and Zotero desktop's attachment resolver. Subresources
 and extension background requests are not policed or attributed to the job.
 There is no separate login-wall detector or five-minute human-check wait.
-The worker never raises or focuses a window.
+The worker never raises or focuses a window. The agent copy adds Chrome's
+`background` permission to remain available with no windows, and its startup
+event wakes the worker. Keep Chrome background apps enabled. The CLI starts
+everyday Chrome without a startup window when needed and waits for readiness
+before submitting a paper; an idle `doctor` status is not an acquisition veto.
 
 The plugin channel has only submit, pickup, finish and status, with queued,
 running and done states. A running job past its deadline becomes done with an
@@ -110,7 +114,7 @@ Connector job deadline plus 30 seconds, or through metadata/PDF import plus
 30 seconds. The user's own saves during that window also skip these add-ons.
 Wrappers are installed once at startup and restored at shutdown.
 
-Build the agent copy with `agent-heavy uv run python scripts/build_connector.py`.
+Build the agent copy with `nice -n 10 uv run python scripts/build_connector.py`.
 Follow README's one-time unpacked-extension setup and keep the official copy
 disabled. Official application files stay unchanged. The plugin reads the
 installed build revision; the idle worker reloads once per newer revision.

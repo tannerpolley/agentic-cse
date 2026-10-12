@@ -34,6 +34,8 @@ def build(source=None, output=OUTPUT):
     shutil.copytree(source, output, ignore=shutil.ignore_patterns("_metadata"))
     manifest.pop("key", None)
     manifest["name"] = "Zotero Connector (agent)"
+    if "background" not in manifest["permissions"]:
+        manifest["permissions"].append("background")
     (output / "manifest.json").write_text(json.dumps(manifest, indent=2) + "\n")
     (output / "connector-agent.js").write_bytes(module)
     (output / "cse-agent-job.html").write_text('<!doctype html><meta charset="utf-8"><title>Saving paper to Zotero</title>\n')

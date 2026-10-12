@@ -1,7 +1,9 @@
 /* Agent jobs use the native Connector; ordinary tabs keep its ordinary behavior. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
-  const MODULE_REVISION = 20;
+  const MODULE_REVISION = 21;
+  // Wake this worker when Chrome starts without a tab to trigger its native listeners.
+  chrome.runtime.onStartup.addListener(() => {});
   const marker = Zotero.getExtensionURL("cse-agent-job.html") + "#";
   const agentTabs = new Set();
   let active = null, busy = false;
