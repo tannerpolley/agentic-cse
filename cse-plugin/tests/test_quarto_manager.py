@@ -142,6 +142,29 @@ class QuartoManagerTests(unittest.TestCase):
                 ["snakemake", "--cores", "1", "present"], cwd=analysis, check=False
             )
 
+    def test_preview_render_skips_an_unchanged_workflow_until_a_file_changes(self):
+        # A present step that rewrites its figures must not re-trigger Quarto's render forever.
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            analysis = root / "case"
+            analysis.mkdir()
+            (analysis / "retained.csv").write_text("1\n")
+            dry_run = subprocess.CompletedProcess(
+                [], 0, stdout=json.dumps({"nodes": [{"value": {"rule": "present"}}]}), stderr=""
+            )
+            completed = subprocess.CompletedProcess([], 0)
+            with (
+                patch.dict(os.environ, {MANUSCRIPT.PREVIEW_STAMPS_ENV: "1"}),
+                patch.object(MANUSCRIPT, "presentation_workflows", return_value=[analysis]),
+                patch.object(MANUSCRIPT.subprocess, "run", side_effect=[dry_run, completed, dry_run, completed]) as run,
+            ):
+                self.assertEqual(0, MANUSCRIPT.prepare(root))
+                self.assertEqual(0, MANUSCRIPT.prepare(root))
+                self.assertEqual(2, run.call_count)
+                (analysis / "retained.csv").write_text("2\n")
+                self.assertEqual(0, MANUSCRIPT.prepare(root))
+                self.assertEqual(4, run.call_count)
+
     def test_prepare_limits_incremental_render_to_the_requested_analysis(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
