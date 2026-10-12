@@ -334,11 +334,12 @@ orphan records, missing evidence, broken links, unsupported promotion,
 contradictions, superseded parameters still in use, and data/equation coverage
 gaps. It should be safe to run on every task and useful before a release.
 
-### Human acquisition gate
+### Paper acquisition
 
 The canonical [`ZOTERO_ACQUISITION.md`](../ZOTERO_ACQUISITION.md) owns
-acquisition eligibility and publisher/browser boundaries. For one paper the
-user specifically requests by DOI or article URL, use the bounded
+acquisition eligibility, collection rules, and publisher/browser boundaries.
+For a user-requested paper or a relevant paper the work finds missing, follow
+that contract and use the bounded
 `cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json`
 route; it does not add a per-save approval. All other Zotero writes keep their
 reviewed-preview and approval steps.
