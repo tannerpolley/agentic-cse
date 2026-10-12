@@ -55,6 +55,9 @@ class InstallationBehaviorTests(unittest.TestCase):
             old_runtime = home / ".local/share/cse/zotero"
             old_runtime.mkdir(parents=True)
             (old_runtime / "previous.txt").write_text("previous runtime\n")
+            agent_build = old_runtime / "zotero-connector-agent/cse-agent-build.json"
+            agent_build.parent.mkdir()
+            agent_build.write_text('{"module_revision": 20}\n')
             old_bin = home / ".local/bin"
             old_bin.mkdir(parents=True)
             for command in ("cse-zotero", "zotero-companion"):
@@ -202,6 +205,7 @@ class InstallationBehaviorTests(unittest.TestCase):
             self.assertEqual({"cse": str(source.resolve())}, state["marketplaces"])
             self.assertEqual(["cse@cse"], [item["pluginId"] for item in state["installed"]])
             self.assertTrue((home / ".codex/plugins/cache/cse/cse/local/skills").is_dir())
+            self.assertEqual('{"module_revision": 20}\n', agent_build.read_text())
             self.assertFalse((home / ".codex/plugins/cse").exists())
             self.assertFalse((home / ".agents/plugins/marketplace.json").exists())
             for command in ("cse-zotero", "zotero-companion"):

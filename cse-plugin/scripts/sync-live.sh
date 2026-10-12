@@ -259,6 +259,10 @@ done
 
 runtime_installed=1
 uv venv "$runtime_target" >/dev/null
+# Chrome loads the unpacked agent Connector from inside the runtime; keep it.
+if [[ -d "$previous/runtime/zotero-connector-agent" ]]; then
+  cp -a -- "$previous/runtime/zotero-connector-agent" "$runtime_target/"
+fi
 uv pip install --python "$runtime_target/bin/python" "$runtime_wheels"/*.whl >/dev/null
 for command in "${runtime_commands[@]}"; do
   [[ -x "$runtime_target/bin/$command" ]] || {
