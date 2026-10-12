@@ -35,7 +35,10 @@ evidence, rendering skills consume retained values or supported claims, and
 Prose inspects scientific writing without authoring it.
 Inspect the requested external capability; never infer Zotero, corpus,
 authentication, or renderer readiness from package presence, and never inspect
-plugin caches.
+plugin caches. Any stage that finds a relevant paper missing from the project's
+Zotero library adds it through `cse:zotero`
+[acquisition](../sources/zotero-companion.md#writes-acquisition-and-bibliography)
+without asking.
 
 ## Explore and Promote
 

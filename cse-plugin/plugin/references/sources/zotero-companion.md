@@ -84,17 +84,26 @@ fields and columns. Neither establishes scientific acceptance.
 ## Writes, acquisition, and bibliography
 
 Run `doctor --json` before operating and inspect operation readiness and
-`acquisition.tokens` without exposing token values. When the user
-requests one specific paper by DOI or article URL, use the bounded route:
+`acquisition.tokens` without exposing token values.
+
+Add a paper with the bounded route when the user requests it, or when any
+stage finds a relevant paper with a DOI or article URL that the library lacks:
+a source the work cites or studies, the origin of an equation, data, method or
+reference case, or other literature relevant to the project's question.
 
 ```bash
 cse-zotero acquire <DOI-or-article-URL> --collection <key-or-name> --json
 ```
 
-The user's explicit request authorizes this `acquire` route without another
-per-save approval. Its browser route runs only when `doctor --json` shows `acquisition.connector.ready`;
-otherwise, and whenever a publisher needs a person, `acquire` returns a hand-off
-link. Give that link to the user instead of retrying.
+Either case authorizes `acquire` without asking or a per-save approval. File an
+agent-found paper in the collection that `cse-zotero project-list --json`
+registers for the current repository; when none is registered, do not acquire
+it and list its DOI or link in the report. Acquire one paper per call, in
+sequence; the command deduplicates against the library. Its browser route runs
+only when `doctor --json` shows `acquisition.connector.ready`; otherwise, and
+whenever a publisher needs a person, `acquire` returns a hand-off link. Never
+retry; continue the task and report acquired item keys and hand-off links. An
+acquired paper is evidence to assess, not claim support.
 
 The canonical
 [Zotero acquisition rules](https://github.com/agentic-cse/cse-zotero/blob/main/ZOTERO_ACQUISITION.md)

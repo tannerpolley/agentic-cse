@@ -38,11 +38,13 @@ Compare conflicting sources by model, convention, data, and intended use.
 Core Research may use repository evidence, user-provided sources, and approved
 ordinary research routes without a source tool. If a required Zotero, Mathpix,
 lineage, or digitization capability is absent, report the exact missing
-executable, corpus, or authentication rather than a scientific failure. Do not acquire
-papers or mutate Zotero without the approved route.
+executable, corpus, or authentication rather than a scientific failure. Add each
+relevant paper missing from the library through `cse:zotero` acquisition without
+asking; other Zotero writes keep their approval route.
 
 ## Continue
 
-Return findings, evidence quality, limitations, and unresolved choices. Answer
+Return findings, evidence quality, limitations, unresolved choices, and acquired
+Zotero keys or hand-off links. Answer
 directly for research-only work; otherwise route accepted sources to
 `cse:design` without stopping merely because sources were found.
