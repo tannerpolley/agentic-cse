@@ -29,7 +29,7 @@ amendment, handoff, review, and completion points without commenting on every
 tool call. Optional reviewer suggestions do not expand scope or acceptance until
 accepted through the existing authority.
 
-Standalone issues are normal. Use parent or sub-issue relationships only for genuine decomposition. Labels describe work and remain advisory; preserve existing labels and ask before creating a repository label set. Offer GitHub Projects during setup and explain that `gh auth refresh -s project` requires separate approval; never run it silently.
+Standalone issues are normal. Use parent or sub-issue relationships only for genuine decomposition. Labels describe work and remain advisory; preserve existing labels and ask before creating a repository label set. Offer GitHub Projects during setup and explain that `gh auth refresh -s project` requires separate approval; never run it silently. A Project may add board fields such as Status and Priority across milestones; it never replaces the milestone section.
 
 ### Milestones
 
