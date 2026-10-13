@@ -671,7 +671,7 @@ def watch_snapshot(root: Path) -> dict[Path, tuple[int, int]]:
             snapshot[path] = (info.st_mtime_ns, info.st_size)
             if path.suffix in {".qmd", ".md"}:
                 pending.extend((path.parent / target).resolve() for target in INCLUDE_RE.findall(path.read_text()))
-        except FileNotFoundError:
+        except (OSError, UnicodeDecodeError):
             continue
     return snapshot
 
@@ -809,7 +809,7 @@ def preview(root: Path, host: str, port: int | None) -> int:
                 continue
             waiting = False
             while process.poll() is None:
-                time.sleep(WATCH_SETTLE_SECONDS)
+                time.sleep(WATCH_INTERVAL_SECONDS if waiting else WATCH_SETTLE_SECONDS)
                 current = watch_snapshot(root)
                 new = changed_paths(snapshot, current)
                 snapshot = current
@@ -866,9 +866,9 @@ def preview_port(repository: Path, port: int | None, *, keep_service_port: bool 
         digest = int(hashlib.sha256(str(repository).encode()).hexdigest(), 16)
         candidates = (SERVICE_PORT_BASE + (digest + step) % SERVICE_PORT_SPAN for step in range(SERVICE_PORT_SPAN))
         port = next((value for value in candidates if value not in claimed and port_free(value)), None)
-        require(port, unit, "no free preview port")
+        require(port, repository, "no free preview port")
     require(1 <= port <= 65535 and port not in claimed and (port == current or port_free(port)),
-            unit, f"port {port} is in use or claimed by another preview unit")
+            repository, f"port {port} is in use or claimed by another preview unit")
     return port
 
 
@@ -966,12 +966,14 @@ def service(root: Path, port: int | None, dry_run: bool, python: Path | None = N
     for value, what in ((str(repository), "repository path"), (root.relative_to(repository).as_posix(), "manuscript path"),
                         (str(python), "interpreter path"), *((entry, "PATH entry") for entry in path)):
         unit_value(value, what)
+    workflows = presentation_workflows(root)
+    modules = PREVIEW_IMPORTS + (", snakemake" if workflows else "")
     require(python.is_file() and os.access(python, os.X_OK), python,
-            f"project interpreter is missing or not executable; prepare the project .venv with {PREVIEW_IMPORTS}")
-    imports = subprocess.run([str(python), "-c", f"import {PREVIEW_IMPORTS}"], check=False, capture_output=True, text=True)
+            f"project interpreter is missing or not executable; prepare the project .venv with {modules}")
+    imports = subprocess.run([str(python), "-c", f"import {modules}"], check=False, capture_output=True, text=True)
     require(not imports.returncode, python,
-            f"project interpreter requires {PREVIEW_IMPORTS} for the presentation profile: {imports.stderr.strip()}")
-    require(not presentation_workflows(root) or shutil.which("snakemake", path=":".join(path)), python.parent,
+            f"project interpreter requires {modules} for the presentation profile: {imports.stderr.strip()}")
+    require(not workflows or shutil.which("snakemake", path=":".join(path)), python.parent,
             "snakemake is required by a presentation workflow but absent from the unit PATH")
     unit = service_unit(repository)
     existing = unit.read_text() if unit.is_file() else None

@@ -112,6 +112,7 @@ The bridge scans sources every ten seconds, excluding `data/`, `results/`,
 and cache trees. It watches exact `{{< include >}}` targets under `results/`
 without walking that tree. After changing retained data or results, run
 `refresh`; arbitrary retained-file changes are not automatic triggers.
+Present stamps no longer cover `data/` or `results/`, so after a calculation run `refresh`.
 The following
 bare Quarto command shows the
 upstream syntax for the separately authorized presentation-only execution
@@ -211,10 +212,16 @@ that project. Prepare that environment with packages providing `jupyter_core`,
 `jupyter-client`, `jupyter-cache`, and `PyYAML`). The command does not install
 packages or fall back to a cache environment: it fails with the required module
 list and the import error when imports fail, or an actionable message when the
-project interpreter is missing. A presentation workflow also requires
-`snakemake` on the unit's `PATH`. The interpreter's directory comes first on
+project interpreter is missing. Projects with a `Snakefile` also need the
+`snakemake` package in that environment: `service` checks its import and the
+`snakemake` executable on the unit's `PATH`, which preparation invokes.
+The interpreter's directory comes first on
 that `PATH`; the command refuses unit paths containing whitespace, quotes,
 backslash, `%`, or `$`.
+
+To migrate an existing unit during approved Setup, add these packages to the
+project environment, rerun `init` to update the managed root's tooling, then
+rerun `service` from the main checkout.
 
 The port is chosen once from the repository path in the 8800–9799 range,
 skipping ports that are bound or claimed by another preview unit, unless

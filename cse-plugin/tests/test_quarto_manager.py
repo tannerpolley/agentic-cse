@@ -278,6 +278,10 @@ class QuartoManagerTests(unittest.TestCase):
             values.write_text("1\n")
             (root / "case/results/unused.csv").write_text("1\n")
             (root / "data/large/input.csv").write_text("1\n")
+            sources = {root / "_quarto.yml", root / "case/Snakefile", root / "case/scripts/present.py"}
+            for source in sources:
+                source.parent.mkdir(exist_ok=True)
+                source.write_text("source\n")
             visited = []
             real_walk = os.walk
 
@@ -288,7 +292,7 @@ class QuartoManagerTests(unittest.TestCase):
 
             with patch.object(MANUSCRIPT.os, "walk", side_effect=walk):
                 before = MANUSCRIPT.watch_snapshot(root)
-            self.assertEqual({root / "case/notebook.qmd", fragment, values}, set(before))
+            self.assertEqual({root / "case/notebook.qmd", fragment, values} | sources, set(before))
             self.assertFalse(any({"data", "results"} & set(path.relative_to(root).parts) for path in visited))
             values.write_text("updated\n")
             self.assertEqual({values}, MANUSCRIPT.changed_paths(before, MANUSCRIPT.watch_snapshot(root)))
@@ -309,6 +313,58 @@ class QuartoManagerTests(unittest.TestCase):
                     self.assertFalse(MANUSCRIPT.is_watchable(root / relative, root))
             self.assertTrue(MANUSCRIPT.is_watchable(root / "case" / "notebook.qmd", root))
 
+    def test_unreadable_markdown_keeps_its_stat_in_watch_and_present_snapshots(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            invalid = root / "invalid.qmd"
+            invalid.write_bytes(b"\xff")
+            denied = root / "denied.md"
+            denied.write_text("{{< include hidden.qmd >}}\n")
+            real_read = Path.read_text
+
+            def read(path, *args, **kwargs):
+                if path == denied:
+                    raise PermissionError("unreadable")
+                return real_read(path, *args, **kwargs)
+
+            with patch.object(Path, "read_text", autospec=True, side_effect=read):
+                snapshot = MANUSCRIPT.watch_snapshot(root)
+                self.assertEqual({invalid, denied}, set(snapshot))
+                self.assertEqual({"invalid.qmd", "denied.md"}, set(MANUSCRIPT.present_snapshot(root)))
+                invalid.write_bytes(b"\xffchanged")
+                self.assertEqual({invalid}, MANUSCRIPT.changed_paths(snapshot, MANUSCRIPT.watch_snapshot(root)))
+
+    def test_preview_checks_a_stale_lock_at_the_idle_interval_after_settling(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script = root / "present.py"
+            script.write_text("before\n")
+            sleeps = []
+
+            def sleep(seconds):
+                sleeps.append(seconds)
+                if len(sleeps) == 1:
+                    script.write_text("changed\n")
+                if len(sleeps) == 4:
+                    raise KeyboardInterrupt
+
+            with (
+                patch.object(MANUSCRIPT, "sync", return_value={}),
+                patch.object(MANUSCRIPT, "presentation_workflows", return_value=[root]),
+                patch.object(MANUSCRIPT, "workflows_running", return_value=True),
+                patch.object(MANUSCRIPT, "wait_for_server"),
+                patch.object(MANUSCRIPT, "stop_process"),
+                patch.object(MANUSCRIPT.socket, "socket") as socket,
+                patch.object(MANUSCRIPT.subprocess, "Popen") as popen,
+                patch.object(MANUSCRIPT.time, "sleep", side_effect=sleep),
+                contextlib.redirect_stderr(io.StringIO()),
+            ):
+                socket.return_value.__enter__.return_value.connect_ex.return_value = 1
+                popen.return_value.poll.return_value = None
+                self.assertEqual(130, MANUSCRIPT.preview(root, "127.0.0.1", 8000))
+            self.assertEqual(MANUSCRIPT.WATCH_SETTLE_SECONDS, sleeps[1])
+            self.assertEqual([MANUSCRIPT.WATCH_INTERVAL_SECONDS] * 2, sleeps[2:])
+
     def test_worktree_preview_allocates_a_port_and_stop_cleans_up_quarto(self):
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
@@ -322,7 +378,11 @@ class QuartoManagerTests(unittest.TestCase):
             root.mkdir()
             units = parent / "config/systemd/user"
             units.mkdir(parents=True)
-            candidate = MANUSCRIPT.preview_port(worktree, None)
+            with patch.dict(os.environ, {"XDG_CONFIG_HOME": str(parent / "config")}):
+                candidate = MANUSCRIPT.preview_port(worktree, None)
+                with patch.object(MANUSCRIPT, "port_free", return_value=False):
+                    with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, f"^{worktree}: no free preview port"):
+                        MANUSCRIPT.preview_port(worktree, None)
             units.joinpath("cse-preview-other.service").write_text(f"ExecStart=python preview --port {candidate}\n")
             bin_dir = parent / "bin"
             bin_dir.mkdir()
@@ -506,6 +566,22 @@ class QuartoManagerTests(unittest.TestCase):
                 state["install"](interpreter=state["base"] / "cache/bin/python")
             self.assertEqual([], state["systemctl"])
             self.assertFalse(state["units"].exists())
+
+    def test_service_checks_snakemake_in_the_project_interpreter_for_a_workflow(self):
+        with self.preview_service() as state:
+            (state["repository"] / "analyses/Snakefile").write_text("rule present:\n    shell: 'true'\n")
+            real_run = MANUSCRIPT.subprocess.run
+
+            def run(command, *args, **kwargs):
+                if command[0] == str(state["python"]):
+                    if ", snakemake" in command[-1]:
+                        return subprocess.CompletedProcess(command, 1, stderr="No module named 'snakemake'")
+                return real_run(command, *args, **kwargs)
+
+            with patch.object(MANUSCRIPT.subprocess, "run", side_effect=run):
+                with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "No module named 'snakemake'"):
+                    state["install"]()
+            self.assertEqual([], state["systemctl"])
 
     def test_preview_service_refuses_unit_unsafe_manuscript_and_path_values(self):
         with self.preview_service() as state:
