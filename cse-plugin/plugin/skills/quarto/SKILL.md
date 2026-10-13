@@ -43,9 +43,11 @@ PDF view with `render.sh --to pdf`; the standalone example retains its separate
 presentation-only `present` target, then refreshes the included notebook page and
 home page with the presentation cache invalidated. Use `manuscript.py preview` to let
 native Quarto serve and reload the local HTML without opening an external
-browser; its small bridge watches retained and presentation sources that native
-preview misses and asks the running preview to re-render only the affected registered
-sources; pass a free `--port`. The
+browser in a task-owned worktree; its bridge watches presentation sources and
+exact include targets that native preview misses, then re-renders affected
+registered sources. The port is allocated automatically. Leave the main-checkout
+service running; use `status` to inspect it and `stop` only for worktree cleanup,
+as described in [quarto-execution](../../references/visualize/quarto-execution.md#main-checkout-preview-service). The
 presentation profile's sole pre-render hook runs presentation-only preparation
 and never calculation. Keep the full customizable LaTeX manuscript route
 separate.

@@ -6,6 +6,8 @@ StartLimitBurst=5
 
 [Service]
 Type=simple
+Nice=10
+CPUWeight=10
 WorkingDirectory={repository}
 Environment=PATH={path}
 Environment=QUARTO_PYTHON={python}

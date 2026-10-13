@@ -266,6 +266,35 @@ class QuartoManagerTests(unittest.TestCase):
             generated = root / "case" / "results" / "cooling_fit_include.qmd"
             self.assertTrue(MANUSCRIPT.is_watchable(generated, root))
 
+    def test_scan_prunes_retained_trees_but_tracks_exact_nested_includes(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "case/results").mkdir(parents=True)
+            (root / "data/large").mkdir(parents=True)
+            (root / "case/notebook.qmd").write_text("{{< include results/table.md >}}\n")
+            fragment = root / "case/results/table.md"
+            fragment.write_text("{{< include values.qmd >}}\n")
+            values = root / "case/results/values.qmd"
+            values.write_text("1\n")
+            (root / "case/results/unused.csv").write_text("1\n")
+            (root / "data/large/input.csv").write_text("1\n")
+            visited = []
+            real_walk = os.walk
+
+            def walk(*args, **kwargs):
+                for entry in real_walk(*args, **kwargs):
+                    visited.append(Path(entry[0]))
+                    yield entry
+
+            with patch.object(MANUSCRIPT.os, "walk", side_effect=walk):
+                before = MANUSCRIPT.watch_snapshot(root)
+            self.assertEqual({root / "case/notebook.qmd", fragment, values}, set(before))
+            self.assertFalse(any({"data", "results"} & set(path.relative_to(root).parts) for path in visited))
+            values.write_text("updated\n")
+            self.assertEqual({values}, MANUSCRIPT.changed_paths(before, MANUSCRIPT.watch_snapshot(root)))
+            fragment.unlink()
+            self.assertIn(fragment, MANUSCRIPT.changed_paths(before, MANUSCRIPT.watch_snapshot(root)))
+
     def test_generated_and_cache_paths_are_not_watch_triggers(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -280,11 +309,21 @@ class QuartoManagerTests(unittest.TestCase):
                     self.assertFalse(MANUSCRIPT.is_watchable(root / relative, root))
             self.assertTrue(MANUSCRIPT.is_watchable(root / "case" / "notebook.qmd", root))
 
-    def test_sigterm_cleans_up_the_fake_quarto_process_group(self):
+    def test_worktree_preview_allocates_a_port_and_stop_cleans_up_quarto(self):
         with tempfile.TemporaryDirectory() as directory:
             parent = Path(directory)
-            root = parent / "analyses"
+            repository = parent / "repo"
+            subprocess.run(["git", "init", "-q", str(repository)], check=True)
+            subprocess.run(["git", "-C", str(repository), "-c", "user.name=Test", "-c", "user.email=test@example.com",
+                            "commit", "-qm", "initial", "--allow-empty"], check=True)
+            worktree = parent / "worktree"
+            subprocess.run(["git", "-C", str(repository), "worktree", "add", "-qb", "task", str(worktree)], check=True)
+            root = worktree / "analyses"
             root.mkdir()
+            units = parent / "config/systemd/user"
+            units.mkdir(parents=True)
+            candidate = MANUSCRIPT.preview_port(worktree, None)
+            units.joinpath("cse-preview-other.service").write_text(f"ExecStart=python preview --port {candidate}\n")
             bin_dir = parent / "bin"
             bin_dir.mkdir()
             pid_file = parent / "quarto.pid"
@@ -309,12 +348,13 @@ class QuartoManagerTests(unittest.TestCase):
                 "spec.loader.exec_module(module)\n"
                 "module.validate_root = module.sync = lambda root: {}\n"
                 "module.presentation_workflows = lambda root: []\n"
-                "raise SystemExit(module.preview(Path(sys.argv[1]), '127.0.0.1', 8000))\n"
+                "raise SystemExit(module.preview(Path(sys.argv[1]), '127.0.0.1', None))\n"
             )
             environment = {
                 **os.environ,
                 "PATH": f"{bin_dir}{os.pathsep}{os.environ['PATH']}",
                 "FAKE_QUARTO_PID": str(pid_file),
+                "XDG_CONFIG_HOME": str(parent / "config"),
             }
             process = subprocess.Popen(
                 [sys.executable, str(runner), str(root)],
@@ -323,16 +363,37 @@ class QuartoManagerTests(unittest.TestCase):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
             )
-            deadline = time.monotonic() + 5
-            while not pid_file.exists() and process.poll() is None and time.monotonic() < deadline:
-                time.sleep(0.01)
-            self.assertTrue(pid_file.exists(), process.stderr.read() if process.poll() is not None else "")
-            fake_pid = int(pid_file.read_text())
-            process.send_signal(signal.SIGTERM)
-            stdout, stderr = process.communicate(timeout=5)
-            self.assertEqual(130, process.returncode, (stdout, stderr))
-            with self.assertRaises(ProcessLookupError):
-                os.kill(fake_pid, 0)
+            try:
+                record = root / ".quarto/cse-preview.json"
+                deadline = time.monotonic() + 5
+                while (not pid_file.exists() or not record.exists()) and process.poll() is None and time.monotonic() < deadline:
+                    time.sleep(0.01)
+                self.assertTrue(pid_file.exists() and record.exists(), process.stderr.read() if process.poll() is not None else "")
+                fake_pid = int(pid_file.read_text())
+                port = json.loads(record.read_text())["port"]
+                self.assertTrue(8800 <= port < 9800)
+                self.assertNotEqual(candidate, port)
+                output = io.StringIO()
+                with contextlib.redirect_stdout(output):
+                    MANUSCRIPT.status(root)
+                self.assertIn(f"state: running\nport: {port}\nurl: http://127.0.0.1:{port}/", output.getvalue())
+                with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "main-checkout service is always on"):
+                    MANUSCRIPT.stop(repository)
+                with contextlib.redirect_stdout(io.StringIO()):
+                    MANUSCRIPT.stop(root)
+                stdout, stderr = process.communicate(timeout=5)
+                self.assertEqual(130, process.returncode, (stdout, stderr))
+                self.assertFalse(record.exists())
+                with self.assertRaises(ProcessLookupError):
+                    os.kill(fake_pid, 0)
+                record.write_text(json.dumps({"pid": os.getpid(), "identity": "stale", "port": port, "host": "127.0.0.1"}))
+                with patch.object(MANUSCRIPT.os, "kill") as kill, contextlib.redirect_stdout(io.StringIO()):
+                    MANUSCRIPT.stop(root)
+                kill.assert_not_called()
+            finally:
+                if process.poll() is None:
+                    process.send_signal(signal.SIGTERM)
+                    process.communicate(timeout=5)
 
     def test_only_results_includes_are_adopted_as_source_inputs(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -358,22 +419,23 @@ class QuartoManagerTests(unittest.TestCase):
             repository = base / "repo"
             (repository / "analyses").mkdir(parents=True)
             real_run(["git", "init", "-q", str(repository)], check=True)
-            python = base / "venv" / "bin" / "python"
+            python = repository / ".venv" / "bin" / "python"
             python.parent.mkdir(parents=True)
             python.write_text("")
             python.chmod(0o755)
             state = {"base": base, "repository": repository, "python": python, "units": base / "config/systemd/user",
-                     "systemctl": [], "busy": set()}
+                     "systemctl": [], "busy": set(), "missing": False}
 
             def run(command, *args, **kwargs):
                 if command[0] == "systemctl":
                     state["systemctl"].append(command[2])
-                    return subprocess.CompletedProcess(command, 0)
+                    return subprocess.CompletedProcess(command, 0, stdout="active\n")
                 if command[0] == str(python):
-                    return subprocess.CompletedProcess(command, 0)
+                    return subprocess.CompletedProcess(command, int(state["missing"]),
+                                                       stderr="ModuleNotFoundError: No module named 'jupyter_cache'" if state["missing"] else "")
                 return real_run(command, *args, **kwargs)
 
-            def install(root=repository / "analyses", port=None, interpreter=python):
+            def install(root=repository / "analyses", port=None, interpreter=None):
                 output = io.StringIO()
                 with contextlib.redirect_stdout(output):
                     status = MANUSCRIPT.service(root, port, False, interpreter)
@@ -393,20 +455,30 @@ class QuartoManagerTests(unittest.TestCase):
     def test_preview_service_keeps_its_port_skips_claimed_ports_and_refuses_foreign_units(self):
         with self.preview_service() as state:
             repository, install, systemctl = state["repository"], state["install"], state["systemctl"]
+            bound = MANUSCRIPT.preview_port(repository, None)
+            state["busy"].add(bound)
             self.assertEqual(0, install()[0])
             unit = next(state["units"].glob("cse-preview-repo-*.service"))
             text = unit.read_text()
             port = MANUSCRIPT.service_port(unit)
+            self.assertNotEqual(bound, port)
             self.assertIn(f"\nWorkingDirectory={repository}\n", text)
             self.assertIn(f"\nExecStart={state['python']} analyses/manuscript.py preview analyses "
                           f"--host 127.0.0.1 --port {port}\n", text)
             self.assertIn(f"\nEnvironment=PATH={state['python'].parent}:/opt/quarto/bin:", text)
+            self.assertIn("\nNice=10\nCPUWeight=10\n", text)
+            self.assertIn("\nRestart=on-failure\n", text)
             self.assertEqual(["show-environment", "daemon-reload", "enable", "restart"], systemctl)
 
             systemctl.clear()
             state["busy"].add(port)
             self.assertEqual(0, install()[0])
-            self.assertEqual((text, ["show-environment", "daemon-reload", "enable", "start"]), (unit.read_text(), systemctl))
+            self.assertEqual((text, ["show-environment", "daemon-reload", "enable", "restart"]), (unit.read_text(), systemctl))
+
+            output = io.StringIO()
+            with contextlib.redirect_stdout(output):
+                MANUSCRIPT.status(repository / "analyses")
+            self.assertIn(f"unit: {unit.name}\nstate: active\nport: {port}\nurl: http://127.0.0.1:{port}/", output.getvalue())
 
             state["busy"].clear()
             other = state["units"] / "cse-preview-other-00000000.service"
@@ -421,6 +493,19 @@ class QuartoManagerTests(unittest.TestCase):
             with self.assertRaises(MANUSCRIPT.ManuscriptError):
                 install()
             self.assertEqual("[Service]\nExecStart=/bin/true\n", unit.read_text())
+
+    def test_service_requires_project_python_and_names_missing_modules_before_installing(self):
+        with self.preview_service() as state:
+            state["missing"] = True
+            with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "No module named 'jupyter_cache'"):
+                state["install"]()
+            state["python"].unlink()
+            with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "project interpreter is missing.*jupyter_core"):
+                state["install"]()
+            with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "interpreter must belong to this project"):
+                state["install"](interpreter=state["base"] / "cache/bin/python")
+            self.assertEqual([], state["systemctl"])
+            self.assertFalse(state["units"].exists())
 
     def test_preview_service_refuses_unit_unsafe_manuscript_and_path_values(self):
         with self.preview_service() as state:

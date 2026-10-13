@@ -120,10 +120,10 @@ populated analysis inputs, scripts, results, and figures; new sets use
 Setup confirms purpose, root/home content, and adoption, then invokes
 `manuscript.py init` when the renderer is available to initialize or safely adopt the
 populated root Quarto analysis site; do not rename or migrate it solely to match the
-default. With the renderer available, Setup then runs
-`python3 analyses/manuscript.py service analyses/` from the main checkout with the
-project's presentation interpreter (`--python <path>` when it is not the one
-running the command), as described in
+default. With the renderer available, the approved Setup action then runs
+`python3 analyses/manuscript.py service analyses/` once from the main checkout
+to install and restart the always-on preview with the project's interpreter,
+as described in
 [quarto-execution](../../references/visualize/quarto-execution.md#main-checkout-preview-service),
 and reports `serving <url>`, the not-answering journal command, or the exact
 missing capability.

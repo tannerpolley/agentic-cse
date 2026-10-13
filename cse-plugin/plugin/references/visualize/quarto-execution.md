@@ -107,7 +107,12 @@ page. Refresh and preview select HTML explicitly, keeping a page's optional
 PDF settings out of the website update.
 Quarto preview does not detect arbitrary external-data changes; the
 managed preview bridge asks the running preview to re-render only the affected
-registered source (touching a file does not trigger it) after the presentation hook has been allowed to validate retained inputs. The following
+registered source (touching a file does not trigger it) after the presentation hook has been allowed to validate retained inputs.
+The bridge scans sources every ten seconds, excluding `data/`, `results/`,
+and cache trees. It watches exact `{{< include >}}` targets under `results/`
+without walking that tree. After changing retained data or results, run
+`refresh`; arbitrary retained-file changes are not automatic triggers.
+The following
 bare Quarto command shows the
 upstream syntax for the separately authorized presentation-only execution
 route; it is not a normal or release CSE render:
@@ -189,27 +194,45 @@ Sources and retained results stay in place.
 
 ## Main-checkout preview service
 
-`python3 analyses/manuscript.py service analyses/` installs a systemd user unit
+During an approved Setup action, run
+`python3 analyses/manuscript.py service analyses/` once from the main checkout.
+It installs and restarts a systemd user unit
 `cse-preview-<repository>-<path hash>.service` that keeps `manuscript.py preview`
-running on `127.0.0.1` from the main checkout, restarting it on failure within a
-bounded start limit. The unit records the interpreter absolutely (`--python`,
-default the interpreter running the command) and puts its directory first on
-`PATH`; the command refuses an interpreter that cannot import the Jupyter
-packages the presentation profile executes with (including `jupyter-cache`,
-which its `execute.cache: true` requires), or a presentation workflow whose
-`snakemake` is absent from that `PATH`. It also refuses any path containing
-whitespace, quotes, backslash, `%`, or `$`. The port is chosen once from the
-repository path, skipping ports that are bound or claimed by another preview unit,
-unless `--port` is given; reruns keep the port and refuse a unit the command did
-not write for that repository. `--dry-run` prints the unit without writing or
-enabling it. Without `systemctl --user`, the command reports that missing
-capability and writes nothing. It reports `serving <url>` only after the URL
-answers, otherwise the unit's journal command. User services stop at logout unless
-lingering is enabled (`loginctl enable-linger`).
+running on `127.0.0.1`, with `Nice=10`, `CPUWeight=10`, and restart on failure
+within a bounded start limit. Outside approved Setup, agents leave this service
+running and use `manuscript.py status analyses/` to report its unit state, URL,
+and port.
 
-The service URL is the main-checkout view: agents do not start or stop it. An
-unmerged worktree branch is previewed by a task-owned
-`manuscript.py preview <root> --port <free port>` that the agent stops at cleanup.
+The service uses the checkout's `.venv/bin/python`, never the interpreter that
+happened to run `service`. An explicit `--python <path>` must also belong to
+that project. Prepare that environment with packages providing `jupyter_core`,
+`nbformat`, `nbclient`, `ipykernel`, `jupyter_client`, `jupyter_cache`, and `yaml`
+(package names: `jupyter-core`, `nbformat`, `nbclient`, `ipykernel`,
+`jupyter-client`, `jupyter-cache`, and `PyYAML`). The command does not install
+packages or fall back to a cache environment: it fails with the required module
+list and the import error when imports fail, or an actionable message when the
+project interpreter is missing. A presentation workflow also requires
+`snakemake` on the unit's `PATH`. The interpreter's directory comes first on
+that `PATH`; the command refuses unit paths containing whitespace, quotes,
+backslash, `%`, or `$`.
+
+The port is chosen once from the repository path in the 8800–9799 range,
+skipping ports that are bound or claimed by another preview unit, unless
+`--port` is given. Reruns keep the port and refuse a unit the command did not
+write for that repository. `--dry-run` prints the unit without writing or
+enabling it. Without `systemctl --user`, the command reports that missing
+capability and writes no unit. It reports `serving <url>` only after the URL
+answers, otherwise the unit's journal command. User services stop at logout
+unless lingering is enabled (`loginctl enable-linger`).
+
+For an unmerged worktree, run `manuscript.py preview <root>` as a task-owned
+foreground process. It uses the same port allocator, hashing the worktree path
+and skipping bound and claimed ports; `--port` may override it.
+`manuscript.py status <root>` reports the worktree preview state, URL, and port.
+At cleanup, use `manuscript.py stop <root>` to signal that preview, which cleans
+up its Quarto process group. `stop` refuses the main checkout, and a stale PID
+record cannot signal a process that reused the PID. Worktree lifecycle records
+live in the ignored `.quarto/` directory; process identity uses Linux `/proc`.
 
 ## HTML
 
