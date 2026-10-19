@@ -38,7 +38,7 @@ Use the project view command above first and `--global` as the fallback, then `w
 
 ### Project library
 
-A project that adopts Zotero owns one collection under the Companion's root project collection. The Companion registry is the only record of that binding; CSE does not copy it. Use `cse-zotero project-list --json` to find the slug and collection. `wiki/projects/<slug>.md` keeps curated notes above its generated marker and shows the live collection tree below it. Reorganize papers in Zotero or with a `project-organize` plan: show the dry-run preview, get native approval, then apply with `--apply`. Never hand-edit the generated part. Setup registers the project with `project-register`; a dry run first, then `--apply` after approval. It links an existing collection with `--collection <key>` (the first registration also names the root with `--root <key>`) or, once a root is registered, creates one under it with `--create "<name>"`. With the Companion add-on installed, Zotero refreshes the page after a collection change. `project-sync --json` lists pages that no longer match Zotero, and `project-sync --apply` rewrites them.
+A project that adopts Zotero owns one collection under the Companion's root project collection. The Companion registry is the only record of that binding; CSE does not copy it. Use `cse-zotero project-list --json` to find the slug and collection. `wiki/projects/<slug>.md` keeps curated notes above its generated marker and shows the live collection tree below it. Reorganize papers in Zotero or with a `project-organize` plan: show the dry-run preview, then apply with `--apply` and report what changed. Never hand-edit the generated part. Setup registers the project with `project-register`; a dry run first, then `--apply` after approval. It links an existing collection with `--collection <key>` (the first registration also names the root with `--root <key>`) or, once a root is registered, creates one under it with `--create "<name>"`. With the Companion add-on installed, Zotero refreshes the page after a collection change. `project-sync --json` lists pages that no longer match Zotero, and `project-sync --apply` rewrites them.
 
 ## Evidence and data authority
 
@@ -113,10 +113,12 @@ The canonical
 owns route eligibility and publisher/browser boundaries; do not duplicate its
 safety rules here.
 
-Other writes still require a reviewed preview and native approval immediately
-before applying them. This includes Zotero corrections, collection changes,
-bibliography refreshes, Mathpix conversions, and companion attachments. Treat
-paper acquisition as its own operation, separate from those writes.
+Metadata corrections and collection changes need a reviewed preview but no
+approval: apply them and report what changed. Other writes still require a
+reviewed preview and native approval immediately before applying them:
+deletions, bibliography refreshes, Mathpix conversions, and companion
+attachments. Treat paper acquisition as its own operation, separate from those
+writes.
 
 The canonical full-library Better BibTeX export is reported by `doctor` and refreshed by `bibliography-export --apply`. Companion enforces omission of `file` fields. Project snapshots contain only cited records, flow one way from that export, and are never hand-edited. Do not update bibliography consumers until the new export has been verified.
 

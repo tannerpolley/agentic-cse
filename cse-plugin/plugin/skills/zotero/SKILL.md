@@ -1,6 +1,6 @@
 ---
 name: zotero
-description: "Find, inspect, and add Zotero sources. Use when asked to cite, sync the bibliography, or search the library, or to add a paper the user named or the work found relevant. Paper additions use bounded acquisition; other library writes require preview and approval. Source selection goes to research."
+description: "Find, inspect, and add Zotero sources. Use when asked to cite, sync the bibliography, or search the library, or to add a paper the user named or the work found relevant. Only deletions, bibliography refreshes, Mathpix and attachments need approval. Source selection goes to research."
 metadata:
   cse-kind: "tool"
   cse-family: "sources"
@@ -24,7 +24,7 @@ read-only, or check and maintain corpus health. Search the configured corpus
 before the live library, and use source, evidence, typed-record, lineage, and
 live library commands only as the operation needs. Preserve parent and
 attachment keys plus exact locators. A project's registered Zotero collection is its
-reading list; reorganize it only through a previewed, approved `project-organize` plan. Treat metadata and generated summaries as
+reading list; reorganize it through a previewed `project-organize` plan. Treat metadata and generated summaries as
 discovery aids, not claim support.
 
 Run `cse-zotero doctor --json` first and inspect operation readiness and
@@ -39,8 +39,9 @@ directs. Each call adds one identified paper; finding papers belongs to
 [Zotero acquisition rules](https://github.com/agentic-cse/cse-zotero/blob/main/ZOTERO_ACQUISITION.md)
 for route eligibility and publisher/browser boundaries.
 
-For corrections, collection changes, bibliography refreshes, Mathpix
-conversions, and companion attachments, preview each mutation and use native
-approval immediately before applying it, including after a blanket correction
-or deletion request. Return keys, locators, authority, and limitations to the
+For metadata corrections and collection changes, preview each mutation, apply
+it without asking, and report what changed. For deletions, bibliography
+refreshes, Mathpix conversions, and companion attachments, preview each mutation
+and use native approval immediately before applying it, including after a
+blanket deletion request. Return keys, locators, authority, and limitations to the
 invoking stage.
