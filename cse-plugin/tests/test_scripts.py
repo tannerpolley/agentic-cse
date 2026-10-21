@@ -7,7 +7,6 @@ import shutil
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
 
 
@@ -80,41 +79,22 @@ class ScriptBehaviorTests(unittest.TestCase):
                 later = self.run_hook(project, "Stop", last_assistant_message="Review: Supported.")
                 self.assertIn(review, later["reason"])
 
-    def test_stop_reviews_everything_but_question_only_messages(self):
+    def test_stop_reviews_every_turn_that_ends_with_a_message(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
             self.hook_fixture(project, "tool")
             self.run_hook(project, "SessionStart", source="startup")
-            samples = (
-                ("The heat capacity is 75.3 J/(mol·K).", True),
-                (r"The temperature is $298.15\,\mathrm{K}$.", True),
-                ("| Case | Pressure (Pa) |\n|---|---|\n| bubble | 6289.08 |", True),
-                ("The relative error is 0.05.", True),
-                ("The mixture separates into two liquid phases.", True),
-                ("I am not blocked; I committed the correction locally.", True),
-                ("The bubble pressure is 6289.08 Pa. Should I continue?", True),
-                ("**The bubble pressure is 6289.08 Pa.** Should I continue?", True),
-                ("The pressure is 6289.08 Pa; should I continue?", True),
-                ("The solver is stable, should I continue?", True),
-                ("Running the check showed the solver is stable.", True),
-                ("The solver converged so should I merge?", True),
+            # Text cannot prove a message holds no result ("Should I merge since 6289.08 Pa matches?").
+            for message, expected in (
+                ("Should I merge since 6289.08 Pa matches?", True),
                 ("Started the review; I'll report when it finishes.", True),
-                ("Which option?\n- A\n- B", True),
-                ("1. Run at 298.15 K.\n2. Compare the pressure.", True),
-                ("Should I use 298.15 K or 300 K?", False),
-                ("1. Should I use 298.15 K?\n2. Or **300 K?**", False),
-                ("Should I merge PR #276? Is the review verdict Ready?", False),
+                ("The mixture separates into two liquid phases.", True),
                 ("", False),
                 (None, False),
-            )
-            for message, expected in samples:
+            ):
                 with self.subTest(message=message):
                     result = self.run_hook(project, "Stop", last_assistant_message=message)
                     self.assertEqual(expected, result.get("decision") == "block", result)
-            # Long input stays linear: the whole Stop finishes well inside the host's 10 s timeout.
-            started = time.monotonic()
-            self.run_hook(project, "Stop", last_assistant_message="Review" + " " * 200_000 + "pending")
-            self.assertLess(time.monotonic() - started, 5)
 
     def test_stance_is_refreshed_at_session_start_and_prompt_routing_remains(self):
         with tempfile.TemporaryDirectory() as directory:

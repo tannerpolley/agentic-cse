@@ -115,28 +115,9 @@ def prompt_route(event: dict[str, object]) -> str:
             "(Claude Code: the Skill tool; Codex: open its SKILL.md).")
 
 
-LIST_MARKER = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
-EMPHASIS = re.compile(r"[*_`]+")
-# Any clause break before the final "?" means a statement may ride along ("6289.08 Pa; should I continue?").
-CLAUSE_BREAK = re.compile(r"[.!;,:]\s")
-# ...and a question line must open as a question ("The solver converged so should I merge?" is reviewed).
-QUESTION_OPENER = re.compile(r"^(?:should|shall|can|could|would|will|do|does|did|is|are|was|were|has|have|may|"
-                             r"which|what|when|where|who|whom|whose|why|how|or|want|okay|ok)\b", re.IGNORECASE)
-
-
-def asks_only_questions(message: object) -> bool:
-    """Only a message made wholly of questions skips the review; anything else, relays included, is reviewed."""
-    # Emphasis can hide a sentence end ("**6289.08 Pa.** Should I continue?"), so it is dropped first.
-    if not isinstance(message, str) or not (text := EMPHASIS.sub("", message).strip()):
-        return True
-    lines = [LIST_MARKER.sub("", line.strip()).strip() for line in text.splitlines() if line.strip()]
-    return all(line.endswith("?") and not CLAUSE_BREAK.search(line) and QUESTION_OPENER.match(line)
-               for line in lines)
-
-
 def answer_review(event: dict[str, object], role: str | None) -> str | None:
     if (role not in {"analysis", "tool"} or event.get("stop_hook_active") is True
-            or asks_only_questions(event.get("last_assistant_message"))):
+            or not str(event.get("last_assistant_message") or "").strip()):
         return None
     result = (
         "result review: check the outcome; supported quantities, units, and conditions; interpretation; "
