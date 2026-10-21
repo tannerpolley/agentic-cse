@@ -190,13 +190,59 @@ class ScriptBehaviorTests(unittest.TestCase):
                     self.assertIn("notes.md", result["reason"])
                     self.assertIn("shell.md", result["reason"])
                     self.assertNotIn("other.md", json.dumps(result))
-                    self.assertNotIn("fell back", json.dumps(result))
+                    self.assertNotIn("could not read", json.dumps(result))
 
             with self.subTest(host="no transcript"):
                 fallback = self.run_hook(project, "Stop", stop_hook_active=True, last_assistant_message="Done.",
                                          transcript_path=str(root / "missing.jsonl"))
                 self.assertIn("other.md", fallback["reason"])
-                self.assertIn("fell back to Git state", fallback.get("systemMessage", ""))
+                self.assertIn("could not read this session's transcript", fallback.get("systemMessage", ""))
+
+    def test_session_checks_follow_a_move_into_a_worktree_and_name_each_test_change_once(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project, lane = Path(directory) / "main", Path(directory) / "lane"
+            project.mkdir()
+            self.hook_fixture(project, "tool")
+            (project / "tests").mkdir()
+            (project / "tests/test_main.py").write_text("def test_main(): pass\n", encoding="utf-8")
+            subprocess.run(["git", "add", "tests"], cwd=project, check=True)
+            subprocess.run(["git", "-c", "user.name=Test", "-c", "user.email=test@example.com", "commit", "-qm", "test"],
+                           cwd=project, check=True)
+            self.run_hook(project, "SessionStart", source="startup")
+            # A lane cut from an older commit lacks the newer test; that is not a deletion by this session.
+            subprocess.run(["git", "worktree", "add", "-q", "-b", "lane", str(lane), "HEAD~1"], cwd=project, check=True)
+
+            # The next turn runs in the lane; its checks keep the record SessionStart wrote.
+            self.run_hook(lane, "UserPromptSubmit", prompt="Continue in the lane.")
+            (lane / "tests").mkdir()
+            (lane / "tests/test_flash.py").write_text("def test_flash(): pass\n", encoding="utf-8")
+            (lane / "notes.md").write_text("The schema changed.\n", encoding="utf-8")
+            # The transcript shows the prose write; tests are reported however they were written.
+            transcript = Path(directory) / "claude.jsonl"
+            transcript.write_text("\n".join(json.dumps(record) for record in (
+                {"type": "assistant", "cwd": str(lane), "message": {"content": [
+                    {"type": "tool_use", "name": "Write", "input": {"file_path": str(lane / "notes.md"), "content": ""}}]}},
+                {"type": "assistant", "cwd": str(lane), "message": {"content": [
+                    {"type": "tool_use", "name": "Bash", "input": {"command": "cat > tests/test_flash.py <<'EOF'\nEOF"}}]}},
+            )) + "\n", encoding="utf-8")
+            first = self.run_hook(lane, "Stop", stop_hook_active=True, last_assistant_message="Done.",
+                                  transcript_path=str(transcript))
+            self.assertIn("notes.md", first.get("reason", ""))
+            self.assertIn("CSE: tests added tests/test_flash.py.", first.get("systemMessage", ""))
+            self.assertNotIn("did not run", json.dumps(first))
+            self.assertNotIn("no session-start record", json.dumps(first))
+            self.assertNotIn("deleted", first.get("systemMessage", ""))
+
+            # A reported change is not repeated; a later edit to the same test is.
+            (lane / "notes.md").unlink()
+            quiet = self.run_hook(lane, "Stop", stop_hook_active=True, last_assistant_message="Done.")
+            self.assertNotIn("tests", quiet.get("systemMessage", ""))
+            (lane / "tests/test_flash.py").write_text("def test_flash(): assert True\n", encoding="utf-8")
+            again = self.run_hook(lane, "Stop", stop_hook_active=True, last_assistant_message="Done.")
+            self.assertIn("CSE: tests changed tests/test_flash.py.", again.get("systemMessage", ""))
+            (lane / "tests/test_flash.py").unlink()
+            removed = self.run_hook(lane, "Stop", stop_hook_active=True, last_assistant_message="Done.")
+            self.assertIn("CSE: tests deleted tests/test_flash.py.", removed.get("systemMessage", ""))
 
     def test_prose_check_reads_glossary_terms_and_avoid_lists_with_scope(self):
         with tempfile.TemporaryDirectory() as directory:

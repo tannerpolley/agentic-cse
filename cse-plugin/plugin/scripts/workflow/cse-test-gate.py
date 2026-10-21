@@ -27,7 +27,7 @@ ROLES_LINE = "delegated roles — "
 NAMED_SKILL = re.compile(r"(?<![/$\w-])cse:([a-z]+)\b", re.IGNORECASE)
 TEST_PARTS = {"test", "tests", "testing"}
 MAX_INPUT_BYTES = 1024 * 1024
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 OPTIONAL_START = "[["
 OPTIONAL_END = "]]"
 ROLE_SLOT = "{repository_role}"
@@ -184,15 +184,14 @@ def project_from(event: dict[str, object]) -> tuple[Path, Path, Path] | None:
 
 
 def state_path(event: dict[str, object], repository: Path, project: Path) -> Path:
+    """One file per session and project, shared by every checkout so a move into a worktree keeps it."""
     session = event.get("session_id")
     if not isinstance(session, str) or not session:
         raise HookError("hook input has no session ID")
-    raw = git(repository, "rev-parse", "--git-path", "cse-test-advisory")
-    data_root = Path(raw.decode(errors="surrogateescape").strip())
-    if not data_root.is_absolute():
-        data_root = repository / data_root
-    name = hashlib.sha256(f"{session}\0{project}".encode()).hexdigest() + ".json"
-    return data_root.resolve() / name
+    common = git(repository, "rev-parse", "--path-format=absolute", "--git-common-dir")
+    scope = project.relative_to(repository).as_posix()
+    name = hashlib.sha256(f"{session}\0{scope}".encode()).hexdigest() + ".json"
+    return Path(common.decode(errors="surrogateescape").strip()) / "cse-test-advisory" / name
 
 
 def is_test_path(path: str) -> bool:
@@ -370,49 +369,53 @@ def session_writes(event: dict[str, object]) -> set[Path] | None:
 
 def save(path: Path, value: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".tmp")
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")  # overlapping Stops never share one
     temporary.write_text(json.dumps(value, sort_keys=True) + "\n", encoding="utf-8")
     temporary.replace(path)
 
 
-def start(event: dict[str, object], repository: Path, project: Path) -> None:
-    path = state_path(event, repository, project)
-    try:
-        current = json.loads(path.read_text(encoding="utf-8")).get("schema_version") if path.is_file() else None
-    except (OSError, ValueError, AttributeError):
-        current = None
-    if str(event.get("source") or "startup") in {"startup", "clear"} or current != SCHEMA_VERSION:
-        save(path, {
-            "schema_version": SCHEMA_VERSION,
-            "project": str(project),
-            "baseline": inventory(repository, project),
-            "refs": session_refs(repository),
-        })
-
-
-def prose_changes(event: dict[str, object], repository: Path, project: Path) -> list[Path]:
-    state = json.loads(state_path(event, repository, project).read_text(encoding="utf-8"))
-    if not isinstance(state, dict) or state.get("schema_version") != SCHEMA_VERSION or state.get("project") != str(project) or not isinstance(state.get("refs"), dict):
-        raise HookError("session prose baseline is unavailable; start a new session")
-    return written_prose(repository, project, state["refs"])
-
-
-def changes(event: dict[str, object], repository: Path, project: Path) -> list[str]:
+def load_state(event: dict[str, object], repository: Path, project: Path) -> tuple[dict, bool]:
+    """The session's state; a fresh one when SessionStart left none (hooks installed mid-session)."""
     try:
         state = json.loads(state_path(event, repository, project).read_text(encoding="utf-8"))
-    except (OSError, UnicodeError, json.JSONDecodeError) as exc:
-        raise HookError("session test baseline is unavailable") from exc
-    if not isinstance(state, dict) or state.get("schema_version") != SCHEMA_VERSION or state.get("project") != str(project):
-        raise HookError("session test baseline is invalid")
-    baseline = state.get("baseline")
-    if not isinstance(baseline, dict):
-        raise HookError("session test baseline is invalid")
+        if (isinstance(state, dict) and state.get("schema_version") == SCHEMA_VERSION
+                and isinstance(state.get("refs"), dict) and isinstance(state.get("tests"), dict)):
+            return state, False
+    except (OSError, ValueError):
+        pass
+    return {"schema_version": SCHEMA_VERSION, "refs": session_refs(repository), "tests": {}}, True
+
+
+def note_checkout(state: dict, repository: Path, project: Path) -> None:
+    """Snapshot this checkout's tests the first time the session works in it."""
+    state["tests"].setdefault(str(repository), inventory(repository, project))
+
+
+def start(event: dict[str, object], repository: Path, project: Path) -> None:
+    path = state_path(event, repository, project)
+    state, fresh = load_state(event, repository, project)
+    if str(event.get("source") or "startup") in {"startup", "clear"} or fresh:
+        state = {"schema_version": SCHEMA_VERSION, "refs": session_refs(repository), "tests": {}}
+    note_checkout(state, repository, project)
+    save(path, state)
+
+
+def test_changes(state: dict, repository: Path, project: Path) -> str:
+    """Test files changed in this checkout since the last report, named once; the snapshot then advances."""
+    # ponytail: a checkout first entered mid-turn is snapshotted at that Stop, so that turn's test
+    # edits there go unreported; T3 worktree handoffs happen between turns and are caught.
+    baseline = state["tests"].get(str(repository))
     current = inventory(repository, project)
-    return [
-        *(f"new test: {path}" for path in sorted(current.keys() - baseline.keys())),
-        *(f"expanded test: {path}" for path in sorted(current.keys() & baseline.keys()) if current[path] != baseline[path]),
-        *(f"deleted test: {path}" for path in sorted(baseline.keys() - current.keys())),
-    ]
+    state["tests"][str(repository)] = current
+    if baseline is None:
+        return ""
+    groups = {
+        "added": sorted(current.keys() - baseline.keys()),
+        "changed": sorted(path for path in current.keys() & baseline.keys() if current[path] != baseline[path]),
+        "deleted": sorted(baseline.keys() - current.keys()),
+    }
+    parts = [f"{kind} {', '.join(paths)}" for kind, paths in groups.items() if paths]
+    return f"CSE: tests {'; '.join(parts)}." if parts else ""
 
 
 def main() -> int:
@@ -432,21 +435,26 @@ def main() -> int:
             try:
                 start(event, repository, project)
             except (HookError, OSError, subprocess.TimeoutExpired) as exc:
-                stance += f" CSE prose baseline unavailable: {exc}."
+                stance += f" CSE session record unavailable: {exc}."
             emit(context(event_name, stance))
         elif event_name == "Stop":
-            warnings = []
-            if role is None:
+            warnings: list[str] = []
+            failures: list[str] = []
+            state, fresh = load_state(event, repository, project)
+            if fresh:
+                warnings.append("CSE checks found no session-start record, so they cover changes from now on.")
+            if role is None and not state.get("role_noted"):
                 warnings.append(ROLE_CORRECTION)
+                state["role_noted"] = True
             try:
-                failures = []
                 written = session_writes(event)
                 if written is None:
-                    warnings.append("CSE prose attribution fell back to Git state: no readable session transcript, so prose other sessions changed since this one started is also checked.")
+                    warnings.append("CSE could not read this session's transcript, so its prose check also covers "
+                                    "what other sessions wrote since this one started.")
                 prefix = project.relative_to(repository)
                 checkouts = worktrees(repository)
                 groups: dict[Path, list[Path]] = {}
-                for path in prose_changes(event, repository, project):
+                for path in written_prose(repository, project, state["refs"]):
                     if written is not None and path.resolve() not in written:
                         continue
                     # A worktree may sit inside another checkout; the deepest one owns the file.
@@ -457,25 +465,29 @@ def main() -> int:
                     failures += violations(paths, root=root)
             except (OSError, UnicodeError, ValueError, HookError, subprocess.TimeoutExpired) as exc:
                 failures = []
-                warnings.append(f"CSE prose check unavailable (not a pass): {exc}. Restart after checking installation; do not recreate prior evidence.")
-            review = answer_review(event, role)
+                warnings.append(f"CSE prose check did not run: {exc}")
             try:
-                findings = changes(event, repository, project)
-                advisory = "CSE test-file changes (advisory only): " + "; ".join(findings) if findings else ""
-            except (HookError, subprocess.TimeoutExpired) as exc:
-                advisory = f"CSE test-file advisory unavailable: {exc}"
+                report = test_changes(state, repository, project)
+                warnings += [report] if report else []
+                save(state_path(event, repository, project), state)
+            except (OSError, UnicodeError, HookError, subprocess.TimeoutExpired) as exc:
+                warnings.append(f"CSE test check did not run: {exc}")
+            review = answer_review(event, role)
+            payload: dict[str, object] = {}
             if failures or review:
-                reason = [*failures, *([review] if review else [])]
-                payload: dict[str, object] = {"decision": "block", "reason": "\n".join(reason)}
-                system_messages = warnings + ([advisory] if advisory else [])
-                if system_messages:
-                    payload["systemMessage"] = "\n".join(system_messages)
+                payload = {"decision": "block", "reason": "\n".join([*failures, *([review] if review else [])])}
+            if warnings:
+                payload["systemMessage"] = "\n".join(warnings)
+            if payload:
                 emit(payload)
-                return 0
-            advisory = "\n".join(warnings + ([advisory] if advisory else []))
-            if advisory:
-                emit({"systemMessage": advisory})
         elif event_name == "UserPromptSubmit":
+            try:  # a session that moved into another checkout gets that checkout's test snapshot now
+                state, _ = load_state(event, repository, project)
+                if str(repository) not in state["tests"]:
+                    note_checkout(state, repository, project)
+                    save(state_path(event, repository, project), state)
+            except (OSError, UnicodeError, HookError, subprocess.TimeoutExpired):
+                pass  # the Stop check reports its own failure; the prompt context still goes out
             route = prompt_route(event)
             emit(context(event_name, " ".join(filter(None, (
                 render_stance(scientific_context, diagnostics=False), PROMPT_REMINDER, route)))))
