@@ -153,10 +153,9 @@ def read_event() -> dict[str, object]:
     return value
 
 
-def git(repository: Path, *arguments: str, stdin: bytes | None = None) -> bytes:
+def git(repository: Path, *arguments: str) -> bytes:
     result = subprocess.run(
         ["git", "-C", str(repository), *arguments],
-        input=stdin,
         capture_output=True,
         check=False,
         timeout=5,
@@ -203,8 +202,27 @@ def is_test_path(path: str) -> bool:
     return bool(parts & TEST_PARTS or name.startswith("test_") or name.endswith(f"_test{suffix}"))
 
 
-def is_prose_path(path: str) -> bool:
-    return PurePosixPath(path).suffix.casefold() in {".md", ".qmd", ".tex"}
+def file_record(path: Path) -> str:
+    raw = os.readlink(path).encode(errors="surrogateescape") if path.is_symlink() else path.read_bytes()
+    return hashlib.sha256(raw).hexdigest()
+
+
+def inventory(repository: Path, project: Path) -> dict[str, str]:
+    raw = git(repository, "ls-files", "--cached", "--others", "--exclude-standard", "-z")
+    prefix = project.relative_to(repository)
+    records = {}
+    for item in raw.split(b"\0"):
+        if not item:
+            continue
+        repository_relative = item.decode(errors="surrogateescape")
+        path = repository / repository_relative
+        try:
+            project_relative = path.relative_to(project).as_posix()
+        except ValueError:
+            continue
+        if is_test_path(project_relative) and (path.exists() or path.is_symlink()):
+            records[(prefix / project_relative).as_posix()] = file_record(path)
+    return dict(sorted(records.items()))
 
 
 def checkouts(repository: Path) -> list[tuple[Path, str | None]]:
@@ -250,56 +268,40 @@ def session_refs(repository: Path) -> dict[str, str]:
     return refs
 
 
-def tree_blobs(worktree: Path, reference: str, relatives: list[str]) -> dict[str, str]:
-    """Blob IDs of the named files at a commit; a file the commit lacks is absent."""
-    blobs = {}
-    for entry in git(worktree, "ls-tree", "-r", "-z", reference, "--", *relatives).split(b"\0"):
-        meta, _, name = entry.partition(b"\t")
-        if name:
-            blobs[name.decode(errors="surrogateescape")] = meta.split()[2].decode()
-    return blobs
+def blob(worktree: Path, reference: str, relative: str) -> str | None:
+    try:
+        return git(worktree, "rev-parse", "--verify", "-q", f"{reference}:{relative}").decode().strip()
+    except HookError:
+        return None
 
 
-def session_changes(repository: Path, project: Path, refs: dict[str, str], wanted) -> dict[Path, tuple[str, str | None, str]]:
-    """Files this session changed in any checkout: path -> (added|changed|deleted, blob ID, project-relative path).
+def written_prose(repository: Path, project: Path, refs: dict[str, str]) -> list[Path]:
+    """Prose this session wrote in any checkout, committed or not.
 
     A file counts when its content differs both from the integrated line (so text that arrived by
     merging or pulling reviewed work is excluded) and from what the checkout's branch held when the
     session started (so an existing branch checked out mid-session is not attributed to it).
-    Git calls are batched per checkout, so lanes far behind main stay fast.
     """
     scope = project.relative_to(repository).as_posix() or "."
-    found: dict[Path, tuple[str, str | None, str]] = {}
+    written = []
     for worktree, branch in checkouts(repository):
         try:
             start = refs.get(branch or "") or refs.get(f"checkout:{worktree}")
             anchors = [a for a in (integrated_line(worktree, branch), start) if a] or ["HEAD"]
             names = set(git(worktree, "ls-files", "--others", "--exclude-standard", "-z", "--", scope).split(b"\0"))
             for anchor in anchors:
-                names |= set(git(worktree, "diff", "--no-renames", "--name-only", "-z", anchor, "--", scope).split(b"\0"))
-            candidates: dict[str, tuple[Path, str]] = {}
+                names |= set(git(worktree, "diff", "--name-only", "-z", anchor, "--", scope).split(b"\0"))
             for item in sorted(names - {b""}):
                 relative = item.decode(errors="surrogateescape")
                 path = worktree / relative
-                inside = path.relative_to(worktree / scope).as_posix()
-                # ponytail: only checkouts that existed at session start attribute deletions; a lane cut
-                # from an older main lacks newer files, and nothing in a transcript records an rm.
-                if wanted(inside) and not path.is_symlink() and (path.is_file() or (not path.exists() and start)):
-                    candidates[relative] = (path, inside)
-            if not candidates:
-                continue
-            present = [relative for relative, (path, _) in candidates.items() if path.exists()]
-            hashes = dict(zip(present, git(worktree, "hash-object", "--stdin-paths",
-                                           stdin="\n".join(present).encode(errors="surrogateescape")).decode().split()))
-            before = [tree_blobs(worktree, anchor, list(candidates)) for anchor in anchors]
-            for relative, (path, inside) in candidates.items():
-                content = hashes.get(relative)
-                if all(blobs.get(relative) != content for blobs in before):
-                    kind = "deleted" if content is None else "changed" if any(relative in b for b in before) else "added"
-                    found[path] = (kind, content, inside)
+                if path.suffix.lower() not in {".md", ".qmd", ".tex"} or not path.is_file() or path.is_symlink():
+                    continue
+                content = git(worktree, "hash-object", "--", relative).decode().strip()
+                if all(blob(worktree, anchor, relative) != content for anchor in anchors):
+                    written.append(path)
         except (HookError, subprocess.TimeoutExpired):
             continue  # an unreadable checkout is skipped rather than disabling the check for all
-    return found
+    return written
 
 
 def shell_writes(command: str, workdir: str) -> set[Path]:
@@ -372,50 +374,48 @@ def save(path: Path, value: dict[str, object]) -> None:
     temporary.replace(path)
 
 
-def new_state(repository: Path, project: Path) -> dict[str, object]:
-    return {"schema_version": SCHEMA_VERSION, "refs": session_refs(repository), "reported": {}}
+def load_state(event: dict[str, object], repository: Path, project: Path) -> tuple[dict, bool]:
+    """The session's state; a fresh one when SessionStart left none (hooks installed mid-session)."""
+    try:
+        state = json.loads(state_path(event, repository, project).read_text(encoding="utf-8"))
+        if (isinstance(state, dict) and state.get("schema_version") == SCHEMA_VERSION
+                and isinstance(state.get("refs"), dict) and isinstance(state.get("tests"), dict)):
+            return state, False
+    except (OSError, ValueError):
+        pass
+    return {"schema_version": SCHEMA_VERSION, "refs": session_refs(repository), "tests": {}}, True
+
+
+def note_checkout(state: dict, repository: Path, project: Path) -> None:
+    """Snapshot this checkout's tests the first time the session works in it."""
+    state["tests"].setdefault(str(repository), inventory(repository, project))
 
 
 def start(event: dict[str, object], repository: Path, project: Path) -> None:
     path = state_path(event, repository, project)
-    try:
-        current = json.loads(path.read_text(encoding="utf-8")).get("schema_version") if path.is_file() else None
-    except (OSError, ValueError, AttributeError):
-        current = None
-    if str(event.get("source") or "startup") in {"startup", "clear"} or current != SCHEMA_VERSION:
-        save(path, new_state(repository, project))
-
-
-def session_state(event: dict[str, object], repository: Path, project: Path) -> tuple[dict, bool]:
-    """The session's state, started now when SessionStart left none (hooks installed mid-session)."""
-    path = state_path(event, repository, project)
-    try:
-        state = json.loads(path.read_text(encoding="utf-8"))
-        if (isinstance(state, dict) and state.get("schema_version") == SCHEMA_VERSION
-                and isinstance(state.get("refs"), dict) and isinstance(state.get("reported"), dict)):
-            return state, False
-    except (OSError, ValueError):
-        pass
-    state = new_state(repository, project)
+    state, fresh = load_state(event, repository, project)
+    if str(event.get("source") or "startup") in {"startup", "clear"} or fresh:
+        state = {"schema_version": SCHEMA_VERSION, "refs": session_refs(repository), "tests": {}}
+    note_checkout(state, repository, project)
     save(path, state)
-    return state, True
 
 
-def test_report(changed: dict[Path, tuple[str, str | None, str]], reported: dict[str, list]) -> tuple[str, dict[str, list]]:
-    """Name each test change once: what differs from the last report, including what it no longer lists."""
-    current = {path.as_posix(): [kind, content, inside] for path, (kind, content, inside) in changed.items()}
-    groups: dict[str, list[str]] = {}
-    for key, (kind, content, inside) in sorted(current.items()):
-        previous = reported.get(key)
-        if previous is None or previous[:2] != [kind, content]:
-            # A second edit to a test this session added reads as a change, not another addition.
-            groups.setdefault("changed" if previous and kind == "added" else kind, []).append(inside)
-    for key, previous in sorted(reported.items()):
-        if key not in current:
-            groups.setdefault("reverted" if Path(key).exists() else "deleted", []).append(previous[2])
-    order = ("added", "changed", "deleted", "reverted")
-    parts = [f"{kind} {', '.join(groups[kind])}" for kind in order if kind in groups]
-    return (f"CSE: tests {'; '.join(parts)}." if parts else ""), current
+def test_changes(state: dict, repository: Path, project: Path) -> str:
+    """Test files changed in this checkout since the last report, named once; the snapshot then advances."""
+    # ponytail: a checkout first entered mid-turn is snapshotted at that Stop, so that turn's test
+    # edits there go unreported; T3 worktree handoffs happen between turns and are caught.
+    baseline = state["tests"].get(str(repository))
+    current = inventory(repository, project)
+    state["tests"][str(repository)] = current
+    if baseline is None:
+        return ""
+    groups = {
+        "added": sorted(current.keys() - baseline.keys()),
+        "changed": sorted(path for path in current.keys() & baseline.keys() if current[path] != baseline[path]),
+        "deleted": sorted(baseline.keys() - current.keys()),
+    }
+    parts = [f"{kind} {', '.join(paths)}" for kind, paths in groups.items() if paths]
+    return f"CSE: tests {'; '.join(parts)}." if parts else ""
 
 
 def main() -> int:
@@ -440,43 +440,38 @@ def main() -> int:
         elif event_name == "Stop":
             warnings: list[str] = []
             failures: list[str] = []
+            state, fresh = load_state(event, repository, project)
+            if fresh:
+                warnings.append("CSE checks found no session-start record, so they cover changes from now on.")
+            if role is None and not state.get("role_noted"):
+                warnings.append(ROLE_CORRECTION)
+                state["role_noted"] = True
             try:
-                state, fresh = session_state(event, repository, project)
-                if role is None and not state.get("role_noted"):
-                    warnings.append(ROLE_CORRECTION)
-                    state["role_noted"] = True
-                if fresh:
-                    warnings.append("CSE checks found no session-start record, so they cover changes from now on.")
                 written = session_writes(event)
                 if written is None:
                     warnings.append("CSE could not read this session's transcript, so its prose check also covers "
                                     "what other sessions wrote since this one started.")
-
+                prefix = project.relative_to(repository)
                 checkouts = worktrees(repository)
                 groups: dict[Path, list[Path]] = {}
-                changed = session_changes(repository, project, state["refs"],
-                                          lambda path: is_prose_path(path) or is_test_path(path))
-                for path, (_, content, inside) in changed.items():
-                    if content is None or not is_prose_path(inside) or (written is not None and path.resolve() not in written):
+                for path in written_prose(repository, project, state["refs"]):
+                    if written is not None and path.resolve() not in written:
                         continue
                     # A worktree may sit inside another checkout; the deepest one owns the file.
                     owner = max((w for w in checkouts if path.is_relative_to(w)), key=lambda w: len(w.parts))
                     groups.setdefault(owner, []).append(path)
                 for owner, paths in groups.items():
-                    failures += violations(paths, root=owner / project.relative_to(repository))
-                # Tests skip the transcript filter: scripts and shell heredocs write them too, and an
-                # extra advisory line costs less than a missed one, unlike a prose block.
-                report, state["reported"] = test_report(
-                    {path: change for path, change in changed.items() if is_test_path(change[2])}, state["reported"])
-                warnings += [report] if report else []
+                    root = owner / prefix
+                    failures += violations(paths, root=root)
             except (OSError, UnicodeError, ValueError, HookError, subprocess.TimeoutExpired) as exc:
-                failures, state = [], None
-                warnings.append(f"CSE prose and test checks did not run: {exc}")
-            if state is not None:
-                try:
-                    save(state_path(event, repository, project), state)
-                except (OSError, HookError, subprocess.TimeoutExpired) as exc:
-                    warnings.append(f"CSE could not save this session's record, so test changes may repeat: {exc}")
+                failures = []
+                warnings.append(f"CSE prose check did not run: {exc}")
+            try:
+                report = test_changes(state, repository, project)
+                warnings += [report] if report else []
+                save(state_path(event, repository, project), state)
+            except (OSError, UnicodeError, HookError, subprocess.TimeoutExpired) as exc:
+                warnings.append(f"CSE test check did not run: {exc}")
             review = answer_review(event, role)
             payload: dict[str, object] = {}
             if failures or review:
@@ -486,6 +481,13 @@ def main() -> int:
             if payload:
                 emit(payload)
         elif event_name == "UserPromptSubmit":
+            try:  # a session that moved into another checkout gets that checkout's test snapshot now
+                state, _ = load_state(event, repository, project)
+                if str(repository) not in state["tests"]:
+                    note_checkout(state, repository, project)
+                    save(state_path(event, repository, project), state)
+            except (OSError, UnicodeError, HookError, subprocess.TimeoutExpired):
+                pass  # the Stop check reports its own failure; the prompt context still goes out
             route = prompt_route(event)
             emit(context(event_name, " ".join(filter(None, (
                 render_stance(scientific_context, diagnostics=False), PROMPT_REMINDER, route)))))

@@ -212,13 +212,12 @@ class ScriptBehaviorTests(unittest.TestCase):
             # A lane cut from an older commit lacks the newer test; that is not a deletion by this session.
             subprocess.run(["git", "worktree", "add", "-q", "-b", "lane", str(lane), "HEAD~1"], cwd=project, check=True)
 
-            # The session now works in the lane; its checks keep the record SessionStart wrote.
+            # The next turn runs in the lane; its checks keep the record SessionStart wrote.
+            self.run_hook(lane, "UserPromptSubmit", prompt="Continue in the lane.")
             (lane / "tests").mkdir()
             (lane / "tests/test_flash.py").write_text("def test_flash(): pass\n", encoding="utf-8")
             (lane / "notes.md").write_text("The schema changed.\n", encoding="utf-8")
-            # An untracked copy identical to main's test is not a change.
-            shutil.copy(project / "tests/test_main.py", lane / "tests/test_main.py")
-            # The transcript shows the prose write; the shell-written test is attributed by Git alone.
+            # The transcript shows the prose write; tests are reported however they were written.
             transcript = Path(directory) / "claude.jsonl"
             transcript.write_text("\n".join(json.dumps(record) for record in (
                 {"type": "assistant", "cwd": str(lane), "message": {"content": [
