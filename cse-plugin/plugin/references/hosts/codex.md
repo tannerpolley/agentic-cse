@@ -35,11 +35,11 @@ has loaded it or that hooks are trusted and active.
 
 ## Install and update
 
-Codex reads the same native local marketplace catalog at the repository root as
-Claude Code. Install CSE as `cse@cse` with the checkout's absolute path:
+Codex reads the same native local marketplace catalog in the `cse-plugin/`
+folder as Claude Code. Install CSE as `cse@cse` with that folder's absolute path:
 
 ```bash
-codex plugin marketplace add <absolute-repository>
+codex plugin marketplace add <absolute-checkout>/cse-plugin
 codex plugin add cse@cse
 codex plugin list --json
 codex plugin marketplace list --json
@@ -50,12 +50,12 @@ its plugin cache, so rerun `codex plugin add cse@cse` to refresh the cache
 after the source changes. Do not install a second copy through another
 marketplace.
 
-From the root of a cse-plugin source checkout (not from the installed plugin),
+From the `cse-plugin/` folder of a source checkout (not from the installed plugin),
 `sync-live.sh` wraps that install with the Zotero runtime and checks:
 
 ```bash
-./scripts/sync-live.sh --check --zotero-source <absolute-zotero-checkout>
-./scripts/sync-live.sh --validate --zotero-source <absolute-zotero-checkout>
+./scripts/sync-live.sh --check
+./scripts/sync-live.sh --validate
 ```
 
 `--check` builds and checks the Zotero runtime without changing host state.

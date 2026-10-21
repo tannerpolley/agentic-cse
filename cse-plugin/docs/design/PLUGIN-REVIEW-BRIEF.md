@@ -14,8 +14,8 @@ to supply domain facts, a universal solver, a private literature corpus, or a
 scientific verdict. The user and the applicable sources remain responsible for
 scientific judgment.
 
-The canonical source is
-[`agentic-cse/cse-plugin`](https://github.com/agentic-cse/cse-plugin). The behavioral
+The canonical source is the `cse-plugin/` folder of
+[`tannerpolley/agentic-cse`](https://github.com/tannerpolley/agentic-cse/tree/main/cse-plugin). The behavioral
 heat-equation example is embedded at
 [`examples/heat-equation/`](../../examples/heat-equation/README.md), so review
 of the plugin and example uses one repository-local checkout.

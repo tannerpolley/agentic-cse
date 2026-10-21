@@ -8,8 +8,8 @@ You are conducting an independent, review-only product and scientific-workflow
 review of the private Codex plugin CSE. You have GitHub app access
 for the repository below:
 
-1. First inspect the plugin source: https://github.com/agentic-cse/cse-plugin
-2. Then inspect the embedded behavioral example at `examples/heat-equation/`
+1. First inspect the plugin source in the `cse-plugin/` folder: https://github.com/tannerpolley/agentic-cse/tree/main/cse-plugin
+2. Then inspect the embedded behavioral example at `cse-plugin/examples/heat-equation/`
 
 Do not modify the repository. Do not create issues, branches, pull requests,
 comments, commits, releases, labels, Projects, or generated files. Do not

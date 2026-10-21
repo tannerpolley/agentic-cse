@@ -20,7 +20,7 @@ eligibility rules.
 
 ## Offline checks
 
-From the repository root, run:
+From the `cse-zotero/` folder, run:
 
 ```bash
 scripts/validate.sh

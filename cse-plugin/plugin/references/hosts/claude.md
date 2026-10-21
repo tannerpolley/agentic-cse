@@ -34,10 +34,10 @@ That import is required before claiming automatic loading of the shared
 current task loaded the plugin, trusted the repository, or activated hooks.
 
 For disposable local development, load the source directory in place from
-the root of a cse-plugin source checkout:
+the `cse-plugin/` folder of a source checkout:
 
 ```bash
-claude --plugin-dir <absolute-repository>/plugin
+claude --plugin-dir <absolute-checkout>/cse-plugin/plugin
 claude --plugin-dir plugin plugin details cse@inline
 ```
 
@@ -48,12 +48,11 @@ load.
 
 ## Install and update
 
-The repository root contains the native local marketplace catalog. From the
-checkout's parent or with its absolute path, use Claude Code's marketplace
-commands:
+The `cse-plugin/` folder contains the native local marketplace catalog. With
+that folder's absolute path, use Claude Code's marketplace commands:
 
 ```bash
-claude plugin marketplace add <absolute-repository>
+claude plugin marketplace add <absolute-checkout>/cse-plugin
 claude plugin install cse@cse
 claude plugin marketplace update cse
 claude plugin update cse@cse

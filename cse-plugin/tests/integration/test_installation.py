@@ -154,6 +154,17 @@ class InstallationBehaviorTests(unittest.TestCase):
 
             empty_state = {"marketplaces": {}, "installed": []}
             fake_state.write_text(json.dumps(empty_state))
+            readme = source / "README.md"
+            committed_readme = readme.read_text()
+            readme.write_text(committed_readme + "uncommitted\n")
+            dirty = sync_validate()
+            self.assertNotEqual(0, dirty.returncode)
+            self.assertIn("Refusing to deploy an uncommitted source tree.", dirty.stderr)
+            self.assertEqual(before, snapshot_preserved())
+            self.assertEqual(empty_state, json.loads(fake_state.read_text()))
+            readme.write_text(committed_readme)
+            # Untracked files beside the plugin are not deployed and must not block it.
+            (runtime / "untracked-note.txt").write_text("local only\n")
             for failure in ("bin-backup:before:zotero-companion", "late:after-install"):
                 failed = sync_validate(CSE_FAIL_AT=failure)
                 self.assertNotEqual(0, failed.returncode)
