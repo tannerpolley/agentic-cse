@@ -41,6 +41,6 @@ supplies its delegated tasks and completion delivery; CSE owns scientific
 stages and acceptance.
 
 Live model-backed workflow and routing trials belong to
-[ScienceBench](https://github.com/agentic-cse/cse-sciencebench) and are never
+[ScienceBench](https://github.com/tannerpolley/cse-sciencebench) and are never
 part of plugin validation. Do not run live Zotero or corpus checks or live
 installation while validating this candidate.

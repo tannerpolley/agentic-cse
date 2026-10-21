@@ -1,28 +1,20 @@
-# CSE workspace
+# Agentic CSE
 
-This directory is the `agentic-cse/cse` superproject. Each child project is a
-Git submodule tracking its own `main`; a parent commit records the set of child
-revisions that were validated together.
+This repository holds every Agentic CSE project in one Git history. Each folder
+was a separate repository until 2026-10-21; its earlier history is preserved
+under the folder, and the old repositories are archived.
 
-- `.github/` owns the GitHub organization profile and shared community files.
-- `cse-plugin/` owns the existing CSE plugin and its Git history.
-- `cse-pi/` is reserved for the independent headless scientific worker runtime.
-- `cse-sciencebench/` is reserved for the private scientific benchmark.
+- `cse-plugin/` owns the CSE plugin: skills, references, assets, packaging, and Setup.
 - `cse-zotero/` owns the source-linked research and scientific data companion.
+- `cse-pi/` owns the headless scientific worker runtime.
+- `.github/` owns the issue and pull request templates and the shared contributing and security files.
 
-Before changing a child project, read its `AGENTS.md` when present and inspect
-its actual repository root, branch, and working tree. Run repository commands
-from that child directory. Keep each project's Git history independent: commit
-and open pull requests in the child, then bump the submodule pointer here in a
-separate parent commit once the child change is merged. Keep submodules on
-`main` (`git submodule update --remote --merge`), never commit on a detached
-HEAD inside one, and never stage this parent checkout into a candidate or
-benchmark environment.
+Before changing a project, read its `AGENTS.md` when present and run its
+commands from that folder. One branch, commit, or pull request may span several
+folders when the change belongs together.
 
-Keep the parent for cross-project planning and coordination. Runtime work belongs
-in the owning child project. The former embedded CSE-Pi harness remains
-recoverable from `cse-plugin` Git history.
-
-Keep hidden benchmark answers and verifiers out of plugin and worker payloads
-and out of benchmark candidate environments. Folder organization alone does not
-provide that isolation.
+The private benchmark and its run base stay in their own repositories,
+`tannerpolley/cse-sciencebench` and `tannerpolley/cse-workflow-benchmark`, so a
+checkout of this repository never contains hidden answers or trusted
+verifiers. Never copy benchmark material here, and never hand a checkout of
+this repository to a benchmark candidate.

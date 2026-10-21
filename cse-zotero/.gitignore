@@ -14,3 +14,4 @@ reports/
 # Rebuildable local search index; source records and manifests are reviewable.
 wiki/index.sqlite
 wiki/.index.sqlite.tmp
+build/

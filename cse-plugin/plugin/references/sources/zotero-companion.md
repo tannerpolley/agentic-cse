@@ -109,7 +109,7 @@ retry; continue the task and report acquired item keys and hand-off links. An
 acquired paper is evidence to assess, not claim support.
 
 The canonical
-[Zotero acquisition rules](https://github.com/agentic-cse/cse-zotero/blob/main/ZOTERO_ACQUISITION.md)
+[Zotero acquisition rules](https://github.com/tannerpolley/agentic-cse/blob/main/cse-zotero/ZOTERO_ACQUISITION.md)
 owns route eligibility and publisher/browser boundaries; do not duplicate its
 safety rules here.
 

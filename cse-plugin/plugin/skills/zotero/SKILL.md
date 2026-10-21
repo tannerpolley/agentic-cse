@@ -36,7 +36,7 @@ the library, without asking, through `cse-zotero acquire` as the
 [acquisition section](../../references/sources/zotero-companion.md#writes-acquisition-and-bibliography)
 directs. Each call adds one identified paper; finding papers belongs to
 `cse:research`. Follow the canonical
-[Zotero acquisition rules](https://github.com/agentic-cse/cse-zotero/blob/main/ZOTERO_ACQUISITION.md)
+[Zotero acquisition rules](https://github.com/tannerpolley/agentic-cse/blob/main/cse-zotero/ZOTERO_ACQUISITION.md)
 for route eligibility and publisher/browser boundaries.
 
 For metadata corrections and collection changes, preview each mutation, apply
