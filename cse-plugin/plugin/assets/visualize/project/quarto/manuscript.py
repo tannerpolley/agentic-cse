@@ -39,11 +39,12 @@ PRESENTATION_PRE_RENDER = "python3 manuscript.py prepare"
 # unchanged since its last successful present, so present output cannot re-trigger a render.
 PREVIEW_STAMPS_ENV = "CSE_PREVIEW_PRESENT_STAMPS"
 PRESENT_STAMP = Path(".snakemake") / "cse-present-stamp.json"
-WATCH_INTERVAL_SECONDS = 0.25
+WATCH_INTERVAL_SECONDS = 10.0
 WATCH_SETTLE_SECONDS = 0.25
 IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "site_libs", "_freeze", "__pycache__", ".ipynb_checkpoints"}
-IGNORED_WATCH_PARTS |= {".snakemake", ".cache", "tmp", "temp", "support"}
+IGNORED_WATCH_PARTS |= {".snakemake", ".cache", ".venv", ".jupyter_cache", "tmp", "temp", "support"}
 IGNORED_WATCH_SUFFIXES = ("_files", "_support")
+UNSCANNED_WATCH_TREES = {"data", "results"}
 # ponytail: Quarto's internal preview render-request path (the one IDE integrations use);
 # preview ignores mtime-only touches and include changes. Recheck on a Quarto upgrade.
 QUARTO_RENDER_REQUEST = "90B3C9E8-0DBC-4BC0-B164-AA2D5C031B28"
@@ -545,7 +546,7 @@ def sync(root: Path) -> dict:
 def presentation_workflows(root: Path) -> list[Path]:
     workflows = []
     for directory, dirs, files in os.walk(root, followlinks=False):
-        dirs[:] = [name for name in dirs if not ignored_watch_part(name)]
+        dirs[:] = [name for name in dirs if not ignored_watch_part(name) and name not in UNSCANNED_WATCH_TREES]
         if "Snakefile" in files:
             workflows.append(Path(directory))
     return sorted(workflows)
@@ -651,19 +652,27 @@ def is_watchable(path: Path, root: Path) -> bool:
 
 
 def watch_snapshot(root: Path) -> dict[Path, tuple[int, int]]:
-    # ponytail: bounded polling scan; use a platform watcher only if project size makes it measurable.
     snapshot = {}
+    pending = []
     for directory, dirs, files in os.walk(root, followlinks=False):
-        dirs[:] = [name for name in dirs if not ignored_watch_part(name)]
-        for name in files:
-            path = Path(directory) / name
-            if not is_watchable(path, root):
-                continue
-            try:
-                info = path.stat()
-            except FileNotFoundError:
+        dirs[:] = [name for name in dirs if not ignored_watch_part(name) and name not in UNSCANNED_WATCH_TREES]
+        pending.extend(Path(directory) / name for name in files)
+    # Follow exact include targets without enumerating retained data or results trees.
+    seen = set()
+    while pending:
+        path = pending.pop()
+        if path in seen or not is_watchable(path, root):
+            continue
+        seen.add(path)
+        try:
+            info = path.stat()
+            if not path.is_file():
                 continue
             snapshot[path] = (info.st_mtime_ns, info.st_size)
+            if path.suffix in {".qmd", ".md"}:
+                pending.extend((path.parent / target).resolve() for target in INCLUDE_RE.findall(path.read_text()))
+        except (OSError, UnicodeDecodeError):
+            continue
     return snapshot
 
 
@@ -762,9 +771,12 @@ def refresh(root: Path, notebook: Path) -> int:
     return 0
 
 
-def preview(root: Path, host: str, port: int) -> int:
+def preview(root: Path, host: str, port: int | None) -> int:
     root = root_path(root)
     state = sync(root)
+    require(preview_record(root) is None, root, "a preview is already running for this root")
+    if port is None:
+        port = preview_port(git_path(root, "--show-toplevel"), None)
     require(1 <= port <= 65535, root, "port must be between 1 and 65535")
     # Quarto silently picks another port when this one is busy, so render requests would miss it.
     with socket.socket() as probe:
@@ -779,7 +791,11 @@ def preview(root: Path, host: str, port: int) -> int:
         raise KeyboardInterrupt
 
     previous_sigterm = signal.signal(signal.SIGTERM, handle_sigterm)
+    record = root / ".quarto" / "cse-preview.json"
     try:
+        record.parent.mkdir(exist_ok=True)
+        atomic_write(record, json_bytes({"pid": os.getpid(), "identity": process_identity(os.getpid()),
+                                        "host": host, "port": port}))
         if not presentation_workflows(root):
             return process.wait()
         wait_for_server(process, host, port)
@@ -793,7 +809,7 @@ def preview(root: Path, host: str, port: int) -> int:
                 continue
             waiting = False
             while process.poll() is None:
-                time.sleep(WATCH_SETTLE_SECONDS)
+                time.sleep(WATCH_INTERVAL_SECONDS if waiting else WATCH_SETTLE_SECONDS)
                 current = watch_snapshot(root)
                 new = changed_paths(snapshot, current)
                 snapshot = current
@@ -818,6 +834,7 @@ def preview(root: Path, host: str, port: int) -> int:
     finally:
         signal.signal(signal.SIGTERM, previous_sigterm)
         stop_process(process)
+        record.unlink(missing_ok=True)
 
 
 def git_path(root: Path, *arguments: str) -> Path:
@@ -830,6 +847,82 @@ def git_path(root: Path, *arguments: str) -> Path:
 def service_port(unit: Path) -> int | None:
     match = SERVICE_PORT_RE.search(unit.read_text()) if unit.is_file() else None
     return int(match.group(1)) if match else None
+
+
+def service_unit(repository: Path) -> Path:
+    digest = hashlib.sha256(str(repository).encode()).hexdigest()[:8]
+    units = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
+    return units / f"cse-preview-{re.sub(r'[^A-Za-z0-9_.-]', '-', repository.name)}-{digest}.service"
+
+
+def preview_port(repository: Path, port: int | None, *, keep_service_port: bool = False) -> int:
+    unit = service_unit(repository)
+    current = service_port(unit) if keep_service_port else None
+    claimed = {service_port(other) for other in unit.parent.glob("cse-preview-*.service")
+               if not keep_service_port or other != unit}
+    if port is None:
+        port = current
+    if port is None:
+        digest = int(hashlib.sha256(str(repository).encode()).hexdigest(), 16)
+        candidates = (SERVICE_PORT_BASE + (digest + step) % SERVICE_PORT_SPAN for step in range(SERVICE_PORT_SPAN))
+        port = next((value for value in candidates if value not in claimed and port_free(value)), None)
+        require(port, repository, "no free preview port")
+    require(1 <= port <= 65535 and port not in claimed and (port == current or port_free(port)),
+            repository, f"port {port} is in use or claimed by another preview unit")
+    return port
+
+
+def process_identity(pid: int) -> str | None:
+    # Linux start time prevents a stale record from stopping a reused PID.
+    try:
+        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[19]
+    except FileNotFoundError:
+        return None
+
+
+def preview_record(root: Path) -> dict | None:
+    record = root / ".quarto" / "cse-preview.json"
+    if not record.is_file():
+        return None
+    state = read_json(read_file(record), record)
+    return state if state["identity"] is not None and process_identity(state["pid"]) == state["identity"] else None
+
+
+def status(root: Path) -> int:
+    root = root_path(root)
+    repository = git_path(root, "--show-toplevel")
+    if git_path(root, "--git-dir") != git_path(root, "--git-common-dir"):
+        state = preview_record(root)
+        print(f"unit: none (worktree)\nstate: {'running' if state else 'stopped'}")
+        port = state["port"] if state else None
+        host = state["host"] if state else "127.0.0.1"
+    else:
+        unit = service_unit(repository)
+        port = service_port(unit)
+        unit_state = "not installed"
+        if unit.is_file():
+            result = subprocess.run(["systemctl", "--user", "show", unit.name, "--property=ActiveState", "--value"],
+                                    check=True, capture_output=True, text=True)
+            unit_state = result.stdout.strip()
+        print(f"unit: {unit.name}\nstate: {unit_state}")
+        host = "127.0.0.1"
+    print(f"port: {port if port is not None else 'unassigned'}\n"
+          f"url: {f'http://{host}:{port}/' if port is not None else 'unassigned'}")
+    return 0
+
+
+def stop(root: Path) -> int:
+    root = root_path(root)
+    require(git_path(root, "--git-dir") != git_path(root, "--git-common-dir"), root,
+            "stop is only for a task-owned worktree preview; the main-checkout service is always on")
+    state = preview_record(root)
+    if state:
+        try:
+            os.kill(state["pid"], signal.SIGTERM)
+        except ProcessLookupError:
+            pass
+    print("worktree preview stop requested" if state else "worktree preview already stopped")
+    return 0
 
 
 def port_free(port: int) -> bool:
@@ -858,7 +951,7 @@ def answering(url: str) -> bool:
             time.sleep(0.5)
 
 
-def service(root: Path, port: int | None, dry_run: bool, python: Path = Path(sys.executable)) -> int:
+def service(root: Path, port: int | None, dry_run: bool, python: Path | None = None) -> int:
     root = root_path(root)
     sync(root)
     quarto = shutil.which("quarto")
@@ -866,33 +959,28 @@ def service(root: Path, port: int | None, dry_run: bool, python: Path = Path(sys
     repository = git_path(root, "--show-toplevel")
     require(git_path(root, "--git-dir") == git_path(root, "--git-common-dir"), root,
             "the preview service serves the main checkout; run it there, not in a worktree")
-    python = python.absolute()
+    python = Path(os.path.abspath(python)) if python is not None else repository / ".venv" / "bin" / "python"
+    require(python.is_relative_to(repository) and python.parent.resolve().is_relative_to(repository), python,
+            "interpreter must belong to this project; no cache-environment fallback")
     path = list(dict.fromkeys([str(python.parent), str(Path(quarto).parent), "/usr/local/bin", "/usr/bin", "/bin"]))
     for value, what in ((str(repository), "repository path"), (root.relative_to(repository).as_posix(), "manuscript path"),
                         (str(python), "interpreter path"), *((entry, "PATH entry") for entry in path)):
         unit_value(value, what)
-    require(python.is_file() and os.access(python, os.X_OK), python, "interpreter is not an executable file")
-    imports = subprocess.run([str(python), "-c", f"import {PREVIEW_IMPORTS}"], check=False, capture_output=True, text=True)
-    require(not imports.returncode, python, f"interpreter cannot import {PREVIEW_IMPORTS} for the presentation profile")
-    require(not presentation_workflows(root) or shutil.which("snakemake", path=":".join(path)), python.parent,
+    workflows = presentation_workflows(root)
+    modules = PREVIEW_IMPORTS + (", snakemake" if workflows else "")
+    require(python.is_file() and os.access(python, os.X_OK), python,
+            f"project interpreter is missing or not executable; prepare the project .venv with {modules}")
+    imports = subprocess.run([str(python), "-c", f"import {modules}"], check=False, capture_output=True, text=True)
+    require(not imports.returncode, python,
+            f"project interpreter requires {modules} for the presentation profile: {imports.stderr.strip()}")
+    require(not workflows or shutil.which("snakemake", path=":".join(path)), python.parent,
             "snakemake is required by a presentation workflow but absent from the unit PATH")
-    digest = hashlib.sha256(str(repository).encode()).hexdigest()
-    units = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
-    unit = units / f"cse-preview-{re.sub(r'[^A-Za-z0-9_.-]', '-', repository.name)}-{digest[:8]}.service"
+    unit = service_unit(repository)
     existing = unit.read_text() if unit.is_file() else None
     require(existing is None or (existing.startswith(SERVICE_MARKER)
                                  and f"\nWorkingDirectory={repository}\n" in existing),
             unit, "refusing to overwrite a unit this command did not write for this repository")
-    current = service_port(unit)
-    claimed = {service_port(other) for other in units.glob("cse-preview-*.service") if other != unit}
-    if port is None:
-        port = current
-    if port is None:
-        candidates = (SERVICE_PORT_BASE + (int(digest, 16) + step) % SERVICE_PORT_SPAN for step in range(SERVICE_PORT_SPAN))
-        port = next((value for value in candidates if value not in claimed and port_free(value)), None)
-        require(port, unit, "no free preview port")
-    require(1 <= port <= 65535 and port not in claimed and (port == current or port_free(port)),
-            unit, f"port {port} is in use or claimed by another preview unit")
+    port = preview_port(repository, port, keep_service_port=True)
     text = read_file(ASSET_ROOT / "preview.service").decode().format(
         repository=repository, manuscript=root.relative_to(repository).as_posix(), port=port,
         python=python, path=":".join(path))
@@ -907,7 +995,7 @@ def service(root: Path, port: int | None, dry_run: bool, python: Path = Path(sys
     if text != existing:
         unit.parent.mkdir(parents=True, exist_ok=True)
         atomic_write(unit, text.encode())
-    for action in ("daemon-reload", "enable", "restart" if text != existing else "start"):
+    for action in ("daemon-reload", "enable", "restart"):
         subprocess.run(["systemctl", "--user", action, *([] if action == "daemon-reload" else [unit.name])], check=True)
     if answering(url):
         print(f"{unit.name} serving {url}")
@@ -919,7 +1007,7 @@ def service(root: Path, port: int | None, dry_run: bool, python: Path = Path(sys
 def main() -> int:
     parser = argparse.ArgumentParser(prog="manuscript.py")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "include", "validate", "sync", "refresh", "preview", "prepare", "service"):
+    for name in ("init", "include", "validate", "sync", "refresh", "preview", "prepare", "service", "status", "stop"):
         command = commands.add_parser(name)
         if name == "prepare":
             command.add_argument("root", type=Path, nargs="?", default=Path("."))
@@ -936,11 +1024,11 @@ def main() -> int:
             command.add_argument("--group", help="optional sidebar group; nest with '/', e.g. 'Bundle/Active formulation'")
         if name == "preview":
             command.add_argument("--host", default="127.0.0.1")
-            command.add_argument("--port", type=int, default=8000)
+            command.add_argument("--port", type=int)
         if name == "service":
             command.add_argument("--port", type=int)
             command.add_argument("--dry-run", action="store_true")
-            command.add_argument("--python", type=Path, default=Path(sys.executable))
+            command.add_argument("--python", type=Path, help="project interpreter (default: checkout .venv/bin/python)")
     args = parser.parse_args()
     try:
         if args.command == "init":
@@ -960,6 +1048,10 @@ def main() -> int:
             return prepare(args.root)
         elif args.command == "refresh":
             return refresh(args.root, args.notebook)
+        elif args.command == "status":
+            return status(args.root)
+        elif args.command == "stop":
+            return stop(args.root)
         elif args.command == "service":
             return service(args.root, args.port, args.dry_run, args.python)
         else:
