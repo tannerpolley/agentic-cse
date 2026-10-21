@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 from pathlib import Path, PurePosixPath
 import re
 import subprocess
@@ -152,9 +153,10 @@ def read_event() -> dict[str, object]:
     return value
 
 
-def git(repository: Path, *arguments: str) -> bytes:
+def git(repository: Path, *arguments: str, stdin: bytes | None = None) -> bytes:
     result = subprocess.run(
         ["git", "-C", str(repository), *arguments],
+        input=stdin,
         capture_output=True,
         check=False,
         timeout=5,
@@ -248,13 +250,23 @@ def session_refs(repository: Path) -> dict[str, str]:
     return refs
 
 
+def tree_blobs(worktree: Path, reference: str, relatives: list[str]) -> dict[str, str]:
+    """Blob IDs of the named files at a commit; a file the commit lacks is absent."""
+    blobs = {}
+    for entry in git(worktree, "ls-tree", "-r", "-z", reference, "--", *relatives).split(b"\0"):
+        meta, _, name = entry.partition(b"\t")
+        if name:
+            blobs[name.decode(errors="surrogateescape")] = meta.split()[2].decode()
+    return blobs
+
+
 def session_changes(repository: Path, project: Path, refs: dict[str, str], wanted) -> dict[Path, tuple[str, str | None, str]]:
-    """Files this session changed in any checkout: path -> (added|changed|deleted, content hash, project-relative path).
+    """Files this session changed in any checkout: path -> (added|changed|deleted, blob ID, project-relative path).
 
     A file counts when its content differs both from the integrated line (so text that arrived by
     merging or pulling reviewed work is excluded) and from what the checkout's branch held when the
     session started (so an existing branch checked out mid-session is not attributed to it).
-    One untracked listing and one diff per anchor serve every file, so lanes far behind main stay fast.
+    Git calls are batched per checkout, so lanes far behind main stay fast.
     """
     scope = project.relative_to(repository).as_posix() or "."
     found: dict[Path, tuple[str, str | None, str]] = {}
@@ -262,27 +274,29 @@ def session_changes(repository: Path, project: Path, refs: dict[str, str], wante
         try:
             start = refs.get(branch or "") or refs.get(f"checkout:{worktree}")
             anchors = [a for a in (integrated_line(worktree, branch), start) if a] or ["HEAD"]
-            untracked = set(git(worktree, "ls-files", "--others", "--exclude-standard", "-z", "--", scope).split(b"\0"))
-            differs = []
+            names = set(git(worktree, "ls-files", "--others", "--exclude-standard", "-z", "--", scope).split(b"\0"))
             for anchor in anchors:
-                fields = git(worktree, "diff", "--no-renames", "--name-status", "-z", anchor, "--", scope).split(b"\0")
-                differs.append(dict(zip(fields[1::2], fields[0::2])))
-            for item in sorted((untracked | set().union(*differs)) - {b""}):
-                if not all(item in untracked or item in status for status in differs):
-                    continue
+                names |= set(git(worktree, "diff", "--no-renames", "--name-only", "-z", anchor, "--", scope).split(b"\0"))
+            candidates: dict[str, tuple[Path, str]] = {}
+            for item in sorted(names - {b""}):
                 relative = item.decode(errors="surrogateescape")
                 path = worktree / relative
                 inside = path.relative_to(worktree / scope).as_posix()
-                if not wanted(inside) or path.is_symlink() or (path.exists() and not path.is_file()):
-                    continue
                 # ponytail: only checkouts that existed at session start attribute deletions; a lane cut
                 # from an older main lacks newer files, and nothing in a transcript records an rm.
-                if not path.exists():
-                    if start:
-                        found[path] = ("deleted", None, inside)
-                    continue
-                kind = "changed" if any(status.get(item) in {b"M", b"T"} for status in differs) else "added"
-                found[path] = (kind, hashlib.sha256(path.read_bytes()).hexdigest(), inside)
+                if wanted(inside) and not path.is_symlink() and (path.is_file() or (not path.exists() and start)):
+                    candidates[relative] = (path, inside)
+            if not candidates:
+                continue
+            present = [relative for relative, (path, _) in candidates.items() if path.exists()]
+            hashes = dict(zip(present, git(worktree, "hash-object", "--stdin-paths",
+                                           stdin="\n".join(present).encode(errors="surrogateescape")).decode().split()))
+            before = [tree_blobs(worktree, anchor, list(candidates)) for anchor in anchors]
+            for relative, (path, inside) in candidates.items():
+                content = hashes.get(relative)
+                if all(blobs.get(relative) != content for blobs in before):
+                    kind = "deleted" if content is None else "changed" if any(relative in b for b in before) else "added"
+                    found[path] = (kind, content, inside)
         except (HookError, subprocess.TimeoutExpired):
             continue  # an unreadable checkout is skipped rather than disabling the check for all
     return found
@@ -353,7 +367,7 @@ def session_writes(event: dict[str, object]) -> set[Path] | None:
 
 def save(path: Path, value: dict[str, object]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    temporary = path.with_suffix(".tmp")
+    temporary = path.with_name(f"{path.name}.{os.getpid()}.tmp")  # overlapping Stops never share one
     temporary.write_text(json.dumps(value, sort_keys=True) + "\n", encoding="utf-8")
     temporary.replace(path)
 
@@ -388,15 +402,19 @@ def session_state(event: dict[str, object], repository: Path, project: Path) -> 
 
 
 def test_report(changed: dict[Path, tuple[str, str | None, str]], reported: dict[str, list]) -> tuple[str, dict[str, list]]:
-    """Name each test change once: only what differs from the last report."""
-    current = {path.as_posix(): [kind, content] for path, (kind, content, _) in changed.items()}
+    """Name each test change once: what differs from the last report, including what it no longer lists."""
+    current = {path.as_posix(): [kind, content, inside] for path, (kind, content, inside) in changed.items()}
     groups: dict[str, list[str]] = {}
-    for path, (kind, content, inside) in sorted(changed.items()):
-        previous = reported.get(path.as_posix())
-        if previous != [kind, content]:
+    for key, (kind, content, inside) in sorted(current.items()):
+        previous = reported.get(key)
+        if previous is None or previous[:2] != [kind, content]:
             # A second edit to a test this session added reads as a change, not another addition.
             groups.setdefault("changed" if previous and kind == "added" else kind, []).append(inside)
-    parts = [f"{kind} {', '.join(groups[kind])}" for kind in ("added", "changed", "deleted") if kind in groups]
+    for key, previous in sorted(reported.items()):
+        if key not in current:
+            groups.setdefault("reverted" if Path(key).exists() else "deleted", []).append(previous[2])
+    order = ("added", "changed", "deleted", "reverted")
+    parts = [f"{kind} {', '.join(groups[kind])}" for kind in order if kind in groups]
     return (f"CSE: tests {'; '.join(parts)}." if parts else ""), current
 
 
@@ -431,33 +449,34 @@ def main() -> int:
                     warnings.append("CSE checks found no session-start record, so they cover changes from now on.")
                 written = session_writes(event)
                 if written is None:
-                    warnings.append("CSE could not read this session's transcript, so it also checks what other "
-                                    "sessions changed since this one started.")
-
-                def mine(path: Path, content: str | None) -> bool:
-                    # A deletion leaves no write-tool call, so Git alone attributes it.
-                    return written is None or content is None or path.resolve() in written
+                    warnings.append("CSE could not read this session's transcript, so its prose check also covers "
+                                    "what other sessions wrote since this one started.")
 
                 checkouts = worktrees(repository)
                 groups: dict[Path, list[Path]] = {}
                 changed = session_changes(repository, project, state["refs"],
                                           lambda path: is_prose_path(path) or is_test_path(path))
                 for path, (_, content, inside) in changed.items():
-                    if content is None or not is_prose_path(inside) or not mine(path, content):
+                    if content is None or not is_prose_path(inside) or (written is not None and path.resolve() not in written):
                         continue
                     # A worktree may sit inside another checkout; the deepest one owns the file.
                     owner = max((w for w in checkouts if path.is_relative_to(w)), key=lambda w: len(w.parts))
                     groups.setdefault(owner, []).append(path)
                 for owner, paths in groups.items():
                     failures += violations(paths, root=owner / project.relative_to(repository))
-                tests = {path: change for path, change in changed.items()
-                         if is_test_path(change[2]) and mine(path, change[1])}
-                report, state["reported"] = test_report(tests, state["reported"])
+                # Tests skip the transcript filter: scripts and shell heredocs write them too, and an
+                # extra advisory line costs less than a missed one, unlike a prose block.
+                report, state["reported"] = test_report(
+                    {path: change for path, change in changed.items() if is_test_path(change[2])}, state["reported"])
                 warnings += [report] if report else []
-                save(state_path(event, repository, project), state)
             except (OSError, UnicodeError, ValueError, HookError, subprocess.TimeoutExpired) as exc:
-                failures = []
+                failures, state = [], None
                 warnings.append(f"CSE prose and test checks did not run: {exc}")
+            if state is not None:
+                try:
+                    save(state_path(event, repository, project), state)
+                except (OSError, HookError, subprocess.TimeoutExpired) as exc:
+                    warnings.append(f"CSE could not save this session's record, so test changes may repeat: {exc}")
             review = answer_review(event, role)
             payload: dict[str, object] = {}
             if failures or review:

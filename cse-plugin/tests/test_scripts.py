@@ -216,7 +216,18 @@ class ScriptBehaviorTests(unittest.TestCase):
             (lane / "tests").mkdir()
             (lane / "tests/test_flash.py").write_text("def test_flash(): pass\n", encoding="utf-8")
             (lane / "notes.md").write_text("The schema changed.\n", encoding="utf-8")
-            first = self.run_hook(lane, "Stop", stop_hook_active=True, last_assistant_message="Done.")
+            # An untracked copy identical to main's test is not a change.
+            shutil.copy(project / "tests/test_main.py", lane / "tests/test_main.py")
+            # The transcript shows the prose write; the shell-written test is attributed by Git alone.
+            transcript = Path(directory) / "claude.jsonl"
+            transcript.write_text("\n".join(json.dumps(record) for record in (
+                {"type": "assistant", "cwd": str(lane), "message": {"content": [
+                    {"type": "tool_use", "name": "Write", "input": {"file_path": str(lane / "notes.md"), "content": ""}}]}},
+                {"type": "assistant", "cwd": str(lane), "message": {"content": [
+                    {"type": "tool_use", "name": "Bash", "input": {"command": "cat > tests/test_flash.py <<'EOF'\nEOF"}}]}},
+            )) + "\n", encoding="utf-8")
+            first = self.run_hook(lane, "Stop", stop_hook_active=True, last_assistant_message="Done.",
+                                  transcript_path=str(transcript))
             self.assertIn("notes.md", first.get("reason", ""))
             self.assertIn("CSE: tests added tests/test_flash.py.", first.get("systemMessage", ""))
             self.assertNotIn("did not run", json.dumps(first))
@@ -230,6 +241,9 @@ class ScriptBehaviorTests(unittest.TestCase):
             (lane / "tests/test_flash.py").write_text("def test_flash(): assert True\n", encoding="utf-8")
             again = self.run_hook(lane, "Stop", stop_hook_active=True, last_assistant_message="Done.")
             self.assertIn("CSE: tests changed tests/test_flash.py.", again.get("systemMessage", ""))
+            (lane / "tests/test_flash.py").unlink()
+            removed = self.run_hook(lane, "Stop", stop_hook_active=True, last_assistant_message="Done.")
+            self.assertIn("CSE: tests deleted tests/test_flash.py.", removed.get("systemMessage", ""))
 
     def test_prose_check_reads_glossary_terms_and_avoid_lists_with_scope(self):
         with tempfile.TemporaryDirectory() as directory:
