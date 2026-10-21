@@ -1,0 +1,16 @@
+record_id: dataset:water-density-example
+record_kind: dataset
+title: Example water density record
+provenance_status: source_linked
+source_ids:
+  - source:example-paper
+exact_locators:
+  - Table 2, row 4
+system_id: water
+components:
+  - water
+property_family: mass-density
+model_formulation: direct observation
+convention: SI units
+validity_domain: T = 293.15 K; p = 101325 Pa
+review_disposition: review

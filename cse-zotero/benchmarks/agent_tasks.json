@@ -1,0 +1,182 @@
+[
+  {
+    "id": "figiel-born-equation",
+    "query": "Born solvation shell",
+    "evidence_query": "Born term solvation shell",
+    "source_keys": ["YEENX35P"],
+    "expected_record_id": "equation:figiel-born-solvation-shell",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "hamer-activity-basis",
+    "query": "osmotic activity coefficients",
+    "evidence_query": "osmotic coefficient mean activity coefficient",
+    "source_keys": ["28NPJ5H6"],
+    "expected_record_id": "dataset:hamer-1972-aqueous-coefficients",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": true
+  },
+  {
+    "id": "registry-parameter-trace",
+    "query": "Born diameter SSM DS",
+    "evidence_query": "model parameters Born diameter",
+    "source_keys": ["YEENX35P"],
+    "expected_record_id": "parameter:figiel-born-diameter-ssm-ds",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": true
+  },
+  {
+    "id": "cross-paper-insight",
+    "query": "activity basis model dependency",
+    "evidence_query": "activity coefficient basis",
+    "source_keys": ["28NPJ5H6", "YEENX35P"],
+    "expected_record_id": "insight:source-basis-is-model-dependency",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "validation-acceptance-gate",
+    "query": "validation acceptance inputs",
+    "evidence_query": "validation results limitations",
+    "source_keys": ["YEENX35P"],
+    "expected_record_id": "validation:figiel-2025-eos-reproduction",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "amundsen-density-dataset",
+    "query": "Amundsen 2009 water density",
+    "evidence_query": "density loaded MEA water",
+    "source_keys": ["3QJR6RHH"],
+    "expected_record_id": "dataset:amundsen-2009-mea-water-co2-density",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": true
+  },
+  {
+    "id": "amundsen-viscosity-correlation",
+    "query": "Weiland viscosity correlation",
+    "evidence_query": "dynamic viscosity correlation",
+    "source_keys": ["3QJR6RHH"],
+    "expected_record_id": "correlation:amundsen-weiland-viscosity",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": true
+  },
+  {
+    "id": "ascani-flash-workflow",
+    "query": "distributed flash phase stability",
+    "evidence_query": "flash phase stability",
+    "source_keys": ["48XP953U"],
+    "expected_record_id": "workflow:ascani-distributed-ion-flash",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "bulow-dielectric-paper",
+    "query": "ePC-SAFT advanced concentration dielectric",
+    "evidence_query": "concentration dielectric Born",
+    "source_keys": ["L79J5R52"],
+    "expected_record_id": "paper:bulow2020",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "gross-residual-equation",
+    "query": "SAFT residual Helmholtz decomposition",
+    "evidence_query": "residual Helmholtz association",
+    "source_keys": ["2AJYEZS6"],
+    "expected_record_id": "equation:gross-pcsaft-residual",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "held-residual-equation",
+    "query": "Revised SAFT residual decomposition",
+    "evidence_query": "residual Helmholtz electrolyte",
+    "source_keys": ["3DIW87Q5"],
+    "expected_record_id": "equation:held-epcsaft-residual",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "carbonate-stripping-insight",
+    "query": "carbonate stripping coextractant",
+    "evidence_query": "carbonate stripping coextractant",
+    "source_keys": ["3LTXWQGN"],
+    "expected_record_id": "idea:li-2021-carbonate-stripping-preserves-coextractant",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "phase-stability-acceptance",
+    "query": "stationarity phase stability acceptance",
+    "evidence_query": "phase stability acceptance",
+    "source_keys": ["YZZ95ZCU"],
+    "expected_record_id": "insight:stability-is-an-acceptance-gate",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "rezaee-reaction-equation",
+    "query": "reaction equilibrium constant standard Gibbs",
+    "evidence_query": "reaction equilibrium constant Gibbs",
+    "source_keys": ["3NMV5MF2"],
+    "expected_record_id": "equation:rezaee-reaction-equilibrium-constant",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "tsanas-charge-balance",
+    "query": "implicit electroneutrality conserved charge",
+    "evidence_query": "electroneutrality charge balance",
+    "source_keys": ["43LEH5GY"],
+    "expected_record_id": "equation:tsanas-electroneutrality",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "uyan-reaction-basis",
+    "query": "activity based reaction equilibrium",
+    "evidence_query": "activity reaction equilibrium",
+    "source_keys": ["GSLTFVDM"],
+    "expected_record_id": "equation:uyan-law-of-mass-action",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "khudaida-lle-paper",
+    "query": "salting out ethanol isobutanol sodium chloride",
+    "evidence_query": "salting out tie lines",
+    "source_keys": ["W5WPHPT4"],
+    "expected_record_id": "paper:khudaida2026",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "hamer-paper-source",
+    "query": "Hamer Wu osmotic coefficient",
+    "evidence_query": "osmotic coefficient mean activity",
+    "source_keys": ["28NPJ5H6"],
+    "expected_record_id": "paper:hamer-1972",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "figiel-paper-source",
+    "query": "Figiel modified Born term",
+    "evidence_query": "Born term mixed solvents",
+    "source_keys": ["YEENX35P"],
+    "expected_record_id": "paper:figiel-2025",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  },
+  {
+    "id": "rezaee-regression-workflow",
+    "query": "Rezaee DES extraction regression",
+    "evidence_query": "DES extraction regression",
+    "source_keys": ["3NMV5MF2"],
+    "expected_record_id": "workflow:rezaee-des-extraction-regression",
+    "min_evidence_hits": 1,
+    "requires_registry_reference": false
+  }
+]

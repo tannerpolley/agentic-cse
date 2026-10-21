@@ -1,0 +1,68 @@
+id: https://w3id.org/zotero-companion/schema/thermophysical
+name: zotero_companion_thermophysical
+title: CSE Zotero thermophysical domain pack
+description: Thermophysical systems, properties, conventions, and review dispositions.
+license: MIT
+prefixes:
+  linkml: https://w3id.org/linkml/
+  companion: https://w3id.org/zotero-companion/
+default_prefix: companion
+imports:
+  - companion
+
+enums:
+  ReviewDisposition:
+    permissible_values:
+      accepted: {}
+      review: {}
+      quarantined: {}
+      superseded: {}
+
+slots:
+  thermophysical_records:
+    range: ThermophysicalRecord
+    multivalued: true
+    inlined_as_list: true
+  system_id:
+    range: string
+  components:
+    range: string
+    multivalued: true
+  property_family:
+    range: string
+  model_formulation:
+    range: string
+  convention:
+    range: string
+  validity_domain:
+    range: string
+  review_disposition:
+    range: ReviewDisposition
+    required: true
+  blocker_codes:
+    range: string
+    multivalued: true
+
+classes:
+  ThermophysicalCatalog:
+    tree_root: true
+    slots:
+      - thermophysical_records
+  ThermophysicalRecord:
+    is_a: ScientificRecord
+    slots:
+      - system_id
+      - components
+      - property_family
+      - model_formulation
+      - convention
+      - validity_domain
+      - review_disposition
+      - blocker_codes
+    slot_usage:
+      system_id:
+        required: true
+      property_family:
+        required: true
+      review_disposition:
+        required: true

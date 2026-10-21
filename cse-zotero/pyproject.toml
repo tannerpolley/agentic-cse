@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cse-zotero"
+version = "1.0.0"
+description = "Source-linked research synthesis and scientific data companion for Zotero"
+requires-python = ">=3.11"
+dependencies = [
+    "duckdb>=1.4,<2",
+    "linkml>=1.9,<2",
+]
+
+[project.scripts]
+cse-zotero = "zotero_companion.cli:main"
+zotero-companion = "zotero_companion.cli:main"
+
+[tool.setuptools.package-data]
+zotero_companion = ["schemas/linkml/*.yaml", "schemas/json/*.json"]
+
+[tool.pytest.ini_options]
+markers = ["live: requires the configured Zotero library or corpus"]
+pythonpath = ["src", "."]
+testpaths = ["tests"]

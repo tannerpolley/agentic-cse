@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.zotero-companion/schemas/project-manifest.schema.json",
+  "title": "CSE Zotero project data manifest",
+  "type": "object",
+  "required": ["schema_version", "project_id", "title", "status", "record_ids"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "project_id": {"type": "string", "pattern": "^[a-z][a-z0-9-]+$"},
+    "title": {"type": "string", "minLength": 1},
+    "status": {"enum": ["scaffold", "proposed", "active", "released", "needs-review"]},
+    "record_ids": {"type": "array", "items": {"type": "string"}},
+    "registry": {"type": "object", "required": ["name", "repository", "revision"]},
+    "data_authority": {"enum": ["project", "registry"]},
+    "datasets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path"],
+        "properties": {
+          "path": {"type": "string", "minLength": 1},
+          "sha256": {"type": "string", "pattern": "^[0-9a-fA-F]{64}$"}
+        }
+      }
+    },
+    "registry_refs": {"type": "array", "items": {"type": "object"}},
+    "validation_runs": {"type": "array", "items": {"type": "string"}},
+    "source_keys": {"type": "array", "items": {"type": "string"}},
+    "filters": {"type": "object"},
+    "notes": {"type": "array", "items": {"type": "string"}}
+  },
+  "anyOf": [
+    {"required": ["registry"]},
+    {"required": ["data_authority"], "properties": {"data_authority": {"const": "project"}}},
+    {"required": ["datasets"], "properties": {"datasets": {"minItems": 1}, "data_authority": {"not": {"const": "registry"}}}}
+  ],
+  "additionalProperties": true
+}

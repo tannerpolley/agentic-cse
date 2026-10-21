@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.zotero-companion/schemas/relation.schema.json",
+  "title": "CSE Zotero typed relation",
+  "type": "object",
+  "required": [
+    "relation_id",
+    "relation_type",
+    "source",
+    "target",
+    "rationale",
+    "status"
+  ],
+  "properties": {
+    "relation_id": {"type": "string", "pattern": "^rel:[a-z0-9][a-z0-9._-]*$"},
+    "relation_type": {
+      "enum": [
+        "extracted_from",
+        "supports",
+        "contradicts",
+        "supersedes",
+        "depends_on",
+        "derived_from",
+        "implemented_by",
+        "uses",
+        "validates",
+        "contextualizes",
+        "related_to"
+      ]
+    },
+    "source": {"type": "string", "minLength": 3},
+    "target": {"type": "string", "minLength": 3},
+    "rationale": {"type": "string", "minLength": 1},
+    "status": {"enum": ["proposed", "accepted", "needs-review", "rejected"]},
+    "provenance": {"type": "object"}
+  },
+  "additionalProperties": true
+}

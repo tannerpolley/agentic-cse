@@ -1,0 +1,77 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://local.zotero-companion/schemas/knowledge-record.schema.json",
+  "title": "CSE Zotero knowledge record",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "record_type",
+    "record_id",
+    "title",
+    "status",
+    "confidence",
+    "summary",
+    "provenance"
+  ],
+  "properties": {
+    "schema_version": {"const": 1},
+    "record_type": {
+      "enum": [
+        "paper_brief",
+        "claim",
+        "equation",
+        "dataset_reference",
+        "parameter_reference",
+        "correlation_reference",
+        "idea",
+        "insight",
+        "workflow",
+        "implementation_reference",
+        "validation_run"
+      ]
+    },
+    "record_id": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_-]*:[a-z0-9][a-z0-9._-]*$"
+    },
+    "title": {"type": "string", "minLength": 1},
+    "status": {
+      "enum": [
+        "proposed",
+        "source-backed",
+        "evidence-ready",
+        "accepted",
+        "open",
+        "needs-review",
+        "superseded",
+        "rejected"
+      ]
+    },
+    "confidence": {"enum": ["high", "medium", "low", "not-assessed"]},
+    "summary": {"type": "string", "minLength": 1},
+    "provenance": {
+      "type": "object",
+      "required": ["derivation_kind", "sources", "derived_from"],
+      "properties": {
+        "derivation_kind": {
+          "enum": [
+            "source-reported",
+            "normalized",
+            "inferred",
+            "project-derived",
+            "implementation-observed"
+          ]
+        },
+        "sources": {"type": "array", "items": {"type": "object"}},
+        "derived_from": {"type": "array", "items": {"type": "string"}},
+        "review": {"type": "object"}
+      },
+      "additionalProperties": true
+    },
+    "registry_refs": {"type": "array", "items": {"type": "object"}},
+    "implementation_refs": {"type": "array", "items": {"type": "object"}},
+    "validation_refs": {"type": "array", "items": {"type": "string"}},
+    "related_records": {"type": "array", "items": {"type": "string"}}
+  },
+  "additionalProperties": true
+}

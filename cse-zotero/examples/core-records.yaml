@@ -1,0 +1,35 @@
+sources:
+  - record_id: source:example-paper
+    record_kind: source
+    title: Example primary source
+    provenance_status: source_linked
+    zotero_key: ABCD1234
+    citation_key: examplePrimary2026
+    doi: 10.0000/example
+    exact_locators:
+      - Table 2, row 4
+catalog_observations:
+  - record_id: observation:example-density
+    record_kind: observation
+    title: Example density observation
+    provenance_status: verified
+    source_ids:
+      - source:example-paper
+    exact_locators:
+      - Table 2, row 4
+    quantity_id: mass_density
+    value: 998.2
+    unit: kg/m3
+    conditions: T = 293.15 K; p = 101325 Pa
+transformations:
+  - record_id: transformation:example-normalization
+    record_kind: transformation
+    title: Convert source density units
+    provenance_status: verified
+    transformation_id: density-unit-conversion-v1
+    method: Multiply g/cm3 by 1000 to obtain kg/m3.
+    input_ids:
+      - source:example-paper
+    output_ids:
+      - observation:example-density
+    code_reference: src/zotero_companion/scientific_data.py
