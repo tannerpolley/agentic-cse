@@ -15,9 +15,9 @@ the payload; ScienceBench owns live workflow and routing evaluation.
 - Skill-use comparison (read-only, T3 transcripts): `nice python3 scripts/measure_skill_use.py [--since YYYY-MM-DD]` counts CSE skill use per session for Claude Code and Codex.
 - Isolated installation check: `python -m unittest discover -s tests/integration -p 'test_installation.py' -v`
 - Selected rendering check: `python -m unittest discover -s tests/integration -p 'test_rendering.py' -v`
-- Codex runtime check: `./scripts/sync-live.sh --check --zotero-source <absolute-checkout>` builds a task-owned Zotero wheel and verifies its CLI
+- Codex runtime check: `./scripts/sync-live.sh --check` builds a task-owned Zotero wheel and verifies its CLI
   schemas. It is not the offline source command.
-- Explicit reviewed Codex installation: `./scripts/sync-live.sh --validate --zotero-source <absolute-checkout>` installs the Zotero runtime and
+- Explicit reviewed Codex installation: `./scripts/sync-live.sh --validate` installs the Zotero runtime and
   `cse@cse` from this repository's marketplace, the same catalog Claude Code uses.
 
 Prepare source-validation dependencies once without changing host state:

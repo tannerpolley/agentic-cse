@@ -5,51 +5,23 @@ repository_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 runtime_target="$HOME/.local/share/cse/zotero"
 runtime_bin_dir="$HOME/.local/bin"
 runtime_commands=(cse-zotero zotero-companion)
-expected_zotero_commit="bc479cde3690490aa25469fee88a3b920b3346b7"
 codex_bin="${CSE_CODEX_BIN:-codex}"
 
 usage() {
-  echo "Usage: $0 --check [--zotero-source ABSOLUTE_CHECKOUT] | $0 --validate [--zotero-source ABSOLUTE_CHECKOUT]" >&2
+  echo "Usage: $0 --check | $0 --validate" >&2
 }
 
 mode=""
-zotero_source=""
-while [[ $# -gt 0 ]]; do
-  case "$1" in
-    --check|--validate)
-      [[ -z "$mode" ]] || { usage; exit 2; }
-      mode="${1#--}"
-      ;;
-    --zotero-source)
-      [[ $# -ge 2 && "$2" = /* ]] || { echo "--zotero-source requires an absolute checkout" >&2; exit 2; }
-      zotero_source="$2"
-      shift
-      ;;
-    *) usage; exit 2 ;;
-  esac
-  shift
-done
-[[ -n "$mode" ]] || { usage; exit 2; }
+case "${1:-}" in
+  --check|--validate) [[ $# -eq 1 ]] || { usage; exit 2; }; mode="${1#--}" ;;
+  *) usage; exit 2 ;;
+esac
 
-if [[ -z "$zotero_source" && -d "$repository_root/../cse-zotero" ]]; then
-  zotero_source="$(cd "$repository_root/../cse-zotero" && pwd)"
-fi
-if [[ -z "$zotero_source" || ! -d "$zotero_source" ]]; then
-  echo "Zotero source capability unavailable; pass --zotero-source <absolute-checkout>." >&2
-  exit 1
-fi
-
-if [[ ! -d "$zotero_source/.git" && ! -f "$zotero_source/.git" ]]; then
-  echo "Zotero source capability unavailable: --zotero-source must be a Git checkout." >&2
-  exit 1
-fi
-zotero_commit="$(git -C "$zotero_source" rev-parse HEAD 2>/dev/null || true)"
-if [[ "$zotero_commit" != "$expected_zotero_commit" ]]; then
-  echo "Zotero source revision mismatch: expected $expected_zotero_commit, got ${zotero_commit:-unavailable}." >&2
-  exit 1
-fi
-if [[ ! -f "$zotero_source/pyproject.toml" ]]; then
-  echo "Zotero source capability unavailable: pyproject.toml is missing." >&2
+# The Zotero runtime is built from the sibling cse-zotero/ folder at the same
+# commit as this plugin.
+zotero_commit="$(git -C "$repository_root" rev-parse HEAD)"
+if ! git -C "$repository_root/.." cat-file -e HEAD:cse-zotero/pyproject.toml 2>/dev/null; then
+  echo "Zotero source capability unavailable: cse-zotero/pyproject.toml is not committed beside cse-plugin/." >&2
   exit 1
 fi
 command -v uv >/dev/null || { echo "Zotero runtime capability unavailable: uv is missing; install uv." >&2; exit 1; }
@@ -58,7 +30,7 @@ if [[ -z "${UV_CACHE_DIR:-}" ]]; then
 fi
 export UV_CACHE_DIR
 
-if [[ "$mode" == validate && -n "$(git -C "$repository_root" status --porcelain)" ]]; then
+if [[ "$mode" == validate && -n "$(git -C "$repository_root" status --porcelain -- .)" ]]; then
   echo "Refusing to deploy an uncommitted source tree." >&2
   exit 1
 fi
@@ -98,7 +70,7 @@ unrelated="$transaction/unrelated"
 mkdir -p "$runtime_source" "$runtime_wheels" "$unrelated"
 trap 'rm -rf -- "$transaction"' EXIT
 
-git -C "$zotero_source" archive "$expected_zotero_commit" | tar -x -C "$runtime_source"
+git -C "$repository_root/.." archive "$zotero_commit:cse-zotero" | tar -x -C "$runtime_source"
 
 uv build --wheel --out-dir "$runtime_wheels" "$runtime_source" >/dev/null
 uv venv "$runtime_venv" >/dev/null
