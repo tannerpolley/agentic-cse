@@ -1,0 +1,111 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,array,booktabs,geometry,siunitx}
+\usepackage[hidelinks]{hyperref}
+\geometry{margin=1in}
+\begin{document}
+
+\title{Verification, validation, and numerical uncertainty}
+\author{cse-heat-equation-example}
+\date{}
+\maketitle
+
+\section{Evidence layers}
+
+\begin{center}
+\begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.22\textwidth}p{0.68\textwidth}@{}}
+\toprule
+Layer & Meaning in this project\\
+\midrule
+Code verification & The implementations reproduce their declared discrete
+equations, amplification behavior, boundaries, and solve residual.\\
+Solution verification & The numerical fields approach the continuous or
+semidiscrete reference under a declared refinement.\\
+Model validation & Comparison with physical reality or experiments. It is not
+performed here.\\
+Numerical uncertainty & Refinement, reference evaluation, tridiagonal solve,
+and floating-point effects on the reported values.\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+\section{Metrics and observed order}
+
+For interior grid values, the retained study reports
+\begin{align}
+  E_{\infty}
+  &=\max_{1\leq i\leq N-1}
+    |\theta_i-\theta_{\mathrm{ref},i}|,\\
+  E_{\mathrm{RMS}}
+  &=\left[\frac{1}{N-1}\sum_{i=1}^{N-1}
+    (\theta_i-\theta_{\mathrm{ref},i})^2\right]^{1/2}.
+\end{align}
+For a factor-two refinement, the observed order is
+\begin{equation}
+  p_{\mathrm{obs}}=\frac{\log(E_h/E_{h/2})}{\log 2}.
+\end{equation}
+
+\section{Retained study conditions}
+
+All studies end at \(Fo=0.1\). The combined study uses
+\(N=10,20,40,80,160\) and \(\mathrm{steps}=N^2/4\), so \(r=0.4\).
+The temporal study holds \(N=20\), uses 80, 160, 320, 640, and 1280 steps,
+and compares with REF-SEMIDISCRETE-001.
+
+\begin{center}
+\begin{tabular}{llrrr}
+\toprule
+Study & Method & Finest error & Finest order & Value bound\\
+\midrule
+Combined & FTCS & \num{1.654619e-5} & \num{2.000230} & \num{2.068712e-5}\\
+Combined & Crank-Nicolson & \num{1.181738e-5} & \num{1.999746} & \num{1.476826e-5}\\
+Temporal & FTCS & \num{1.415673e-4} & \num{1.000467} & \num{1.770737e-4}\\
+Temporal & Crank-Nicolson & \num{1.814958e-8} & \num{2.000004} & \num{2.268708e-8}\\
+\bottomrule
+\end{tabular}
+\end{center}
+
+Every error sequence decreases monotonically. The combined results approach
+second order. The isolated temporal results approach first order for FTCS and
+second order for Crank-Nicolson.
+
+\section{Case-specific acceptance}
+
+For nested fields with target order \(p\), the fine-grid remaining-error
+estimate is
+\begin{equation}
+  U_h=1.25\frac{\|\theta_{h/2}-\theta_h\|_{\infty}}
+                    {2^p-1}
+      +64\epsilon_{64}\max(1,\|\theta_{h/2}\|_{\infty}).
+\end{equation}
+The factor 1.25 is the declared safety allowance around the leading-order
+Richardson estimate. The second term represents accumulated floating-point
+scale. Every finest-grid analytic or semidiscrete error is below this bound.
+
+The order tolerance is twice the absolute change between the two finest
+observed orders plus the floating allowance propagated relative to the finest
+error. This rule tests entry into the measured asymptotic regime. It replaces
+the former unexplained \(\pm0.2\) band.
+
+Direct value comparisons retain the form
+\[
+  |\mathrm{error}|\leq a_{\mathrm{tol}}
+  +r_{\mathrm{tol}}|\mathrm{reference}|,
+\]
+with terms chosen for the individual comparison. The discrete-mode code tests
+use a 64-epsilon relative allowance and an absolute allowance proportional to
+the number of time steps.
+
+\section{Numerical uncertainty and limits}
+
+The Richardson term estimates unresolved discretization error for the selected
+sequence. Continuous and semidiscrete references are evaluated in IEEE binary64.
+The largest retained Crank-Nicolson linear residual is
+\(4.44\times10^{-16}\), below its corresponding discretization error by more
+than ten orders of magnitude. These observations do not quantify physical
+input or model-form uncertainty.
+
+The single smooth Fourier mode does not exercise discontinuities, variable
+coefficients, nonlinear sources, nonuniform grids, or multidimensional
+operators. The reported orders and tolerances apply only to the declared case.
+
+\end{document}

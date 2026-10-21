@@ -1,0 +1,156 @@
+---
+title: "Artificial absorber-profile comparison"
+subtitle: "One working analysis notebook for Review"
+execute:
+  enabled: false
+resources:
+  - ../../data/artificial-absorber-profile.csv
+  - ../../figures/artificial-absorber-comparison.tex
+  - ../../figures/analysis-notebook-lineage.tex
+---
+
+This working analysis notebook has not been independently reviewed or promoted
+for manuscript use.
+
+::: {.content-visible when-format="pdf"}
+```{=latex}
+\clearpage
+```
+:::
+
+# Artificial packed-absorber profile
+
+## Question
+
+How closely does the artificial absorber model reproduce the artificial
+gas-phase $\mathrm{CO_2}$ observations over a packed height of
+$0$ to $6\ \mathrm{m}$?
+
+The comparison is deliberately synthetic. It demonstrates the analysis-notebook
+view and does not validate a physical absorber model.
+
+## Conditions
+
+| Item | Retained condition |
+|---|---|
+| Quantity | Gas-phase $\mathrm{CO_2}$, percent by volume |
+| Coordinate | Packed height, $0$ to $6\ \mathrm{m}$ |
+| Model role | Continuous predicted profile |
+| Observation role | Artificial point observations |
+| Observation uncertainty | Assigned $\pm 0.30$ percentage points |
+| Residual definition | $e_i=y_{i,\mathrm{model}}-y_{i,\mathrm{obs}}$ |
+| Data authority | `../../data/artificial-absorber-profile.csv` |
+
+::: {.content-visible when-format="pdf"}
+```{=latex}
+\clearpage
+```
+:::
+
+## Model and observations
+
+::: {#fig-artificial-absorber}
+
+:::: {.content-visible when-format="pdf"}
+```{=latex}
+\centering
+\newcommand{\absorberdatatable}{../../data/artificial-absorber-profile.csv}
+\input{../../figures/artificial-absorber-comparison.tex}
+```
+::::
+
+:::: {.content-visible when-format="html"}
+```{=html}
+<img
+  src="../../figures/generated/artificial-absorber-comparison.svg"
+  alt="Artificial carbon-dioxide profile: a blue model line decreases with packed height and orange open-circle observations with error bars remain close to it."
+  loading="eager"
+  style="width:94%;height:auto"
+>
+```
+::::
+
+Artificial gas-phase $\mathrm{CO_2}$ profile. The continuous line is the
+artificial model; open circles are artificial observations; vertical intervals
+are assigned observation uncertainties of $\pm 0.30$ percentage points.
+:::
+
+::: {.content-visible when-format="pdf"}
+```{=latex}
+\clearpage
+```
+:::
+
+## Numerical comparison
+
+The retained residual column gives:
+
+| Statistic | Value (percentage points) |
+|---|---:|
+| Root-mean-square residual | 0.165 |
+| Mean absolute residual | 0.157 |
+| Mean residual | -0.071 |
+| Maximum absolute residual | 0.200 |
+
+Every artificial residual is smaller in magnitude than the assigned observation
+uncertainty. The model and observations therefore agree by construction for
+this demonstration; the comparison establishes no physical-model accuracy.
+
+## Interpretation and limitations
+
+The artificial model reproduces the imposed decreasing profile across the
+tested height range. The residuals include both signs and show no monotonic
+drift in this seven-point example.
+
+The values are fabricated, the uncertainty is assigned rather than measured,
+and no code-verification, solution-verification, or physical-validation claim
+follows. The example supports only the document workflow: one retained table,
+one interpretation, and consistent PDF and HTML views.
+
+## Conclusion and next steps
+
+The retained synthetic values demonstrate consistent table, figure, PDF, and
+HTML reporting without model execution. A real analysis should replace the
+synthetic table with reviewed retained results and repeat the same numerical
+and visual checks.
+
+::: {.content-visible when-format="pdf"}
+```{=latex}
+\clearpage
+```
+:::
+
+## Provenance and shared rendering
+
+::: {#fig-analysis-notebook-lineage}
+
+:::: {.content-visible when-format="pdf"}
+```{=latex}
+\centering
+\input{../../figures/analysis-notebook-lineage.tex}
+```
+::::
+
+:::: {.content-visible when-format="html"}
+```{=html}
+<img
+  src="../../figures/generated/analysis-notebook-lineage.svg"
+  alt="Retained CSV feeds shared TikZ and PGFPlots source, which branches to a LuaLaTeX PDF and ordinary HTML."
+  loading="eager"
+  style="width:92%;height:auto"
+>
+```
+::::
+
+Both outputs read the same retained table and the same TikZ or PGFPlots source.
+LuaLaTeX compiles that source directly; the HTML build uses an SVG compiled
+from the same source.
+:::
+
+- [Retained artificial comparison table](../../data/artificial-absorber-profile.csv)
+- [PGFPlots source](../../figures/artificial-absorber-comparison.tex)
+- [TikZ lineage source](../../figures/analysis-notebook-lineage.tex)
+
+```{=latex}
+\FloatBarrier
+```

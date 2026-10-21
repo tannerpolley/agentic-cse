@@ -1,0 +1,58 @@
+\input{tex/shared-preamble.tex}
+\KOMAoptions{parskip=half}
+\usepackage{setspace}
+\setstretch{1.04}
+\usepackage[automark,headsepline]{scrlayer-scrpage}
+\clearpairofpagestyles
+\ihead{Quarto + LaTeX chemical-engineering showcase}
+\ohead{\pagemark}
+\pagestyle{scrheadings}
+\usepackage{amsthm}
+\usepackage{thmtools}
+\declaretheoremstyle[
+  headfont=\bfseries\color{cseBlue},
+  bodyfont=\normalfont,
+  spaceabove=6pt,
+  spacebelow=6pt
+]{cseassumption}
+\declaretheorem[style=cseassumption,name=Engineering assumption]{assumption}
+\usepackage{enumitem}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{listings}
+\usepackage{algorithmicx}
+\usepackage{algpseudocode}
+\usepackage[most]{tcolorbox}
+\usepackage{pdflscape}
+\usepackage{placeins}
+\usepackage{xurl}
+\usepackage{bookmark}
+\usepackage[nameinlink,noabbrev]{cleveref}
+\usepackage[abbreviations,symbols]{glossaries-extra}
+\makenoidxglossaries
+\newabbreviation{pfd}{PFD}{process flow diagram}
+\newabbreviation{pid}{P\&ID}{piping and instrumentation diagram}
+\newabbreviation{cstr}{CSTR}{continuous stirred-tank reactor}
+\newabbreviation{vle}{VLE}{vapor-liquid equilibrium}
+\newglossaryentry{conversion}{name=conversion,description={fraction of a limiting reactant consumed}}
+\newglossaryentry{residence-time}{name=residence time,description={time a material element spends in a system}}
+\tcbset{
+  csebox/.style={
+    enhanced,
+    breakable,
+    colback=csePaper,
+    colframe=cseBlue,
+    boxrule=0.6pt,
+    arc=2pt,
+    left=5pt,right=5pt,top=5pt,bottom=5pt
+  }
+}
+\lstset{
+  basicstyle=\ttfamily\small,
+  frame=single,
+  rulecolor=\color{cseSky},
+  keywordstyle=\color{cseBlue}\bfseries,
+  commentstyle=\color{cseGreen!70!black},
+  breaklines=true,
+  showstringspaces=false
+}

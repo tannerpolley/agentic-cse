@@ -1,0 +1,26 @@
+project:
+  type: default
+  output-dir: builds
+
+execute:
+  enabled: false
+
+format:
+  pdf:
+    pdf-engine: lualatex
+    latex-auto-install: false
+    keep-tex: true
+    documentclass: scrartcl
+    classoption:
+      - oneside
+      - headings=normal
+    fontsize: 10pt
+    geometry:
+      - left=0.62in
+      - right=0.62in
+      - top=0.55in
+      - bottom=0.55in
+    fig-pos: H
+    include-in-header:
+      - promoted-pdf-header.tex
+      - figure-header.tex

@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Research and design — Setup"
+  short_description: "Establish or revise a repository's CSE setup"
+  default_prompt: "Use $cse:setup to establish or revise this repository's scientific setup for the work."

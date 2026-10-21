@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Sources — Data"
+  short_description: "Query and trace retained scientific data"
+  default_prompt: "Use $cse:data to inspect and trace the retained scientific data for this question."

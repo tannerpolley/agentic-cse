@@ -1,0 +1,18 @@
+\begin{tikzpicture}[node distance=11mm and 15mm]
+  \node[draw,shape=pump,minimum width=12mm,minimum height=9mm] (pump) {};
+  \node[draw,shape=valve,right=24mm of pump,minimum width=11mm,minimum height=8mm] (valve) {};
+  \node[draw,shape=column,right=27mm of valve,minimum width=13mm,minimum height=30mm] (column) {};
+  \draw[cse stream] (pump.east) -- (valve.west);
+  \draw[cse stream] (valve.east) -- (column.west);
+  \node[circle,draw=cseOrange,fill=white,above=13mm of valve] (fc) {FC};
+  \draw[cse signal] (fc) -- (valve.north);
+  \node[cse note,below=6mm of pump] {P-101};
+  \node[cse note,below=6mm of valve] {FV-101};
+  \node[cse note,below=6mm of column] {T-101};
+
+  \begin{scope}[xshift=9.0cm,yshift=-.2cm]
+    \draw (0,0) to[sV,l=$V_s$] (0,2)
+      to[R,l=$R_s$] (2.1,2)
+      to[C,l=$C_m$] (2.1,0) -- (0,0);
+  \end{scope}
+\end{tikzpicture}

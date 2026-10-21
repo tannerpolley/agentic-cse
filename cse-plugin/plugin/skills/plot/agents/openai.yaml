@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Rendering — Plot"
+  short_description: "Plot retained model, data, and uncertainty"
+  default_prompt: "Use $cse:plot to create a clear model-versus-data figure for this result."

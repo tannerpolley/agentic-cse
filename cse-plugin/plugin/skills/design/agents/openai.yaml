@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Research and design — Design"
+  short_description: "Design and publish the scientific work issue"
+  default_prompt: "Use $cse:design to design this scientific work and publish its GitHub issue when the repository uses GitHub issues."

@@ -1,0 +1,11 @@
+project:
+  type: default
+  output-dir: builds
+
+# A normal or release render never executes document code.
+execute:
+  enabled: false
+
+format:
+  html:
+    embed-resources: true

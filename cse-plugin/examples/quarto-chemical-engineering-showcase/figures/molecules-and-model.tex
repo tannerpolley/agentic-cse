@@ -1,0 +1,23 @@
+\begin{minipage}[t]{0.46\linewidth}
+\centering
+\chemfig{CH_3-CH_2-OH}
+\qquad
+\chemfig{H-O-H}
+
+\smallskip
+\ce{CH3CH2OH + 3 O2 -> 2 CO2 + 3 H2O}
+
+\smallskip
+\scriptsize\texttt{chemfig} draws structure; \texttt{mhchem} writes reactions.
+\end{minipage}\hfill
+\begin{minipage}[t]{0.50\linewidth}
+\centering
+\begin{forest}
+  for tree={draw,rounded corners,align=center,font=\scriptsize,
+    edge={-Latex},l sep=8mm,s sep=2mm}
+  [Reactor model
+    [Balances [Mass] [Energy]]
+    [Closure [Kinetics] [Heat transfer]]
+  ]
+\end{forest}
+\end{minipage}

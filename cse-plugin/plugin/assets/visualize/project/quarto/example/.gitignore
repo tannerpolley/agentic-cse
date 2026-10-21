@@ -1,0 +1,8 @@
+/.quarto/
+/builds/
+/figures/generated/*
+/*.aux
+/*.log
+/notebook.tex
+/*.html
+/*.pdf

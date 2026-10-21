@@ -1,0 +1,55 @@
+# LaTeX auxiliary files
+*.aux
+*.bcf
+*.bbl
+*.blg
+*.fdb_latexmk
+*.fls
+*.idx
+*.ilg
+*.ind
+*.lof
+*.log
+*.lot
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.nav
+*.snm
+*.vrb
+
+# Generated documents. Retained analysis and shared manuscript figures are not
+# ignored; only document builds and rendered notebook views are disposable.
+docs/scientific/latex/builds/
+analyses/**/notebook.pdf
+analyses/**/notebook.html
+analyses/**/notebook_files/
+
+# Python and tool caches
+__pycache__/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+tmp/
+build/
+dist/
+*.egg-info/
+
+# Private research notes and disposable analysis runs
+.research/
+notes/
+analyses/**/scratch/
+analyses/**/results/runs/
+analyses/**/results/*.tmp
+analyses/**/figures/*.tmp
+
+# Local editor and operating-system files
+.DS_Store
+*.swp
+*.swo
+
+# Do not ignore docs/scientific/latex/references.bib, small retained CSV tables, or
+# retained PDF, PNG, and SVG analysis figures. They become versioned evidence
+# when a future study actually produces them.

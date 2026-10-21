@@ -1,0 +1,100 @@
+\documentclass[11pt]{article}
+\usepackage{amsmath,amssymb,booktabs,geometry,siunitx}
+\usepackage[hidelinks]{hyperref}
+\geometry{margin=1in}
+\begin{document}
+
+\title{Numerical methods and discrete reference oracles}
+\author{cse-heat-equation-example}
+\date{}
+\maketitle
+
+\section{Uniform grid}
+
+Both methods use
+\[
+  \xi_i=i\Delta\xi,\qquad Fo^n=n\Delta Fo,
+  \qquad i=0,\ldots,N,
+\]
+with \(\Delta\xi=1/N\), an integer number of equal time steps, exact zero
+boundaries, and
+\[
+  r=\frac{\Delta Fo}{(\Delta\xi)^2}.
+\]
+
+\section{M-FTCS-001: forward-time centered-space}
+
+The project-derived explicit update is
+\begin{equation}
+  \theta_i^{n+1}
+  =\theta_i^n+r\left(
+    \theta_{i-1}^n-2\theta_i^n+\theta_{i+1}^n
+  \right),
+  \qquad i=1,\ldots,N-1.
+  \label{eq:ftcs}
+\end{equation}
+It is first order in \(\Delta Fo\), second order in \(\Delta\xi\), and
+linearly stable for this diffusion stencil only when
+\begin{equation}
+  r\leq\frac{1}{2}.
+  \label{eq:ftcs-stability}
+\end{equation}
+\texttt{solve\_ftcs} rejects a larger value before time integration.
+
+\section{M-CN-001: Crank-Nicolson}
+
+Trapezoidal centering of the same spatial difference gives
+\begin{equation}
+\begin{split}
+  \theta_i^{n+1}-\theta_i^n
+  =\frac{r}{2}\big[&
+    \theta_{i-1}^{n+1}-2\theta_i^{n+1}+\theta_{i+1}^{n+1}\\
+    &+\theta_{i-1}^{n}-2\theta_i^n+\theta_{i+1}^n
+  \big].
+\end{split}
+\label{eq:crank-nicolson}
+\end{equation}
+The historical finite-difference form appears in Crank and Nicolson (1947),
+Section 4, equation (16), printed pages 54--55, DOI
+\texttt{10.1017/S0305004100023197}. Zotero parent \texttt{NPC9836V}, PDF
+child \texttt{R4GC8HTF}, and Markdown child \texttt{I5DDQJH8} identify the
+exact evidence chain.
+
+The implementation solves the tridiagonal interior system with
+\texttt{scipy.linalg.solve\_banded}. It records the maximum algebraic residual
+over all time steps. The method is second order in both increments for the
+smooth declared case. Its linear \(L^2\) stability for positive \(r\) does not
+imply unconditional monotonicity. Crank and Nicolson discuss the damping of
+Method III error modes and slowly disappearing oscillation for large step
+ratio in Section 7(b), printed page 59.
+
+\section{Discrete amplification oracles}
+
+For phase \(\mu\), the centered difference contributes
+\(-4\sin^2(\mu/2)\). Independent substitution into the two declared schemes
+gives
+\begin{align}
+  G_{\mathrm{FTCS}}(\mu,r)
+  &=1-4r\sin^2(\mu/2),
+  \label{eq:ftcs-amplification}\\
+  G_{\mathrm{CN}}(\mu,r)
+  &=\frac{1-2r\sin^2(\mu/2)}
+          {1+2r\sin^2(\mu/2)}.
+  \label{eq:cn-amplification}
+\end{align}
+These oracles are evaluated separately from the stencil and linear-solve code.
+For the worst grid mode, \(\mu=\pi\), FTCS reaches \(-1\) at \(r=1/2\) and
+then becomes unstable. Crank-Nicolson remains within unit magnitude for every
+positive \(r\), but its factor becomes negative above \(r=1/2\), so a
+high-frequency component can alternate in sign.
+
+\section{Implementation and tests}
+
+The public methods and oracles live in
+\texttt{src/heat\_verification/model.py}. The compact test matrix in
+\path{tests/test_scientific_behavior.py} protects the reference case,
+discrete-mode reproduction, exact boundaries, FTCS rejection, the stability
+versus monotonicity distinction, and entry into the second-order combined
+refinement regime.
+
+\end{document}

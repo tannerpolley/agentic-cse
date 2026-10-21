@@ -1,0 +1,20 @@
+version: 2
+records:
+  - plot_id: heat_verification_solution_overlay
+    title: Numerical and continuous heat-equation fields
+    svg_path: analyses/heat_verification/figures/solution_overlay/output/solution_overlay.svg
+    sidecar_path: analyses/heat_verification/figures/solution_overlay/output/solution_overlay.mpl.yaml
+    data_path: analyses/heat_verification/figures/solution_overlay/output/solution_overlay.csv
+    source: project-render
+  - plot_id: heat_verification_refinement
+    title: Spatial-temporal and isolated-time refinement
+    svg_path: analyses/heat_verification/figures/refinement/output/refinement.svg
+    sidecar_path: analyses/heat_verification/figures/refinement/output/refinement.mpl.yaml
+    data_path: analyses/heat_verification/figures/refinement/output/refinement.csv
+    source: project-render
+  - plot_id: heat_verification_amplification
+    title: Worst-mode amplification and monotonicity
+    svg_path: analyses/heat_verification/figures/amplification/output/amplification.svg
+    sidecar_path: analyses/heat_verification/figures/amplification/output/amplification.mpl.yaml
+    data_path: analyses/heat_verification/figures/amplification/output/amplification.csv
+    source: project-render

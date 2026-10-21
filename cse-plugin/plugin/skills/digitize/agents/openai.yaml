@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Sources — Digitize"
+  short_description: "Recover calibrated figure values with QA"
+  default_prompt: "Use $cse:digitize to extract calibrated data from this figure."

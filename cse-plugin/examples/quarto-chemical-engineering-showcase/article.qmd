@@ -1,0 +1,424 @@
+---
+title: "Quarto + LaTeX: a chemical-engineering bundle in action"
+subtitle: "A working article template and package-use map"
+format:
+  pdf:
+    pdf-engine: lualatex
+    latex-auto-install: false
+    keep-tex: true
+    toc: true
+    number-sections: true
+    colorlinks: true
+    include-in-header:
+      - tex/article-preamble.tex
+    papersize: a4
+    documentclass: scrartcl
+    classoption:
+      - DIV=11
+      - headings=normal
+---
+
+## Bundle scope
+
+This document is rendered by Quarto, transformed by Pandoc, and compiled by
+LuaLaTeX. It demonstrates how a chemical engineer can combine consistent
+units, reaction notation, equations, tables, process diagrams, control
+schematics, molecular structures, reusable terminology, algorithms, and
+table-driven scientific plots in one reproducible source system. The values
+are illustrative and do not represent experimental or validation data.
+
+::: {#fig-pieces-fit}
+```{=latex}
+\centering
+\input{figures/how-pieces-fit.tex}
+```
+
+How the pieces fit: Quarto owns the document workflow while LaTeX packages
+provide focused notation and rendering tools.
+:::
+
+Quarto is the manager rather than another competing typesetting layer
+[@quarto2026]. TikZ and PGFPlots remain inspectable LaTeX sources
+[@tikz2026; @pgfplots2026].
+
+## Scientific notation that stays consistent
+
+The material balance for species $A$ in a constant-volume
+\gls{cstr} can be written with `derivative`, `mathtools`, and
+`unicode-math` as
+
+```{=latex}
+\begin{equation}
+  V\pdv{C_A}{t}=F(C_{A,0}-C_A)-VkC_A,
+  \qquad
+  \symbf{N}\,\symbf{r}=\symbf{0}.
+\end{equation}
+```
+
+`siunitx` owns values, uncertainty, ranges, and numeric alignment. `multirow`
+groups related measurements without repeating labels, while `makecell` keeps a
+multiline numeric heading compact:
+
+```{=latex}
+\begin{center}
+\begin{threeparttable}
+\caption{Illustrative operating conditions.}
+\begin{tabular}{@{}ll S[table-format=3.2] l@{}}
+\toprule
+Location & Quantity & {\makecell{Value\\(illustrative)}} & {Unit} \\
+\midrule
+\multirow{2}{*}{Feed} & Temperature & 355.20 & \si{\kelvin} \\
+ & Pressure & 4.70 & \si{\barunit} \\
+\addlinespace
+\multirow{2}{*}{Reactor} & Molar flow & 12.20 & \si{\kmol\per\hour} \\
+ & Heat duty & -48.3 & \si{\kilo\watt} \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}[flushleft]\footnotesize
+\item Values demonstrate formatting only. A project table must record its source and basis.
+\end{tablenotes}
+\end{threeparttable}
+\end{center}
+```
+
+`mhchem` handles formulas and reactions:
+$\ce{CO2(aq) + 2 RNH2 <=> RNHCOO- + RNH3+}$.
+`chemnum` supplies stable compound identifiers such as solvent
+\cmpd{solvent} and product \cmpd{product}. In teaching material, `cancel`
+can expose an assumption without changing the governing equation:
+$\cancel{\pdv{C_A}{t}}=0$ at steady state.
+
+```{=latex}
+\begin{assumption}[Ideal illustrative reactor]
+The gallery neglects axial dispersion and heat loss. This assumption is a
+typesetting example, not a claim about a physical plant.
+\end{assumption}
+```
+
+## Matrix and table tools
+
+`nicematrix` makes block structure visible in a Jacobian while keeping the
+mathematics editable:
+
+```{=latex}
+\[
+\begin{bNiceMatrix}[first-row,first-col]
+  & C_A & T & P \\
+f_A & -F/V-k & -C_A\pdv{k}{T} & 0 \\
+f_T & -\Delta H\,k & -UA/(\rho C_pV) & 0 \\
+f_P & 0 & 0 & 1 \\
+\CodeAfter
+  \SubMatrix[{1-1}{2-2}]
+\end{bNiceMatrix}
+\]
+```
+
+The same retained CSV can feed both a table and a plot. `pgfplotstable`
+formats the data without recomputing it:
+
+```{=latex}
+\begin{center}
+\pgfplotstabletypeset[
+  col sep=comma,
+  columns={volume,model,observation,lower,upper},
+  every head row/.style={before row=\toprule,after row=\midrule},
+  every last row/.style={after row=\bottomrule},
+  columns/volume/.style={
+    column name={\multicolumn{1}{c}{Volume / \si{\meter\cubed}}},
+    column type={S[table-format=1.1]},string type
+  },
+  columns/model/.style={
+    column name={\multicolumn{1}{c}{Model}},
+    column type={S[table-format=1.2]},string type
+  },
+  columns/observation/.style={
+    column name={\multicolumn{1}{c}{Observation}},
+    column type={S[table-format=1.2]},string type
+  },
+  columns/lower/.style={
+    column name={\multicolumn{1}{c}{Lower}},
+    column type={S[table-format=1.2]},string type
+  },
+  columns/upper/.style={
+    column name={\multicolumn{1}{c}{Upper}},
+    column type={S[table-format=1.2]},string type
+  }
+]{data/reactor-profile.csv}
+\end{center}
+```
+
+Use `longtable`, `csvsimple`, and `pdflscape` when the content truly needs
+continued pages, CSV row selection, or landscape orientation. They are not
+reasons to make every table complicated.
+
+```{=latex}
+\newpage
+```
+
+## Process and instrumentation diagrams
+
+::: {#fig-pfd}
+```{=latex}
+\centering
+\adjustbox{max width=\linewidth}{\input{figures/process-flow.tex}}
+```
+
+A simplified PFD using `chemplants`, TikZ paths, semantic stream arrows, and
+source-sized geometry.
+:::
+
+```{=latex}
+\FloatBarrier
+```
+
+::: {#fig-pid}
+```{=latex}
+\centering
+\adjustbox{max width=\linewidth}{\input{figures/pid-control.tex}}
+```
+
+`chempid` supplies P&ID symbols, while `circuitikz` expresses an electrical
+sensor analogue. Project conventions still decide tag and symbol meaning.
+:::
+
+```{=latex}
+\FloatBarrier
+\newpage
+```
+
+## Molecules, reactions, and model hierarchy
+
+::: {#fig-chemistry-model}
+```{=latex}
+\centering
+\input{figures/molecules-and-model.tex}
+```
+
+`chemfig`, `mhchem`, and `forest` cover three different abstractions:
+structure, reaction notation, and hierarchy.
+:::
+
+```{=latex}
+\FloatBarrier
+```
+
+## TikZ as the semantic diagram layer
+
+::: {#fig-tikz-gallery}
+```{=latex}
+\centering
+\adjustbox{max width=\linewidth}{\input{figures/tikz-tool-gallery.tex}}
+```
+
+The core libraries provide relative placement, matrices, calculated geometry,
+intersections, semantic shapes, fitted regions, background layers, and modern
+arrows. `tikz-ext` adds multi-node positioning, orthogonal routing, node-family
+sizing, convenient layers, path arrows, true arc-to operations, arcs through a
+point, and controlled whole-picture sizing when those gaps are real.
+:::
+
+```{=latex}
+\FloatBarrier
+```
+
+::: {#fig-tikz-ext-gallery}
+```{=latex}
+\centering
+\adjustbox{max width=\linewidth}{\input{figures/tikz-ext-gallery.tex}}
+```
+
+Four independent subfigures keep unrelated demonstrations in separate
+coordinate systems: (a) relative positioning and shared node dimensions,
+(b) orthogonal signal routing and layers, (c) path operations, and (d) the
+grayscale-safe packing and repeated flow direction.
+`ext.topaths.arcthrough` and
+`ext.scalepicture` remain documented, version-gated APIs; this build does not
+load them because their advertised path/key syntax does not execute under the
+installed 2026 toolchain.
+:::
+
+```{=latex}
+\FloatBarrier
+```
+
+`tikzmark` connects prose to a diagram without converting the sentence to an
+image. Here the \tikzmarknode{balance-anchor}{mass balance} is a named anchor.
+
+```{=latex}
+\begin{tikzpicture}[remember picture,overlay]
+  \node[cse note,anchor=north] (balance-note)
+    at ([yshift=-8mm]balance-anchor.south) {named prose anchor};
+  \draw[-Latex,cseOrange,thick]
+    (balance-note.north) -- ([yshift=-1mm]balance-anchor.south);
+\end{tikzpicture}
+```
+
+## PGFPlots renders retained scientific values
+
+::: {#fig-quantitative}
+```{=latex}
+\centering
+\input{figures/quantitative-plots.tex}
+```
+
+`groupplots` aligns panels, `fillbetween` renders a stated uncertainty region,
+and `statistics` draws a prepared box plot. Models remain lines and illustrative
+observations remain points.
+:::
+
+```{=latex}
+\FloatBarrier
+```
+
+::: {#fig-coordinate-systems}
+```{=latex}
+\centering
+\input{figures/composition-and-polar.tex}
+```
+
+`ternary` displays normalized composition data; `polar` displays a cyclic
+response. The selected `colormaps` library provides the continuous palette;
+`colorbrewer` remains conditional for categorical or multi-series work, while
+`patchplots` is reserved for small reviewed meshes.
+:::
+
+```{=latex}
+\FloatBarrier
+```
+
+::: {#fig-patch-field}
+```{=latex}
+\centering
+\input{figures/patch-field.tex}
+```
+
+`patchplots` and a perceptually ordered colormap render a small reviewed
+triangular field. Larger fields belong in analysis code.
+:::
+
+```{=latex}
+\FloatBarrier
+```
+
+## Algorithms, code, callouts, and lists
+
+```{=latex}
+\begin{tcolorbox}[csebox,title={A useful engineering callout}]
+A nonlinear solver success flag is not physical acceptance. Check residuals,
+conservation, bounds, phase identity, and sensitivity to initialization.
+\end{tcolorbox}
+
+\begin{algorithmic}[1]
+\Require Feed state, specifications, tolerances
+\State Normalize composition and verify units
+\State Solve material and energy balances
+\If{residuals and physical acceptance tests pass}
+  \State retain the state and diagnostics
+\Else
+  \State report the failure class
+\EndIf
+\end{algorithmic}
+```
+
+Raw LaTeX can use `listings`; Quarto normally owns fenced-code highlighting:
+
+```python
+def conversion(c_in, c_out):
+    if c_in <= 0:
+        raise ValueError("inlet concentration must be positive")
+    return (c_in - c_out) / c_in
+```
+
+`enumitem` is appropriate when an author-controlled article needs deliberate
+list spacing. Beamer keeps ownership of slide lists.
+
+## Layout and visual QA defaults
+
+1. design shared figures at the smallest article or Beamer placement;
+2. anchor labels so they grow away from paths and page edges;
+3. place panel captions below a named bounding box with an explicit gutter;
+4. route connectors separately from nodes and prose, and isolate unrelated path demonstrations;
+5. render every final page and inspect it at full size;
+6. keep figures inside semantic sections with `\FloatBarrier` where needed;
+7. use contact sheets for flow, not as the only overlap check.
+
+`chktex`, `lacheck`, and `texfot` are useful source and log checks, but raster
+inspection remains the acceptance test for overlap, clipping, and legibility.
+See `plugin/references/visualize/latex-layout-and-qa.md` for the release sequence.
+
+## Package profiles
+
+Load only the packages required by the selected output profile. The table names
+the default owner for each role and incompatible alternatives:
+
+| Role | Use here or add when triggered | Do not combine by default |
+|---|---|---|
+| Fonts and math | `fontspec`, `unicode-math`, `mathtools`, `derivative`, `microtype` | `bm` belongs to a traditional math-font profile |
+| Chemistry | `mhchem`, `chemfig`, `chemnum` | `chemmacros` replaces the chemistry syntax when its wider model is required |
+| Tables | `booktabs`, `siunitx`, `threeparttable`, `pgfplotstable`; conditional `longtable`, `multirow`, `makecell`, `csvsimple`, `pdflscape` | `tabularray` is a complete alternative table system |
+| Terms | `glossaries-extra` | `acro` is the acronym-only alternative |
+| Code | Quarto highlighting; `listings` for raw LaTeX | `minted` only with a trusted source and resolved external highlighter |
+| Algorithms | `algorithmicx` + `algpseudocode` | `algorithm2e` is a complete replacement |
+| Document structure | `subfiles`, `import`, `xr-hyper`, `pdfpages` when the project shape requires them | Keep a flat source tree until scale proves otherwise |
+| Identity and links | Quarto links plus `xurl`; conditional `orcidlink` | Let venue classes own their hyperlink stack |
+| Draft/review | Git + `latexdiff`; conditional `lineno`, `changes`, `todonotes` | Remove draft markup from final output |
+| Beamer | Moloch, `appendixnumberbeamer`; conditional `pdfpc`, tested-viewer `animate` | Beamer owns geometry, navigation, colors, and lists |
+| External media | `graphicx`; conditional `svg` with a controlled Inkscape route | Prefer a committed PDF for portable publication builds |
+
+`standalone` is the reuse boundary for a TikZ or PGFPlots figure that must
+compile independently. `adjustbox` can constrain reviewed content, but it
+must not hide unreadable design. TikZ `external` is a measured performance
+mode, not a default; its controlled build owns the cache. `tikzscale`,
+`tikzplotlib`, `gnuplottex`, novelty diagram packages, and direct shell calls
+remain outside the selected bundle because the native sources already cover
+the intended jobs.
+
+## Quarto templates for real projects
+
+The article profile keeps stable packages in `tex/article-preamble.tex`:
+
+```yaml
+format:
+  pdf:
+    pdf-engine: lualatex
+    keep-tex: true
+    include-in-header:
+      - tex/article-preamble.tex
+```
+
+The Beamer profile uses a smaller header and lets the class own slide layout:
+
+```yaml
+format:
+  beamer:
+    pdf-engine: lualatex
+    theme: moloch
+    aspectratio: 169
+    include-in-header:
+      - tex/beamer-preamble.tex
+```
+
+Inspect generated TeX when package order or a Pandoc transformation is
+uncertain. Keep scientific calculations outside TeX and feed retained values
+to the document layer.
+
+## Terminology
+
+The sample used \gls{conversion}, \gls{residence-time}, \gls{pfd}, \gls{pid},
+\gls{cstr}, and \gls{vle} as examples of reusable terminology.
+
+```{=latex}
+\printnoidxglossary[type=\acronymtype,title={Acronyms}]
+\printnoidxglossary[title={Terms}]
+```
+
+```{=latex}
+\appendix
+```
+
+{{< include appendices/supported-tools.qmd >}}
+
+## References
+
+::: {#refs}
+:::

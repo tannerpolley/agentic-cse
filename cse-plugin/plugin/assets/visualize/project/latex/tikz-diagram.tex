@@ -1,0 +1,16 @@
+% Copy this body into docs/scientific/latex/figures/tikz/<figure-id>.tex.
+% Load figure-styles.tex from the manuscript preamble first.
+\begin{tikzpicture}[node distance=11mm and 17mm]
+  \begin{scope}[local bounding box=panel-content]
+    \node[cse node] (question) {Scientific\\question};
+    \node[cse node, right=of question] (model) {Equation\\or model};
+    \node[cse node, right=of model] (result) {Result\\and evidence};
+    \draw[cse arrow] (question) -- (model);
+    \draw[cse arrow] (model) -- (result);
+  \end{scope}
+  \begin{scope}[on background layer]
+    \node[cse panel frame, fit=(panel-content)] (panel-frame) {};
+  \end{scope}
+  \node[cse panel caption, below=4mm of panel-frame.south]
+    {Model and evidence flow};
+\end{tikzpicture}

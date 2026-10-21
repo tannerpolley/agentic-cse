@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Execute and deliver — Build"
+  short_description: "Resolve an issue in models or research code"
+  default_prompt: "Use $cse:build to resolve this agreed scientific implementation issue."

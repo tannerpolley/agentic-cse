@@ -1,0 +1,86 @@
+\begin{tabular}{@{}c@{\hspace{4mm}}c@{}}
+% (a) Relative placement and shared node dimensions.
+\begin{tikzpicture}[
+  node distance=6mm,
+  every node/.append style={font=\scriptsize}
+]
+  \begin{scope}[local bounding box=positioning-content]
+    \node[cse tool,ext/node family={width=operations,height=operations}] (feed) {Feed};
+    \node[cse tool,ext/node family={width=operations,height=operations},right=of feed] (react) {Long reactor label};
+    \node[cse tool,ext/node family={width=operations,height=operations},right=of react] (product) {Product};
+    \draw[cse flow] (feed) -- (react);
+    \draw[cse flow] (react) -- (product);
+    \node[cse note,draw=cseSky,rounded corners,above=2mm of react,
+      ext/span horizontal={(feed)(product)}] (span) {positioning-plus};
+  \end{scope}
+  \node[ext/node on layer=background,cse panel frame,fit=(positioning-content)]
+    (positioning-panel) {};
+  \node[cse panel caption,below=4mm of positioning-panel.south]
+    {(a) positioning + node families};
+\end{tikzpicture}
+&
+% (b) Orthogonal routing and layer separation.
+\begin{tikzpicture}[
+  every node/.append style={font=\scriptsize}
+]
+  \begin{scope}[local bounding box=routing-content]
+    \node[cse tool] (sensor) {sensor};
+    \node[cse tool,right=18mm of sensor] (controller) {controller};
+    \draw[cse signal] (sensor.east) r-rl (controller.west);
+  \end{scope}
+  \node[ext/node on layer=background,cse panel frame,fit=(routing-content),fill=cseSky!12]
+    (routing-panel) {};
+  \node[cse panel caption,below=4mm of routing-panel.south]
+    {(b) orthogonal routing + layers};
+\end{tikzpicture}
+\\[5mm]
+% (c) Each path operation owns a separate row and coordinate system.
+\begin{tikzpicture}[
+  every node/.append style={font=\scriptsize}
+]
+  \begin{scope}[local bounding box=path-content]
+    \node[cse note,anchor=east] (arrow-label) at (0,0) {arrow};
+    \coordinate (arrow-start) at ([xshift=3mm]arrow-label.east);
+    \coordinate (arrow-end) at ([xshift=13mm]arrow-start);
+    \draw[thick,csePurple]
+      (arrow-start) .. controls ([xshift=6.5mm,yshift=3mm]arrow-start) .. (arrow-end)
+      pic[pos=.55]{ext/arrow={Latex}};
+
+    \node[cse note,anchor=east] (arc-label) at (0,-.75) {arc-to};
+    \coordinate (arc-start) at ([xshift=3mm]arc-label.east);
+    \coordinate (arc-end) at ([xshift=13mm]arc-start);
+    \draw[thick,cseOrange] (arc-start) arc to[radius=.65] (arc-end);
+
+    \node[cse note,anchor=east] (control-label) at (0,-1.5) {control};
+    \coordinate (control-start) at ([xshift=3mm]control-label.east);
+    \coordinate (control-end) at ([xshift=13mm]control-start);
+    \coordinate (control-point) at ([xshift=6.5mm,yshift=2mm]control-start);
+    \draw[thick,cseGreen] (control-start) .. controls (control-point) .. (control-end);
+    \fill[cseGreen] (control-point) circle (1.4pt);
+  \end{scope}
+
+  \node[ext/node on layer=background,cse panel frame,fit=(path-content)]
+    (path-panel) {};
+  \node[cse panel caption,below=4mm of path-panel.south]
+    {(c) isolated path operations};
+\end{tikzpicture}
+&
+% (d) Grayscale-safe packing and repeated flow direction.
+\begin{tikzpicture}[
+  every node/.append style={font=\scriptsize}
+]
+  \begin{scope}[local bounding box=encoding-content]
+    \node[cse tool,minimum width=34mm,minimum height=12mm,
+      pattern={Lines[angle=45,distance=3pt]},pattern color=cseSky] (bed) {};
+    \node[cse note,fill=white,inner sep=1pt] at ([yshift=2.5mm]bed.center)
+      {packed bed};
+    \draw[thick,cseBlue,postaction={decorate},decoration={markings,
+      mark=at position .55 with {\arrow{Latex}}}]
+      ([yshift=-3mm]bed.west) -- ([yshift=-3mm]bed.east);
+  \end{scope}
+  \node[ext/node on layer=background,cse panel frame,fit=(encoding-content)]
+    (encoding-panel) {};
+  \node[cse panel caption,below=4mm of encoding-panel.south]
+    {(d) pattern + path marking};
+\end{tikzpicture}
+\end{tabular}

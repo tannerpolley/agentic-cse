@@ -1,0 +1,2 @@
+# Zotero-owned Better BibTeX keys cited by this project.
+crankPracticalMethodNumerical1947

@@ -1,0 +1,33 @@
+\providecommand{\absorberdatatable}{data/artificial-absorber-profile.csv}
+\begin{tikzpicture}
+\begin{axis}[
+  cse research axis,
+  width=0.92\linewidth,
+  height=0.54\linewidth,
+  xlabel={Packed height (\si{\meter})},
+  ylabel={Gas-phase \ce{CO2} (\si{\percent})},
+  xmin=-0.15,
+  xmax=6.15,
+  ymin=2.0,
+  ymax=12.8,
+  legend pos=north east,
+]
+  \addplot[cse research model]
+    table[x=height_m,y=model_co2_pct,col sep=comma]
+    {\absorberdatatable};
+  \addlegendentry{Artificial model}
+
+  \addplot+[
+    cse research observation,
+    error bars/.cd,
+    y dir=both,
+    y explicit,
+  ] table[
+    x=height_m,
+    y=observation_co2_pct,
+    y error=uncertainty_pct,
+    col sep=comma,
+  ] {\absorberdatatable};
+  \addlegendentry{Artificial observations}
+\end{axis}
+\end{tikzpicture}

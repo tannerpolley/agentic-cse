@@ -1,0 +1,9 @@
+/.quarto/
+/_site/
+/_freeze/
+/*.aux
+/*.log
+/notebook.tex
+/*.html
+/*.pdf
+/*_files/

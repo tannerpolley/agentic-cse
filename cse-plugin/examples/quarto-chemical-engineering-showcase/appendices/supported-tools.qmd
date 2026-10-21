@@ -1,0 +1,270 @@
+## Supported bundle tool catalog
+
+This appendix is the complete curated bundle inventory, not a claim that every
+CTAN package belongs in one preamble. **Core** tools normally belong in the
+matching profile. **Conditional** tools are supported when their named job
+appears. **Alternative** tools replace a selected system. **Exception** tools
+require a tested external workflow or viewer. **Excluded** tools are recorded
+so an agent does not select them accidentally.
+
+### Workflow, engine, and typography
+
+| Tool | Status | Job |
+|---|---|---|
+| Quarto | Core | Own `.qmd` profiles, citations, code blocks, cross-references, and multi-format rendering. |
+| Pandoc | Core through Quarto | Transform the document model into article or Beamer LaTeX. |
+| LuaLaTeX | Core | Compile Unicode text and OpenType mathematics; required for graph drawing. |
+| `latexmk` | Conditional | Drive repeated raw-LaTeX compilation outside Quarto. |
+| `fontspec` | Core with LuaLaTeX | Select OpenType or TrueType text fonts. |
+| `unicode-math` | Core with LuaLaTeX | Select Unicode mathematics and provide `\symbf`. |
+| `microtype` | Core for articles | Improve protrusion, expansion, and spacing. |
+| `xcolor` | Core | Define semantic colors for figures, links, and callouts. |
+| `geometry` | Conditional | Set author-controlled article, report, or thesis margins. |
+| `setspace` | Conditional | Meet an explicit line-spacing requirement. |
+| `fancyhdr` | Conditional | Add headers and footers when the class does not own them. |
+
+### Mathematics, quantities, and chemistry
+
+| Tool | Status | Job |
+|---|---|---|
+| `mathtools` | Core | Extend AMS mathematics environments and symbols. |
+| `derivative` | Core when derivatives appear | Keep ordinary, partial, material, and higher derivatives consistent. |
+| `siunitx` | Core | Typeset values, units, ranges, uncertainty, scientific notation, and numeric columns. |
+| `amsthm` | Conditional | Define theorem, definition, assumption, and proof environments. |
+| `thmtools` | Conditional companion | Define declarative theorem styles and lists. |
+| `nicematrix` | Conditional | Annotate block Jacobians, Hessians, stoichiometric matrices, and bordered arrays. |
+| `cancel` | Teaching only | Expose canceled terms in instructional derivations. |
+| `bm` | Alternative | Bold traditional math fonts when `unicode-math` is not the selected architecture. |
+| `mhchem` | Core chemistry syntax | Typeset formulas, phases, charges, reactions, and equilibrium arrows. |
+| `chemfig` | Conditional | Draw document-native two-dimensional molecular structures. |
+| `chemnum` | Conditional | Assign stable labels to repeatedly discussed compounds. |
+| `chemmacros` with `chemformula` | Alternative | Replace the chemistry syntax when broader chemistry conventions are required. |
+
+### Tables and retained values
+
+| Tool | Status | Job |
+|---|---|---|
+| `booktabs` | Core | Use restrained horizontal rules and whitespace. |
+| `threeparttable` | Core when notes exist | Keep caption, table, and notes at one width. |
+| `pgfplotstable` | Selected | Format the same retained tables used by PGFPlots. |
+| `longtable` | Conditional | Continue a table across pages. |
+| `multirow` | Conditional | Group repeated row categories. |
+| `makecell` | Conditional | Make compact multiline headers and cells. |
+| `csvsimple` | Conditional | Filter CSV rows or generate repeated LaTeX content. |
+| `pdflscape` | Conditional | Rotate a wide table page with correct PDF orientation. |
+| `tabularray` | Alternative | Replace the traditional stack for complex author-controlled tables. |
+
+### Figures, process diagrams, and reusable sources
+
+| Tool | Status | Job |
+|---|---|---|
+| `graphicx` | Core | Include, crop, scale, and rotate reviewed external graphics. |
+| TikZ | Selected | Draw semantic schematics, geometry, workflows, and process concepts. |
+| PGFPlots | Selected | Render modest retained tables with document-matched axes and typography. |
+| `standalone` | Conditional | Compile a reusable TikZ or PGFPlots source independently. |
+| `adjustbox` | Conditional | Constrain or crop reviewed content without repairing bad source geometry. |
+| `chemplants` | Conditional | Supply simplified process-flow equipment symbols. |
+| `chempid` | Conditional | Supply P&ID symbols after checking the project convention. |
+| `circuitikz` | Conditional | Draw electrical instrumentation, sensors, and control hardware. |
+| `forest` | Conditional | Draw compact rooted model or solver hierarchies. |
+| `schemabloc` | Existing-source exception | Maintain an established control block diagram. |
+| `svg` | External-tool exception | Import SVG through a controlled Inkscape conversion route. |
+
+### Built-in TikZ libraries
+
+| Library | Status | Job |
+|---|---|---|
+| `arrows.meta` | Core for directed paths | Select modern, consistently sized arrow tips. |
+| `positioning` | Core for node diagrams | Place named nodes relative to one another. |
+| `calc` | Conditional | Express offsets, interpolation, and projections from named coordinates. |
+| `fit` | Conditional | Draw a boundary around an explicit node set. |
+| `backgrounds` | Conditional | Put regions behind paths and nodes. |
+| `matrix` | Conditional | Build regular node grids and stage arrays. |
+| `chains` | Conditional | Build a repeated ordered sequence. |
+| `intersections` | Conditional | Compute a geometric intersection that belongs to the diagram. |
+| `decorations.markings` | Conditional | Add repeated arrows or markers along a path. |
+| `decorations.pathmorphing` | Conditional | Draw restrained coils, waves, or irregular boundaries. |
+| `patterns.meta` | Conditional | Add grayscale-safe material or region patterns. |
+| `shapes.geometric` | Conditional | Use a conventional geometry or decision shape. |
+| `graphs` | Conditional | Declare compact graph syntax with manual layout. |
+| `graphdrawing` plus `layered,trees` | Conditional | Automatically lay out a larger directed graph with LuaLaTeX. |
+| `external` | Performance exception | Cache measured expensive figures through a controlled build. |
+
+### `tikz-ext` and annotation libraries
+
+| Library | Status | Job |
+|---|---|---|
+| `ext.positioning-plus` | Selected | Place or span nodes relative to multiple bounding boxes. |
+| `ext.paths.ortho` | Selected | Route explicit orthogonal streams and signals. |
+| `ext.node-families` | Conditional | Stabilize shared dimensions across related nodes. |
+| `ext.layers` | Conditional | Put a node or path on a named layer. |
+| `ext.arrows-plus` | Conditional | Place or bend arrow tips on complex paths. |
+| `ext.paths.arcto` | Conditional | Construct a true geometric arc-to path. |
+| `ext.topaths.arcthrough` | Version-gated | Test its exact path syntax against the installed TikZ release. |
+| `ext.scalepicture` | Version-gated exception | Test its keys before using auxiliary-file picture scaling. |
+| `tikzmark` | Selected | Anchor an overlay to prose, equations, or table cells. |
+
+### PGFPlots libraries
+
+| Library | Status | Job |
+|---|---|---|
+| `groupplots` | Selected | Align multi-panel comparisons. |
+| `fillbetween` | Selected | Render a stated uncertainty or feasible region. |
+| `ternary` | Selected for compositions | Plot normalized mass- or mole-basis composition data. |
+| `statistics` | Conditional | Render box plots or histograms from retained values. |
+| `colorbrewer` | Conditional palette source | Select an appropriate sequential, diverging, or qualitative palette. |
+| `colormaps` | Conditional | Supply an ordered continuous colormap. |
+| `polar` | Conditional | Plot physically meaningful angular or cyclic data. |
+| `patchplots` | Exception | Render a small reviewed mesh; use analysis code for large fields. |
+
+### References, terminology, and document structure
+
+| Tool | Status | Job |
+|---|---|---|
+| `hyperref` | Core | Create hyperlinks, targets, and PDF metadata unless class-owned. |
+| `bookmark` | Core companion | Improve and control the PDF outline. |
+| `cleveref` | Core companion | Generate semantic reference names and ranges. |
+| `xurl` | Core for URL-heavy work | Add legal line breaks to long URLs. |
+| `orcidlink` | Conditional | Add an ORCID mark when the class does not provide it. |
+| `subcaption` | Conditional | Create labeled subfigures when the class permits it. |
+| `placeins` | Conditional | Keep floats within semantic boundaries using `\FloatBarrier`. |
+| `csquotes` | Author-controlled core | Provide language-aware quotation behavior for `biblatex`. |
+| `biblatex` with Biber | Author-controlled core | Manage Unicode citations and bibliographies. |
+| `biblatex-chem` | Conditional | Select a supported chemistry bibliography style. |
+| `achemso` | Explicit-template only | Maintain a required existing ACS workflow. |
+| `glossaries-extra` | Selected | Manage acronyms, symbols, nomenclature, and multiple lists. |
+| `acro` | Alternative | Replace the glossary system when acronyms are the only requirement. |
+| `subfiles` | Conditional | Compile chapters independently in a large document. |
+| `import` | Conditional | Resolve component-relative input and graphics paths. |
+| `xr-hyper` | Conditional | Link references between separately compiled documents. |
+| `pdfpages` | Conditional | Insert complete reviewed PDF pages. |
+
+### Lists, code, algorithms, drafting, and Beamer
+
+| Tool | Status | Job |
+|---|---|---|
+| `enumitem` | Article conditional | Tune author-controlled list labels and spacing. |
+| Quarto highlighting | Core in `.qmd` | Highlight fenced source code without a LaTeX code package. |
+| `listings` | Selected raw-LaTeX route | Typeset portable code without an external highlighter. |
+| `minted` | Alternative exception | Use a resolved external highlighter for trusted source. |
+| `algorithmicx` plus `algpseudocode` | Selected | Typeset adaptable pseudocode. |
+| `algorithm2e` | Alternative | Replace the selected pseudocode system with an integrated float style. |
+| `tcolorbox` | Conditional | Create breakable examples, definitions, and teaching callouts. |
+| Git plus `latexdiff` | Selected review route | Generate a review copy from committed source states. |
+| `lineno` | Review only | Add requested manuscript line numbers. |
+| `changes` | Manual-review exception | Record explicit source markup when collaboration requires it. |
+| `todonotes` | Draft only | Keep visible author tasks out of final output. |
+| Moloch | Selected Beamer theme | Provide the restrained presentation profile. |
+| `appendixnumberbeamer` | Conditional | Exclude backup frames from the main frame count. |
+| `pdfpc` | Conditional | Add PDF Presenter Console notes and metadata. |
+| `animate` | Tested-viewer exception | Embed frame animation only after rehearsal on the exact viewer. |
+| Poppler `pdftotext` and `pdftoppm` | QA dependency | Extract text geometry and render final PDF pages. |
+| MuPDF `mutool` | QA dependency | Trace stroked vector paths for text-to-drawing clearance checks. |
+| ImageMagick `montage` | QA conditional | Build document-flow contact sheets when requested. |
+| `latex_visual_qa.py` | Release gate | Check text-to-text and text-to-vector clearance, render color and grayscale pages, and write a JSON report. |
+
+```{=latex}
+\newpage
+```
+
+### Deliberately unselected tools
+
+| Tool | Status | Reason |
+|---|---|---|
+| `tikzscale` | $\enspace$ Excluded | Set explicit source dimensions or use `standalone`; preserve text size. |
+| `tikzplotlib` | $\enspace$ Excluded | Retain data and use the selected Matplotlib or PGFPlots route. |
+| `gnuplottex`, `\addplot shell`, direct `\write18` | $\enspace$ Excluded | Keep computation in the analysis environment and the build reproducible. |
+| `smartdiagram` and `pgf-pie` | $\enspace$ Excluded | Use semantic TikZ or a chart tied to the scientific question. |
+| novelty shape collections | $\enspace$ Excluded | Project semantics, not decoration, should select shapes. |
+| `tikz-3dplot` | $\enspace$ Not a default | Use 3-D only when it clarifies a relation that 2-D cannot. |
+
+## Quick examples for high-value tools
+
+### Quantities, chemistry, and derivatives
+
+```{=latex}
+\[
+  \qty{4.70}{\bar},\qquad
+  \num{1.23(4)},\qquad
+  \ce{CO2 + 2 RNH2 <=> RNHCOO- + RNH3+},\qquad
+  \pdv{C_A}{t}
+\]
+```
+
+### A restrained scientific table
+
+```{=latex}
+\begin{center}
+\begin{tabular}{@{}l S[table-format=2.1]@{}}
+\toprule
+Stream & {Flow / \si{\kmol\per\hour}} \\
+\midrule
+Feed & 12.2 \\
+Product & 10.8 \\
+\bottomrule
+\end{tabular}
+\end{center}
+```
+
+### Relative TikZ geometry and an orthogonal signal
+
+```{=latex}
+\begin{tikzpicture}[node distance=8mm]
+\node[cse tool] (sensor) {sensor};
+\node[cse tool,right=of sensor] (controller) {controller};
+\draw[cse signal] (sensor.east) r-rl (controller.west);
+\end{tikzpicture}
+```
+
+### Retained values rendered by PGFPlots
+
+```{=latex}
+\begin{tikzpicture}
+\begin{axis}[cse axis,xlabel={Volume / \si{\meter\cubed}},ylabel={Conversion}]
+\addplot[cse model] table[x=volume,y=model,col sep=comma]
+  {data/reactor-profile.csv};
+\end{axis}
+\end{tikzpicture}
+```
+
+### Molecular and process abstractions
+
+```{=latex}
+\chemfig{CH_3-CH_2-OH}
+\qquad
+\ce{CH3CH2OH + 3 O2 -> 2 CO2 + 3 H2O}
+```
+
+Use `chemplants` for Figure 2's unit-operation vocabulary, `chempid` for
+Figure 3's P&ID symbols, `circuitikz` for its sensor analogue, and `forest` for
+Figure 4's model hierarchy. Those source files are reusable examples rather
+than fragments duplicated here.
+
+### Quarto owns the two output profiles
+
+```yaml
+format:
+  pdf:
+    pdf-engine: lualatex
+    include-in-header: tex/article-preamble.tex
+```
+
+The Beamer target changes `pdf` to `beamer`, selects `theme: moloch`, and loads
+the smaller Beamer header. Shared notation and figures stay in common source.
+
+## Agent lookup and QA resources
+
+The repository guidance in `plugin/references/visualize/latex-layout-and-qa.md` defines label
+zones, connector clearance, bounding-box padding, profile-width checks, log
+inspection, and full-size raster inspection. The searchable local official
+manual cache is built with `plugin/scripts/visualize/cache-latex-manuals.sh` and indexed at
+`~/.local/share/cse/latex-manuals/INDEX.md`.
+
+The release order is source review, real Quarto build, log review, automated
+visual QA, full-size manual inspection, and a recorded disposition. Automated
+success never certifies path crossings, schematic truth, or scientific claims.
+
+```bash
+python3 plugin/scripts/visualize/latex_visual_qa.py builds/article.pdf \
+  --profile article --output-dir builds/visual-qa/article --contact-sheet
+```

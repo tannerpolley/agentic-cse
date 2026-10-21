@@ -1,0 +1,122 @@
+---
+title: "Cooling-rate fit"
+subtitle: "One-parameter exponential cooling fit to the example observations"
+bibliography: references.bib
+resources:
+  - results/fit_summary.json
+  - results/fit_curve.csv
+---
+
+<!--
+This hand-authored notebook reads only the retained presentation prepared by
+`snakemake --cores 1 present`; it contains no executable cells. Generated
+fragments under results/ carry every number shown here, including the labeled
+figures and tables that the cross-references below resolve. The site renders
+this file as an ordinary page beside the root article.
+-->
+
+{{< include results/cooling_fit_values.qmd >}}
+
+::: {.callout-important}
+## Result
+The fitted cooling rate is {{< meta cooling-fit.rate >}} with a linearized
+standard error of {{< meta cooling-fit.rate-standard-error >}}, a time constant of
+{{< meta cooling-fit.time-constant >}}, and a residual RMSE of
+{{< meta cooling-fit.rmse >}} over {{< meta cooling-fit.observations >}} observations.
+Numerical checks: {{< meta cooling-fit.checks >}}.
+:::
+
+## Question
+
+What single first-order cooling rate $k$ ($\mathrm{s^{-1}}$) describes the
+retained temperature observations when the ambient and initial temperatures are
+fixed inputs?
+
+## Model
+
+The model assumes that the cooling rate is proportional to the temperature
+difference from the surroundings, the relation usually attributed to
+@newton1701:
+
+$$
+\frac{\mathrm{d}T}{\mathrm{d}t} = -k\,(T - T_a)
+\quad\Longrightarrow\quad
+T(t) = T_a + (T_0 - T_a)\,e^{-k t},
+$$ {#eq-cooling-model}
+
+with temperature $T$ in $^{\circ}\mathrm{C}$, time $t$ in $\mathrm{s}$, ambient
+temperature $T_a$, and initial temperature $T_0$. The fit minimizes the sum of
+squared temperature residuals subject to $k \ge 0$,
+
+$$
+\hat{k} = \arg\min_{k \ge 0} \sum_{i=1}^{n} \left[T(t_i; k) - T_i^{\mathrm{obs}}\right]^2,
+$$ {#eq-fit-objective}
+
+using @eq-cooling-model for $T(t_i; k)$, solved with the SciPy
+[@virtanen2020] trust-region reflective least-squares method [@branch1999]
+from two initial guesses.
+
+::: {.callout-tip appearance="simple"}
+The time constant $1/k$ is the time for the temperature excess $T - T_a$ to
+fall by a factor of $e$.
+:::
+
+::: {.callout-note}
+## Assumptions
+- $T_a$ and $T_0$ are exact inputs from `inputs/parameters.json`; only $k$ is fitted.
+- Temperature errors are independent with equal variance, and time is exact.
+- One exponential rate describes the whole record (lumped, first-order cooling).
+:::
+
+## Results
+
+@tbl-cooling-parameters reports the fitted rate at the minimum of
+@eq-fit-objective. @fig-cooling-fit compares @eq-cooling-model with the
+observations, and @fig-cooling-residuals and @tbl-cooling-data give the
+remaining misfit at each observation time.
+
+{{< include results/cooling_fit_include.qmd >}}
+
+## Uncertainty
+
+The standard error comes from the Jacobian $J_i = \partial T(t_i; k)/\partial k$
+at the optimum,
+
+$$
+\mathrm{SE}(\hat{k}) = \sqrt{\frac{s^2}{\sum_i J_i^2}},
+\qquad
+s^2 = \frac{1}{n-1}\sum_{i=1}^{n} r_i^2,
+$$ {#eq-rate-standard-error}
+
+and the 95 % interval in @tbl-cooling-parameters is
+$\hat{k} \pm t_{0.975,\,n-1}\,\mathrm{SE}(\hat{k})$ from @eq-rate-standard-error.[^linearized]
+The residual RMSE bound used by the numerical check is 5 % of the observed
+temperature range; the refit tolerance scales with $\hat{k}$ (see the model
+source below).
+
+[^linearized]: This estimate linearizes the model around $\hat{k}$ and omits
+    any uncertainty in $T_a$ and $T_0$, so the full uncertainty of $k$ can be
+    larger than the interval shown.
+
+::: {.callout-warning}
+## Limitations
+- The example observations carry no measurement record, instrument uncertainty,
+  or sample description, so this fit demonstrates the method; it is not a
+  physical validation of the cooling model.
+- $T_0$ equals the first observation, so the fit does not test that input.
+- A structured residual pattern would indicate that one rate is not enough;
+  inspect @fig-cooling-residuals before relying on $k$.
+:::
+
+## Data and provenance
+
+Snakemake [@molder2021] separates the `calculate` entry, which runs the fit,
+from the `present` entry, which checks the hashes below before writing this
+page. Rendering never runs the model.
+
+{{< include results/cooling_fit_provenance.qmd >}}
+
+## References
+
+::: {#refs}
+:::

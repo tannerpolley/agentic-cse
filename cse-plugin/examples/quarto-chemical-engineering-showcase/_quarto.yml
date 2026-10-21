@@ -1,0 +1,13 @@
+project:
+  type: default
+  output-dir: builds
+  render:
+    - article.qmd
+    - deck.qmd
+    - analyses/artificial-absorber/notebook.qmd
+
+execute:
+  enabled: false
+
+metadata-files:
+  - metadata.yml

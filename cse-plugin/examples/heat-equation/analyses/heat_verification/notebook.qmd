@@ -1,0 +1,74 @@
+---
+title: "Heat-equation verification"
+format:
+  pdf:
+    pdf-engine: lualatex
+    toc: true
+    number-sections: true
+    documentclass: scrartcl
+    fontsize: 10pt
+execute:
+  enabled: false
+---
+
+# Question
+
+Do FTCS and Crank--Nicolson reproduce the declared single-mode heat equation,
+converge at their expected rates, and preserve the distinction between linear
+stability and monotonicity?
+
+# Conditions and method
+
+The dimensionless problem is
+
+$$
+\frac{\partial\theta}{\partial Fo}=\frac{\partial^2\theta}{\partial\xi^2},
+\qquad
+\theta(0,Fo)=\theta(1,Fo)=0,
+\qquad
+\theta(\xi,0)=\sin(\pi\xi),
+$$
+
+with continuous reference
+$\theta_{\mathrm{ref}}=\exp(-\pi^2Fo)\sin(\pi\xi)$. Combined refinement ends
+at $Fo=0.1$, uses interval counts 10 through 160, and fixes
+$r=\Delta Fo/(\Delta\xi)^2=0.4$. Isolated temporal refinement fixes 20
+intervals and uses 80 through 1280 steps.
+
+# Results
+
+![Numerical fields at 40 intervals, compared with the continuous
+reference.](figures/solution_overlay/output/solution_overlay.png){width=78%}
+
+![Combined and isolated-temporal refinement results retained by the analysis
+set.](figures/refinement/output/refinement.png){width=82%}
+
+| Study | Method | Finest error | Finest observed order |
+|---|---|---:|---:|
+| Combined | FTCS | $1.654619\times10^{-5}$ | 2.000230 |
+| Combined | Crank--Nicolson | $1.181738\times10^{-5}$ | 1.999746 |
+| Temporal | FTCS | $1.415673\times10^{-4}$ | 1.000467 |
+| Temporal | Crank--Nicolson | $1.814958\times10^{-8}$ | 2.000004 |
+
+Every finest error is below its retained Richardson-based value bound. The
+combined path recovers second-order behavior for both methods. Removing spatial
+error recovers first-order FTCS and second-order Crank--Nicolson temporal
+behavior.
+
+![Worst-grid-mode amplification distinguishes bounded amplification from
+monotonic decay.](figures/amplification/output/amplification.png){width=68%}
+
+FTCS crosses $G=-1$ at $r=0.5$. Crank--Nicolson remains linearly stable for
+positive $r$ but can change sign, so it is not unconditionally monotone.
+
+# Interpretation and limitations
+
+The retained values support code and solution verification for one smooth
+Fourier mode on a uniform one-dimensional grid with constant coefficients and
+exact homogeneous boundaries. They do not validate a physical heat-transfer
+model or cover nonsmooth fields, variable coefficients, nonlinear sources, or
+multidimensional operators.
+
+The exact values displayed here come from CSV files below `figures/*/output/`.
+Generation, rendering, and independent checks remain in `scripts/` and do not
+run from this notebook.

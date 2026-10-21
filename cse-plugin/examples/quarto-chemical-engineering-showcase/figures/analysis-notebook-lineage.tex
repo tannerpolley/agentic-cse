@@ -1,0 +1,12 @@
+\begin{tikzpicture}[node distance=12mm and 15mm]
+  \node[cse research data] (data) {Retained comparison\\\texttt{CSV}};
+  \node[cse research source,right=of data] (source) {Shared TikZ +\\PGFPlots source};
+  \node[cse research output,above right=8mm and 17mm of source] (pdf)
+    {LuaLaTeX\\analysis-notebook PDF};
+  \node[cse research output,below right=8mm and 17mm of source] (html)
+    {SVG in ordinary\\analysis-notebook HTML};
+
+  \draw[cse research flow] (data) -- (source);
+  \draw[cse research flow] (source.east) -| (pdf.west);
+  \draw[cse research flow] (source.east) -| (html.west);
+\end{tikzpicture}

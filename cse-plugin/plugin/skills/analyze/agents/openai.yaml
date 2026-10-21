@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Execute and deliver — Analyze"
+  short_description: "Run and interpret a defined numerical study"
+  default_prompt: "Use $cse:analyze to analyze the numerical results for this question."

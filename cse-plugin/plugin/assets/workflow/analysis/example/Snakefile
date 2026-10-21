@@ -1,0 +1,141 @@
+"""Small analysis-local Snakemake template.
+
+Copy this file to ``analyses/<id>/Snakefile`` and replace the named paths and
+commands with the analysis owners. Run it from that analysis directory. The
+two branches are intentional: ``present`` loads no calculation rule, so a
+presentation request can only consume retained files.
+
+The calculation command should stage its complete result set, validate its
+checks, and replace the named outputs only after staging succeeds. The
+presentation command should validate the retained set before writing its
+Quarto include file. No rule below owns an input directory or a notebook.
+"""
+
+import sys
+from pathlib import Path
+
+from snakemake.exceptions import WorkflowError
+
+
+# Replace these named paths for the adopted analysis. Keep every generated
+# path explicit so Snakemake can track the study, parameter, script, and
+# imported helper-code dependencies without owning the analysis directory.
+CALCULATION_INPUTS = {
+    "observations": "inputs/observations.csv",
+    "parameters": "inputs/parameters.json",
+    "environment": "inputs/environment.json",
+    "script": "scripts/calculate.py",
+    "helper": "scripts/cooling_fit.py",
+    "workflow": "Snakefile",
+}
+CALCULATION_OUTPUTS = {
+    "summary": "results/fit_summary.json",
+    "curve": "results/fit_curve.csv",
+    "figure": "figures/cooling_fit.png",
+    "residual_figure": "figures/cooling_residuals.png",
+}
+PRESENTATION_INPUTS = {
+    "observations": CALCULATION_INPUTS["observations"],
+    "parameters": CALCULATION_INPUTS["parameters"],
+    "environment": CALCULATION_INPUTS["environment"],
+    "summary": CALCULATION_OUTPUTS["summary"],
+    "curve": CALCULATION_OUTPUTS["curve"],
+    "figure": CALCULATION_OUTPUTS["figure"],
+    "residual_figure": CALCULATION_OUTPUTS["residual_figure"],
+    "script": CALCULATION_INPUTS["script"],
+    "helper": CALCULATION_INPUTS["helper"],
+    "presentation_script": "scripts/present.py",
+    "workflow": "Snakefile",
+}
+# Quarto include fragments: result tables and figures, inline values as a YAML
+# metadata block, provenance with the verified model source, and a notebook of
+# labeled retained views for `{{< embed >}}` in the root article.
+PRESENTATION_OUTPUTS = {
+    "include": "results/cooling_fit_include.qmd",
+    "values": "results/cooling_fit_values.qmd",
+    "provenance": "results/cooling_fit_provenance.qmd",
+    "views": "results/cooling_fit_views.ipynb",
+}
+
+
+def _requested_targets(arguments):
+    """Return positional Snakemake targets without treating option values as targets."""
+    value_options = {
+        "--cores", "-c", "--snakefile", "-s", "--directory", "-d",
+        "--configfile", "--profile", "--workflow-profile",
+    }
+    targets = set()
+    skip_value = False
+    for argument in arguments:
+        if skip_value:
+            skip_value = False
+        elif argument in value_options:
+            skip_value = True
+        elif not argument.startswith("-"):
+            targets.add(argument)
+    return targets
+
+
+_TARGETS = _requested_targets(sys.argv[1:])
+if "present" in _TARGETS and "calculate" in _TARGETS:
+    raise WorkflowError("choose one entry per run: calculate or present, not both")
+_PRESENTING = "present" in _TARGETS or not _TARGETS.isdisjoint(PRESENTATION_OUTPUTS.values())
+_MODE = "present" if _PRESENTING else "calculate"
+
+
+if _MODE == "present":
+    retained_paths = [PRESENTATION_INPUTS[name] for name in CALCULATION_OUTPUTS]
+    missing = [path for path in retained_paths if not Path(path).is_file()]
+    if missing:
+        raise WorkflowError(
+            "present requires the retained calculation set; missing "
+            + ", ".join(missing)
+            + ". Run `snakemake --cores 1 calculate` first."
+        )
+
+    rule present:
+        input:
+            observations=PRESENTATION_INPUTS["observations"],
+            parameters=PRESENTATION_INPUTS["parameters"],
+            environment=PRESENTATION_INPUTS["environment"],
+            summary=PRESENTATION_INPUTS["summary"],
+            curve=PRESENTATION_INPUTS["curve"],
+            figure=PRESENTATION_INPUTS["figure"],
+            residual_figure=PRESENTATION_INPUTS["residual_figure"],
+            script=PRESENTATION_INPUTS["presentation_script"],
+            calculation_script=PRESENTATION_INPUTS["script"],
+            helper=PRESENTATION_INPUTS["helper"],
+            workflow=PRESENTATION_INPUTS["workflow"],
+        output:
+            **PRESENTATION_OUTPUTS,
+        shell:
+            "python {input.script} "
+            "--observations {input.observations} --parameters {input.parameters} "
+            "--environment {input.environment} "
+            "--script {input.calculation_script} --helper {input.helper} "
+            "--summary {input.summary} --curve {input.curve} "
+            "--figure {input.figure} --residual-figure {input.residual_figure} "
+            "--output {output.include} --values {output.values} "
+            "--provenance {output.provenance} --views {output.views}"
+else:
+    rule calculate:
+        input:
+            observations=CALCULATION_INPUTS["observations"],
+            parameters=CALCULATION_INPUTS["parameters"],
+            environment=CALCULATION_INPUTS["environment"],
+            script=CALCULATION_INPUTS["script"],
+            helper=CALCULATION_INPUTS["helper"],
+            workflow=CALCULATION_INPUTS["workflow"],
+        output:
+            summary=CALCULATION_OUTPUTS["summary"],
+            curve=CALCULATION_OUTPUTS["curve"],
+            figure=CALCULATION_OUTPUTS["figure"],
+            residual_figure=CALCULATION_OUTPUTS["residual_figure"],
+        threads: 1
+        shell:
+            "python {input.script} "
+            "--observations {input.observations} --parameters {input.parameters} "
+            "--environment {input.environment} "
+            "--script {input.script} --helper {input.helper} "
+            "--summary {output.summary} --curve {output.curve} --figure {output.figure} "
+            "--residual-figure {output.residual_figure}"

@@ -1,0 +1,193 @@
+---
+title: "The chemical engineer's Quarto + LaTeX toolkit"
+subtitle: "One source system, two polished PDF formats"
+format:
+  beamer:
+    pdf-engine: lualatex
+    latex-auto-install: false
+    keep-tex: true
+    theme: moloch
+    aspectratio: 169
+    slide-level: 2
+    include-in-header:
+      - tex/beamer-preamble.tex
+    navigation: horizontal
+---
+
+# Architecture
+
+## Quarto manages the system; focused tools do the rendering
+
+```{=latex}
+\centering
+\resizebox{0.93\textwidth}{!}{\input{figures/how-pieces-fit.tex}}
+```
+
+## The package bundle is a toolbox, not one giant preamble
+
+- Quarto: profiles, citations, code blocks, cross-references, reproducible builds
+- LuaLaTeX: Unicode text and mathematics
+- `siunitx` + `mhchem`: engineering quantities and chemistry
+- TikZ + domain extensions: process meaning and diagrams
+- PGFPlots: retained values with document-matched typography
+
+::: {.alert}
+Load a tool when the page visibly needs its job.
+:::
+
+# Chemical-engineering notation
+
+## Equations, units, and reactions share one notation system
+
+$$
+V\frac{\partial C_A}{\partial t}
+=F(C_{A,0}-C_A)-VkC_A
+$$
+
+```{=latex}
+\begin{columns}[T,onlytextwidth]
+\column{0.48\textwidth}
+\begin{block}{Operating point}
+$T=\SI{355.2}{\kelvin}$\\
+$P=\SI{4.7}{\barunit}$\\
+$\dot n=\SI{12.2}{\kmol\per\hour}$
+\end{block}
+\column{0.48\textwidth}
+\begin{block}{Reaction}
+\centering
+\ce{CO2 + 2 RNH2 <=> RNHCOO- + RNH3+}
+\end{block}
+\end{columns}
+```
+
+## Molecular structure and model structure need different tools
+
+```{=latex}
+\centering
+\resizebox{0.88\textwidth}{!}{\input{figures/molecules-and-model.tex}}
+```
+
+# Diagrams
+
+## `chemplants` turns unit operations into a readable PFD
+
+```{=latex}
+\centering
+\resizebox{0.94\textwidth}{!}{\input{figures/process-flow.tex}}
+```
+
+## P\&ID symbols and circuit analogues
+
+```{=latex}
+\centering
+\resizebox{0.93\textwidth}{!}{\input{figures/pid-control.tex}}
+```
+
+## TikZ libraries carry relationships, not decoration
+
+```{=latex}
+\centering
+\resizebox{0.76\textwidth}{!}{\input{figures/tikz-tool-gallery.tex}}
+```
+
+- Relative placement keeps geometry editable.
+- Intersections, fit regions, layers, and arrows expose meaning.
+
+## `tikz-ext` fills focused geometry gaps
+
+```{=latex}
+\centering
+\resizebox{0.92\textwidth}{!}{\input{figures/tikz-ext-gallery.tex}}
+```
+
+# Quantitative evidence
+
+## PGFPlots keeps models, observations, and uncertainty distinct
+
+```{=latex}
+\centering
+\resizebox{0.94\textwidth}{!}{\input{figures/quantitative-plots.tex}}
+```
+
+## Coordinate systems should match the physical question
+
+```{=latex}
+\centering
+\resizebox{0.90\textwidth}{!}{\input{figures/composition-and-polar.tex}}
+```
+
+- Ternary axes: composition data normalized to a declared mass or mole basis.
+- Polar axes: cyclic or directional responses with physical angular meaning.
+- Patch plots: small reviewed meshes only; data-rich fields belong in analysis code.
+
+## A patch plot is useful only while the mesh stays reviewable
+
+```{=latex}
+\centering
+\resizebox{0.78\textwidth}{!}{\input{figures/patch-field.tex}}
+```
+
+The values are illustrative; a real field must retain mesh connectivity,
+units, and provenance with the plotted table.
+
+# Reusable authoring
+
+## Quarto profiles keep article and Beamer ownership separate
+
+```yaml
+# article.qmd
+format:
+  pdf:
+    pdf-engine: lualatex
+    include-in-header: tex/article-preamble.tex
+
+# deck.qmd
+format:
+  beamer:
+    pdf-engine: lualatex
+    theme: moloch
+    include-in-header: tex/beamer-preamble.tex
+```
+
+## Authoring and release defaults
+
+1. Keep calculations and fitted values in analysis code.
+2. Retain the exact tables used for claims.
+3. Let TikZ or PGFPlots render the smallest useful visual.
+4. Let Quarto produce the article and presentation profiles.
+5. Run the automated color/grayscale QA packet for both PDFs.
+6. Inspect every page at full size and record `keep`, `simplify`, `split`, or `reject`.
+
+::: {.alert}
+Load each tool for a visible output requirement. Retain a source for each
+reported number.
+:::
+
+## Compilation is not a visual acceptance test
+
+- Reserve label zones away from pipes, arrows, and page edges.
+- Use one semantic demonstration per panel and one coordinate system per panel.
+- Add source-level clearance below the lowest diagram node.
+- Design shared figures at the smaller article or Beamer placement.
+- Inspect every rendered page at full size; use contact sheets only for flow.
+
+The deck default is 16:9 Moloch with one major claim per frame, no automatic
+shrink, accessible text contrast, and roughly one main frame per speaking
+minute. Detail belongs in notes or backup frames.
+
+`chktex`, `lacheck`, and `texfot` help with source and log defects. Raster
+inspection owns overlap, clipping, and legibility.
+
+## Backup: narrow tools remain available
+
+`standalone`, `subfiles`, `import`, `xr-hyper`, `pdfpages`, `pdflscape`,
+`longtable`, `csvsimple`, `tcolorbox`, `algorithmicx`, `listings`, `latexdiff`,
+`lineno`, `todonotes`, `appendixnumberbeamer`, `pdfpc`, `animate`, and `svg`
+remain conditional tools. Add them only for the feature their nameable job
+requires.
+
+## Reference manuals
+
+- Quarto documentation: \url{https://quarto.org/docs/}
+- TikZ and PGF manual: \url{https://tikz.dev/}
+- PGFPlots manual: \url{https://tikz.dev/pgfplots/}

@@ -1,0 +1,84 @@
+---
+title: "Cooling-rate synthesis"
+bibliography: cooling-fit/references.bib
+---
+
+<!--
+Example root article for `manuscript.py init analyses --article-source
+article.qmd`. Paths assume this example analysis is copied to
+analyses/cooling-fit and included with `manuscript.py include`. Figures and the
+parameter table are embedded from the notebook of retained views that
+`snakemake --cores 1 present` writes; nothing here executes the model.
+-->
+
+{{< include cooling-fit/results/cooling_fit_values.qmd >}}
+
+## Summary
+
+A one-parameter exponential cooling model fitted to the example observations
+gives {{< meta cooling-fit.rate >}} ({{< meta cooling-fit.time-constant >}}),
+with a residual RMSE of {{< meta cooling-fit.rmse >}}
+(@tbl-cooling-parameters).
+
+::: {.callout-important}
+## Numerical checks: {{< meta cooling-fit.checks >}}
+The checks verify the fit to these observations. The observations have no
+measurement record, so the result demonstrates the method and is not a
+physical validation.
+:::
+
+## Model
+
+The temperature excess over ambient decays at a rate proportional to itself
+[@newton1701], giving
+
+$$
+T(t) = T_a + (T_0 - T_a)\,e^{-k t},
+$$ {#eq-cooling-model}
+
+where $T$ and the fixed inputs $T_a$ and $T_0$ are in $^{\circ}\mathrm{C}$, $t$ is
+in $\mathrm{s}$, and $k$ is in $\mathrm{s^{-1}}$.
+
+::: {.callout-tip appearance="simple"}
+The time constant $1/k$ is the time for the temperature excess $T - T_a$ to
+fall by a factor of $e$.
+:::
+
+The rate $k$ solves the bounded least-squares problem[^solver]
+
+$$
+\hat{k} = \arg\min_{k \ge 0} \sum_{i=1}^{n} \left[T(t_i; k) - T_i^{\mathrm{obs}}\right]^2
+$$ {#eq-fit-objective}
+
+over the $n =$ {{< meta cooling-fit.observations >}} observations, using
+@eq-cooling-model for $T(t_i; k)$.
+
+[^solver]: SciPy's trust-region reflective method [@branch1999; @virtanen2020],
+    started from two initial guesses to check that the optimum does not depend
+    on the start.
+
+## Results
+
+@fig-cooling-fit compares @eq-cooling-model at $\hat{k}$ with the observations.
+The residuals in @fig-cooling-residuals show the remaining misfit.
+
+{{< embed cooling-fit/results/cooling_fit_views.ipynb#fig-cooling-fit >}}
+
+{{< embed cooling-fit/results/cooling_fit_views.ipynb#fig-cooling-residuals >}}
+
+The interval in @tbl-cooling-parameters linearizes the model and treats
+$T_a$ and $T_0$ as exact.
+
+{{< embed cooling-fit/results/cooling_fit_views.ipynb#tbl-cooling-parameters >}}
+
+## Limitations
+
+The linearized standard error of {{< meta cooling-fit.rate-standard-error >}}
+omits uncertainty in $T_a$ and $T_0$, and the observations have no recorded
+measurement uncertainty. The analysis notebook lists the retained files, their
+hashes, and the model source.
+
+## References
+
+::: {#refs}
+:::

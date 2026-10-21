@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Execute and deliver — Summarize"
+  short_description: "Create the working analysis research notebook"
+  default_prompt: "Use $cse:summarize to replace this analysis notebook with the current retained numerical results for Review."

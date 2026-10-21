@@ -1,0 +1,4 @@
+interface:
+  display_name: "CSE: Research and design — Research"
+  short_description: "Find literature, equations, data, and methods"
+  default_prompt: "Use $cse:research to research the sources and evidence for this question."
