@@ -80,7 +80,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                 later = self.run_hook(project, "Stop", last_assistant_message="Review: Supported.")
                 self.assertIn(review, later["reason"])
 
-    def test_stop_reviews_everything_but_questions_and_short_relays(self):
+    def test_stop_reviews_everything_but_question_only_messages(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
             self.hook_fixture(project, "tool")
@@ -93,16 +93,17 @@ class ScriptBehaviorTests(unittest.TestCase):
                 ("The mixture separates into two liquid phases.", True),
                 ("I am not blocked; I committed the correction locally.", True),
                 ("The bubble pressure is 6289.08 Pa. Should I continue?", True),
+                ("**The bubble pressure is 6289.08 Pa.** Should I continue?", True),
+                ("The pressure is 6289.08 Pa; should I continue?", True),
+                ("The solver is stable, should I continue?", True),
+                ("Running the check showed the solver is stable.", True),
+                ("The solver converged so should I merge?", True),
+                ("Started the review; I'll report when it finishes.", True),
                 ("Which option?\n- A\n- B", True),
                 ("1. Run at 298.15 K.\n2. Compare the pressure.", True),
-                ("**The bubble pressure is 6289.08 Pa.** Should I continue?", True),
-                ("Next, the mixture separates into two liquid phases.", True),
-                ("The solver is stable. I will report the evidence later.", True),
-                ("I committed the correction; review is running.", True),
                 ("Should I use 298.15 K or 300 K?", False),
                 ("1. Should I use 298.15 K?\n2. Or **300 K?**", False),
-                ("Started the review; I'll report when it finishes.", False),
-                ("Waiting on the worker.", False),
+                ("Should I merge PR #276? Is the review verdict Ready?", False),
                 ("", False),
                 (None, False),
             )

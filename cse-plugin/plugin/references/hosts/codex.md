@@ -96,8 +96,8 @@ CSE registrations, remains safe to repeat, and keeps the four
 `SessionStart` supplies the full stance and skill routing on startup, resume,
 clear, and compaction. Subagent entry gets the stance and routing; user prompts get
 only prompt-specific skill routing. The semantic Stop review runs after every
-turn except one that only asks the user questions or is a short progress relay
-without numbers; anything unclear is reviewed. Prose checks and the test-file advisory still run at every Stop. A
+turn except one that only asks the user questions; anything else, progress
+relays included, is reviewed. Prose checks and the test-file advisory still run at every Stop. A
 changed installed runtime requires the explicit `--replace-runtime` guard.
 
 Codex never runs a hook that lacks persisted trust, and T3 Code has no hook

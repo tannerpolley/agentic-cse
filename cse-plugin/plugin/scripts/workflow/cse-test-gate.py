@@ -115,32 +115,28 @@ def prompt_route(event: dict[str, object]) -> str:
             "(Claude Code: the Skill tool; Codex: open its SKILL.md).")
 
 
-# A relay only reports progress: every clause opens with one of these, so a clause with a claim or delivery is reviewed.
-RELAY_START = re.compile(r"^(?:i[’']?ll|i will|i[’']?m waiting|waiting|started|starting|running|queued|launched|delegated|"
-                         r"relayed)\b", re.IGNORECASE)
 LIST_MARKER = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
-SENTENCE_END = re.compile(r"[.!]\s")
-CLAUSE_BREAK = re.compile(r"[.!?;]+")
 EMPHASIS = re.compile(r"[*_`]+")
+# Any clause break before the final "?" means a statement may ride along ("6289.08 Pa; should I continue?").
+CLAUSE_BREAK = re.compile(r"[.!;,:]\s")
+# ...and a question line must open as a question ("The solver converged so should I merge?" is reviewed).
+QUESTION_OPENER = re.compile(r"^(?:should|shall|can|could|would|will|do|does|did|is|are|was|were|has|have|may|"
+                             r"which|what|when|where|who|whom|whose|why|how|or|want|okay|ok)\b", re.IGNORECASE)
 
 
-def plainly_not_a_result(message: object) -> bool:
-    """Only questions to the user and short progress relays skip the review; anything unclear is reviewed."""
+def asks_only_questions(message: object) -> bool:
+    """Only a message made wholly of questions skips the review; anything else, relays included, is reviewed."""
     # Emphasis can hide a sentence end ("**6289.08 Pa.** Should I continue?"), so it is dropped first.
     if not isinstance(message, str) or not (text := EMPHASIS.sub("", message).strip()):
         return True
     lines = [LIST_MARKER.sub("", line.strip()).strip() for line in text.splitlines() if line.strip()]
-    # A line that also ends a statement ("... 6289.08 Pa. Should I continue?") is not question-only.
-    if all(line.endswith("?") and not SENTENCE_END.search(line) for line in lines):
-        return True
-    clauses = [clause.strip() for clause in CLAUSE_BREAK.split(text) if clause.strip()]
-    return (len(text.split()) <= 25 and not any(c.isdigit() for c in text)
-            and all(RELAY_START.match(clause) for clause in clauses))
+    return all(line.endswith("?") and not CLAUSE_BREAK.search(line) and QUESTION_OPENER.match(line)
+               for line in lines)
 
 
 def answer_review(event: dict[str, object], role: str | None) -> str | None:
     if (role not in {"analysis", "tool"} or event.get("stop_hook_active") is True
-            or plainly_not_a_result(event.get("last_assistant_message"))):
+            or asks_only_questions(event.get("last_assistant_message"))):
         return None
     result = (
         "result review: check the outcome; supported quantities, units, and conditions; interpretation; "

@@ -96,8 +96,8 @@ safe to repeat, and keeps the four `SessionStart`, `SubagentStart`,
 `UserPromptSubmit`, and `Stop` events. `SessionStart` supplies the full stance
 and skill routing on startup, resume, clear, and compaction. Subagent entry gets the stance and routing; user prompts get
 only prompt-specific skill routing. The semantic Stop review runs after every
-turn except one that only asks the user questions or is a short progress relay
-without numbers; anything unclear is reviewed. Prose checks and the
+turn except one that only asks the user questions; anything else, progress
+relays included, is reviewed. Prose checks and the
 test-file advisory still run at every Stop. A changed installed runtime requires
 the explicit `--replace-runtime` guard. Plugin discovery, native registration,
 enabled state, active-session loading, trust, and observed hook execution are
