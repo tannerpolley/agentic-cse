@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 import unittest
 
 
@@ -79,36 +80,25 @@ class ScriptBehaviorTests(unittest.TestCase):
                 later = self.run_hook(project, "Stop", last_assistant_message="Review: Supported.")
                 self.assertIn(review, later["reason"])
 
-    def test_stop_reviews_substantive_messages_and_passes_relays_and_questions(self):
+    def test_stop_reviews_everything_but_questions_and_short_relays(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
             self.hook_fixture(project, "tool")
             self.run_hook(project, "SessionStart", source="startup")
             samples = (
                 ("The heat capacity is 75.3 J/(mol·K).", True),
-                ("The relative pressure error is 1.24e-12.", True),
-                ("The worst residual is 2.8×10⁻¹³.", True),
-                (r"The residual is $2.8 \times 10^{-13}$.", True),
-                ("The readiness review returned **Revise**, with two findings.", True),
-                ("**Not supported**: the density comparison is unresolved.", True),
-                ("I committed the hook fix locally.", True),
-                ("I haven't merged it. I committed the hook fix locally.", True),
-                ("Opened PR #276 for the density correction.", True),
-                ("I opened a draft PR for the density correction.", True),
-                ("PR #276 is merged: merge commit `c1067020` on main.", True),
-                ("Delivered: https://github.com/tannerpolley/ePC-SAFT/pull/276", True),
+                (r"The temperature is $298.15\,\mathrm{K}$.", True),
+                ("| Case | Pressure (Pa) |\n|---|---|\n| bubble | 6289.08 |", True),
+                ("The relative error is 0.05.", True),
+                ("The mixture separates into two liquid phases.", True),
+                ("I am not blocked; I committed the correction locally.", True),
                 ("The bubble pressure is 6289.08 Pa. Should I continue?", True),
-                ("Pressure: 6289.08 Pa\nShould I continue?", True),
-                ("The answer stands.", False),
-                ("I relayed the worker's question; nothing needs your input.", False),
-                ("#289 is being built; review is running on GPT-6.1 Sol.", False),
-                ("The 73 checks passed; I will commit after review.", False),
-                ("I haven't committed or opened a PR yet.", False),
-                ("I haven't opened a draft PR yet.", False),
-                ("The changes have not been merged.", False),
-                ("The branch will be merged after review.", False),
+                ("Which option?\n- A\n- B", True),
+                ("1. Run at 298.15 K.\n2. Compare the pressure.", True),
                 ("Should I use 298.15 K or 300 K?", False),
-                ("Should I merge PR #276? Is the review verdict Ready?", False),
+                ("1. Should I use 298.15 K?\n2. Or **300 K?**", False),
+                ("Started the review; I'll report when it finishes.", False),
+                ("Waiting on the worker.", False),
                 ("", False),
                 (None, False),
             )
@@ -116,6 +106,10 @@ class ScriptBehaviorTests(unittest.TestCase):
                 with self.subTest(message=message):
                     result = self.run_hook(project, "Stop", last_assistant_message=message)
                     self.assertEqual(expected, result.get("decision") == "block", result)
+            # Long input stays linear: the whole Stop finishes well inside the host's 10 s timeout.
+            started = time.monotonic()
+            self.run_hook(project, "Stop", last_assistant_message="Review" + " " * 200_000 + "pending")
+            self.assertLess(time.monotonic() - started, 5)
 
     def test_stance_is_refreshed_at_session_start_and_prompt_routing_remains(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -127,13 +121,18 @@ class ScriptBehaviorTests(unittest.TestCase):
                     stance = start["hookSpecificOutput"]["additionalContext"]
                     self.assertIn("confirmed agent role: numerical scientist", stance)
                     self.assertIn("CSE skill routing", stance)
-                    for event in ("UserPromptSubmit", "SubagentStart"):
-                        self.assertEqual({}, self.run_hook(project, event, prompt="Continue the current work."))
-                        routed = self.run_hook(project, event, prompt="Act as the implementation sub-agent for this task.")
-                        text = routed["hookSpecificOutput"]["additionalContext"]
-                        self.assertIn("invoke `cse:build`", text)
-                        self.assertNotIn("confirmed agent role", text)
-                        self.assertNotIn("CSE skill routing", text)
+                    self.assertEqual({}, self.run_hook(project, "UserPromptSubmit", prompt="Continue the current work."))
+                    routed = self.run_hook(project, "UserPromptSubmit",
+                                           prompt="Act as the implementation sub-agent for this task.")
+                    text = routed["hookSpecificOutput"]["additionalContext"]
+                    self.assertIn("invoke `cse:build`", text)
+                    self.assertNotIn("confirmed agent role", text)
+                    self.assertNotIn("CSE skill routing", text)
+                    # Native subagents start with an agent ID and type, no prompt, and need the stance.
+                    subagent = self.run_hook(project, "SubagentStart", agent_id="agent-1", agent_type="general-purpose")
+                    text = subagent["hookSpecificOutput"]["additionalContext"]
+                    self.assertIn("confirmed agent role: numerical scientist", text)
+                    self.assertIn("CSE skill routing", text)
 
     def test_prose_check_follows_worktree_edits_not_merged_text(self):
         git = ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com"]
@@ -439,7 +438,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             self.assertIn("invoke `cse:analyze`", named["hookSpecificOutput"]["additionalContext"])
 
             stop = self.run_hook(project, "Stop", last_assistant_message="Infrastructure only.")
-            self.assertNotIn("decision", stop)
+            self.assertIn("capability review", stop["reason"])
 
     def test_nested_cse_and_non_cse_paths_keep_project_discovery(self):
         with tempfile.TemporaryDirectory() as directory:

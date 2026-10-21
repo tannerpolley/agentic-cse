@@ -56,7 +56,7 @@ def context(event: str, message: str) -> dict[str, object]:
     return {"hookSpecificOutput": {"hookEventName": event, "additionalContext": message}}
 
 
-def render_stance(scientific_context: Path) -> str:
+def render_stance(scientific_context: Path, *, diagnostics: bool = True) -> str:
     template = STANCE.read_text(encoding="utf-8").strip()
     if template.count(OPTIONAL_START) != 1 or template.count(OPTIONAL_END) != 1:
         raise HookError("scientific stance has an invalid optional clause")
@@ -74,8 +74,8 @@ def render_stance(scientific_context: Path) -> str:
             f"; confirmed agent role: {agent}" if agent else "",
         )
     rendered = template[:start] + clause + template[end + len(OPTIONAL_END):]
-    # Setup diagnostics accompany the session stance.
-    notes = [
+    # Setup diagnostics appear once per session (start and stop), not on every subagent.
+    notes = [] if not diagnostics else [
         *([ROLE_CORRECTION] if role is None else []), *([AGENT_ROLE_CORRECTION] if agent is None else [])]
     return f"{rendered}{(' ' + ' '.join(notes)) if notes else ''}"
 
@@ -115,34 +115,27 @@ def prompt_route(event: dict[str, object]) -> str:
             "(Claude Code: the Skill tool; Codex: open its SKILL.md).")
 
 
-def substantive_answer(message: object) -> bool:
-    """Review stated quantities, explicit verdicts, and completed deliveries."""
+# A short relay reports ongoing or upcoming work; a short claim without these words is still reviewed.
+RELAY_WORDS = re.compile(r"\b(?:started|starting|waiting|running|queued|launched|delegated|relayed|"
+                         r"i'll|i will|will report|in progress|next)\b", re.IGNORECASE)
+LIST_MARKER = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
+SENTENCE_END = re.compile(r"[.!]\s")
+
+
+def plainly_not_a_result(message: object) -> bool:
+    """Only questions to the user and short progress relays skip the review; anything unclear is reviewed."""
     if not isinstance(message, str) or not (text := message.strip()):
-        return False
-    if (all(line.rstrip().endswith("?") for line in text.splitlines() if line.strip())
-            and not re.search(r"[.!](?:\s|$)", text)):
-        return False
-    quantities = (
-        r"\b(?:\d+(?:\.\d+)?[eE][+−-]?\d+|10(?:[⁺⁻]?[⁰¹²³⁴⁵⁶⁷⁸⁹]+|\^\{?[+−-]?\d+\}?))"
-        r"|(?<![\w#])[-+−]?(?:\d+(?:\.\d*)?|\.\d+)\s*"
-        r"(?:°[CF]|%|(?:[kMmunµμ]?Pa|bar|[munµμk]?mol|[kM]?J|[kM]?W|kg|g|K|m|s|h|GB|MB|Å)\b)"
-    )
-    verdicts = (
-        r"\b(?:verdict|review)\s*(?:is|:|returned|came back)?\s*[*`]*"
-        r"(?:ready|revise|block|(?:not\s+)?supported|pass(?:ed)?|fail(?:ed)?)\b"
-        r"|(?:^|\n)\s*[*#` ]*(?:Ready|Revise|Block|Supported|Not supported|Pass|Fail)\b(?=\s*[:.*`]|$)"
-    )
-    delivery = re.sub(r"\b(?:not|never|hasn't|haven't|isn't|wasn't|will|would|could|should)\b[^.!?\n]*",
-                      "", text, flags=re.IGNORECASE)
-    return bool(re.search(quantities, text) or re.search(verdicts, text, re.IGNORECASE) or re.search(
-        r"\b(?:committed|merged)\b|\b(?:opened|created)\s+(?:(?:a|the)\s+)?(?:draft\s+)?(?:PR|pull request)\b"
-        r"|\bcommit\s+[`*]*[0-9a-f]{7,40}\b|https://github\.com/[^/\s]+/[^/\s]+/pull/\d+",
-        delivery, re.IGNORECASE))
+        return True
+    lines = [LIST_MARKER.sub("", line.strip()).rstrip("*_` ") for line in text.splitlines() if line.strip()]
+    # A line that also ends a statement ("... 6289.08 Pa. Should I continue?") is not question-only.
+    if all(line.endswith("?") and not SENTENCE_END.search(line) for line in lines):
+        return True
+    return len(text.split()) <= 25 and not any(c.isdigit() for c in text) and bool(RELAY_WORDS.search(text))
 
 
 def answer_review(event: dict[str, object], role: str | None) -> str | None:
     if (role not in {"analysis", "tool"} or event.get("stop_hook_active") is True
-            or not substantive_answer(event.get("last_assistant_message"))):
+            or plainly_not_a_result(event.get("last_assistant_message"))):
         return None
     result = (
         "result review: check the outcome; supported quantities, units, and conditions; interpretation; "
@@ -505,15 +498,18 @@ def main() -> int:
                 payload["systemMessage"] = "\n".join(warnings)
             if payload:
                 emit(payload)
+        elif event_name == "SubagentStart":
+            # A native subagent starts without the parent's context or a prompt to route, so it gets the stance.
+            emit(context(event_name, " ".join(filter(None, (render_stance(scientific_context, diagnostics=False),
+                                                             routing_table())))))
         else:
-            if event_name == "UserPromptSubmit":
-                try:  # a session that moved into another checkout gets that checkout's test snapshot now
-                    state, _ = load_state(event, repository, project)
-                    if str(repository) not in state["tests"]:
-                        note_checkout(state, repository, project)
-                        save(state_path(event, repository, project), state)
-                except (OSError, UnicodeError, HookError, subprocess.TimeoutExpired):
-                    pass  # the Stop check reports its own failure; the prompt route still goes out
+            try:  # a session that moved into another checkout gets that checkout's test snapshot now
+                state, _ = load_state(event, repository, project)
+                if str(repository) not in state["tests"]:
+                    note_checkout(state, repository, project)
+                    save(state_path(event, repository, project), state)
+            except (OSError, UnicodeError, HookError, subprocess.TimeoutExpired):
+                pass  # the Stop check reports its own failure; the prompt route still goes out
             if route := prompt_route(event):
                 emit(context(event_name, route))
     except (HookError, OSError, subprocess.TimeoutExpired) as exc:
