@@ -23,8 +23,9 @@ for issue and integration rules. When CSE and engineering skills overlap, use
 For a GitHub repository, reconcile its
 [milestones](../../references/workflow/github-and-git.md#milestones) on every
 run: read all milestones and open issues with `gh`, then preview the exact
-milestone renames and missing descriptions, issue title-prefix removals, and a
-proposed milestone for each unassigned open issue. Apply only the approved
+milestone renames, merges, and missing descriptions, issue title-prefix
+removals, and a proposed milestone for each open issue that is unassigned or
+in a milestone being merged away. Apply only the approved
 subset and read it back. Use `cse:zotero` or
 `cse:data` after checking the requested external capability when source authority
 or lineage is unresolved. Use CSE rendering only for a selected render output or

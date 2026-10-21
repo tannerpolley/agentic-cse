@@ -29,28 +29,27 @@ amendment, handoff, review, and completion points without commenting on every
 tool call. Optional reviewer suggestions do not expand scope or acceptance until
 accepted through the existing authority.
 
-Standalone issues are normal. Use parent or sub-issue relationships only for genuine decomposition. Labels describe work and remain advisory; preserve existing labels and ask before creating a repository label set. Offer GitHub Projects during setup and explain that `gh auth refresh -s project` requires separate approval; never run it silently.
+Standalone issues are normal. Use parent or sub-issue relationships only for genuine decomposition. Labels describe work and remain advisory; preserve existing labels and ask before creating a repository label set. Offer GitHub Projects during setup and explain that `gh auth refresh -s project` requires separate approval; never run it silently. A Project may add board fields such as Status and Priority across milestones; it never replaces the milestone section.
 
 ### Milestones
 
-Milestones group a repository's issues; hosts such as T3 Code list issues under
+Milestones are a repository's standing sections: a small, constant set of
+areas of the project where issues live. Hosts such as T3 Code list issues under
 their milestone, sorted by milestone title.
 
 - Every open issue belongs to one milestone through GitHub's native milestone
   field. Assign it when the issue is published; when no milestone fits, ask
   before creating one.
+- Milestone titles are plain area names, such as `Thermodynamic Models`,
+  `Column Solver`, `Manuscript`, or `Tooling`, with no number, category, or
+  version prefix. A section stays open while the area exists, even when empty.
+- The milestone description states the section's scope, the code paths or
+  records it covers, and its exclusions.
 - Issue titles state the work only. Do not prefix a category, component, or
   milestone such as `[Equilibrium]` or `M3:`; the milestone carries the grouping.
-- Ordered delivery milestones are titled `00 - Name`, `01 - Name`, and so on,
-  zero-padded to the widest number so title order is delivery order. Numbering
-  expresses priority, not a scientific dependency; native issue relationships
-  own prerequisites.
-- Milestones outside the ordered sequence are titled `<Category> - Name`, such
-  as `Extension - IDAES Adapter` or `Performance - Solver Cost`.
-- The milestone description states its scope, identifiers, and exclusions.
+- Milestone titles carry no order. Native issue relationships own prerequisites.
 
-Closed milestones follow the same titles so the order stays consistent. Closed
-issue titles remain history and are not renamed.
+Closed milestones and closed issue titles remain history and are not renamed.
 
 Native dependency links record real prerequisites; parent relationships record
 decomposition. Preserve satisfied links as ordering history and remove or
