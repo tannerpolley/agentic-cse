@@ -115,22 +115,27 @@ def prompt_route(event: dict[str, object]) -> str:
             "(Claude Code: the Skill tool; Codex: open its SKILL.md).")
 
 
-# A short relay reports ongoing or upcoming work; a short claim without these words is still reviewed.
-RELAY_WORDS = re.compile(r"\b(?:started|starting|waiting|running|queued|launched|delegated|relayed|"
-                         r"i'll|i will|will report|in progress|next)\b", re.IGNORECASE)
+# A relay only reports progress: every clause opens with one of these, so a clause with a claim or delivery is reviewed.
+RELAY_START = re.compile(r"^(?:i[’']?ll|i will|i[’']?m waiting|waiting|started|starting|running|queued|launched|delegated|"
+                         r"relayed)\b", re.IGNORECASE)
 LIST_MARKER = re.compile(r"^(?:[-*+]|\d+[.)])\s+")
 SENTENCE_END = re.compile(r"[.!]\s")
+CLAUSE_BREAK = re.compile(r"[.!?;]+")
+EMPHASIS = re.compile(r"[*_`]+")
 
 
 def plainly_not_a_result(message: object) -> bool:
     """Only questions to the user and short progress relays skip the review; anything unclear is reviewed."""
-    if not isinstance(message, str) or not (text := message.strip()):
+    # Emphasis can hide a sentence end ("**6289.08 Pa.** Should I continue?"), so it is dropped first.
+    if not isinstance(message, str) or not (text := EMPHASIS.sub("", message).strip()):
         return True
-    lines = [LIST_MARKER.sub("", line.strip()).rstrip("*_` ") for line in text.splitlines() if line.strip()]
+    lines = [LIST_MARKER.sub("", line.strip()).strip() for line in text.splitlines() if line.strip()]
     # A line that also ends a statement ("... 6289.08 Pa. Should I continue?") is not question-only.
     if all(line.endswith("?") and not SENTENCE_END.search(line) for line in lines):
         return True
-    return len(text.split()) <= 25 and not any(c.isdigit() for c in text) and bool(RELAY_WORDS.search(text))
+    clauses = [clause.strip() for clause in CLAUSE_BREAK.split(text) if clause.strip()]
+    return (len(text.split()) <= 25 and not any(c.isdigit() for c in text)
+            and all(RELAY_START.match(clause) for clause in clauses))
 
 
 def answer_review(event: dict[str, object], role: str | None) -> str | None:
