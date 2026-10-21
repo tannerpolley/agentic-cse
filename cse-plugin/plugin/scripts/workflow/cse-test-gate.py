@@ -32,7 +32,6 @@ OPTIONAL_START = "[["
 OPTIONAL_END = "]]"
 ROLE_SLOT = "{repository_role}"
 AGENT_ROLE_CLAUSE = "{agent_role_clause}"
-PROMPT_REMINDER = "Answer the scientific question: outcome, evidence, physical meaning, limits, and unresolved decisions. For analysis work, distinguish prediction, numerical verification, and physical validation; software status is provenance."
 ROLE_CORRECTION = ("Repository role is not confirmed in docs/scientific/CONTEXT.md; ask the investigator to run "
                    "cse:setup. Route every other stage to its skill as usual.")
 AGENT_ROLE_CORRECTION = "Setup diagnostic: agent role not confirmed; cse:setup records it."
@@ -75,7 +74,7 @@ def render_stance(scientific_context: Path, *, diagnostics: bool = True) -> str:
             f"; confirmed agent role: {agent}" if agent else "",
         )
     rendered = template[:start] + clause + template[end + len(OPTIONAL_END):]
-    # Setup diagnostics appear once per session (start and stop), not on every prompt and subagent.
+    # Setup diagnostics appear once per session (start and stop), not on every subagent.
     notes = [] if not diagnostics else [
         *([ROLE_CORRECTION] if role is None else []), *([AGENT_ROLE_CORRECTION] if agent is None else [])]
     return f"{rendered}{(' ' + ' '.join(notes)) if notes else ''}"
@@ -117,7 +116,8 @@ def prompt_route(event: dict[str, object]) -> str:
 
 
 def answer_review(event: dict[str, object], role: str | None) -> str | None:
-    if role not in {"analysis", "tool"} or event.get("stop_hook_active") is True:
+    if (role not in {"analysis", "tool"} or event.get("stop_hook_active") is True
+            or not str(event.get("last_assistant_message") or "").strip()):
         return None
     result = (
         "result review: check the outcome; supported quantities, units, and conditions; interpretation; "
@@ -480,20 +480,20 @@ def main() -> int:
                 payload["systemMessage"] = "\n".join(warnings)
             if payload:
                 emit(payload)
-        elif event_name == "UserPromptSubmit":
+        elif event_name == "SubagentStart":
+            # A native subagent starts without the parent's context or a prompt to route, so it gets the stance.
+            emit(context(event_name, " ".join(filter(None, (render_stance(scientific_context, diagnostics=False),
+                                                             routing_table())))))
+        else:
             try:  # a session that moved into another checkout gets that checkout's test snapshot now
                 state, _ = load_state(event, repository, project)
                 if str(repository) not in state["tests"]:
                     note_checkout(state, repository, project)
                     save(state_path(event, repository, project), state)
             except (OSError, UnicodeError, HookError, subprocess.TimeoutExpired):
-                pass  # the Stop check reports its own failure; the prompt context still goes out
-            route = prompt_route(event)
-            emit(context(event_name, " ".join(filter(None, (
-                render_stance(scientific_context, diagnostics=False), PROMPT_REMINDER, route)))))
-        else:
-            emit(context(event_name, " ".join(filter(None, (render_stance(scientific_context, diagnostics=False),
-                                                             routing_table())))))
+                pass  # the Stop check reports its own failure; the prompt route still goes out
+            if route := prompt_route(event):
+                emit(context(event_name, route))
     except (HookError, OSError, subprocess.TimeoutExpired) as exc:
         emit({"systemMessage": f"CSE hook skipped safely: {exc}"})
     return 0

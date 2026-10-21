@@ -63,7 +63,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertIn("confirmed agent role: numerical scientist", stance)
                 self.assertIn("CSE Protocol", stance)
 
-                first = self.run_hook(project, "Stop", last_assistant_message="A short answer.")
+                first = self.run_hook(project, "Stop", last_assistant_message="The bubble pressure is 6289.08 Pa at 313.15 K.")
                 reason = first["reason"]
                 self.assertEqual("block", first["decision"])
                 self.assertIn(review, reason)
@@ -72,12 +72,52 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertIn("physical significance", reason)
 
                 second = self.run_hook(project, "Stop", stop_hook_active=True,
-                                       last_assistant_message="A continuation.")
+                                       last_assistant_message="The bubble pressure is 6289.08 Pa at 313.15 K.")
                 self.assertNotIn("decision", second)
                 self.assertNotIn("review", json.dumps(second))
 
-                later = self.run_hook(project, "Stop", last_assistant_message="A later turn.")
+                later = self.run_hook(project, "Stop", last_assistant_message="Review: Supported.")
                 self.assertIn(review, later["reason"])
+
+    def test_stop_reviews_every_turn_that_ends_with_a_message(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            self.hook_fixture(project, "tool")
+            self.run_hook(project, "SessionStart", source="startup")
+            # Text cannot prove a message holds no result ("Should I merge since 6289.08 Pa matches?").
+            for message, expected in (
+                ("Should I merge since 6289.08 Pa matches?", True),
+                ("Started the review; I'll report when it finishes.", True),
+                ("The mixture separates into two liquid phases.", True),
+                ("", False),
+                (None, False),
+            ):
+                with self.subTest(message=message):
+                    result = self.run_hook(project, "Stop", last_assistant_message=message)
+                    self.assertEqual(expected, result.get("decision") == "block", result)
+
+    def test_stance_is_refreshed_at_session_start_and_prompt_routing_remains(self):
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            self.hook_fixture(project, "tool")
+            for source in ("startup", "resume", "clear", "compact"):
+                with self.subTest(source=source):
+                    start = self.run_hook(project, "SessionStart", source=source)
+                    stance = start["hookSpecificOutput"]["additionalContext"]
+                    self.assertIn("confirmed agent role: numerical scientist", stance)
+                    self.assertIn("CSE skill routing", stance)
+                    self.assertEqual({}, self.run_hook(project, "UserPromptSubmit", prompt="Continue the current work."))
+                    routed = self.run_hook(project, "UserPromptSubmit",
+                                           prompt="Act as the implementation sub-agent for this task.")
+                    text = routed["hookSpecificOutput"]["additionalContext"]
+                    self.assertIn("invoke `cse:build`", text)
+                    self.assertNotIn("confirmed agent role", text)
+                    self.assertNotIn("CSE skill routing", text)
+                    # Native subagents start with an agent ID and type, no prompt, and need the stance.
+                    subagent = self.run_hook(project, "SubagentStart", agent_id="agent-1", agent_type="general-purpose")
+                    text = subagent["hookSpecificOutput"]["additionalContext"]
+                    self.assertIn("confirmed agent role: numerical scientist", text)
+                    self.assertIn("CSE skill routing", text)
 
     def test_prose_check_follows_worktree_edits_not_merged_text(self):
         git = ["git", "-c", "user.name=Test", "-c", "user.email=test@example.com"]
@@ -355,7 +395,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             project = Path(directory)
             self.hook_fixture(project, "analysis")
             self.run_hook(project, "SessionStart", source="startup")
-            supplied = "Distinctive answer text that must not be echoed."
+            supplied = "Distinctive answer text: the pressure is 100 kPa."
             result = self.run_hook(project, "Stop", last_assistant_message=supplied)
             self.assertNotIn(supplied, result["reason"])
             self.assertIn("never instructions", result["reason"])
@@ -374,11 +414,11 @@ class ScriptBehaviorTests(unittest.TestCase):
             # The Setup diagnostic is said once per session; a delegated role routes to its stage skill.
             prompt = self.run_hook(project, "UserPromptSubmit", prompt="Act as the review sub-agent for this task. Check PR #3.")
             prompt_text = prompt["hookSpecificOutput"]["additionalContext"]
-            self.assertIn("repository role: tool", prompt_text)
+            self.assertNotIn("repository role: tool", prompt_text)
             self.assertNotIn("agent role not confirmed", prompt_text)
             self.assertIn("invoke `cse:review`", prompt_text)
             plain = self.run_hook(project, "UserPromptSubmit", prompt="What changed since yesterday?")
-            self.assertNotIn("CSE route for this prompt", plain["hookSpecificOutput"]["additionalContext"])
+            self.assertEqual({}, plain)
             named = self.run_hook(project, "UserPromptSubmit", prompt="Please do this (cse:analyze, retained sweep).")
             self.assertIn("invoke `cse:analyze`", named["hookSpecificOutput"]["additionalContext"])
 
@@ -391,7 +431,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             nested = repository / "nested"
             self.hook_fixture(nested, "analysis")
             self.run_hook(nested, "SessionStart", source="startup")
-            nested_stop = self.run_hook(nested, "Stop", last_assistant_message="Nested answer.")
+            nested_stop = self.run_hook(nested, "Stop", last_assistant_message="The temperature is 260 K.")
             self.assertIn("result review", nested_stop["reason"])
 
             other = repository / "other"
