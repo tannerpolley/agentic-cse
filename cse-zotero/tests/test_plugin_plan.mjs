@@ -307,7 +307,10 @@ async function browserFixture(mode = "success") {
     tabs: { update: async (id, options) => { assert.equal(id, 2); assert.deepEqual({ ...options }, { active: true }); }, get: async () => {
       reads++;
       if (reads === 1) return { ...tab, url: "about:blank" };
-      if (reads === 2) return { ...tab, status: "loading" };
+      if (reads === 2 || mode === "429loading") {
+        if (mode === "429loading") headers({ tabId: 2, type: "main_frame", statusCode: 429, responseHeaders: [] });
+        return { ...tab, status: "loading" };
+      }
       const challenge = mode === "persist" || mode === "clear" && desktop.now() < 5000;
       headers({ tabId: 2, type: "main_frame", statusCode: challenge ? 403 : 200,
         responseHeaders: challenge ? [{ name: "cf-mitigated", value: "challenge" }] : [] });
@@ -332,12 +335,15 @@ async function browserFixture(mode = "success") {
         assert.equal(await Zotero.Connector.callMethod("saveItems", { sessionID: "SESSION" }, t), "native-result");
         if (mode === "prompt") await Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://pdf.example/check", t);
         else if (mode === "window") await Zotero.Connector_Browser.openWindow("https://pdf.example/check", {}, t);
-        else if (mode === "snapshot") assert.equal(await Zotero.Connector.saveSingleFile({ method: "saveSingleFile" }, {}, t), null);
+        // Same shape as messaging.js: a postReceive hook replaces the usual tab and frame arguments.
+        else if (mode === "snapshot") assert.equal(await Zotero.Connector.saveSingleFile(
+          ...await context.MESSAGES.Connector.saveSingleFile.background.postReceive([{ method: "saveSingleFile" }, {}], t, 0)), null);
         else if (mode === "auth") return Zotero.API.authorize().catch(() => Zotero.Messaging.sendMessage("progressWindow.done", [false], t));
         await Zotero.Messaging.sendMessage("progressWindow.done", [true], t);
       } }
   };
-  const context = vm.createContext({ Zotero, chrome, AbortSignal, Date: class extends Date { static now() { return desktop.now(); } },
+  const MESSAGES = { Connector: { saveSingleFile: { background: { postReceive: async args => args } } } };
+  const context = vm.createContext({ Zotero, chrome, AbortSignal, MESSAGES, Date: class extends Date { static now() { return desktop.now(); } },
     setInterval() {}, setTimeout: (fn, ms) => { if (ms === 500) { desktop.advance(ms); queueMicrotask(fn); } },
     fetch: async (_, request) => {
       const data = JSON.parse(request.body), result = await desktop.call("acquire-job", data);
@@ -365,6 +371,21 @@ test("a page check waits until the job deadline; cleared checks continue the nat
   assert.match(stopped.outcome.stop.reason, /job deadline/); assert.ok(stopped.desktop.now() >= 180000);
   assert.deepEqual(stopped.native, []); assert.deepEqual(stopped.closed, [10]);
   assert.equal(cleared.outcome.ok, true); assert.equal(cleared.outcome.stop, null);
+});
+
+test("a main-frame 429 stops at once, even while the page is still loading", async () => {
+  const r = await browserFixture("429loading");
+  assert.equal(r.outcome.stop.reason, "Publisher HTTP 429"); assert.ok(r.desktop.now() < 5000);
+  assert.deepEqual(r.native, []); assert.deepEqual(r.closed, [10]);
+});
+
+test("an overdue job keeps running 15 seconds so the worker can report its own result", async () => {
+  const r = desktopFixture();
+  await r.heartbeat(); await r.call("acquire-job", { action: "submit", job: { id: "JOB" } }); await r.heartbeat();
+  r.advance(180000 + 14000);
+  assert.equal((await r.call("acquire-job", { action: "status" })).job.state, "running");
+  r.advance(2000);
+  assert.match((await r.call("acquire-job", { action: "status" })).job.result.error, /timed out/);
 });
 
 test("unsupported and multiple-item pages hand off without saving", async () => {

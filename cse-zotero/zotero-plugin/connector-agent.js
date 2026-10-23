@@ -27,6 +27,9 @@
     return callMethod.call(this, options, data, tab, ...rest);
   };
   // Agent saves keep only a PDF: skip the page snapshot. The Connector's own check pop-up stays native.
+  // Its message hook drops the sender tab, so pass the tab on for the check below.
+  const singleFileMessage = MESSAGES.Connector.saveSingleFile.background, postReceive = singleFileMessage.postReceive;
+  singleFileMessage.postReceive = async (args, tab, ...rest) => [...await postReceive(args, tab, ...rest), tab];
   const saveSingleFile = Zotero.Connector.saveSingleFile;
   Zotero.Connector.saveSingleFile = async function(options, data, tab, ...rest) {
     if (agentTabs.has(tab?.id)) return null;
@@ -53,12 +56,13 @@
       let stableURL, stableSince, checked = false, started = false;
       while (Date.now() < job.deadline && !a.stop && a.ok === undefined) {
         const tab = await chrome.tabs.get(a.tab);
-        if (tab.url !== "about:blank" && tab.status === "complete") {
+        if (a.status === 429) {
           a.url = tab.url; a.title = tab.title || "";
-          if (a.status === 429) {
-            a.stop = { reason: "Publisher HTTP 429" };
-            a.handoff = a.url;
-          } else if (a.challenge || /just a moment|checking your browser|verify you are human|captcha/i.test(a.title)) {
+          a.stop = { reason: "Publisher HTTP 429" };
+          a.handoff = a.url;
+        } else if (tab.url !== "about:blank" && tab.status === "complete") {
+          a.url = tab.url; a.title = tab.title || "";
+          if (a.challenge || /just a moment|checking your browser|verify you are human|captcha/i.test(a.title)) {
             // Wait out the page check until the job deadline; the user may clear it in the agent window.
             checked = true;
           } else {

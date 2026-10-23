@@ -60,7 +60,7 @@ def connector_save(url, safety, pub, *, collection=None, doi="", existing_key=No
             outcome = job.get("result") or {}
             if job.get("state") == "done":
                 break
-            if job.get("deadline") and time.time() * 1000 >= job["deadline"]:
+            if job.get("deadline") and time.time() * 1000 >= job["deadline"] + 15000:
                 outcome = {"error": "Connector attempt timed out; no retry"}
                 break
             time.sleep(1)

@@ -451,7 +451,8 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
   async function acquireJob(data) {
     if (!data || typeof data.action !== "string") return response(400, { error: "invalid_job_action" });
     const now = Date.now();
-    if (connectorJob?.state === "running" && connectorJob.deadline < now) {
+    // The worker reports its own deadline result; give it 15 seconds before a generic timeout.
+    if (connectorJob?.state === "running" && connectorJob.deadline + 15000 < now) {
       connectorJob.state = "done";
       connectorJob.result = { error: "Connector attempt timed out; no retry" };
     }

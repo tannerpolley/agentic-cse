@@ -95,7 +95,9 @@ Everything else in the Connector stays native, including retries, hidden
 iframes, the Amazon path and Zotero desktop's attachment resolver. Subresources
 and extension background requests are not policed or attributed to the job.
 There is no separate login-wall detector or five-minute human-check wait.
-The worker never raises or focuses a window. The agent copy adds Chrome's
+The worker's own window is never raised or focused. The Connector's native
+check pop-up does open in front, and it may outlive the job by up to its own
+60-second wait. The agent copy adds Chrome's
 `background` permission to remain available with no windows, and its startup
 event wakes the worker. Keep Chrome background apps enabled. The CLI starts
 everyday Chrome without a startup window when needed and waits for readiness
