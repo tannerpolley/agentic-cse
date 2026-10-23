@@ -218,11 +218,11 @@ work. The current Elsevier key is refused for Article Retrieval; support ticket
 
 The browser route uses the official Connector in everyday Chrome, with one
 normal window created unfocused. Springer is verified; Elsevier, Wiley, AIP and
-ACS commonly need a human. A page check gets 15 seconds to clear by itself.
-A persistent check or a requested human-check popup closes the job window,
-returns the link, records a 24-hour cooldown and sends one desktop notification
-when available. Agent tabs create no popup. Other Connector requests, retries,
-iframes and attachment handling stay native.
+ACS commonly need a human. A page check may clear until the job deadline; a
+persistent check closes the job window, returns the link and sends one desktop
+notification when available. No publisher is put on hold. The Connector's own
+human-check pop-up stays native, and agent saves skip the page snapshot. Other
+Connector requests, retries, iframes and attachment handling stay native.
 
 The job waits for a settled page, calls the native single-paper save and closes
 within three minutes. Finalization merges into an alive existing parent and
@@ -230,7 +230,7 @@ keeps the fresh item when the old parent is absent or trashed. A short quiet
 window skips acquisition add-ons, including the user's own saves during that
 window. Results include the route, handoff/stop reason and any verified keys.
 See [`ZOTERO_ACQUISITION.md`](ZOTERO_ACQUISITION.md) for the CLI's public-HTTPS
-input boundary, pacing, caps, cooldowns and the exact job behavior. Other
+input boundary, pacing, caps and the exact job behavior. Other
 Zotero writes retain their reviewed previews and explicit approval.
 
 ### One-time Connector setup

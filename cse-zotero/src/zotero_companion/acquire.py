@@ -36,10 +36,6 @@ class AcquireStop(RuntimeError):
     pass
 
 
-class Cooldown(AcquireStop):
-    """An earlier stop still cools this host; optional free-copy sources skip it."""
-
-
 class APIConfiguration(AcquireStop):
     """A verified API key configuration error permits Connector fall-through."""
 
@@ -178,21 +174,13 @@ class Safety:
         os.chmod(temp, 0o600)
         temp.replace(self.path)
 
-    def available(self, pub):
-        entry = self.data.get(canonical_host(pub), {})
-        remaining = entry.get("cooldown_until", 0) - time.time()
-        if remaining > 0:
-            raise Cooldown(f"{pub} cooldown active for {int(remaining)} seconds")
-
-    def stop(self, pub, reason, *, cooldown=False, host="", at=None):
+    def stop(self, pub, reason, *, host="", at=None):
         now = time.time() if at is None else at
         for key in {canonical_host(pub), canonical_host(host)} - {""}:
             entry = self.data.setdefault(key, {})
             if entry.get("stopped_at", 0) > now:
                 continue
             entry.update(stop_reason=reason, stopped_at=now)
-            if cooldown:
-                entry["cooldown_until"] = max(entry.get("cooldown_until", 0), now + 86400)
         self.save()
         raise AcquireStop(reason)
 
@@ -205,13 +193,11 @@ class Safety:
             raise AcquireStop(f"{blocked} publisher sites require the Connector or official API")
         if api and host not in {"api.elsevier.com", "api.wiley.com"}:
             raise AcquireStop("Publisher API redirect outside official API host refused")
-        self.available(host)
         return host
 
     def before(self, pub, url, route, *, api=False, public=False):
         pub = canonical_host(pub)
         host = self.check_url(url, api=api, browser=route == "browser") if url else ""
-        self.available(pub)
         if not public:
             require_vpn()
         entry = self.data.setdefault(pub, {})
@@ -241,9 +227,9 @@ class Safety:
     def response(self, pub, status, body=b"", *, is_pdf=False, host="", detail=""):
         reason = None if body.startswith(b"%PDF") else challenge(body[:200000].decode("utf-8", "replace"))
         if reason:
-            self.stop(pub, f"Publisher access challenge: {reason} (HTTP {status})", cooldown=True, host=host)
+            self.stop(pub, f"Publisher access challenge: {reason} (HTTP {status})", host=host)
         if status in {401, 403, 429}:
-            self.stop(pub, f"Publisher HTTP {status}{': ' + detail if detail else ''}; no retry", cooldown=status == 429, host=host)
+            self.stop(pub, f"Publisher HTTP {status}{': ' + detail if detail else ''}; no retry", host=host)
         if is_pdf and not body.startswith(b"%PDF"):
             self.stop(pub, "Non-PDF bytes where a PDF was expected", host=host)
 
@@ -321,13 +307,6 @@ def pmc_id(location):
                 return "PMC" + match[1]
     match = re.fullmatch(r"oai:pubmedcentral.nih.gov:(\d+)", location.get("pmh_id") or "")
     return "PMC" + match[1] if match else None
-
-
-def optional(fetch, *args, **kwargs):
-    try:
-        return fetch(*args, **kwargs)
-    except Cooldown:
-        return None
 
 
 def pmc_pdf(pmcid, doi, safety):
@@ -490,7 +469,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                         if pmcid not in seen:
                             seen.add(pmcid)
                             tried_pmc = True
-                            body = optional(pmc_pdf, pmcid, doi, safety)
+                            body = pmc_pdf(pmcid, doi, safety)
                             if body:
                                 result["route"] = "pmc-cloud"
                                 break
@@ -499,12 +478,12 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     if not url or url in seen or restricted_host(checked_url(url)):
                         continue
                     seen.add(url)
-                    body = optional(request, url, safety=safety, pub=pub, is_pdf=True)
+                    body = request(url, safety=safety, pub=pub, is_pdf=True)
                     if body:
                         result["route"] = "unpaywall"
                         break
                 if not body and not tried_pmc:
-                    body = optional(pmc_pdf, None, doi, safety)
+                    body = pmc_pdf(None, doi, safety)
                     if body:
                         result["route"] = "pmc-cloud"
             if not body and route == "auto" and pub in {"elsevier", "wiley"}:

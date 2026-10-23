@@ -59,13 +59,13 @@ NetworkManager connection may be activated and checked automatically; do not
 rotate or reconfigure networks, discover public IPs, or change browser identity.
 Crossref and Unpaywall metadata do not require the VPN.
 
-A process lock serializes acquisition. Persist pacing, daily counts and
-cooldowns in `~/.local/state/cse-zotero/acquire.json`; unreadable state refuses
-remote access. Space browser visits by at least 60 seconds per publisher/host,
+A process lock serializes acquisition. Persist pacing, daily counts and the
+last stop reason in `~/.local/state/cse-zotero/acquire.json`; unreadable state
+refuses remote access. Space browser visits by at least 60 seconds per publisher/host,
 with a 25-attempt daily publisher cap. CLI API/OA requests are sequential, at
-most one per second globally and one per 10 seconds for Wiley. A stop marked
-`cooldown` records 24 hours for the publisher and responding host. Do not clear
-state to evade it. If the CLI dies mid-job, its cooldown is not recorded.
+most one per second globally and one per 10 seconds for Wiley. A stop ends
+only the current paper; the next paper keeps the 60-second spacing and no
+publisher is put on hold.
 
 ## Everyday-Chrome Connector
 
@@ -79,14 +79,16 @@ and wait for that tab's `progressWindow.done` before closing the window.
 
 Only main-frame 429, `cf-mitigated: challenge`, or titles matching “just a
 moment”, “checking your browser”, “verify you are human” or “captcha” trigger
-the page-check wait. Allow 15 seconds to clear without interaction; if it
-persists, close the window, hand back the link and record the cooldown.
+the page-check wait. A 429 stops at once. A check page waits until the job
+deadline, so it can clear by itself or the user can clear it in the agent
+window; if it persists, close the window and hand back the link. The agent never
+clicks, solves, reloads or retries a check itself.
 
-For agent tabs, the Connector's human-check window prompt and `openWindow`
-create no window: stop with a handoff and cooldown. The CLI sends one
-`notify-send` notification when available: “<publisher> needs you to save this
-paper; link in the agent's result”. Never click, solve, reload or retry a check.
-Ordinary tabs keep native popup behavior. Agent tab IDs remain marked for
+The Connector's own human-check pop-up and `openWindow` stay native for agent
+tabs, so a PDF behind a check (ScienceDirect, for example) still downloads.
+Agent saves keep only the PDF: the page snapshot is skipped. On a stop, the CLI
+sends one `notify-send` notification when available: “<publisher> needs you to
+save this paper; link in the agent's result”. Agent tab IDs remain marked for
 60 seconds after the job ends; later native work is left to the Connector.
 
 Everything else in the Connector stays native, including retries, hidden

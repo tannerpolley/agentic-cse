@@ -321,7 +321,8 @@ async function browserFixture(mode = "success") {
   const Zotero = {
     version: "5.0.217", getExtensionURL: path => "chrome-extension://test/" + path, initDeferred: { promise: Promise.resolve() },
     logError: error => assert.fail(String(error)), Messaging: { sendMessage: async () => native.push("done") },
-    Connector: { callMethod: async () => { native.push("saveItems"); return "native-result"; } },
+    Connector: { callMethod: async () => { native.push("saveItems"); return "native-result"; },
+      saveSingleFile: async () => { native.push("snapshot"); return "native-snapshot"; } },
     BotBypass: { passJSDetectionViaWindowPrompt: async () => { native.push("prompt"); return "native-popup"; } },
     API: { authorize: async () => { native.push("authorize"); return "native-auth"; } },
     Connector_Browser: { openWindow: async () => { native.push("window"); return "native-window"; },
@@ -331,6 +332,7 @@ async function browserFixture(mode = "success") {
         assert.equal(await Zotero.Connector.callMethod("saveItems", { sessionID: "SESSION" }, t), "native-result");
         if (mode === "prompt") await Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://pdf.example/check", t);
         else if (mode === "window") await Zotero.Connector_Browser.openWindow("https://pdf.example/check", {}, t);
+        else if (mode === "snapshot") assert.equal(await Zotero.Connector.saveSingleFile({ method: "saveSingleFile" }, {}, t), null);
         else if (mode === "auth") return Zotero.API.authorize().catch(() => Zotero.Messaging.sendMessage("progressWindow.done", [false], t));
         await Zotero.Messaging.sendMessage("progressWindow.done", [true], t);
       } }
@@ -358,9 +360,9 @@ test("native save finishes with its session, closes the window and merges into t
   assert.ok(r.desktop.calls.some(c => c.join() === "erase,FRESH"));
 });
 
-test("a check gets 15 seconds: persistent checks stop; cleared checks continue the native save", async () => {
+test("a page check waits until the job deadline; cleared checks continue the native save", async () => {
   const stopped = await browserFixture("persist"), cleared = await browserFixture("clear");
-  assert.equal(stopped.outcome.stop.cooldown, true); assert.ok(stopped.desktop.now() >= 16000);
+  assert.match(stopped.outcome.stop.reason, /job deadline/); assert.ok(stopped.desktop.now() >= 180000);
   assert.deepEqual(stopped.native, []); assert.deepEqual(stopped.closed, [10]);
   assert.equal(cleared.outcome.ok, true); assert.equal(cleared.outcome.stop, null);
 });
@@ -373,14 +375,15 @@ test("unsupported and multiple-item pages hand off without saving", async () => 
   }
 });
 
-test("agent window prompts hand off and cool down without a popup; ordinary calls stay native", async () => {
-  for (const mode of ["prompt", "window"]) {
+test("agent saves open the native check pop-up and skip the page snapshot", async () => {
+  for (const [mode, call] of [["prompt", "prompt"], ["window", "window"]]) {
     const r = await browserFixture(mode);
-    assert.equal(r.created.length, 1); assert.equal(r.outcome.stop.cooldown, true);
-    assert.equal(r.outcome.handoff, "https://pdf.example/check"); assert.deepEqual(r.native, ["saveItems"]);
-    assert.equal(await r.Zotero.BotBypass.passJSDetectionViaWindowPrompt("https://pdf.example", { id: 99 }), "native-popup");
-    assert.equal(await r.Zotero.Connector_Browser.openWindow("https://paper.example", {}, { id: 99 }), "native-window");
+    assert.equal(r.outcome.ok, true); assert.equal(r.outcome.stop, null);
+    assert.deepEqual(r.native, ["saveItems", call, "done"]);
   }
+  const r = await browserFixture("snapshot");
+  assert.equal(r.outcome.ok, true); assert.deepEqual(r.native, ["saveItems", "done"]);
+  assert.equal(await r.Zotero.Connector.saveSingleFile({}, {}, { id: 99 }), "native-snapshot");
 });
 
 test("the quiet window skips add-on hooks, expires and restores the native methods on shutdown", async () => {

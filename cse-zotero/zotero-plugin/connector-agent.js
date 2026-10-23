@@ -1,7 +1,7 @@
 /* Agent jobs use the native Connector; ordinary tabs keep its ordinary behavior. */
 (() => {
   const CONNECTOR_VERSION = "5.0.217";
-  const MODULE_REVISION = 21;
+  const MODULE_REVISION = 22;
   // Wake this worker when Chrome starts without a tab to trigger its native listeners.
   chrome.runtime.onStartup.addListener(() => {});
   const marker = Zotero.getExtensionURL("cse-agent-job.html") + "#";
@@ -26,18 +26,12 @@
     if (agentTabs.has(tab?.id) && active?.tabs.has(tab.id) && ["saveItems", "saveSnapshot"].includes(method)) active.session_id = data.sessionID;
     return callMethod.call(this, options, data, tab, ...rest);
   };
-  for (const [object, name] of [[Zotero.BotBypass, "passJSDetectionViaWindowPrompt"], [Zotero.Connector_Browser, "openWindow"]]) {
-    const original = object[name];
-    object[name] = async function(url, ...args) {
-      const tab = name === "openWindow" ? args[1] : args[0];
-      if (!agentTabs.has(tab?.id)) return original.call(this, url, ...args);
-      if (active?.tabs.has(tab.id)) {
-        active.handoff = url;
-        active.stop = { reason: "Publisher requires a human save", cooldown: true };
-      }
-      throw Error("Publisher requires a human save");
-    };
-  }
+  // Agent saves keep only a PDF: skip the page snapshot. The Connector's own check pop-up stays native.
+  const saveSingleFile = Zotero.Connector.saveSingleFile;
+  Zotero.Connector.saveSingleFile = async function(options, data, tab, ...rest) {
+    if (agentTabs.has(tab?.id)) return null;
+    return saveSingleFile.call(this, options, data, tab, ...rest);
+  };
   // ponytail: during a job, Zotero being unreachable hands off instead of opening the zotero.org sign-in window; a user save in that minute does too.
   const authorize = Zotero.API.authorize;
   Zotero.API.authorize = async function(...args) {
@@ -56,19 +50,18 @@
       a.window = window.id; a.tab = window.tabs[1].id;
       for (const tab of window.tabs) { a.tabs.add(tab.id); agentTabs.add(tab.id); }
       await chrome.tabs.update(a.tab, { active: true });
-      let stableURL, stableSince, checkSince, started = false;
+      let stableURL, stableSince, checked = false, started = false;
       while (Date.now() < job.deadline && !a.stop && a.ok === undefined) {
         const tab = await chrome.tabs.get(a.tab);
         if (tab.url !== "about:blank" && tab.status === "complete") {
           a.url = tab.url; a.title = tab.title || "";
-          if (a.status === 429 || a.challenge || /just a moment|checking your browser|verify you are human|captcha/i.test(a.title)) {
-            checkSince ??= Date.now();
-            if (Date.now() - checkSince >= 15000) {
-              a.stop = { reason: a.status === 429 ? "Publisher HTTP 429" : "Publisher check did not clear within 15 seconds", cooldown: true };
-              a.handoff = a.url;
-            }
+          if (a.status === 429) {
+            a.stop = { reason: "Publisher HTTP 429" };
+            a.handoff = a.url;
+          } else if (a.challenge || /just a moment|checking your browser|verify you are human|captcha/i.test(a.title)) {
+            // Wait out the page check until the job deadline; the user may clear it in the agent window.
+            checked = true;
           } else {
-            checkSince = undefined;
             if (stableURL !== tab.url) { stableURL = tab.url; stableSince = Date.now(); }
             if (!started && Date.now() - stableSince >= 3000) {
               const translators = Zotero.Connector_Browser.getTabInfo(tab.id).translators || [];
@@ -81,7 +74,10 @@
         }
         await new Promise(resolve => setTimeout(resolve, 500));
       }
-      if (a.ok === undefined && !a.stop && !a.handoff) a.handoff = "Connector attempt timed out; save with the normal Zotero Connector";
+      if (a.ok === undefined && !a.stop && !a.handoff) {
+        if (checked && !started) { a.stop = { reason: "Publisher check did not clear before the job deadline" }; a.handoff = a.url; }
+        else a.handoff = "Connector attempt timed out; save with the normal Zotero Connector";
+      }
     } catch (error) { a.handoff ||= String(error); }
     finally {
       if (a.window) await chrome.windows.remove(a.window).catch(() => {});

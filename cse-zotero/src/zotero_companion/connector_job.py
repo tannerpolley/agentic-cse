@@ -76,11 +76,10 @@ def connector_save(url, safety, pub, *, collection=None, doi="", existing_key=No
     for host in hosts:
         safety.data.setdefault(host, {})["last_browser"] = time.time()
     safety.save()
-    # ponytail: if the CLI dies mid-job, its cooldown is not recorded.
-    if (stop := outcome.get("stop") or {}).get("cooldown"):
+    if stop := outcome.get("stop"):
         try:
             safety.stop(pub, stop["reason"], host=checked_url(outcome.get("handoff") if
-                        str(outcome.get("handoff", "")).startswith("https://") else final or url), cooldown=True)
+                        str(outcome.get("handoff", "")).startswith("https://") else final or url))
         except AcquireStop:
             pass
         if outcome.get("handoff") and (notify := shutil.which("notify-send")):

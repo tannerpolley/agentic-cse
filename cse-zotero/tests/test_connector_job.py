@@ -54,7 +54,7 @@ def test_job_roundtrip_counts_one_visit_and_preserves_session_and_refusal(monkey
             if self.job_id:
                 return {'job': {'id': self.job_id, 'publisher': 'wiley', 'state': 'done', 'result': {
                     'session_id': 'SESSION', 'url': 'https://WILEY.COM./paper', 'title': 'Just a moment', 'status': 403,
-                    'stop': {'reason': 'Publisher access challenge: Cloudflare', 'host': 'wiley.com', 'cooldown': True}}}}
+                    'stop': {'reason': 'Publisher access challenge: Cloudflare', 'host': 'wiley.com'}}}}
             return {'ready': True, 'version': '5.0.217'}
     plugin = Plugin()
     monkeypatch.setattr(bridge, 'ZoteroPluginClient', lambda *a, **k: plugin)
@@ -63,7 +63,7 @@ def test_job_roundtrip_counts_one_visit_and_preserves_session_and_refusal(monkey
         assert result['session_id'] == 'SESSION' and result['status'] == 403
         assert safety.data['wiley']['count'] == 1
         assert safety.data['wiley.com']['last_browser'] > 0
-        assert safety.data['wiley']['cooldown_until'] == safety.data['wiley.com']['cooldown_until']
+        assert safety.data['wiley']['stop_reason'] == safety.data['wiley.com']['stop_reason']
     assert calls.count('submit') == 1
 
 
@@ -94,7 +94,7 @@ def test_connector_build_keeps_official_files_and_rejects_version_mismatch(tmp_p
         build(source, output)
 
 
-def test_attachment_check_hands_off_notifies_once_and_cools_publisher_and_host(monkeypatch, tmp_path):
+def test_attachment_check_hands_off_notifies_once_without_a_hold(monkeypatch, tmp_path):
     notices, calls = [], []
     monkeypatch.setattr(bridge, 'ensure_chrome', lambda: None)
     monkeypatch.setattr(acquisition, 'require_vpn', lambda: None)
@@ -112,13 +112,13 @@ def test_attachment_check_hands_off_notifies_once_and_cools_publisher_and_host(m
                 return {'ready': True}
             return {'job': {'id': self.job_id, 'state': 'done', 'result': {
                 'handoff': 'https://pdf.example/check', 'url': 'https://publisher.example/paper',
-                'stop': {'reason': 'Publisher requires a human save', 'host': 'pdf.example', 'cooldown': True}}}}
+                'stop': {'reason': 'Publisher check did not clear before the job deadline', 'host': 'pdf.example'}}}}
     monkeypatch.setattr(bridge, 'ZoteroPluginClient', Plugin)
     with acquisition.Safety(tmp_path / 'state.json') as safety:
         result = bridge.connector_save('https://publisher.example/paper', safety, 'elsevier')
         assert result['handoff'] == 'https://pdf.example/check'
-        assert safety.data['elsevier']['cooldown_until'] == safety.data['pdf.example']['cooldown_until']
-        assert safety.data['elsevier']['cooldown_until'] == safety.data['elsevier']['stopped_at'] + 86400
+        assert safety.data['elsevier']['stop_reason'] == safety.data['pdf.example']['stop_reason']
+        assert 'cooldown_until' not in safety.data['elsevier']
     assert calls == ['status', 'submit', 'status']
     assert len(notices) == 1
     assert notices[0][2] == "elsevier needs you to save this paper; link in the agent's result"

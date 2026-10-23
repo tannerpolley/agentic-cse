@@ -87,18 +87,15 @@ def test_api_precedes_connector_for_all_publishers(runtime, doi, member, name, t
     assert all('secret-test-token' not in str(call) for call in calls)
 
 
-def test_429_and_challenge_stop_and_survive_restart(tmp_path):
+def test_429_and_challenge_stop_without_a_publisher_hold(tmp_path):
     path = tmp_path / 'state.json'
     for status, body in [(429, b''), (200, b'<title>Just a moment...</title>'), (200, b'<script>const POW_CHALLENGE="test";</script>')]:
         with mod.Safety(path) as state:
             with pytest.raises(mod.AcquireStop):
                 state.response('elsevier', status, body, host='API.ELSEVIER.COM.')
-        with mod.Safety(path) as state:
-            with pytest.raises(mod.AcquireStop, match='cooldown'):
-                state.available('elsevier')
-            with pytest.raises(mod.AcquireStop, match='cooldown'):
-                state.before('unclassified', 'https://api.elsevier.com/file', 'api', api=True)
-            assert state.data['elsevier']['cooldown_until'] == state.data['api.elsevier.com']['cooldown_until']
+        saved = json.loads(path.read_text())
+        assert saved['elsevier']['stop_reason'] and saved['api.elsevier.com']['stop_reason']
+        assert not any('cooldown_until' in entry for entry in saved.values() if isinstance(entry, dict))
     with mod.Safety(path) as state:
         with pytest.raises(mod.AcquireStop, match='Non-PDF'):
             state.response('other', 200, b'<html>not a pdf</html>', is_pdf=True)
@@ -145,7 +142,7 @@ def test_oa_pdf_stops_further_requests(runtime, monkeypatch):
 
 
 @pytest.mark.parametrize('source', ['location', 'landing', 'converter', 'outside-oa'])
-def test_pmc_cloud_selects_declared_main_pdf_and_preserves_cooldowns(runtime, monkeypatch, source):
+def test_pmc_cloud_selects_declared_main_pdf(runtime, monkeypatch, source):
     import base64
     import io
     from urllib.parse import parse_qs, urlsplit
@@ -156,10 +153,6 @@ def test_pmc_cloud_selects_declared_main_pdf_and_preserves_cooldowns(runtime, mo
     clock = [1000000.0]
     monkeypatch.setattr(mod.time, 'time', lambda: clock[0])
     monkeypatch.setattr(mod.time, 'sleep', lambda seconds: clock.__setitem__(0, clock[0] + seconds))
-    cooldowns = {} if source == 'outside-oa' else {'crossref-340': {'cooldown_until': clock[0] + 86400}}
-    if source != 'converter':
-        cooldowns['pmc.ncbi.nlm.nih.gov'] = {'cooldown_until': clock[0] + 86400}
-    (root / 'state.json').write_text(json.dumps(cooldowns))
     main = b'%PDF-1.7 main article'
     location = {'host_type': 'repository', 'url_for_pdf': 'https://pmc.ncbi.nlm.nih.gov/articles/PMC123/pdf/paper.pdf'}
     if source == 'landing':
@@ -210,8 +203,6 @@ def test_pmc_cloud_selects_declared_main_pdf_and_preserves_cooldowns(runtime, mo
     assert result['ok'] and result['verified'] and result['attachment_key'] == 'PDFKEY'
     assert result['route'] == ('unpaywall' if source == 'outside-oa' else 'pmc-cloud')
     assert all(b - a >= 1 for a, b in zip(times, times[1:]))
-    state = json.loads((root / 'state.json').read_text())
-    assert all(state[host]['cooldown_until'] == entry['cooldown_until'] for host, entry in cooldowns.items())
     assert not any('/pdf/' in url or 'supplement.pdf' in url for url in urls)
     with mod.Safety() as safety:
         with pytest.raises(mod.AcquireStop, match='official PMC Cloud'):
@@ -280,8 +271,6 @@ def test_api_hard_stop_cannot_fall_through(runtime, monkeypatch, status, body):
     result = mod.acquire(current['doi'])
     assert not result['ok'] and result['item_key'] == 'PARENT' and not result['attachment_key']
     assert not any(path.endswith('attachment') for path, _ in calls)
-    state = json.loads((root / 'state.json').read_text())
-    assert bool(state['elsevier'].get('cooldown_until')) == (status == 429 or b'CAPTCHA' in body)
 
 
 @pytest.mark.parametrize("value,doi", [
@@ -455,22 +444,6 @@ def test_native_metadata_operation_reserves_api_slot(runtime, monkeypatch):
     assert result["ok"] and clock[0] == 1000001.0
 
 
-def test_cooled_free_copy_source_is_skipped_not_fatal(runtime, monkeypatch):
-    # Regression: a PMC cooldown left by an earlier paper halted an Elsevier acquisition before its API route.
-    current, calls, root = runtime
-    current.update(doi='10.1016/test', member=78, has_pdf=False)
-    path = root / 'elsevier-api-key'
-    path.write_text('secret-test-token')
-    path.chmod(0o600)
-    original = mod.request
-    def cooled_pmc(url, **kwargs):
-        if 'idconv' in url:
-            raise mod.Cooldown('pmc.ncbi.nlm.nih.gov cooldown active for 100 seconds')
-        return original(url, **kwargs)
-    monkeypatch.setattr(mod, 'request', cooled_pmc)
-    result = mod.acquire(current['doi'])
-    assert result['ok'] and result['route'] == 'elsevier-api' and result['attachment_key'] == 'PDFKEY'
-
 
 @pytest.mark.parametrize('status,detail,body', [
     (403, 'AUTHENTICATION_ERROR', b'{"error":"Requestor configuration settings insufficient"}'),
@@ -504,8 +477,6 @@ def test_elsevier_configuration_error_falls_through_but_bans_stop(runtime, monke
     assert (detail or 'Requestor configuration settings insufficient') in str(result.get('skipped_routes') or result['stop_reason']) or b'CAPTCHA' in body
     assert 'private-test-key' not in json.dumps(result)
     assert not any(path.endswith('metadata') and mode == 'apply' for path, mode in calls) if skipped else result['item_key'] == 'PARENT'
-    state = json.loads((root / 'state.json').read_text())
-    assert bool(state.get('elsevier', {}).get('cooldown_until')) == (status == 429 or b'CAPTCHA' in body)
 
 
 @pytest.mark.parametrize('url', ['https://127.0.0.1/a', 'https://private.internal/a', 'http://public.example/10.1002/test', 'file:///tmp/paper'])
@@ -524,7 +495,7 @@ def test_connector_partial_save_is_filed_once_then_hands_off(runtime, monkeypatc
     monkeypatch.setattr('zotero_companion.connector_job.connector_save', lambda *a, **k: {
         'session_id': 'SESSION', 'url': 'https://doi.org/10.1016/test', 'title': '', 'status': None,
         'stop': {'reason': 'Publisher access challenge: CAPTCHA', 'host': 'WWW.SCIENCEDIRECT.COM.',
-                 'url': 'https://www.sciencedirect.com/article/test', 'status': 403, 'cooldown': True}})
+                 'url': 'https://www.sciencedirect.com/article/test', 'status': 403}})
     result = mod.acquire(current['doi'])
     assert not result['ok'] and result['item_key'] == 'EXISTING'
     assert result['browser'] == {'url': 'https://www.sciencedirect.com/article/test', 'title': '', 'status': 403}
