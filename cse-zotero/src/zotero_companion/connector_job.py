@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import subprocess
-import shutil
 import time
 from pathlib import Path
 from urllib.parse import urlsplit
@@ -82,11 +81,4 @@ def connector_save(url, safety, pub, *, collection=None, doi="", existing_key=No
                         str(outcome.get("handoff", "")).startswith("https://") else final or url))
         except AcquireStop:
             pass
-        if outcome.get("handoff") and (notify := shutil.which("notify-send")):
-            try:
-                subprocess.run([notify, "CSE Zotero needs a manual save",
-                                f"{pub} needs you to save this paper; link in the agent's result"],
-                               timeout=5, check=False, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-            except (OSError, subprocess.TimeoutExpired):
-                pass
     return outcome

@@ -94,11 +94,10 @@ def test_connector_build_keeps_official_files_and_rejects_version_mismatch(tmp_p
         build(source, output)
 
 
-def test_attachment_check_hands_off_notifies_once_without_a_hold(monkeypatch, tmp_path):
+def test_attachment_check_hands_off_without_a_hold_or_notification(monkeypatch, tmp_path):
     notices, calls = [], []
     monkeypatch.setattr(bridge, 'ensure_chrome', lambda: None)
     monkeypatch.setattr(acquisition, 'require_vpn', lambda: None)
-    monkeypatch.setattr(bridge.shutil, 'which', lambda name: '/usr/bin/notify-send')
     monkeypatch.setattr(bridge.subprocess, 'run', lambda command, **kwargs: notices.append(command))
     monkeypatch.setattr(bridge.time, 'sleep', lambda seconds: pytest.fail('a handoff must not wait or retry'))
     class Plugin:
@@ -120,5 +119,4 @@ def test_attachment_check_hands_off_notifies_once_without_a_hold(monkeypatch, tm
         assert safety.data['elsevier']['stop_reason'] == safety.data['pdf.example']['stop_reason']
         assert 'cooldown_until' not in safety.data['elsevier']
     assert calls == ['status', 'submit', 'status']
-    assert len(notices) == 1
-    assert notices[0][2] == "elsevier needs you to save this paper; link in the agent's result"
+    assert notices == []

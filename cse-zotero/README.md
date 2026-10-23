@@ -219,8 +219,8 @@ work. The current Elsevier key is refused for Article Retrieval; support ticket
 The browser route uses the official Connector in everyday Chrome, with one
 normal window created unfocused. Springer is verified; Elsevier, Wiley, AIP and
 ACS commonly need a human. A page check may clear until the job deadline; a
-persistent check closes the job window, returns the link and sends one desktop
-notification when available. No publisher is put on hold. The Connector's own
+persistent check closes the job window and returns the link. No publisher is
+put on hold, and nothing sends a desktop notification. The Connector's own
 human-check pop-up stays native, and agent saves skip the page snapshot. Other
 Connector requests, retries, iframes and attachment handling stay native.
 
@@ -533,8 +533,10 @@ uv run python scripts/build_plugin.py
 ```
 
 Install `dist/cse-zotero-1.0.0.xpi` from Zotero's Add-ons manager, then
-restart Zotero once. The plugin runs in the background and adds these
-loopback-only endpoints to Zotero's existing local server:
+restart Zotero once. The plugin runs in the background and turns off Zotero's
+progress pop-ups, which every add-on uses for its notifications (duplicate
+alerts, "Progress" bubbles, error notices). It adds these loopback-only
+endpoints to Zotero's existing local server:
 
 - `GET /zotero-companion/status`
 - `POST /zotero-companion/tag-cleanup` (dry-run unless an exact confirmation token is supplied)

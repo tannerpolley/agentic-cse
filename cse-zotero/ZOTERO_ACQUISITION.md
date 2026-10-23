@@ -86,9 +86,8 @@ clicks, solves, reloads or retries a check itself.
 
 The Connector's own human-check pop-up and `openWindow` stay native for agent
 tabs, so a PDF behind a check (ScienceDirect, for example) still downloads.
-Agent saves keep only the PDF: the page snapshot is skipped. On a stop, the CLI
-sends one `notify-send` notification when available: “<publisher> needs you to
-save this paper; link in the agent's result”. Agent tab IDs remain marked for
+Agent saves keep only the PDF: the page snapshot is skipped. A stop hands back
+the link in the result, with no desktop notification. Agent tab IDs remain marked for
 60 seconds after the job ends; later native work is left to the Connector.
 
 Everything else in the Connector stays native, including retries, hidden

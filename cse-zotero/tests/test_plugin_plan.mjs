@@ -284,7 +284,8 @@ function desktopFixture() {
     Items: { getByLibraryAndKey: (_, key) => key === "OLD" ? old : null, getAsync: async () => [pdf],
       merge: async (parent, items) => { calls.push(["merge", parent.key, items[0].key]); parent.children.push(...items[0].children); } },
     Linter: { hooks }, ActionsTags: { api: { actionManager } }, ZoteroAttanger: { data: { menu } },
-    File: { getContentsAsync: async () => '{"module_revision":19}' }
+    File: { getContentsAsync: async () => '{"module_revision":19}' },
+    ProgressWindow: function() { this.show = () => { calls.push(["popup"]); return true; }; this.close = () => calls.push(["close"]); }
   };
   const context = vm.createContext({ Zotero, Services: { dirsvc: { get: () => ({ path: "/home/test" }) } }, Components: { interfaces: {} },
     Date: class extends Date { static now() { return clock; } }, atob });
@@ -405,6 +406,14 @@ test("agent saves open the native check pop-up and skip the page snapshot", asyn
   const r = await browserFixture("snapshot");
   assert.equal(r.outcome.ok, true); assert.deepEqual(r.native, ["saveItems", "done"]);
   assert.equal(await r.Zotero.Connector.saveSingleFile({}, {}, { id: 99 }), "native-snapshot");
+});
+
+test("no Zotero progress pop-up ever shows while the add-on runs; shutdown restores it", async () => {
+  const r = desktopFixture();
+  const popup = new r.Zotero.ProgressWindow({ closeOnClick: true });
+  assert.equal(popup.show(), false); popup.close(); assert.deepEqual(r.calls, []);
+  r.context.ZoteroCompanion.stop();
+  assert.equal(new r.Zotero.ProgressWindow().show(), true); assert.deepEqual(r.calls, [["popup"]]);
 });
 
 test("the quiet window skips add-on hooks, expires and restores the native methods on shutdown", async () => {

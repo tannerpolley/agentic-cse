@@ -50,6 +50,13 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     });
   }
 
+  // The owner wants no Zotero pop-ups at all: every add-on notification goes through this window.
+  function silenceProgressWindows() {
+    replace(zotero, "ProgressWindow", Native => function(...args) {
+      return Object.assign(new Native(...args), { show: () => false, close() {} });
+    });
+  }
+
   async function quietAcquisition(run, data) {
     quietUntil = Infinity;
     try { return await run(data); }
@@ -690,7 +697,7 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
   }
 
   return {
-    start() { quietAddons(); register(); },
+    start() { quietAddons(); silenceProgressWindows(); register(); },
     stop: unregister,
     paths: registeredPaths
   };
