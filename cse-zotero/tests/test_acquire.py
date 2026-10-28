@@ -255,6 +255,28 @@ def test_metadata_busy_returns_a_stop(runtime, monkeypatch):
     assert result['item_key'] is None and result['attachment_key'] is None
 
 
+@pytest.mark.parametrize('doi,reason', [
+    ('10.1021/je960141+', 'native translation failure'),
+    ('10.22034/ijche.2024.450400.1526', 'No items returned from any translator; hand off the DOI landing page'),
+])
+def test_metadata_endpoint_message_reaches_stop_reason(runtime, monkeypatch, doi, reason):
+    from io import BytesIO
+    from urllib.error import HTTPError
+    from zotero_companion import plugin_client
+
+    runtime[0].update(doi=doi)
+    payload = json.dumps({'error': 'metadata_acquisition_failed', 'message': reason}).encode()
+    def failed_response(request, **kwargs):
+        assert json.loads(request.data)['identifier'] == doi
+        raise HTTPError(request.full_url, 500, 'Internal Server Error', {}, BytesIO(payload))
+    monkeypatch.setattr(plugin_client, 'urlopen', failed_response)
+    monkeypatch.setattr(mod, 'ZoteroPluginClient', plugin_client.ZoteroPluginClient)
+    result = mod.acquire(doi, dry_run=True)
+    assert not result['ok'] and reason in result['stop_reason']
+    assert result['handoff_url'] == 'https://doi.org/' + doi
+    assert result['item_key'] is None and result['attachment_key'] is None
+
+
 @pytest.mark.parametrize('status,body', [(429, b''), (403, b''), (403, b'<html>CAPTCHA</html>'), (200, b'<html>CAPTCHA</html>'), (200, b'not a PDF')])
 def test_api_hard_stop_cannot_fall_through(runtime, monkeypatch, status, body):
     current, calls, root = runtime
