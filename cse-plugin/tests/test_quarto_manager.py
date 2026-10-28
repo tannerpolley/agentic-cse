@@ -7,6 +7,10 @@ import json
 import os
 from pathlib import Path
 import signal
+import shutil
+import socket
+import urllib.request
+import html
 import subprocess
 import sys
 import tempfile
@@ -21,6 +25,168 @@ SPEC = importlib.util.spec_from_file_location("cse_manuscript", SCRIPT)
 assert SPEC and SPEC.loader
 MANUSCRIPT = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(MANUSCRIPT)
+
+
+@unittest.skipUnless(shutil.which("quarto") and shutil.which("snakemake"), "live Quarto and Snakemake required")
+class PreviewFailureTests(unittest.TestCase):
+    @contextlib.contextmanager
+    def project(self):
+        with tempfile.TemporaryDirectory(prefix="cse-preview-test-") as directory:
+            root = Path(directory) / "original"
+            root.mkdir()
+            (root / "index.qmd").write_text("# Home\n")
+            MANUSCRIPT.init(root, root / "index.qmd", "c" * 40, "d" * 64)
+            for name in ("bad", "good", "unlisted"):
+                workflow = root / name
+                (workflow / "results").mkdir(parents=True)
+                (workflow / "Snakefile").write_text("rule present:\n    shell: 'python3 present.py'\n")
+                (workflow / "present.py").write_text(
+                    "from pathlib import Path\n"
+                    "runs = Path('.runs')\n"
+                    "runs.write_text(str(int(runs.read_text()) + 1) if runs.exists() else '1')\n"
+                    "p = Path('results/view.md')\n"
+                    "p.unlink(missing_ok=True)\n"
+                    "Path('results/view.ipynb').unlink(missing_ok=True)\n"
+                    "if Path('refuse').exists(): print('REJECTED-PAYLOAD')\n"
+                    "assert not Path('refuse').exists(), 'integrity check REFUSED'\n"
+                    "p.write_text('CHECKED-VALUE\\n')\n"
+                    "Path('results/view.ipynb').write_text('{}')\n")
+                (workflow / "results/view.md").write_text("CHECKED-VALUE\n")
+                (workflow / "results/view.ipynb").write_text("{}")
+                (workflow / "notebook.qmd").write_text("# Results\n\n{{< include results/view.md >}}\n")
+                if name != "unlisted":
+                    MANUSCRIPT.include(root, workflow / "notebook.qmd", name)
+            subprocess.run(["git", "init", "-q", str(root)], check=True)
+            subprocess.run(["git", "-C", str(root), "add", "."], check=True)
+            with patch.dict(os.environ, {"XDG_CACHE_HOME": str(Path(directory) / "cache")}):
+                yield root
+
+    @contextlib.contextmanager
+    def server(self, root):
+        with socket.socket() as sock:
+            sock.bind(("127.0.0.1", 0))
+            port = sock.getsockname()[1]
+        runner = root.parent / "runner.py"
+        runner.write_text(
+            "import importlib.util, sys\nfrom pathlib import Path\n"
+            f"spec = importlib.util.spec_from_file_location('manager', {str(SCRIPT)!r})\n"
+            "m = importlib.util.module_from_spec(spec)\nspec.loader.exec_module(m)\n"
+            "m.WATCH_INTERVAL_SECONDS = 0.1\nm.WATCH_SETTLE_SECONDS = 0.1\n"
+            "import faulthandler\nfaulthandler.dump_traceback_later(60, repeat=True)\n"
+            "raise SystemExit(m.preview(Path(sys.argv[1]), '127.0.0.1', int(sys.argv[2])))\n")
+        with (root.parent / "preview.log").open("w+") as log:
+            process = subprocess.Popen([sys.executable, str(runner), str(root), str(port)], stdout=log, stderr=log)
+            def get(page):
+                with urllib.request.urlopen(f"http://127.0.0.1:{port}/{page}", timeout=30) as response:
+                    return response.read().decode()
+            try:
+                self.until(lambda: "Home" in get("index.html"), process, log)
+                yield get, process, log, port
+            finally:
+                process.terminate()
+                try:
+                    process.wait(timeout=15)
+                except subprocess.TimeoutExpired:
+                    process.kill()
+                    process.wait()
+
+    def until(self, predicate, process, log):
+        deadline = time.monotonic() + 120
+        while time.monotonic() < deadline and process.poll() is None:
+            try:
+                if predicate():
+                    return
+            except OSError:
+                pass
+            time.sleep(0.1)
+        log.flush()
+        self.fail("preview did not reach expected state:\n" + Path(log.name).read_text()[-12000:])
+
+    def test_cold_refusal_missing_outputs_keeps_healthy_site_and_lists_unregistered_failure(self):
+        with self.project() as root:
+            (root / "index.qmd").write_text("# Home\n\n{{< include bad/results/view.md >}}\n")
+            for name in ("bad", "unlisted"):
+                (root / name / "refuse").touch()
+                (root / name / "results/view.md").unlink()
+                (root / name / "results/view.ipynb").unlink()
+            with self.server(root) as (get, process, log, port):
+                self.assertIn("Presentation unavailable", get("bad/notebook.html"))
+                self.assertIn("CHECKED-VALUE", get("good/notebook.html"))
+                self.assertIn("unlisted", get("index.html"))
+                self.assertIn("REFUSED", Path(log.name).read_text())
+                self.assertNotIn("REJECTED-PAYLOAD", get("bad/notebook.html"))
+                self.assertNotIn("REJECTED-PAYLOAD", get("index.html"))
+                copy = MANUSCRIPT.preview_path(root)
+                self.assertFalse((copy / "bad/results/view.ipynb").exists())
+                self.assertFalse((copy / "bad/results/view.md").exists())
+                self.assertFalse(copy.is_relative_to(root))
+
+    def test_live_refusal_and_recovery_use_native_endpoint_without_present_loop(self):
+        with self.project() as root, self.server(root) as (get, process, log, port):
+            good_runs = (root / "good/.runs").read_text()
+            (root / "bad/refuse").touch()
+            self.until(lambda: "Presentation unavailable" in get("bad/notebook.html"), process, log)
+            self.assertNotIn("CHECKED-VALUE", get("bad/notebook.html"))
+            self.assertIn("CHECKED-VALUE", get("good/notebook.html"))
+            (root / "bad/refuse").unlink()
+            self.until(lambda: "CHECKED-VALUE" in get("bad/notebook.html"), process, log)
+            self.until(lambda: "Preview failures" not in get("index.html"), process, log)
+            copy = MANUSCRIPT.preview_path(root)
+            url = f"http://127.0.0.1:{port}/{MANUSCRIPT.QUARTO_RENDER_REQUEST}/bad/notebook.qmd"
+            before = (root / "bad/.runs").read_text()
+            with urllib.request.urlopen(url, timeout=30) as response:
+                self.assertEqual(b"rendered", response.read())
+            time.sleep(0.5)
+            self.assertEqual(before, (root / "bad/.runs").read_text())
+            self.assertEqual(good_runs, (root / "good/.runs").read_text())
+
+    def test_strict_refusal_originals_and_notice_cleanup_resource_boundary(self):
+        with self.project() as root:
+            originals = {p.relative_to(root): p.read_bytes() for p in root.rglob("*")
+                         if p.is_file() and ".git" not in p.parts}
+            (root / "bad/refuse").touch()
+            self.assertNotEqual(0, MANUSCRIPT.prepare(root))
+            with self.assertRaises(MANUSCRIPT.ManuscriptError):
+                MANUSCRIPT.refresh(root, root / "bad/notebook.qmd")
+            result = subprocess.run(["quarto", "render", "bad/notebook.qmd", "--profile", "presentation"],
+                                    cwd=root, capture_output=True)
+            self.assertNotEqual(0, result.returncode)
+            failures, snapshot = {}, MANUSCRIPT.watch_snapshot(root)
+            MANUSCRIPT.check_preview_workflows(root, None, failures, snapshot)
+            copy = MANUSCRIPT.preview_path(root)
+            MANUSCRIPT.populate_preview(root, copy, failures)
+            self.assertIn("bad", json.loads((copy / ".cse-preview-failures.json").read_text()))
+            (root / "bad/refuse").unlink()
+            MANUSCRIPT.check_preview_workflows(root, {root / "bad/refuse"}, failures, snapshot)
+            MANUSCRIPT.populate_preview(root, copy, failures)
+            self.assertNotIn("Preview failures", (copy / "index.qmd").read_text())
+            (root / "unlisted/refuse").touch()
+            MANUSCRIPT.check_preview_workflows(root, {root / "unlisted/refuse"}, failures, snapshot)
+            (root / "unlisted/Snakefile").unlink()
+            MANUSCRIPT.check_preview_workflows(root, {root / "unlisted/Snakefile"}, failures, snapshot)
+            MANUSCRIPT.populate_preview(root, copy, failures)
+            self.assertEqual({}, json.loads((copy / ".cse-preview-failures.json").read_text()))
+            for path, data in originals.items():
+                if path.parts[0] != "unlisted" and "results" not in path.parts:
+                    self.assertEqual(data, (root / path).read_bytes(), str(path))
+            resource = root / "good/results/view.md"
+            stamp = resource.stat().st_mtime_ns
+            resource.write_text("CHANGED-VALUE\n")
+            os.utime(resource, ns=(stamp, stamp))
+            MANUSCRIPT.populate_preview(root, copy, {})
+            self.assertEqual(resource.read_bytes(), (copy / "good/results/view.md").read_bytes())
+            (root / "good/results/view.md").write_text("{{< include ../../../outside.md >}}")
+            MANUSCRIPT.populate_preview(root, copy, {})
+            self.assertIn("resource outside preview root", html.unescape((copy / "good/notebook.qmd").read_text()))
+            snapshot = MANUSCRIPT.watch_snapshot(root)
+            def concurrent_edit(*args):
+                (root / "good/notebook.qmd").write_text("# Concurrent edit\n")
+                return subprocess.CompletedProcess([], 0, "", "")
+            with (patch.object(MANUSCRIPT, "check_presentation_plan", return_value=0),
+                  patch.object(MANUSCRIPT, "preview_run", side_effect=concurrent_edit)):
+                MANUSCRIPT.check_preview_workflows(root, {root / "bad/present.py"}, {}, snapshot)
+            self.assertIn(root / "good/notebook.qmd",
+                          MANUSCRIPT.changed_paths(snapshot, MANUSCRIPT.watch_snapshot(root)))
 
 
 class QuartoManagerTests(unittest.TestCase):
@@ -142,29 +308,6 @@ class QuartoManagerTests(unittest.TestCase):
                 ["snakemake", "--cores", "1", "present"], cwd=analysis, check=False
             )
 
-    def test_preview_render_skips_an_unchanged_workflow_until_a_file_changes(self):
-        # A present step that rewrites its figures must not re-trigger Quarto's render forever.
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            analysis = root / "case"
-            analysis.mkdir()
-            (analysis / "retained.csv").write_text("1\n")
-            dry_run = subprocess.CompletedProcess(
-                [], 0, stdout=json.dumps({"nodes": [{"value": {"rule": "present"}}]}), stderr=""
-            )
-            completed = subprocess.CompletedProcess([], 0)
-            with (
-                patch.dict(os.environ, {MANUSCRIPT.PREVIEW_STAMPS_ENV: "1"}),
-                patch.object(MANUSCRIPT, "presentation_workflows", return_value=[analysis]),
-                patch.object(MANUSCRIPT.subprocess, "run", side_effect=[dry_run, completed, dry_run, completed]) as run,
-            ):
-                self.assertEqual(0, MANUSCRIPT.prepare(root))
-                self.assertEqual(0, MANUSCRIPT.prepare(root))
-                self.assertEqual(2, run.call_count)
-                (analysis / "retained.csv").write_text("2\n")
-                self.assertEqual(0, MANUSCRIPT.prepare(root))
-                self.assertEqual(4, run.call_count)
-
     def test_prepare_limits_incremental_render_to_the_requested_analysis(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -235,21 +378,6 @@ class QuartoManagerTests(unittest.TestCase):
             self.assertIn("calculate", output.getvalue())
             self.assertIn("extra jobs refused", output.getvalue())
 
-    def test_preview_bridge_prepares_before_rendering_and_keeps_stale_sources_on_failure(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            output = io.StringIO()
-            with (
-                patch.object(MANUSCRIPT, "prepare", return_value=7) as prepare,
-                patch.object(MANUSCRIPT, "request_renders") as render,
-                contextlib.redirect_stderr(output),
-            ):
-                self.assertEqual(7, MANUSCRIPT.prepare_and_render(root, {}, {root / "case" / "results.json"}, "127.0.0.1", 8000))
-
-            prepare.assert_called_once_with(root)
-            render.assert_not_called()
-            self.assertIn("retained pages remain stale", output.getvalue())
-
     def test_changed_retained_file_notifies_its_notebook_and_root(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -302,6 +430,8 @@ class QuartoManagerTests(unittest.TestCase):
     def test_generated_and_cache_paths_are_not_watch_triggers(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            (root / "case").mkdir()
+            (root / "case/notebook.qmd").write_text("source")
             ignored = (
                 ".snakemake/log.txt", ".cache/state", "tmp/file", "temp/file",
                 "index_files/image.png", "_site/page.html",
@@ -313,7 +443,7 @@ class QuartoManagerTests(unittest.TestCase):
                     self.assertFalse(MANUSCRIPT.is_watchable(root / relative, root))
             self.assertTrue(MANUSCRIPT.is_watchable(root / "case" / "notebook.qmd", root))
 
-    def test_unreadable_markdown_keeps_its_stat_in_watch_and_present_snapshots(self):
+    def test_unreadable_markdown_keeps_its_stat_in_watch_snapshot(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             invalid = root / "invalid.qmd"
@@ -330,7 +460,6 @@ class QuartoManagerTests(unittest.TestCase):
             with patch.object(Path, "read_text", autospec=True, side_effect=read):
                 snapshot = MANUSCRIPT.watch_snapshot(root)
                 self.assertEqual({invalid, denied}, set(snapshot))
-                self.assertEqual({"invalid.qmd", "denied.md"}, set(MANUSCRIPT.present_snapshot(root)))
                 invalid.write_bytes(b"\xffchanged")
                 self.assertEqual({invalid}, MANUSCRIPT.changed_paths(snapshot, MANUSCRIPT.watch_snapshot(root)))
 
@@ -349,7 +478,8 @@ class QuartoManagerTests(unittest.TestCase):
                     raise KeyboardInterrupt
 
             with (
-                patch.object(MANUSCRIPT, "sync", return_value={}),
+                patch.object(MANUSCRIPT, "populate_preview", return_value={"project": {"render": []}}),
+                patch.object(MANUSCRIPT, "check_preview_workflows"),
                 patch.object(MANUSCRIPT, "presentation_workflows", return_value=[root]),
                 patch.object(MANUSCRIPT, "workflows_running", return_value=True),
                 patch.object(MANUSCRIPT, "wait_for_server"),
@@ -406,7 +536,8 @@ class QuartoManagerTests(unittest.TestCase):
                 f"spec = importlib.util.spec_from_file_location('manuscript', {str(SCRIPT)!r})\n"
                 "module = importlib.util.module_from_spec(spec)\n"
                 "spec.loader.exec_module(module)\n"
-                "module.validate_root = module.sync = lambda root: {}\n"
+                "module.preview_path = lambda root: root.parent\n"
+                "module.populate_preview = lambda *args: {'project': {'render': []}}\n"
                 "module.presentation_workflows = lambda root: []\n"
                 "raise SystemExit(module.preview(Path(sys.argv[1]), '127.0.0.1', None))\n"
             )
