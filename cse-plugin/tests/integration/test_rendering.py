@@ -32,6 +32,39 @@ class RenderingBehaviorTests(unittest.TestCase):
             cwd=cwd, env=env or os.environ.copy(), text=True, capture_output=True, check=False,
         )
 
+    def test_title_only_sidebar_round_trip(self):
+        if shutil.which("quarto") is None:
+            self.skipTest("quarto is required")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "analyses"
+            article = Path(directory) / "article.qmd"
+            article.write_text("---\ntitle: Home\n---\n\n## Home heading\n")
+            def run(*args):
+                result = self.run_script(str(MANUSCRIPT), *map(str, args))
+                self.assertEqual(0, result.returncode, result.stderr)
+            run("init", root, "--article-source", article, "--source-commit", "a" * 40,
+                "--runtime-tree-sha256", "b" * 64)
+            page = root / "page.qmd"
+            page.write_text("---\ntitle: Page\n---\n\n## First\n")
+            run("include", root, page, "--title", "Overview", "--group", "Group", "--title-only")
+            def check():
+                state = json.loads((root / "_cse-manuscript.json").read_text())
+                self.assertEqual([{"text": "Overview", "href": "page.qmd"}],
+                                 state["website"]["sidebar"]["contents"][1]["contents"])
+                self.assertEqual("Overview", state["website"]["sidebar"]["contents"][0]["contents"][0]["text"])
+            check()
+            page.write_text(page.read_text() + "\n## Second\n")
+            run("sync", root)
+            check()
+            spec = importlib.util.spec_from_file_location("manuscript_roundtrip", MANUSCRIPT)
+            module = importlib.util.module_from_spec(spec)
+            spec.loader.exec_module(module)
+            state = json.loads((root / "_cse-manuscript.json").read_text())
+            module.refresh_sections(root, state)
+            self.assertEqual([{"text": "Overview", "href": "page.qmd"}],
+                             state["website"]["sidebar"]["contents"][1]["contents"])
+            run("validate", root)
+
     def test_quarto_preflight_preserves_original_and_rejects_competing_owner(self):
         real_quarto = shutil.which("quarto")
         if real_quarto is None:
