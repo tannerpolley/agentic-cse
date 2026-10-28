@@ -1,6 +1,6 @@
 ---
 name: prose
-description: "Inspect scientific writing read-only: exact-span findings on clarity, banned language, semantic fidelity, and final manuscript cohesion. Use when asked to \"check my writing\", \"does this revision change the meaning\", or for a final manuscript check. Edits go to write; claim support to review."
+description: "Inspect scientific writing read-only. Use when checking clarity, banned language, revision meaning, a rejected draft, a manuscript that reads like a report and needs restructuring, or final cohesion. Routine wording or citation edits go to write; claim support to review."
 metadata:
   cse-kind: "supporting"
   cse-family: "supporting"
@@ -16,6 +16,7 @@ Read first: [operating-model](../../references/workflow/operating-model.md), [sc
 
 Identify the exact paragraph, section, manuscript, report, reviewer response, or
 original-and-revision pair and apply the shared rules in [scientific-projects](../../references/workflow/scientific-projects.md).
+For a new or rejected manuscript, journal retarget, or material restructure, use its manuscript structure review.
 Default to inspection only. For file-backed input, run the existing deterministic
 prose check with available repository and personal authorities before semantic
 inspection. For pasted text without a declared repository-relative path, state
