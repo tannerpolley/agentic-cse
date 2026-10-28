@@ -14,6 +14,7 @@ def runtime(monkeypatch, tmp_path):
     real_safety = mod.Safety
     monkeypatch.setattr(mod, "Safety", lambda: real_safety(tmp_path / 'state.json'))
     monkeypatch.setattr(mod, "require_vpn", lambda: None)
+    monkeypatch.setattr(mod, "vpn_active", lambda: False)
     monkeypatch.setattr(mod, "CONFIG", tmp_path)
     calls = []
     class API:
@@ -100,6 +101,27 @@ def test_429_and_challenge_stop_without_a_publisher_hold(tmp_path):
         with pytest.raises(mod.AcquireStop, match='Non-PDF'):
             state.response('other', 200, b'<html>not a pdf</html>', is_pdf=True)
     assert json.loads(path.read_text())['other']['stop_reason'].startswith('Non-PDF')
+
+
+def test_wiley_skips_vpn_while_elsevier_requires_it(runtime, monkeypatch):
+    current, calls, root = runtime
+    vpn_calls = []
+    monkeypatch.setattr(mod.time, "sleep", lambda _: None)
+    monkeypatch.setattr(mod, "require_vpn", lambda: vpn_calls.append("vpn"))
+    monkeypatch.setattr(mod, "vpn_active", lambda: True)
+    current.update(doi="10.1002/test", member=311, has_pdf=False)
+    result = mod.acquire(current["doi"], route="browser")
+    assert result["stop_reason"] == "Wiley needs the BYU login with the CAEDM VPN off; the VPN is on"
+    assert result["handoff_url"] == "https://doi.org/10.1002/test"
+    assert ("connector-visit", None) not in calls
+    monkeypatch.setattr(mod, "vpn_active", lambda: False)
+    with mod.Safety() as safety:
+        safety.before(mod.publisher("10.1002/test"), "https://doi.org/10.1002/test", "browser")
+        assert vpn_calls == []
+        safety.before(mod.publisher("10.1016/test"), "https://doi.org/10.1016/test", "browser")
+        assert vpn_calls == ["vpn", "vpn"]
+    result = mod.acquire(current["doi"], route="browser")
+    assert result["ok"] and ("connector-visit", None) in calls
 
 
 def test_pacing_daily_cap_and_lock_persist(monkeypatch, tmp_path):

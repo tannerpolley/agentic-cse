@@ -62,22 +62,24 @@ def configured_tokens():
     return result
 
 
+def vpn_active():
+    try:
+        names = subprocess.run(["nmcli", "-t", "-f", "NAME", "connection", "show", "--active"],
+                               capture_output=True, text=True, timeout=5, check=True).stdout.splitlines()
+    except (OSError, subprocess.SubprocessError):
+        raise AcquireStop("VPN status unavailable") from None
+    return "CAEDM IKEv2 VPN" in names
+
+
 def require_vpn():
-    def active():
-        try:
-            names = subprocess.run(["nmcli", "-t", "-f", "NAME", "connection", "show", "--active"],
-                                   capture_output=True, text=True, timeout=5, check=True).stdout.splitlines()
-        except (OSError, subprocess.SubprocessError):
-            raise AcquireStop("VPN status unavailable") from None
-        return "CAEDM IKEv2 VPN" in names
-    if active():
+    if vpn_active():
         return
     try:
         subprocess.run(["nmcli", "--wait", "25", "con", "up", "CAEDM IKEv2 VPN"],
                        capture_output=True, text=True, timeout=30, check=True)
     except (OSError, subprocess.SubprocessError):
         raise AcquireStop("Unable to activate CAEDM IKEv2 VPN; publisher access refused") from None
-    if not active():
+    if not vpn_active():
         raise AcquireStop("CAEDM IKEv2 VPN did not become active; publisher access refused")
 
 
@@ -198,7 +200,7 @@ class Safety:
     def before(self, pub, url, route, *, api=False, public=False):
         pub = canonical_host(pub)
         host = self.check_url(url, api=api, browser=route == "browser") if url else ""
-        if not public:
+        if not public and pub != "wiley":
             require_vpn()
         entry = self.data.setdefault(pub, {})
         now = time.time()
@@ -214,7 +216,7 @@ class Safety:
             delay = (10 if pub == "wiley" else 1) - (now - self.data.get("last_api", 0))
         if delay > 0:
             time.sleep(min(delay, 60))
-        if not public:
+        if not public and pub != "wiley":
             require_vpn()
         if route == "browser":
             entry["count"] = entry.get("count", 0) + 1
@@ -506,6 +508,8 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     if body:
                         result["route"] = pub + "-api"
             if not body and result["handoff_url"]:
+                if pub == "wiley" and vpn_active():
+                    raise AcquireStop("Wiley needs the BYU login with the CAEDM VPN off; the VPN is on")
                 from .connector_job import connector_save
                 preflight = plugin._request("/zotero-companion/acquire-connector", method="POST",
                                             payload={"collection": collection, "mode": "dry-run"})
