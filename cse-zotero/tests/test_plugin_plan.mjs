@@ -286,7 +286,7 @@ function desktopFixture() {
   let clock = 0;
   const calls = [], collection = { id: 2, key: "COLL", libraryID: 1 };
   class Item {
-    constructor(key = "FRESH") { this.id = key === "OLD" ? 1 : 2; this.key = key; this.libraryID = 1; this.children = key === "OLD" ? [] : [3]; }
+    constructor(key = "FRESH") { this.id = key === "OLD" ? 1 : 2; this.key = key; this.libraryID = 1; this.children = key === "OLD" ? [4] : [3]; }
     isRegularItem() { return true; }
     toJSON() { return { itemType: "journalArticle", DOI: "10.1234/test", title: "Paper" }; }
     getField() { return "10.1234/test"; }
@@ -311,7 +311,7 @@ function desktopFixture() {
     Utilities: { cleanDOI: s => s, extractIdentifiers: () => [{ DOI: "10.1234/test" }] },
     Translate: { Search: class { setSearch() {} setTranslator() {} async translate() { return [fresh]; } } },
     ItemFields: { getID: () => 1 }, DB: { queryAsync: async () => [] },
-    Items: { getByLibraryAndKey: (_, key) => key === "OLD" ? old : null, getAsync: async () => [pdf],
+    Items: { getByLibraryAndKey: (_, key) => key === "OLD" ? old : null, getAsync: async ids => ids.map(id => id === 3 ? pdf : { key: "PREVIEW", attachmentContentType: "application/pdf" }),
       merge: async (parent, items) => { calls.push(["merge", parent.key, items[0].key]); parent.children.push(...items[0].children); } },
     Linter: { hooks }, ActionsTags: { api: { actionManager } }, ZoteroAttanger: { data: { menu } },
     File: { getContentsAsync: async () => '{"module_revision":19}' },
@@ -467,4 +467,49 @@ test("Zotero sign-in fallback during a job hands off without a window; outside a
   assert.equal(r.outcome.ok, false); assert.match(r.outcome.handoff, /Zotero desktop was unreachable/);
   assert.ok(!r.native.includes("authorize")); assert.equal(r.created.length, 1);
   assert.equal(await r.Zotero.API.authorize(), "native-auth");
+});
+
+test("internal CLI replacement retains the old PDF on invalid relationships", async () => {
+  const erased = [];
+  const parent = { id: 1, key: "PARENT", isRegularItem: () => true };
+  const attachment = key => ({ key, parentItemID: 1, isAttachment: () => true,
+    attachmentContentType: "application/pdf", getFilePathAsync: async () => "/tmp/fixture.pdf",
+    eraseTx: async () => erased.push(key) });
+  const old = attachment("OLD"), fresh = attachment("NEW");
+  const items = { PARENT: parent, OLD: old, NEW: fresh };
+  const Zotero = { Libraries: { userLibraryID: 1 }, Server: { Endpoints: {} },
+    Notifier: { registerObserver: () => 1 }, Items: { getByLibraryAndKey: (_, key) => items[key] } };
+  const context = vm.createContext({ Zotero, Services: {}, Components: {} });
+  for (const name of ["cleanup-plan.js", "organize-plan.js", "zotero-companion.js"]) load(context, name);
+  context.ZoteroCompanion.start();
+  const call = async data => {
+    const [status, , body] = await new Zotero.Server.Endpoints["/zotero-companion/acquire-attachment"]().init({ data });
+    return { status, ...JSON.parse(body) };
+  };
+  const data = { action: "replace", item_key: "PARENT", old_key: "OLD", new_key: "NEW" };
+  const preview = await call(data);
+  assert.equal(preview.mode, "dry-run");
+  assert.equal(preview.applyToken, undefined);
+  assert.deepEqual(erased, []);
+  fresh.parentItemID = 2;
+  assert.equal((await call({ ...data, mode: "apply" })).error, "invalid_replacement");
+  assert.deepEqual(erased, []);
+  fresh.parentItemID = 1;
+  assert.equal((await call({ ...data, mode: "apply" })).attachment_key, "NEW");
+  assert.deepEqual(erased, ["OLD"]);
+});
+
+
+test("Connector hands off on two fresh PDFs in either order and retains the old article", async () => {
+  for (const keys of [["SUPPLEMENT", "MAIN_PDF"], ["MAIN_PDF", "SUPPLEMENT"]]) {
+    const r = desktopFixture();
+    r.Zotero.Items.getAsync = async () => keys.map(key => ({ key, attachmentContentType: "application/pdf" }));
+    const result = await r.call("acquire-connector", {
+      mode: "apply", session_id: "SESSION", existing_key: "OLD", doi: "10.1234/test", collection: "COLL"
+    });
+    assert.match(result.handoff, /several PDFs/);
+    assert.equal(result.attachment_key, undefined);
+    assert.ok(!r.calls.some(call => ["merge", "erase"].includes(call[0])));
+    assert.deepEqual(r.old.children, [4]);
+  }
 });

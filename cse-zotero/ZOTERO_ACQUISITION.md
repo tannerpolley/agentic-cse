@@ -22,14 +22,16 @@ Acquisition is sequential and accepts one paper. The dry run checks metadata,
 duplicates and the collection without creating items, downloading PDFs or
 starting Chrome. The collection must exist in the personal library; selected
 group libraries are refused. Deduplication uses DOI, then normalized exact title,
-ignoring trash. An existing PDF returns its keys immediately. Other library
-writes keep their existing previews and approvals.
+ignoring trash. An existing PDF returns its keys only after the shared
+verification below. Other library writes keep their existing previews and
+approvals.
 
 ## Routes
 
 Try Unpaywall's declared open-access PDF locations, PMC Cloud, an official
 Elsevier/Wiley API when configured, then the everyday-Chrome Connector. The
-first PDF wins; an incomplete acquisition hands back the DOI or article link.
+first verified PDF wins; an incomplete acquisition hands back the DOI or
+article link.
 DOI metadata uses Zotero's Crossref translator. If lookup fails (including a DOI
 registered outside Crossref), return the translator reason and DOI link for a
 landing-page handoff through web translators. Do not invent PDF URLs.
@@ -44,8 +46,42 @@ API; challenge responses and 429 still stop acquisition.
 PMC uses its official Cloud dataset and metadata-declared PDF, with the ID
 Converter as a fallback. Do not fetch PMC web PDF links or legacy OA packages.
 Elsevier/Wiley/ACS direct OA downloads require a declared repository location,
-excluding their publisher/CDN hosts. CLI PDF downloads and imports require a
-`%PDF` prefix and fit the 50 MiB limit. Native Connector downloads stay native.
+excluding their publisher/CDN hosts.
+
+All routes and existing attachments share one completeness check: require a
+`%PDF` prefix, at most 50 MiB, and a readable page count using Poppler's
+`pdfinfo` (required on the CLI host). Reject a PDF with fewer than half the
+pages in a numeric Crossref page range (falling back to Zotero's pages), or a
+single page unless the range explicitly describes a one-page article. Article
+numbers are not page ranges. Rejected downloads fall through with the reason;
+a rejected native Connector save hands off without reporting verified success
+or deleting its attachment. Native Connector downloads stay native. Without a
+usable range, multiple pages alone cannot prove completeness.
+
+Elsevier requests explicitly use `view=FULL`; the [Article Retrieval docs](https://dev.elsevier.com/documentation/ArticleRetrievalAPI.wadl)
+list response formats and view selection but no PDF coverage response header.
+The shared page check therefore remains necessary.
+
+`acquire --refetch` previews recovery for confirmed truncation only; uncertain
+existing attachments hand off for inspection and are never removed. Explicit
+single-page ranges such as `123-123` or `S10-S10` are usable; lone numbers and
+article numbers cannot establish a one-page paper. The shared verifier uses
+Zotero pages when Crossref has no usable range.
+
+The preview makes no acquisition or attachment writes. Review the returned parent, old
+attachment keys, failure reasons and `preview_sha256`, then obtain owner
+approval before running the same command with `--apply --preview-sha256 <digest>`.
+The digest binds the old files, page range, collection and route; changes require
+a fresh preview. The new attachment is saved and verified before the old PDFs
+are removed. Acquisition or verification failure retains the old attachments. A complete existing PDF is
+reused even with `--refetch`.
+
+Replacement is supported only through the CLI. The add-on replacement endpoint
+is an internal operation, not an independently approved write interface: it
+checks parent/attachment relationships, while the CLI owns the approved preview
+digest, old-file hash checks and completeness verification. No constant token
+provides approval. Connector sessions with several fresh PDFs hand off without
+selecting one or removing an existing attachment.
 
 Tokens live in mode-0600 files under `~/.config/zotero-companion/`:
 `elsevier-api-key`, optional `elsevier-insttoken`, and `wiley-tdm-token`.

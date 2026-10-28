@@ -408,6 +408,22 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
   }
 
   async function acquireAttachment(data) {
+    if (data?.action === "replace") {
+      const parent = zotero.Items.getByLibraryAndKey(libraryID(), data.item_key);
+      const old = zotero.Items.getByLibraryAndKey(libraryID(), data.old_key);
+      const fresh = zotero.Items.getByLibraryAndKey(libraryID(), data.new_key);
+      if (!parent || !parent.isRegularItem() || !old || !fresh || old === fresh ||
+          old.deleted || fresh.deleted || !old.isAttachment() || !fresh.isAttachment() ||
+          old.parentItemID !== parent.id || fresh.parentItemID !== parent.id ||
+          old.attachmentContentType !== "application/pdf" || fresh.attachmentContentType !== "application/pdf" ||
+          !await fresh.getFilePathAsync()) return response(422, { error: "invalid_replacement" });
+      if (data.mode !== "apply") return response(200, {
+        mode: "dry-run", item_key: parent.key, old_key: old.key, new_key: fresh.key
+      });
+      // Internal CLI operation: approval and completeness verification belong to acquire.py.
+      await old.eraseTx();
+      return response(200, { mode: "apply", item_key: parent.key, attachment_key: fresh.key });
+    }
     if (!data || typeof data.item_key !== "string" || !data.item_key || typeof data.pdf_base64 !== "string")
       return response(400, { error: "item_key_and_pdf_required" });
     if (data.mode && !["apply", "dry-run"].includes(data.mode))
@@ -453,6 +469,12 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     const doi = zotero.Utilities.cleanDOI(data.doi || "");
     const actual = zotero.Utilities.cleanDOI(fresh.getField("DOI") || "");
     if (doi && actual && doi.toLowerCase() !== actual.toLowerCase()) return response(422, { error: "connector_doi_differs" });
+    const freshChildren = await zotero.Items.getAsync(fresh.getAttachments());
+    const pdfs = freshChildren.filter(item => item.attachmentContentType === "application/pdf");
+    if (pdfs.length > 1) return response(200, {
+      handoff: "Zotero Connector saved several PDFs; select the article PDF manually; existing attachments retained"
+    });
+    const pdf = pdfs[0];
     const parent = existing && !existing.deleted ? existing : fresh;
     if (target.collection) parent.addToCollection(target.collection.id);
     await parent.saveTx();
@@ -460,8 +482,6 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
       await zotero.Items.merge(parent, [fresh]);
       await fresh.eraseTx();
     }
-    const children = await zotero.Items.getAsync(parent.getAttachments());
-    const pdf = children.find(item => item.attachmentContentType === "application/pdf");
     return response(200, { item_key: parent.key, attachment_key: pdf && pdf.key || null,
       collection_key: target.collection && target.collection.key || null, metadata: metadataJSON(parent) });
   }

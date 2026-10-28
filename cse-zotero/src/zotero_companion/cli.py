@@ -211,6 +211,9 @@ def main() -> int:
     acquire_cmd.add_argument("--collection", help="existing collection key or unambiguous name")
     acquire_cmd.add_argument("--dry-run", action="store_true")
     acquire_cmd.add_argument("--route", choices=("auto", "browser"), default="auto", help="force native Connector route for one paper")
+    acquire_cmd.add_argument("--refetch", action="store_true", help="preview replacement of incomplete existing PDFs")
+    acquire_cmd.add_argument("--apply", action="store_true", help="apply an owner-approved refetch preview")
+    acquire_cmd.add_argument("--preview-sha256", help="approved replacement preview digest")
     acquire_cmd.add_argument("--json", action="store_true")
     doctor = subparsers.add_parser("doctor", help="report installed protocol and capability readiness")
     doctor.add_argument("--config", type=Path, default=default_config_path())
@@ -629,7 +632,7 @@ def main() -> int:
     args = parser.parse_args()
     if args.command == "acquire":
         try:
-            payload = acquire(args.identifier, collection=args.collection, dry_run=args.dry_run, route=args.route)
+            payload = acquire(args.identifier, collection=args.collection, dry_run=args.dry_run, route=args.route, refetch=args.refetch, apply=args.apply, preview_sha256=args.preview_sha256)
         except (AcquireStop, OSError, ValueError) as exc:
             payload = {"ok": False, "stop_reason": str(exc)}
         emit_json(payload)
