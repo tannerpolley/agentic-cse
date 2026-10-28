@@ -316,9 +316,19 @@ fonts, clipping, and page breaks. A package decision is complete only when the
 source declares one owner for every overlapping capability and the assembled
 document passes these checks.
 
-For scientific tables, use `\toprule`, `\midrule`, and `\bottomrule`; omit
-vertical and double rules, place units in numeric-column headings, align values
-with `S`, and retain leading zeros for magnitudes below one. For accessible
+## Scientific tables
+
+Use `booktabs` rules without vertical or double rules. Put one value per cell,
+one quantity and unit per column, with the unit in its header. Align numbers
+with `siunitx` S columns or right alignment and consistent precision; retain
+leading zeros. Give each discrete item one row on one line. Use sub-headers
+for a different form or unit, and a dash for an absent term, distinct from zero.
+Put conventions and notes in the caption or `threeparttable` notes, and use
+compact citations as sources. Set reaction rows with a single
+`$\rightleftharpoons$` glyph. Inspect rendered rows for wrapping and columns
+for mixed units; source lint cannot reliably establish either.
+
+For accessible
 color, target at least 4.5:1 contrast for ordinary text and 3:1 for large text
 and essential non-text marks. Keep series distinguishable by marker or line
 style in grayscale. Tagged PDF is a separately tested output profile, not a

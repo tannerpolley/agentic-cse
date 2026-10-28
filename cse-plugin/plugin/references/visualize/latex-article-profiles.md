@@ -43,8 +43,7 @@ select the relevant investigator-promoted results and write a separate manuscrip
   comparison, and supported observation. A table caption states what the
   values compare. Put figure captions below figures and table captions above
   tables.
-- Use `booktabs` rules, `siunitx` numeric columns, leading zeros, explicit
-  units, and no decorative vertical rules.
+- Follow the scientific tables rules in `latex-packages.md`.
 - Apply `latex-layout-and-qa.md` to every selected PDF output. Compilation,
   resolved references, automated visual QA, and full-size page inspection are
   required for both profiles.

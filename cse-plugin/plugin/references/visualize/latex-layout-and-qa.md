@@ -169,3 +169,5 @@ error, every page has been inspected at full size in color and grayscale, and
 the recorded disposition is not `unreviewed`.
 No unintended overlap, clipping, ambiguous connector, blank plot, unreadable
 label, or unsupported scientific implication remains.
+
+For source table warnings, run `python3 <plugin>/scripts/visualize/latex_visual_qa.py --tex file.tex` (add `--warnings-as-errors` to fail on warnings). This checks simple `tabular` and `longtable` sources; inspect generated or complex tables manually. A copyable generator is available at `assets/visualize/scientific_table.py`.
