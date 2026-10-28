@@ -18,7 +18,26 @@ class ScientificTablesTest(unittest.TestCase):
             self.assertEqual(result.returncode, 1)
             self.assertIn('packed values', result.stdout)
             self.assertIn('numeric p{}', result.stdout)
-            source.write_text('\\begin{tabular}{l S}\nItem & {Value} \\\\\nA & 3.4 \\\\\n\\end{tabular}\n')
+            source.write_text(r"""\begin{tabular}{l S[table-format=3.2] p{2cm} S S}
+\toprule
+Item & {Value} & Description & {Value} & {Value} \\
+A & 3.4 & text & 2 & 1.25 \\
+B & \tablenum[table-format=3.2,round-precision=2]{1.25} & text & 2 & 3 \\
+\bottomrule
+\end{tabular}
+\begin{longtable}{l S}
+\caption{Conditions $T=300$ and $P=1$} \\
+A & 1 \\
+\end{longtable}
+""")
+            result = subprocess.run([sys.executable, str(script), '--tex', str(source), '--warnings-as-errors'], text=True, capture_output=True)
+            self.assertEqual(result.returncode, 0, result.stdout)
+            self.assertFalse(result.stdout.strip())
+            source.write_text(r'\begin{tabular}{p{2cm}}\num{1.25} \\ \end{tabular}')
+            result = subprocess.run([sys.executable, str(script), '--tex', str(source), '--warnings-as-errors'], text=True, capture_output=True)
+            self.assertEqual(result.returncode, 1)
+            self.assertIn('numeric p{}', result.stdout)
+            source.write_text(r'\begin{tabular}{l X p{2cm}}A & B & 3.4 \\ \end{tabular}')
             result = subprocess.run([sys.executable, str(script), '--tex', str(source), '--warnings-as-errors'], text=True, capture_output=True)
             self.assertEqual(result.returncode, 0, result.stdout)
             self.assertFalse(result.stdout.strip())

@@ -370,16 +370,30 @@ def lint_tables(path: Path) -> list[str]:
     table = r"\\begin\{(?:tabular|longtable)\}\{((?:[^{}]|\{[^{}]*\})*)\}(.*?)\\end\{(?:tabular|longtable)\}"
     for match in re.finditer(table, source, re.S):
         spec, body = match.groups()
-        columns = re.findall(r"p\{[^{}]*\}|[lcrS]", re.sub(r">\{[^{}]*\}", "", spec))
+        columns = []
+        remaining = spec
+        token = r"\s*(?:(?:[><@!]\{[^{}]*\}|\|)|([lcrS]|p\{[^{}]*\})(?:\[[^][{}]*\]|\{[^{}]*\})*)"
+        while remaining.strip():
+            part = re.match(token, remaining)
+            if not part:
+                break
+            if part.group(1):
+                columns.append(part.group(1))
+            remaining = remaining[part.end():]
+        if remaining.strip():
+            continue
         for row in re.finditer(r"(.*?)(?:\\\\(?:\[[^]]*\])?)", body, re.S):
             for index, cell in enumerate(row.group(1).split("&")):
                 offset = row.start(1) + row.group(1).find(cell)
                 offset += len(cell) - len(cell.lstrip())
                 line = source.count("\n", 0, match.start(2) + offset) + 1
-                pairs = re.findall(r"\b[A-Za-z][A-Za-z0-9_]*\s*=\s*[-+−]?\d", cell)
+                text = re.sub(r"\\caption(?:\[[^][{}]*\])?\{(?:[^{}]|\{[^{}]*\})*\}", "", cell)
+                text = re.sub(r"(\\[A-Za-z]+)\[[^][{}]*\]", r"\1", text)
+                pairs = re.findall(r"\b[A-Za-z][A-Za-z0-9_]*\s*=\s*[-+−]?\d", text)
                 if len(pairs) >= 2:
                     findings.append(f"{path}:{line}: packed values; put one value in each column")
                 value = re.sub(r"\\(?:toprule|midrule|bottomrule)\b", "", cell).strip()
+                value = re.sub(r"^\\num(?:\[[^][{}]*\])?\{([^{}]*)\}$", r"\1", value)
                 if index < len(columns) and columns[index].startswith("p{") and re.fullmatch(r"\$?\s*[-+−]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?\s*\$?", value):
                     findings.append(f"{path}:{line}: numeric p{{}} cell; use an aligned S or right-aligned column")
     return findings
