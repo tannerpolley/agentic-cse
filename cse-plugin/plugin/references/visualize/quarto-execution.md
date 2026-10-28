@@ -106,13 +106,28 @@ the presentation cache, and updates the included notebook page and the home
 page. Refresh and preview select HTML explicitly, keeping a page's optional
 PDF settings out of the website update.
 Quarto preview does not detect arbitrary external-data changes; the
-managed preview bridge asks the running preview to re-render only the affected
-registered source (touching a file does not trigger it) after the presentation hook has been allowed to validate retained inputs.
+managed preview bridge checks affected workflows, then publishes a last-checked
+source copy under the user cache (`$XDG_CACHE_HOME/cse-preview`, or
+`~/.cache/cse-preview`). Quarto runs no workflows in this copy. Refused workflows
+contribute no resources; their registered pages and pages including or embedding
+those resources show a typed failure. The home page lists every refusal, including
+workflows without a registered page. Checks remain strict outside this preview.
+
 The bridge scans sources every ten seconds, excluding `data/`, `results/`,
-and cache trees. It watches exact `{{< include >}}` targets under `results/`
-without walking that tree. After changing retained data or results, run
-`refresh`; arbitrary retained-file changes are not automatic triggers.
-Present stamps no longer cover `data/` or `results/`, so after a calculation run `refresh`.
+and cache trees. It follows exact include targets, including HTML includes,
+without walking retained trees. Its watcher compares timestamps and sizes, so an
+edit preserving both needs another watched edit or a new preview session. Copying
+always compares bytes, even when timestamps and sizes match. After changing
+arbitrary retained data or results, run `refresh`; these changes are not automatic
+triggers. Writes from a presentation check are absorbed only within that workflow.
+The check-then-copy gap has the same known race as check-then-render.
+
+Every copied source-like text file is conservatively scanned for paths escaping
+the copy, absolute paths into the original tree, and `file://` references. These
+need resource reconciliation. Includes, embeds, and inline images reaching refused
+workflows produce typed failures. Other reference forms, such as front-matter
+bibliographies and reference-style images, can instead show Quarto's missing-file
+render message; refused values are absent from the copy.
 The following
 bare Quarto command shows the
 upstream syntax for the separately authorized presentation-only execution

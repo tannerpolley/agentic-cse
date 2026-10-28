@@ -3,6 +3,10 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
+import html
+import io
+import urllib.parse
 import hashlib
 import json
 import os
@@ -35,10 +39,6 @@ SITE_CONFIG = {
     "execute": {"enabled": False},
 }
 PRESENTATION_PRE_RENDER = "python3 manuscript.py prepare"
-# Set by preview for Quarto's own renders: their pre-render skips a workflow whose files are
-# unchanged since its last successful present, so present output cannot re-trigger a render.
-PREVIEW_STAMPS_ENV = "CSE_PREVIEW_PRESENT_STAMPS"
-PRESENT_STAMP = Path(".snakemake") / "cse-present-stamp.json"
 WATCH_INTERVAL_SECONDS = 10.0
 WATCH_SETTLE_SECONDS = 0.25
 IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "site_libs", "_freeze", "__pycache__", ".ipynb_checkpoints"}
@@ -347,13 +347,8 @@ def inspect_config(root: Path, files: dict[str, bytes], state: dict) -> None:
             raise ManuscriptError(f"{root}: inspection refused: {str(exc).replace(directory, str(root))}") from exc
 
 
-def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
+def validate_configuration(root: Path, files: dict[str, bytes]) -> dict:
     check_boundary(root)
-    pending = pending or {}
-    files = {}
-    for name in REQUIRED_FILES:
-        reject_symlink(root / name)
-        files[name] = pending[name] if name in pending else read_file(root / name)
     state = metadata(files["_cse-manuscript.json"], root / "_cse-manuscript.json")
     identity = read_json(files[".cse-quarto-source.json"], root / ".cse-quarto-source.json")
     require(set(identity) == {"sourceCommit", "runtimeTreeSha256"}
@@ -382,6 +377,13 @@ def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
         check_owners(config, root / name, allow_presentation_hook=profile)
     if (root / "_variables.yml").is_file():
         files["_variables.yml"] = read_file(root / "_variables.yml")
+    return state
+
+
+def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
+    pending = pending or {}
+    files = {name: pending[name] if name in pending else read_file(root / name) for name in REQUIRED_FILES}
+    state = validate_configuration(root, files)
     for name in state["project"]["render"]:
         relative = inside(root, root / name)
         require(relative == name and name.endswith(".qmd") and not any(c in name for c in "*?[]!"), root / name, "expected literal relative QMD path")
@@ -612,17 +614,17 @@ def check_presentation_plan(workflow: Path) -> int:
 
 def prepare(root: Path) -> int:
     root = root_path(root)
+    original = os.environ.get("CSE_PREVIEW_ROOT")
+    if original:
+        require(root == preview_path(root_path(Path(original))), root, "preview hook requires checked cache copy")
+        return 0
     workflows = presentation_workflows(root)
     requested = [Path(value) for value in os.environ.get("QUARTO_PROJECT_INPUT_FILES", "").splitlines() if value]
     requested = [path if path.is_absolute() else root / path for path in requested]
     if requested and root / "index.qmd" not in requested:
         workflows = [workflow for workflow in workflows
                      if any(path == workflow or path.is_relative_to(workflow) for path in requested)]
-    use_stamps = os.environ.get(PREVIEW_STAMPS_ENV) == "1"
     for workflow in workflows:
-        stamp = workflow / PRESENT_STAMP
-        if use_stamps and stamp.is_file() and json.loads(stamp.read_text()) == present_snapshot(workflow):
-            continue
         status = check_presentation_plan(workflow)
         if status:
             return status
@@ -630,13 +632,235 @@ def prepare(root: Path) -> int:
         if result.returncode:
             print(f"presentation failed in {workflow}; retained view is stale", file=sys.stderr)
             return result.returncode
-        stamp.parent.mkdir(exist_ok=True)
-        stamp.write_text(json.dumps(present_snapshot(workflow)))
     return 0
 
 
-def present_snapshot(workflow: Path) -> dict[str, list[int]]:
-    return {path.relative_to(workflow).as_posix(): list(value) for path, value in sorted(watch_snapshot(workflow).items())}
+def literal_text(text: str) -> str:
+    # Encode punctuation before Quarto parses Markdown: even code fences and shortcodes stay inert.
+    return "".join(c if c.isalnum() or c.isspace() else f"&#{ord(c)};" for c in text)
+
+
+def failure_source(page: str, diagnostic: str) -> bytes:
+    message = literal_text(f"Presentation unavailable: {page}\n\n{diagnostic}")
+    return ("---\ntitle: Presentation unavailable\n---\n\n<pre>" + message + "</pre>\n").encode()
+
+
+def preview_path(root: Path) -> Path:
+    cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
+    return cache / "cse-preview" / hashlib.sha256(str(root.resolve()).encode()).hexdigest()
+
+
+def preview_run(command: list[str], cwd: Path, env: dict | None = None) -> subprocess.CompletedProcess:
+    process = subprocess.Popen(command, cwd=cwd, env=env, start_new_session=True,
+                               text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    try:
+        stdout, stderr = process.communicate()
+        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+    finally:
+        stop_process(process)
+
+
+def check_preview_workflows(root: Path, changed: set[Path] | None, failures: dict, snapshot: dict) -> set[Path]:
+    workflows = presentation_workflows(root)
+    affected = {w for w in workflows if changed is None or any(p.is_relative_to(w) for p in changed)}
+    if changed and any(not any(p.is_relative_to(w) for w in workflows) for p in changed):
+        affected = set(workflows)
+    for key in list(failures):
+        if root / key not in workflows:
+            del failures[key]
+    for workflow in sorted(affected):
+        require(workflow != root, workflow, "preview requires workflows below the root")
+        diagnostic = io.StringIO()
+        with contextlib.redirect_stderr(diagnostic):
+            status = check_presentation_plan(workflow)
+        if not status:
+            result = preview_run(["snakemake", "--cores", "1", "present"], workflow)
+            status = result.returncode
+            if status:
+                errors = re.findall(r"^.*(?:Error:|Exception:|FAILED|WARNING:).*$",
+                                    result.stdout + result.stderr, re.MULTILINE)
+                diagnostic.write(f"present integrity/presentation check failed in {workflow} (exit {status})\n"
+                                 + "\n".join(errors))
+        key = workflow.relative_to(root).as_posix()
+        failures.pop(key, None)
+        if status:
+            failures[key] = diagnostic.getvalue().strip()
+            print(failures[key], file=sys.stderr, flush=True)
+        current = watch_snapshot(workflow)
+        # Only this workflow's writes are absorbed; concurrent edits elsewhere remain pending.
+        for path in set(snapshot) | set(current):
+            if path.is_relative_to(workflow):
+                if path in current:
+                    snapshot[path] = current[path]
+                else:
+                    snapshot.pop(path, None)
+    return affected
+
+
+def check_preview_escape(root: Path, source: Path, content: bytes) -> None:
+    text = urllib.parse.unquote(html.unescape(content.decode(errors="ignore")))
+    text = re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m[1], 16)), text).replace("\\", "/")
+    require("file://" not in text.lower() and str(root) not in text, source,
+            "preview resource reconciliation: absolute original path or file:// reference")
+    for value in re.findall(r"[^\s\"'<>()[\]{},;`]+", text):
+        if "../" in value:
+            value = value[value.find("../"):].split("#")[0]
+            require(Path(os.path.abspath(source.parent / value)).is_relative_to(root), source,
+                    "preview resource reconciliation: resource outside preview root")
+
+
+def preview_byproduct(path: Path, root: Path) -> bool:
+    return (any(ignored_watch_part(p) for p in path.relative_to(root).parts)
+            or path.name.endswith(("-preview.html", ".embed.ipynb"))
+            or (path.suffix == ".html" and any(path.with_suffix(s).is_file() for s in (".qmd", ".md", ".ipynb"))))
+
+
+def copy_preview_file(source: Path, target: Path) -> bool:
+    reject_symlink(source)
+    # filecmp caches stat matches; compare bytes directly instead, even at equal mtime/size.
+    if target.is_file() and source.stat().st_size == target.stat().st_size:
+        with source.open("rb") as left, target.open("rb") as right:
+            if all(chunk == right.read(1024 * 1024) for chunk in iter(lambda: left.read(1024 * 1024), b"")):
+                return False
+    target.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".cse-manuscript-", delete=False) as handle:
+        temporary = Path(handle.name)
+    try:
+        shutil.copy2(source, temporary)
+        os.replace(temporary, target)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return True
+
+
+def populate_preview(original: Path, copy: Path, failures: dict,
+                     changed: set[Path] | None = None, targets: set[Path] | None = None) -> dict:
+    """Validate a complete candidate before publishing in inspection-safe order."""
+    check_boundary(original)
+    files = {name: read_file(original / name) for name in REQUIRED_FILES}
+    validate_configuration(original, files)
+    state = metadata(files["_cse-manuscript.json"], original / "_cse-manuscript.json")
+    pages = state["project"]["render"]
+    candidates = {}
+    workflows = presentation_workflows(original)
+    records = dict(failures)
+    byproducts = {str(Path(page).with_suffix(".html")) for page in pages}
+    for directory, dirs, names in os.walk(original, followlinks=False):
+        dirs[:] = [n for n in dirs if not ignored_watch_part(n)]
+        for name in names:
+            source = Path(directory) / name
+            relative = source.relative_to(original).as_posix()
+            if preview_byproduct(source, original) or relative == ".cse-preview-failures.json":
+                continue
+            if any(source.is_relative_to(original / key) for key in failures):
+                continue
+            reject_symlink(source)
+            if source.suffix.lower() in {".qmd", ".md", ".yml", ".yaml", ".json", ".bib", ".css", ".scss", ".html", ".ipynb", ".tex", ".txt", ".svg", ".js"}:
+                try:
+                    check_preview_escape(original, source, read_file(source))
+                except ManuscriptError as exc:
+                    owner = next((w for w in workflows if source.is_relative_to(w)), None)
+                    owner = owner or source
+                    records[owner.relative_to(original).as_posix()] = str(exc)
+                    continue
+            candidates[relative] = source
+    refused = [original / key for key in records if original / key in workflows]
+    candidates = {name: source for name, source in candidates.items()
+                  if not any(source.is_relative_to(w) for w in refused)}
+    page_failures, sources, unavailable = {}, {}, set()
+    for page in pages:
+        pending, seen = [(original / page, original / page)], set()
+        try:
+            while pending:
+                source, owner = pending.pop()
+                if source in seen:
+                    continue
+                seen.add(source)
+                if targets is not None and any(source == p or source.is_relative_to(p) for p in changed or ()):
+                    targets.add(original / page)
+                reason = next((detail for key, detail in records.items()
+                               if source == original / key or source.is_relative_to(original / key)), None)
+                require(not reason, source, f"preview dependency check failed: refused workflow/resource: {reason}")
+                require(not preview_byproduct(source, original), source,
+                        "preview resource reconciliation: excluded render output")
+                data = read_file(source)
+                check_preview_escape(original, source, data)
+                # Non-shortcode references retain Quarto's missing-file diagnostic, but
+                # must not keep an earlier HTML page containing now-refused resources.
+                for value in re.findall(r"[^\s\"'<>()[\]{},;`]+", data.decode(errors="ignore")):
+                    if "/" not in value or re.match(r"\w+:|#", value):
+                        continue
+                    target = (source.parent / value.split("#")[0]).resolve()
+                    if any(target.is_relative_to(w) for w in refused):
+                        unavailable.add(page)
+                        if targets is not None:
+                            targets.add(original / page)
+                references = re.findall(
+                    r"\{\{<\s*(include|embed)\s+[\"']?([^\s>\"']+)|!\[[^\]]*\]\(\s*<?([^\s)>]+)"
+                    r"|<img\b[^>]*\bsrc\s*=\s*[\"']([^\"']+)", data.decode(errors="ignore"), re.IGNORECASE)
+                for kind, included, image, html_image in references:
+                    value = included or image or html_image
+                    if re.match(r"https?:|data:|#", value):
+                        continue
+                    target = ((owner if kind == "embed" else source).parent / value.split("#")[0]).resolve()
+                    require(target.is_relative_to(original), source, "preview resource reconciliation: resource outside preview root")
+                    require(not preview_byproduct(target, original), source,
+                            "preview resource reconciliation: excluded render output")
+                    if kind or any(target.is_relative_to(w) for w in refused):
+                        pending.append((target, target if kind == "embed" else owner))
+            sources[page] = read_file(original / page)
+        except ManuscriptError as exc:
+            page_failures[page] = str(exc)
+            sources[page] = failure_source(page, str(exc))
+    if records or page_failures:
+        notices = {**records, **page_failures}
+        sources["index.qmd"] += ("\n## Preview failures\n\n" + "\n".join(
+            f"<pre>{literal_text(key + ': ' + detail)}</pre>" for key, detail in notices.items()) + "\n").encode()
+    copy.parent.mkdir(parents=True, exist_ok=True)
+    reject_symlink(copy)
+    if copy.exists():
+        check_boundary(copy)
+    with tempfile.TemporaryDirectory(prefix=".cse-preview-stage-", dir=copy.parent) as directory:
+        stage = Path(directory)
+        for name, source in candidates.items():
+            if name not in {*pages, "_cse-manuscript.json"}:
+                copy_preview_file(source, stage / name)
+        for page, data in sources.items():
+            (stage / page).parent.mkdir(parents=True, exist_ok=True)
+            (stage / page).write_bytes(data)
+        refresh_sections(stage, state)
+        (stage / "_cse-manuscript.json").write_bytes(json_bytes(state))
+        (stage / ".cse-preview-failures.json").write_bytes(json_bytes(records))
+        validate_root(stage)
+        copy.mkdir(exist_ok=True)
+        retained = {p.relative_to(stage) for p in stage.rglob("*") if p.is_file()}
+        # Failure sources precede deletions; healthy resources precede healthy sources.
+        configs = {p for p in retained if p.name in CONFIG_FILES or
+                   p.name.startswith(("_quarto", "_metadata", "_variables"))}
+        for relative in sorted(retained, key=lambda p: (
+                3 if p in configs else 0 if str(p) in page_failures else 2 if str(p) in pages else 1, str(p))):
+            copy_preview_file(stage / relative, copy / relative)
+        # Retire previously rendered values immediately, before native render requests.
+        for page in page_failures:
+            output = copy / "_site" / Path(page).with_suffix(".html")
+            output.parent.mkdir(parents=True, exist_ok=True)
+            atomic_write(output, b"<html><body>" + sources[page].split(b"---\n", 2)[-1] + b"</body></html>")
+        for directory, dirs, names in os.walk(copy):
+            dirs[:] = [n for n in dirs if not ignored_watch_part(n)]
+            for name in names:
+                path = Path(directory) / name
+                if path.relative_to(copy) not in retained and path.relative_to(copy).as_posix() not in byproducts:
+                    path.unlink()
+        for page in unavailable - page_failures.keys():
+            (copy / "_site" / Path(page).with_suffix(".html")).unlink(missing_ok=True)
+        for workflow in refused:
+            output = copy / "_site" / workflow.relative_to(original)
+            allowed = {copy / "_site" / Path(p).with_suffix(".html") for p in page_failures}
+            for path in output.rglob("*"):
+                if path.is_file() and path not in allowed:
+                    path.unlink()
+    return state
+
 
 
 def is_watchable(path: Path, root: Path) -> bool:
@@ -646,7 +870,8 @@ def is_watchable(path: Path, root: Path) -> bool:
         return False
     return not any(ignored_watch_part(part) for part in relative.parts) and not (
         # Quarto writes these render byproducts beside sources; watching them re-triggers renders.
-        path.name.startswith(".") or path.name.endswith(".html")
+        path.name.startswith(".") or (path.suffix == ".html" and any(
+            path.with_suffix(ext).is_file() for ext in (".qmd", ".md", ".ipynb")))
         or path.name in {"manuscript.py", "render.sh"}
     )
 
@@ -685,14 +910,13 @@ def presentation_targets(root: Path, state: dict, changed: set[Path]) -> set[Pat
     pages = [root / entry["href"] for entry in notebooks(state)]
     targets = set()
     for path in changed:
-        # Native preview already re-renders an edited page source.
-        if not is_watchable(path, root) or path == article or path in pages:
+        if not is_watchable(path, root):
             continue
         matched = [page for page in pages if path.is_relative_to(page.parent)]
         if matched:
             targets.update(matched)
             targets.add(article)
-        elif len(path.relative_to(root).parts) == 1:
+        else:
             targets.update(pages)
             targets.add(article)
     return targets
@@ -703,26 +927,13 @@ def request_renders(root: Path, targets: set[Path], host: str, port: int) -> Non
     for path in sorted(targets):
         if path.is_file():
             url = f"http://{host}:{port}/{QUARTO_RENDER_REQUEST}/{path.relative_to(root).as_posix()}"
-            with urllib.request.urlopen(url, timeout=10) as response:
-                if response.read() != b"rendered":
-                    raise OSError(f"preview refused to render {path}")
+            try:
+                with urllib.request.urlopen(url, timeout=30) as response:
+                    if response.read() != b"rendered":
+                        raise OSError(f"preview refused to render {path}")
+            except OSError as exc:
+                print(f"preview render request failed for {path}: {exc}", file=sys.stderr, flush=True)
 
-
-def prepare_and_render(root: Path, state: dict, changed: set[Path], host: str, port: int) -> int:
-    try:
-        status = prepare(root)
-    except (OSError, subprocess.SubprocessError) as exc:
-        print(f"presentation refresh error in {root}: {exc}; retained pages remain stale", file=sys.stderr)
-        return 1
-    if status:
-        print(f"presentation refresh failed in {root} (exit {status}); retained pages remain stale", file=sys.stderr)
-        return status
-    try:
-        request_renders(root, presentation_targets(root, state, changed), host, port)
-    except OSError as exc:
-        print(f"preview render request failed in {root}: {exc}; retained pages remain stale", file=sys.stderr)
-        return 1
-    return 0
 
 
 def workflows_running(root: Path) -> bool:
@@ -743,15 +954,28 @@ def wait_for_server(process: subprocess.Popen, host: str, port: int) -> None:
 def stop_process(process: subprocess.Popen) -> None:
     if process.poll() is not None:
         return
+    # Snakemake's shells can own separate process groups. Capture descendants before
+    # terminating their parent, so stopping a blocked present leaves no orphan.
+    descendants, pending = [], [process.pid]
+    while pending:
+        pid = pending.pop()
+        try:
+            children = [int(p) for p in Path(f"/proc/{pid}/task/{pid}/children").read_text().split()]
+        except OSError:
+            children = []
+        descendants.extend(children)
+        pending.extend(children)
     try:
         os.killpg(process.pid, signal.SIGTERM)
-    except ProcessLookupError:
-        return
-    try:
         process.wait(timeout=5)
+    except ProcessLookupError:
+        pass
     except subprocess.TimeoutExpired:
         os.killpg(process.pid, signal.SIGKILL)
         process.wait()
+    for pid in reversed(descendants):
+        with contextlib.suppress(ProcessLookupError):
+            os.kill(pid, signal.SIGKILL)
 
 
 def refresh(root: Path, notebook: Path) -> int:
@@ -773,7 +997,8 @@ def refresh(root: Path, notebook: Path) -> int:
 
 def preview(root: Path, host: str, port: int | None) -> int:
     root = root_path(root)
-    state = sync(root)
+    copy = preview_path(root)
+    require(not copy.resolve().is_relative_to(root), copy, "preview cache must be outside original tree")
     require(preview_record(root) is None, root, "a preview is already running for this root")
     if port is None:
         port = preview_port(git_path(root, "--show-toplevel"), None)
@@ -783,23 +1008,31 @@ def preview(root: Path, host: str, port: int | None) -> int:
         require(probe.connect_ex((host if host not in {"0.0.0.0", "::", ""} else "127.0.0.1", port)) != 0,
                 root, f"port {port} is already in use; pass --port with a free port")
     command = ["quarto", "preview", "--to", "html", "--profile", "presentation", "--no-browser",
-               "--host", host, "--port", str(port)]
-    for workflow in presentation_workflows(root):
-        (workflow / PRESENT_STAMP).unlink(missing_ok=True)  # the first render checks every workflow in full
-    process = subprocess.Popen(command, cwd=root, start_new_session=True, env={**os.environ, PREVIEW_STAMPS_ENV: "1"})
+               "--no-watch-inputs", "--no-render", "--host", host, "--port", str(port)]
+    environment = {**os.environ, "CSE_PREVIEW_ROOT": str(root)}
+    process = None
     def handle_sigterm(signum, frame):
         raise KeyboardInterrupt
 
     previous_sigterm = signal.signal(signal.SIGTERM, handle_sigterm)
     record = root / ".quarto" / "cse-preview.json"
     try:
+        failures, snapshot = {}, watch_snapshot(root)
+        check_preview_workflows(root, None, failures, snapshot)
+        state = populate_preview(root, copy, failures)
+        for page in state["project"]["render"]:
+            result = preview_run(["quarto", "render", page, "--to", "html", "--profile", "presentation"], copy, environment)
+            if result.returncode:
+                print(result.stdout + result.stderr, file=sys.stderr)
+                output = copy / "_site" / Path(page).with_suffix(".html")
+                output.parent.mkdir(parents=True, exist_ok=True)
+                atomic_write(output, ("<html><body><pre>" + literal_text(result.stdout + result.stderr)
+                                      + "</pre></body></html>").encode())
+        process = subprocess.Popen(command, cwd=copy, start_new_session=True, env=environment)
         record.parent.mkdir(exist_ok=True)
         atomic_write(record, json_bytes({"pid": os.getpid(), "identity": process_identity(os.getpid()),
                                         "host": host, "port": port}))
-        if not presentation_workflows(root):
-            return process.wait()
         wait_for_server(process, host, port)
-        snapshot = watch_snapshot(root)
         while process.poll() is None:
             time.sleep(WATCH_INTERVAL_SECONDS)
             current = watch_snapshot(root)
@@ -821,19 +1054,21 @@ def preview(root: Path, host: str, port: int | None) -> int:
                 if not new and not running:
                     break
                 pending.update(new)
-            if any(path.suffix == ".qmd" for path in pending):
-                try:
-                    state = sync(root)
-                except ManuscriptError as exc:
-                    print(f"sidebar sync failed: {exc}", file=sys.stderr)
-            prepare_and_render(root, state, pending, host, port)
-            snapshot = watch_snapshot(root)
+            try:
+                affected = check_preview_workflows(root, pending, failures, snapshot)
+                targets = {root / "index.qmd"}
+                state = populate_preview(root, copy, failures, pending | affected, targets)
+                targets.update(presentation_targets(root, state, pending | affected))
+                request_renders(copy, {copy / p.relative_to(root) for p in targets}, host, port)
+            except (OSError, ManuscriptError) as exc:
+                print(f"preview refresh failed: {exc}", file=sys.stderr)
         return process.wait()
     except KeyboardInterrupt:
         return 130
     finally:
         signal.signal(signal.SIGTERM, previous_sigterm)
-        stop_process(process)
+        if process is not None:
+            stop_process(process)
         record.unlink(missing_ok=True)
 
 
