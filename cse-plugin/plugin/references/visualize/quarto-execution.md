@@ -112,6 +112,8 @@ source copy under the user cache (`$XDG_CACHE_HOME/cse-preview`, or
 contribute no resources; their registered pages and pages including or embedding
 those resources show a typed failure. The home page lists every refusal, including
 workflows without a registered page. Checks remain strict outside this preview.
+Preview requires each presentation workflow in its own folder below the website
+root; a `Snakefile` at the website root stops the preview.
 
 The bridge scans sources every ten seconds, excluding `data/`, `results/`,
 and cache trees. It follows exact include targets, including HTML includes,

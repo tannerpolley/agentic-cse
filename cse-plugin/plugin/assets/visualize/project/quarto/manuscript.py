@@ -669,7 +669,7 @@ def check_preview_workflows(root: Path, changed: set[Path] | None, failures: dic
         if root / key not in workflows:
             del failures[key]
     for workflow in sorted(affected):
-        require(workflow != root, workflow, "preview requires workflows below the root")
+        require(workflow != root, workflow, "preview requires workflows below the root; move this Snakefile into an analysis folder")
         diagnostic = io.StringIO()
         with contextlib.redirect_stderr(diagnostic):
             status = check_presentation_plan(workflow)
