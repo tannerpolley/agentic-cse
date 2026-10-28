@@ -9,6 +9,23 @@ from zotero_companion.acquire import request as http_request
 from zotero_companion.plugin_client import PluginClientError
 
 
+def fixture_pdf(pages=4):
+    """A small valid PDF with a real page tree and cross-reference table."""
+    objects = [b"<< /Type /Catalog /Pages 2 0 R >>",
+               f"<< /Type /Pages /Count {pages} /Kids [".encode() +
+               b" ".join(f"{i + 3} 0 R".encode() for i in range(pages)) + b"] >>"]
+    objects += [b"<< /Type /Page /Parent 2 0 R /MediaBox [0 0 100 100] /Resources << >> >>"] * pages
+    body = b"%PDF-1.4\n"
+    offsets = [0]
+    for i, obj in enumerate(objects, 1):
+        offsets.append(len(body))
+        body += f"{i} 0 obj\n".encode() + obj + b"\nendobj\n"
+    start = len(body)
+    body += f"xref\n0 {len(offsets)}\n0000000000 65535 f \n".encode()
+    body += b"".join(f"{offset:010d} 00000 n \n".encode() for offset in offsets[1:])
+    return body + f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{start}\n%%EOF\n".encode()
+
+
 @pytest.fixture
 def runtime(monkeypatch, tmp_path):
     real_safety = mod.Safety
@@ -16,9 +33,13 @@ def runtime(monkeypatch, tmp_path):
     monkeypatch.setattr(mod, "require_vpn", lambda: None)
     monkeypatch.setattr(mod, "CONFIG", tmp_path)
     calls = []
+    pdf_path = tmp_path / 'retained.pdf'
+    pdf_path.write_bytes(fixture_pdf())
     class API:
         def items(self, **kwargs):
             return []
+        def get_text(self, path):
+            return pdf_path.as_uri()
         def get(self, path):
             if path.endswith('children'):
                 return [{'key': 'PDFKEY', 'data': {'contentType': 'application/pdf'}}] if current['has_pdf'] else []
@@ -50,7 +71,7 @@ def runtime(monkeypatch, tmp_path):
             return b'{"oa_locations":[]}'
         if 'idconv' in url:
             return b'{"records":[]}'
-        return b'%PDF-1.7 test'
+        return fixture_pdf()
     current = {'doi': '', 'member': '', 'has_pdf': True}
     monkeypatch.setattr(mod, 'ZoteroLocalAPI', API)
     monkeypatch.setattr(mod, 'ZoteroPluginClient', Plugin)
@@ -153,7 +174,7 @@ def test_pmc_cloud_selects_declared_main_pdf(runtime, monkeypatch, source):
     clock = [1000000.0]
     monkeypatch.setattr(mod.time, 'time', lambda: clock[0])
     monkeypatch.setattr(mod.time, 'sleep', lambda seconds: clock.__setitem__(0, clock[0] + seconds))
-    main = b'%PDF-1.7 main article'
+    main = fixture_pdf()
     location = {'host_type': 'repository', 'url_for_pdf': 'https://pmc.ncbi.nlm.nih.gov/articles/PMC123/pdf/paper.pdf'}
     if source == 'landing':
         location = {'host_type': 'repository', 'url_for_landing_page': 'https://www.ncbi.nlm.nih.gov/pmc/articles/123/'}
@@ -519,3 +540,98 @@ def test_connector_empty_session_hands_off_without_losing_existing_key(runtime, 
     assert result['attachment_key'] == None
     assert 'saved no parent item' in result['stop_reason'] and '422' not in result['stop_reason']
     assert result['handoff_url'] == 'https://doi.org/' + current['doi']
+
+
+@pytest.mark.parametrize('pages,article_range,accepted', [(1, '10-19', False), (3, '10-19', False),
+    (6, '10-19', True), (1, '', False), (1, 'S10-S10', True), (4, '143279', True)])
+def test_pdf_completeness(pages, article_range, accepted):
+    body = fixture_pdf(pages)
+    if accepted:
+        assert mod.pdf_bytes(body, article_range) == body
+    else:
+        with pytest.raises(mod.IncompletePDF):
+            mod.pdf_bytes(body, article_range)
+
+
+@pytest.mark.parametrize('route', ['unpaywall', 'pmc-cloud', 'elsevier-api', 'wiley-api', 'connector'])
+def test_preview_falls_through_or_hands_off(runtime, monkeypatch, route):
+    current, calls, root = runtime
+    current.update(doi='10.1016/test' if route == 'elsevier-api' else '10.1002/test' if route == 'wiley-api' else '10.1371/test')
+    original = mod.request
+    def request(url, **kwargs):
+        if 'crossref' in url:
+            return b'{"message":{"page":"10-19"}}'
+        if 'unpaywall' in url and route == 'unpaywall':
+            return b'{"oa_locations":[{"url_for_pdf":"https://repository.example/preview.pdf"}]}'
+        if 'preview.pdf' in url or 'api.elsevier' in url or 'api.wiley' in url:
+            return fixture_pdf(1)
+        return original(url, **kwargs)
+    monkeypatch.setattr(mod, 'request', request)
+    if route in {'elsevier-api', 'wiley-api'}:
+        name = 'elsevier-api-key' if route == 'elsevier-api' else 'wiley-tdm-token'
+        (root / name).write_text('test-token')
+        (root / name).chmod(0o600)
+    if route == 'pmc-cloud':
+        monkeypatch.setattr(mod, 'pmc_pdf', lambda *args: fixture_pdf(1))
+    (root / 'retained.pdf').write_bytes(fixture_pdf(1 if route == 'connector' else 6))
+    result = mod.acquire(current['doi'])
+    assert ('connector-visit', None) in calls
+    assert not any(path.endswith('acquire-attachment') for path, _ in calls)
+    if route == 'connector':
+        assert not result['ok'] and 'Incomplete' in result['stop_reason']
+    else:
+        assert result['ok'] and result['route'] == 'connector'
+        assert route in result['skipped_routes'][0]
+
+
+@pytest.mark.parametrize('route', ['auto', 'browser'])
+@pytest.mark.parametrize('outcome', ['success', 'stale', 'failed'])
+def test_refetch_previews_then_verifies_before_removing(runtime, monkeypatch, route, outcome):
+    current, calls, root = runtime
+    current.update(doi='10.1371/test')
+    old_path = root / 'old.pdf'
+    old_path.write_bytes(fixture_pdf(1))
+    original_get = mod.ZoteroLocalAPI.get
+    monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda self, **kwargs: [
+        {'key': 'PARENT', 'data': {'DOI': current['doi'], 'itemType': 'journalArticle'}}])
+    def get(self, path):
+        if path.endswith('children'):
+            return [{'key': 'OLDPDF', 'data': {'contentType': 'application/pdf'}}] + original_get(self, path)
+        return original_get(self, path)
+    monkeypatch.setattr(mod.ZoteroLocalAPI, 'get', get)
+    original_text = mod.ZoteroLocalAPI.get_text
+    monkeypatch.setattr(mod.ZoteroLocalAPI, 'get_text', lambda self, path:
+        old_path.as_uri() if 'OLDPDF' in path else original_text(self, path))
+    # The fake library starts with just the incomplete attachment.
+    current['has_pdf'] = False
+    original = mod.request
+    def request(url, **kwargs):
+        if 'unpaywall' in url:
+            return b'{"oa_locations":[{"url_for_pdf":"https://repository.example/paper.pdf"}]}'
+        return original(url, **kwargs)
+    monkeypatch.setattr(mod, 'request', request)
+    removed = []
+    original_plugin = mod.ZoteroPluginClient._request
+    def plugin(self, path, **kwargs):
+        payload = kwargs['payload']
+        if payload.get('action') == 'replace':
+            assert mod.pdf_bytes((root / 'retained.pdf').read_bytes())
+            assert payload['old_key'] == 'OLDPDF' and payload['new_key'] == 'PDFKEY'
+            removed.append(payload)
+            return {}
+        return original_plugin(self, path, **kwargs)
+    monkeypatch.setattr(mod.ZoteroPluginClient, '_request', plugin)
+    ordinary = mod.acquire(current['doi'])
+    assert not ordinary['ok'] and '--refetch' in ordinary['stop_reason']
+    preview = mod.acquire(current['doi'], refetch=True, route=route)
+    assert preview['mode'] == 'dry-run' and preview['approval_required']
+    assert not removed and not any(mode == 'apply' or path == 'connector-visit' for path, mode in calls)
+    if outcome == 'stale':
+        old_path.write_bytes(fixture_pdf(1) + b'\nchanged')
+    if outcome == 'failed':
+        (root / 'retained.pdf').write_bytes(fixture_pdf(1))
+    result = mod.acquire(current['doi'], refetch=True, route=route, apply=True, preview_sha256=preview['preview_sha256'])
+    assert bool(removed) == (outcome == 'success')
+    assert result['ok'] == (outcome == 'success')
+    if outcome == 'stale':
+        assert 'preview changed' in result['stop_reason']

@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 from contextlib import ExitStack
 import fcntl
+import hashlib
 import json
 import ipaddress
 import os
@@ -20,6 +21,7 @@ from urllib.request import HTTPRedirectHandler, Request, build_opener
 from xml.etree import ElementTree as ET
 
 from .local_api import ZoteroLocalAPI
+from .source_ops import attachment_path
 from .plugin_client import ZoteroPluginClient
 
 EMAIL = "42780259+tannerpolley@users.noreply.github.com"
@@ -133,10 +135,34 @@ def challenge(text):
                  if s in text), None)
 
 
-def pdf_bytes(body):
+class IncompletePDF(AcquireStop):
+    pass
+
+
+def pdf_bytes(body, pages=""):
     if not body.startswith(b"%PDF"):
         raise AcquireStop("Non-PDF bytes where a PDF was expected")
+    try:
+        info = subprocess.run(["pdfinfo", "-"], input=body, capture_output=True, timeout=15, check=True)
+        count = int(re.search(rb"(?m)^Pages:\s+(\d+)", info.stdout)[1])
+    except (OSError, subprocess.SubprocessError, TypeError, ValueError):
+        raise IncompletePDF("PDF page count unavailable; install Poppler pdfinfo or inspect the PDF") from None
+    match = re.fullmatch(r"\s*([A-Za-z]*)(\d+)\s*[-–—]\s*([A-Za-z]*)(\d+)\s*", str(pages))
+    expected = None
+    if match and (not match[3] or match[1].lower() == match[3].lower()):
+        expected = int(match[4]) - int(match[2]) + 1
+        if expected < 1:
+            expected = None
+    if (count == 1 and expected != 1) or (expected and count * 2 < expected):
+        raise IncompletePDF(f"Incomplete or uncertain PDF: {count} pages; article page range: {pages or 'unknown'}")
     return body
+
+
+def local_pdf(api, key, pages):
+    path = Path(attachment_path(key, api=api)["path"])
+    if path.stat().st_size > 50 * 1024 * 1024:
+        raise AcquireStop("PDF exceeds 50 MiB limit")
+    return pdf_bytes(path.read_bytes(), pages)
 
 
 class Safety:
@@ -378,18 +404,33 @@ def duplicate(items, doi=""):
     return None
 
 
-def use_existing_parent(api, result, key):
+def use_existing_parent(api, result, key, pages, *, refetch=False):
     result["item_key"] = key
     children = api.get(f"/api/users/0/items/{key}/children")
-    pdf = next((i["key"] for i in children if i["data"].get("contentType") == "application/pdf"), None)
-    if pdf:
-        result.update(ok=True, attachment_key=pdf, route="existing", verified=True, handoff_url=None)
-    return bool(pdf)
+    failures = []
+    for child in children:
+        if child["data"].get("contentType") != "application/pdf":
+            continue
+        try:
+            local_pdf(api, child["key"], pages)
+        except (AcquireStop, OSError, RuntimeError) as exc:
+            failures.append({"attachment_key": child["key"], "reason": str(exc)})
+            continue
+        result.update(ok=True, attachment_key=child["key"], route="existing", verified=True, handoff_url=None)
+        return True
+    if failures:
+        result["incomplete_attachments"] = failures
+        if not refetch:
+            result["stop_reason"] = failures[0]["reason"] + "; use --refetch to preview recovery"
+            return True
+    return False
 
 
-def acquire(value, *, collection=None, dry_run=False, route="auto"):
+def acquire(value, *, collection=None, dry_run=False, route="auto", refetch=False, apply=False, preview_sha256=None):
     result = {"ok": False, "item_key": None, "attachment_key": None, "route": None, "stop_reason": None,
               "handoff_url": None}
+    if apply and (not refetch or not preview_sha256):
+        return {**result, "stop_reason": "Replacement requires --refetch and --preview-sha256 from the preview"}
     api = ZoteroLocalAPI()
     plugin = ZoteroPluginClient(timeout=90)
     ident = ""
@@ -414,12 +455,15 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
             if doi:
                 result["handoff_url"] = "https://doi.org/" + doi
             existing = duplicate(api.items(top_level=True), doi)
-            if existing and use_existing_parent(api, result, existing):
-                return result
             crossref = {}
             if doi:
                 raw = request("https://api.crossref.org/works/" + quote(doi, safe=""), safety=safety)
                 crossref = json.loads(raw)["message"] if raw else {}
+            pages = crossref.get("page", "")
+            if existing:
+                pages = pages or api.get(f"/api/users/0/items/{existing}")["data"].get("pages", "")
+                if use_existing_parent(api, result, existing, pages, refetch=refetch):
+                    return result
             pub = publisher(doi, crossref.get("member", ""))
             if not doi and result["handoff_url"]:
                 host = checked_url(result["handoff_url"])
@@ -432,7 +476,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                 metadata = plugin._request("/zotero-companion/acquire-metadata", method="POST",
                                            payload={"identifier": ident, "collection": collection, "mode": "dry-run"})
                 result["collection_key"] = metadata.get("collection_key")
-                if metadata.get("existing") and use_existing_parent(api, result, metadata["item_key"]):
+                if metadata.get("existing") and use_existing_parent(api, result, metadata["item_key"], crossref.get("page") or metadata["metadata"].get("pages", ""), refetch=refetch):
                     return result
             if not doi:
                 native = (metadata or {}).get("metadata", {})
@@ -447,6 +491,26 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     target = native["url"].replace("http://", "https://", 1)
                     checked_url(target)
                     result["handoff_url"] = target
+            pages = crossref.get("page") or (metadata or {}).get("metadata", {}).get("pages", "")
+            replacements = result.get("incomplete_attachments", [])
+            if replacements:
+                plan = {"item_key": result["item_key"], "attachments": [
+                    {**item, "sha256": hashlib.sha256(Path(attachment_path(item["attachment_key"], api=api)["path"]).read_bytes()).hexdigest()}
+                    for item in replacements], "collection": collection, "route": route, "pages": pages}
+                digest = hashlib.sha256(json.dumps(plan, sort_keys=True).encode()).hexdigest()
+                result.update(replacement=plan, preview_sha256=digest)
+                if not apply or dry_run:
+                    return {**result, "ok": True, "mode": "dry-run", "approval_required": True}
+                if preview_sha256 != digest:
+                    return {**result, "stop_reason": "Replacement preview changed; review a fresh preview"}
+            def candidate(body, route_name):
+                if body is None:
+                    return None
+                try:
+                    return pdf_bytes(body, pages)
+                except IncompletePDF as exc:
+                    result.setdefault("skipped_routes", []).append(route_name + ": " + str(exc))
+                    return None
             if dry_run:
                 if metadata is None:
                     result.update(plugin._request("/zotero-companion/acquire-connector", method="POST",
@@ -469,7 +533,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                         if pmcid not in seen:
                             seen.add(pmcid)
                             tried_pmc = True
-                            body = pmc_pdf(pmcid, doi, safety)
+                            body = candidate(pmc_pdf(pmcid, doi, safety), "pmc-cloud")
                             if body:
                                 result["route"] = "pmc-cloud"
                                 break
@@ -478,12 +542,12 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     if not url or url in seen or restricted_host(checked_url(url)):
                         continue
                     seen.add(url)
-                    body = request(url, safety=safety, pub=pub, is_pdf=True)
+                    body = candidate(request(url, safety=safety, pub=pub, is_pdf=True), "unpaywall")
                     if body:
                         result["route"] = "unpaywall"
                         break
                 if not body and not tried_pmc:
-                    body = pmc_pdf(None, doi, safety)
+                    body = candidate(pmc_pdf(None, doi, safety), "pmc-cloud")
                     if body:
                         result["route"] = "pmc-cloud"
             if not body and route == "auto" and pub in {"elsevier", "wiley"}:
@@ -491,7 +555,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                 credential = token(name)
                 if credential:
                     if pub == "elsevier":
-                        url = "https://api.elsevier.com/content/article/doi/" + quote(doi, safe="")
+                        url = "https://api.elsevier.com/content/article/doi/" + quote(doi, safe="") + "?view=FULL"
                         headers = {"X-ELS-APIKey": credential, "Accept": "application/pdf"}
                         inst = token("elsevier-insttoken")
                         if inst:
@@ -500,9 +564,9 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                         url = "https://api.wiley.com/onlinelibrary/tdm/v1/articles/" + quote(doi, safe="")
                         headers = {"Wiley-TDM-Client-Token": credential, "Accept": "application/pdf"}
                     try:
-                        body = request(url, safety=safety, pub=pub, route="api", headers=headers, is_pdf=True)
+                        body = candidate(request(url, safety=safety, pub=pub, route="api", headers=headers, is_pdf=True), pub + "-api")
                     except APIConfiguration as exc:
-                        result["skipped_routes"] = [str(exc)]
+                        result.setdefault("skipped_routes", []).append(str(exc))
                     if body:
                         result["route"] = pub + "-api"
             if not body and result["handoff_url"]:
@@ -533,7 +597,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
             if body:
                 ensure_parent()
                 attached = plugin._request("/zotero-companion/acquire-attachment", method="POST",
-                                       payload={"item_key": result["item_key"], "pdf_base64": base64.b64encode(pdf_bytes(body)).decode(), "mode": "apply"})
+                                       payload={"item_key": result["item_key"], "pdf_base64": base64.b64encode(body).decode(), "mode": "apply"})
                 result["attachment_key"] = attached["attachment_key"]
             if not result["attachment_key"]:
                 raise AcquireStop((saved.get("error") if not body and result["handoff_url"] else None) or "No PDF acquired; save with the normal Zotero Connector")
@@ -545,6 +609,15 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                 raise AcquireStop("Live verification failed: parent title differs from translated metadata")
             if not any(i["key"] == result["attachment_key"] and i["data"].get("contentType") == "application/pdf" for i in children):
                 raise AcquireStop("Live verification failed: PDF child is missing")
+            local_pdf(api, result["attachment_key"], pages)
+            for old in result.get("replacement", {}).get("attachments", []):
+                old_path = Path(attachment_path(old["attachment_key"], api=api)["path"])
+                if hashlib.sha256(old_path.read_bytes()).hexdigest() != old["sha256"]:
+                    raise AcquireStop("Old attachment changed during acquisition; retained both PDFs")
+            for old in replacements:
+                plugin._request("/zotero-companion/acquire-attachment", method="POST", payload={
+                    "action": "replace", "mode": "apply", "applyToken": "replace-incomplete-pdf",
+                    "item_key": result["item_key"], "old_key": old["attachment_key"], "new_key": result["attachment_key"]})
             result.update(ok=True, verified=True, handoff_url=None)
         except (AcquireStop, OSError, ValueError, KeyError, RuntimeError) as exc:
             result["stop_reason"] = str(exc)
