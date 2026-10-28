@@ -520,11 +520,13 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     for (const name of ["local-api-key", "elsevier-api-key", "elsevier-insttoken", "wiley-tdm-token"]) {
       try {
         const value = (await zotero.File.getContentsAsync(home + "/.config/zotero-companion/" + name)).trim();
-        if (value) message = message.split(value).join("[redacted]");
+        if (value) message = message.split(value).join("[redacted]")
+          .split(encodeURIComponent(value)).join("[redacted]");
       } catch (_) { /* An unconfigured token has no value to redact. */ }
     }
-    message = message.replace(/(Bearer\s+)[^\s"'<>]+/gi, "$1[redacted]")
-      .replace(/((?:api[-_]?key|access[-_]?token|insttoken|tdm[-_]?token|authorization)["']?\s*[:=]\s*["']?)[^\s&"'<>]+/gi,
+    message = message.replace(/(\bauthorization["']?\s*[:=]\s*["']?)[^\r\n"'<>]+/gi, "$1[redacted]")
+      .replace(/(Bearer\s+)[^\s"'<>]+/gi, "$1[redacted]")
+      .replace(/((?:api[-_]?key|access[-_]?token|insttoken|tdm[-_]?token|token)["']?\s*[:=]\s*["']?)[^\s&#"'<>]+/gi,
         "$1[redacted]");
     return response(500, { error: "metadata_acquisition_failed", message });
   }

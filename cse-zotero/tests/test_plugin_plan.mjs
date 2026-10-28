@@ -149,6 +149,7 @@ test("metadata acquisition previews without writes and applies one attachment-fr
     Items: { getAsync: async () => false },
     File: { getContentsAsync: async path => {
       if (path.endsWith("elsevier-api-key")) return "test-secret-value\n";
+      if (path.endsWith("wiley-tdm-token")) return "synthetic+secret/123\n";
       throw new Error("unconfigured");
     } }
   };
@@ -214,11 +215,15 @@ test("metadata acquisition previews without writes and applies one attachment-fr
   pendingTranslation = new Promise((_resolve, fail) => { reject = fail; });
   const failing = call({ identifier: "10.1234/example" });
   assert.equal((await call({ identifier: "10.1234/example" })).status, 409);
-  reject(new Error("native translation failure: test-secret-value api_key=unknown-secret Bearer bearer-secret"));
+  reject(new Error("native translation failure: test-secret-value api_key=unknown-secret Bearer bearer-secret\n" +
+    "Authorization: Token token-secret\nAuthorization: Basic dXNlcjpwYXNz\n" +
+    "https://example.test/?token=synthetic%2Bsecret%2F123"));
   const failure = await failing;
   assert.equal(failure.status, 500);
   assert.match(failure.body.message, /native translation failure/);
-  for (const secret of ["test-secret-value", "unknown-secret", "bearer-secret"])
+  assert.equal((failure.body.message.match(/Authorization: \[redacted\]/g) || []).length, 2);
+  for (const secret of ["test-secret-value", "unknown-secret", "bearer-secret",
+    "Token", "token-secret", "Basic", "dXNlcjpwYXNz", "synthetic%2Bsecret%2F123"])
     assert.ok(!JSON.stringify(failure.body).includes(secret));
   pendingTranslation = null;
   assert.equal((await call({ identifier: "10.1234/example" })).status, 200);
