@@ -56,7 +56,9 @@ status only. Credentials do not follow cross-host redirects.
 
 The CLI is the single trust boundary for agent input: require HTTPS and public
 hosts; reject loopback, private, link-local, `.local`, `.internal` and single-label
-hosts. Require `CAEDM IKEv2 VPN` for publisher/API/repository access. Its existing
+hosts. Require `CAEDM IKEv2 VPN` for publisher/API/repository access except Wiley,
+which needs the VPN off for BYU library login; if it is active, hand back the
+Wiley link without a browser attempt or disconnecting it. The existing
 NetworkManager connection may be activated and checked automatically; do not
 rotate or reconfigure networks, discover public IPs, or change browser identity.
 Crossref and Unpaywall metadata do not require the VPN.

@@ -62,22 +62,24 @@ def configured_tokens():
     return result
 
 
+def vpn_active():
+    try:
+        names = subprocess.run(["nmcli", "-t", "-f", "NAME", "connection", "show", "--active"],
+                               capture_output=True, text=True, timeout=5, check=True).stdout.splitlines()
+    except (OSError, subprocess.SubprocessError):
+        raise AcquireStop("VPN status unavailable") from None
+    return "CAEDM IKEv2 VPN" in names
+
+
 def require_vpn():
-    def active():
-        try:
-            names = subprocess.run(["nmcli", "-t", "-f", "NAME", "connection", "show", "--active"],
-                                   capture_output=True, text=True, timeout=5, check=True).stdout.splitlines()
-        except (OSError, subprocess.SubprocessError):
-            raise AcquireStop("VPN status unavailable") from None
-        return "CAEDM IKEv2 VPN" in names
-    if active():
+    if vpn_active():
         return
     try:
         subprocess.run(["nmcli", "--wait", "25", "con", "up", "CAEDM IKEv2 VPN"],
                        capture_output=True, text=True, timeout=30, check=True)
     except (OSError, subprocess.SubprocessError):
         raise AcquireStop("Unable to activate CAEDM IKEv2 VPN; publisher access refused") from None
-    if not active():
+    if not vpn_active():
         raise AcquireStop("CAEDM IKEv2 VPN did not become active; publisher access refused")
 
 
@@ -198,7 +200,7 @@ class Safety:
     def before(self, pub, url, route, *, api=False, public=False):
         pub = canonical_host(pub)
         host = self.check_url(url, api=api, browser=route == "browser") if url else ""
-        if not public:
+        if not public and pub != "wiley":
             require_vpn()
         entry = self.data.setdefault(pub, {})
         now = time.time()
@@ -214,7 +216,7 @@ class Safety:
             delay = (10 if pub == "wiley" else 1) - (now - self.data.get("last_api", 0))
         if delay > 0:
             time.sleep(min(delay, 60))
-        if not public:
+        if not public and pub != "wiley":
             require_vpn()
         if route == "browser":
             entry["count"] = entry.get("count", 0) + 1
@@ -309,17 +311,18 @@ def pmc_id(location):
     return "PMC" + match[1] if match else None
 
 
-def pmc_pdf(pmcid, doi, safety):
+def pmc_pdf(pmcid, doi, safety, pub):
+    pmc_pub = "wiley" if pub == "wiley" else "ncbi-pmc"
     if not pmcid:
         url = "https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/?" + urlencode(
             {"ids": doi, "idtype": "doi", "format": "json", "tool": "cse-zotero", "email": EMAIL})
-        raw = request(url, safety=safety, pub="ncbi-pmc", allowed_hosts={"pmc.ncbi.nlm.nih.gov"})
+        raw = request(url, safety=safety, pub=pmc_pub, allowed_hosts={"pmc.ncbi.nlm.nih.gov"})
         records = json.loads(raw).get("records", []) if raw else []
         pmcid = next((r.get("pmcid") for r in records if r.get("doi", "").lower() == doi), None)
     if not pmcid or not re.fullmatch(r"PMC\d+", pmcid):
         return None
     url = PMC_CLOUD + "/?" + urlencode({"list-type": 2, "prefix": "metadata/" + pmcid + ".", "max-keys": 20})
-    raw = request(url, safety=safety, pub="ncbi-pmc", allowed_hosts={PMC_CLOUD_HOST})
+    raw = request(url, safety=safety, pub=pmc_pub, allowed_hosts={PMC_CLOUD_HOST})
     if not raw:
         return None
     try:
@@ -332,7 +335,7 @@ def pmc_pdf(pmcid, doi, safety):
     for node in listing.findall("{*}Contents/{*}Key"):
         if not re.fullmatch(r"metadata/" + pmcid + r"\.\d+\.json", node.text or ""):
             continue
-        raw = request(PMC_CLOUD + "/" + node.text, safety=safety, pub="ncbi-pmc", allowed_hosts={PMC_CLOUD_HOST})
+        raw = request(PMC_CLOUD + "/" + node.text, safety=safety, pub=pmc_pub, allowed_hosts={PMC_CLOUD_HOST})
         if raw:
             records.append(json.loads(raw))
     # Prefer the published article; version numbers do not imply publication order.
@@ -345,7 +348,7 @@ def pmc_pdf(pmcid, doi, safety):
         url = url.replace("s3://pmc-oa-opendata/", PMC_CLOUD + "/", 1)
         if checked_url(url) != PMC_CLOUD_HOST or not re.match("/" + pmcid + r"\.\d+/", urlsplit(url).path):
             raise AcquireStop("PMC declared PDF is outside the official article prefix")
-        body = request(url, safety=safety, pub="ncbi-pmc", is_pdf=True, allowed_hosts={PMC_CLOUD_HOST})
+        body = request(url, safety=safety, pub=pmc_pub, is_pdf=True, allowed_hosts={PMC_CLOUD_HOST})
         if body:
             return body
     return None
@@ -421,9 +424,6 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                 raw = request("https://api.crossref.org/works/" + quote(doi, safe=""), safety=safety)
                 crossref = json.loads(raw)["message"] if raw else {}
             pub = publisher(doi, crossref.get("member", ""))
-            if not doi and result["handoff_url"]:
-                host = checked_url(result["handoff_url"])
-                pub = restricted_host(host) or host
             result["publisher"] = pub
             if existing:
                 metadata = {"metadata": api.get(f"/api/users/0/items/{existing}")["data"]}
@@ -442,11 +442,18 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     raw = request("https://api.crossref.org/works/" + quote(doi, safe=""), safety=safety)
                     crossref = json.loads(raw)["message"] if raw else {}
                     pub = publisher(doi, crossref.get("member", ""))
-                    result["publisher"] = pub
                 elif native.get("url"):
                     target = native["url"].replace("http://", "https://", 1)
                     checked_url(target)
                     result["handoff_url"] = target
+            urls = [value, (metadata or {}).get("metadata", {}).get("url", "")]
+            hosts = [checked_url(url.replace("http://", "https://", 1)) for url in urls
+                     if url.startswith(("http://", "https://"))]
+            if pub == "wiley" or any(restricted_host(host) == "wiley" for host in hosts):
+                pub = "wiley"
+            elif not doi and hosts:
+                pub = restricted_host(hosts[0]) or hosts[0]
+            result["publisher"] = pub
             if dry_run:
                 if metadata is None:
                     result.update(plugin._request("/zotero-companion/acquire-connector", method="POST",
@@ -469,7 +476,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                         if pmcid not in seen:
                             seen.add(pmcid)
                             tried_pmc = True
-                            body = pmc_pdf(pmcid, doi, safety)
+                            body = pmc_pdf(pmcid, doi, safety, pub)
                             if body:
                                 result["route"] = "pmc-cloud"
                                 break
@@ -483,7 +490,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                         result["route"] = "unpaywall"
                         break
                 if not body and not tried_pmc:
-                    body = pmc_pdf(None, doi, safety)
+                    body = pmc_pdf(None, doi, safety, pub)
                     if body:
                         result["route"] = "pmc-cloud"
             if not body and route == "auto" and pub in {"elsevier", "wiley"}:
@@ -506,6 +513,8 @@ def acquire(value, *, collection=None, dry_run=False, route="auto"):
                     if body:
                         result["route"] = pub + "-api"
             if not body and result["handoff_url"]:
+                if pub == "wiley" and vpn_active():
+                    raise AcquireStop("Wiley needs the BYU login with the CAEDM VPN off; the VPN is on")
                 from .connector_job import connector_save
                 preflight = plugin._request("/zotero-companion/acquire-connector", method="POST",
                                             payload={"collection": collection, "mode": "dry-run"})
