@@ -38,7 +38,7 @@ def clean_xml(text: str) -> str:
 
 
 def require_tools(contact_sheet: bool) -> dict[str, str]:
-    names = ["pdftotext", "pdftoppm", "mutool"]
+    names = ["pdffonts", "pdftotext", "pdftoppm", "mutool"]
     if contact_sheet:
         names.append("montage")
     resolved = {name: shutil.which(name) or "" for name in names}
@@ -378,6 +378,11 @@ def main() -> int:
 
     try:
         tools = require_tools(arguments.contact_sheet)
+        fonts = command(tools["pdffonts"], str(arguments.pdf))
+        if fonts.returncode:
+            raise RuntimeError(fonts.stderr.strip() or "pdffonts failed")
+        if "Type 3" in fonts.stdout:
+            raise RuntimeError("Type 3 fonts found; attribute each source and replace bitmap fonts. For T1 venue classes use Latin Modern sans/typewriter; for Matplotlib use pdf.fonttype: 42.\n" + fonts.stdout)
         pages = parse_text_boxes(arguments.pdf, tools["pdftotext"])
         if not pages:
             raise RuntimeError("PDF contains no pages")
