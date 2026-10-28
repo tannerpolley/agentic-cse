@@ -463,6 +463,37 @@ class QuartoManagerTests(unittest.TestCase):
                 invalid.write_bytes(b"\xffchanged")
                 self.assertEqual({invalid}, MANUSCRIPT.changed_paths(snapshot, MANUSCRIPT.watch_snapshot(root)))
 
+    def test_preview_keeps_native_context_and_isolates_startup_render_failure(self):
+        for failed in (False, True):
+            with self.subTest(failed=failed), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory) / "original"
+                root.mkdir()
+                copy = Path(directory) / "copy"
+                pages = ["index.qmd", "good.qmd"]
+                first, fallback = unittest.mock.Mock(), unittest.mock.Mock()
+                first.poll.return_value = 1 if failed else None
+                fallback.poll.return_value = None
+                with (
+                    patch.object(MANUSCRIPT, "preview_path", return_value=copy),
+                    patch.object(MANUSCRIPT, "check_preview_workflows"),
+                    patch.object(MANUSCRIPT, "populate_preview", return_value={"project": {"render": pages}}),
+                    patch.object(MANUSCRIPT, "preview_run", side_effect=[
+                        subprocess.CompletedProcess([], 1, "", "bad page"),
+                        subprocess.CompletedProcess([], 0, "", "")]) as render,
+                    patch.object(MANUSCRIPT.subprocess, "Popen", side_effect=[first, fallback]) as launch,
+                    patch.object(MANUSCRIPT, "wait_for_server"),
+                    patch.object(MANUSCRIPT, "stop_process"),
+                    patch.object(MANUSCRIPT.time, "sleep", side_effect=KeyboardInterrupt),
+                    contextlib.redirect_stderr(io.StringIO()),
+                ):
+                    self.assertEqual(130, MANUSCRIPT.preview(root, "127.0.0.1", 8000))
+                self.assertEqual(["--render", "html"], launch.call_args_list[0].args[0][-2:])
+                self.assertEqual(2 if failed else 1, launch.call_count)
+                self.assertEqual(pages if failed else [], [entry.args[0][2] for entry in render.call_args_list])
+                if failed:
+                    self.assertIn("--no-render", launch.call_args_list[1].args[0])
+                    self.assertIn("bad page", (copy / "_site/index.html").read_text())
+
     def test_preview_checks_a_stale_lock_at_the_idle_interval_after_settling(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

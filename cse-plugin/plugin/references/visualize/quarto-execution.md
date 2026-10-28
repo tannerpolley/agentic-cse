@@ -115,6 +115,10 @@ those resources show a typed failure. The home page lists every refusal, includi
 workflows without a registered page. Checks remain strict outside this preview.
 Preview requires each presentation workflow in its own folder below the website
 root; a `Snakefile` at the website root stops the preview.
+At startup, the complete checked copy passes native inspection before Quarto
+previews it. Quarto shares its initial project render across pages.
+If that render exits, the bridge renders pages separately, writes diagnostics
+for native render failures, and starts preview with `--no-render`.
 
 The bridge scans sources every ten seconds, excluding `data/`, `results/`,
 and cache trees. It follows exact include targets, including HTML includes,

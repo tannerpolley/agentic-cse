@@ -718,11 +718,10 @@ def check_preview_escape(root: Path, source: Path, content: bytes) -> None:
     text = re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m[1], 16)), text).replace("\\", "/")
     require("file://" not in text.lower() and str(root) not in text, source,
             "preview resource reconciliation: absolute original path or file:// reference")
-    for value in re.findall(r"[^\s\"'<>()[\]{},;`]+", text):
-        if "../" in value:
-            value = value[value.find("../"):].split("#")[0]
-            require(Path(os.path.abspath(source.parent / value)).is_relative_to(root), source,
-                    "preview resource reconciliation: resource outside preview root")
+    for value in re.findall(r"\.\./[^\s\"'<>()[\]{},;`]*", text):
+        value = value.split("#")[0]
+        require(Path(os.path.abspath(source.parent / value)).is_relative_to(root), source,
+                "preview resource reconciliation: resource outside preview root")
 
 
 def preview_byproduct(path: Path, root: Path) -> bool:
@@ -803,7 +802,7 @@ def populate_preview(original: Path, copy: Path, failures: dict,
                 check_preview_escape(original, source, data)
                 # Non-shortcode references retain Quarto's missing-file diagnostic, but
                 # must not keep an earlier HTML page containing now-refused resources.
-                for value in re.findall(r"[^\s\"'<>()[\]{},;`]+", data.decode(errors="ignore")):
+                for value in re.findall(r"[^\s\"'<>()[\]{},;`]+", data.decode(errors="ignore")) if refused else ():
                     if "/" not in value or re.match(r"\w+:|#", value):
                         continue
                     target = (source.parent / value.split("#")[0]).resolve()
@@ -848,6 +847,9 @@ def populate_preview(original: Path, copy: Path, failures: dict,
         (stage / "_cse-manuscript.json").write_bytes(json_bytes(state))
         (stage / ".cse-preview-failures.json").write_bytes(json_bytes(records))
         validate_root(stage)
+        if not copy.exists():
+            stage.rename(copy)
+            return state
         copy.mkdir(exist_ok=True)
         retained = {p.relative_to(stage) for p in stage.rglob("*") if p.is_file()}
         # Failure sources precede deletions; healthy resources precede healthy sources.
@@ -1024,7 +1026,7 @@ def preview(root: Path, host: str, port: int | None) -> int:
         require(probe.connect_ex((host if host not in {"0.0.0.0", "::", ""} else "127.0.0.1", port)) != 0,
                 root, f"port {port} is already in use; pass --port with a free port")
     command = ["quarto", "preview", "--to", "html", "--profile", "presentation", "--no-browser",
-               "--no-watch-inputs", "--no-render", "--host", host, "--port", str(port)]
+               "--no-watch-inputs", "--host", host, "--port", str(port)]
     environment = {**os.environ, "CSE_PREVIEW_ROOT": str(root)}
     process = None
     def handle_sigterm(signum, frame):
@@ -1036,19 +1038,23 @@ def preview(root: Path, host: str, port: int | None) -> int:
         failures, snapshot = {}, watch_snapshot(root)
         check_preview_workflows(root, None, failures, snapshot)
         state = populate_preview(root, copy, failures)
-        for page in state["project"]["render"]:
-            result = preview_run(["quarto", "render", page, "--to", "html", "--profile", "presentation"], copy, environment)
-            if result.returncode:
-                print(result.stdout + result.stderr, file=sys.stderr)
-                output = copy / "_site" / Path(page).with_suffix(".html")
-                output.parent.mkdir(parents=True, exist_ok=True)
-                atomic_write(output, ("<html><body><pre>" + literal_text(result.stdout + result.stderr)
-                                      + "</pre></body></html>").encode())
-        process = subprocess.Popen(command, cwd=copy, start_new_session=True, env=environment)
+        process = subprocess.Popen([*command, "--render", "html"], cwd=copy, start_new_session=True, env=environment)
         record.parent.mkdir(exist_ok=True)
         atomic_write(record, json_bytes({"pid": os.getpid(), "identity": process_identity(os.getpid()),
                                         "host": host, "port": port}))
         wait_for_server(process, host, port)
+        # Keep Quarto's rendered context for first requests; isolate pages on native failure.
+        if process.poll() is not None:
+            for page in state["project"]["render"]:
+                result = preview_run(["quarto", "render", page, "--to", "html", "--profile", "presentation"], copy, environment)
+                if result.returncode:
+                    print(result.stdout + result.stderr, file=sys.stderr)
+                    output = copy / "_site" / Path(page).with_suffix(".html")
+                    output.parent.mkdir(parents=True, exist_ok=True)
+                    atomic_write(output, ("<html><body><pre>" + literal_text(result.stdout + result.stderr)
+                                          + "</pre></body></html>").encode())
+            process = subprocess.Popen([*command, "--no-render"], cwd=copy, start_new_session=True, env=environment)
+            wait_for_server(process, host, port)
         while process.poll() is None:
             time.sleep(WATCH_INTERVAL_SECONDS)
             current = watch_snapshot(root)
