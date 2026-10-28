@@ -636,6 +636,28 @@ class ScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(result.stdout.strip(), str(project))
             self.assertTrue((project / "synced").is_file())
 
+    def test_visual_qa_rejects_type3_fonts(self):
+        for tool in ("pdflatex", "kpsewhich", "pdffonts", "pdftotext", "pdftoppm", "mutool"):
+            if not shutil.which(tool):
+                self.skipTest(f"{tool} is unavailable")
+        if subprocess.run(["kpsewhich", "lmodern.sty"], capture_output=True).returncode:
+            self.skipTest("Latin Modern TeX package is unavailable")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for name, preamble in (("bitmap", r"\pdfmapfile{}"), ("vector", r"\usepackage{lmodern}")):
+                (root / f"{name}.tex").write_text(
+                    r"\documentclass{article}" + preamble
+                    + r"\begin{document}Font check.\end{document}"
+                )
+                build = subprocess.run(["pdflatex", "-interaction=nonstopmode", "-halt-on-error", f"{name}.tex"], cwd=root, capture_output=True, text=True)
+                self.assertEqual(build.returncode, 0, build.stdout)
+                result = self.run_script("plugin/scripts/visualize/latex_visual_qa.py", str(root / f"{name}.pdf"), "--profile", "article", "--output-dir", str(root / name), cwd=root)
+                if name == "bitmap":
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn("Type 3 fonts found", result.stderr)
+                else:
+                    self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_visualization_and_source_helpers_have_single_payload_locations(self):
         for relative in (
             "plugin/scripts/sources/sync_bibliography.py",

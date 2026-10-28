@@ -93,13 +93,14 @@ Run these gates in order. A later gate does not excuse an earlier failure.
    Pandoc, package order, or class behavior is uncertain.
 3. **Log:** reject TeX errors, unresolved references, font substitutions, and
    unexplained overfull boxes.
-4. **Automated visual QA:** run `scripts/visualize/latex_visual_qa.py` on each final PDF.
+4. **Fonts:** require `pdffonts <pdf> | grep -c 'Type 3'` to report 0. Attribute any Type 3 font to its source, including embedded figures, and fix it before release. For pdfLaTeX, `grep -E '\.[0-9]+pk' <build>.log` helps diagnose bitmap fallback but cannot check other engines.
+5. **Automated visual QA:** run `scripts/visualize/latex_visual_qa.py` on each final PDF.
    It checks text-to-text and text-to-vector geometry, renders color and
    grayscale pages, and writes `report.json`.
-5. **Manual visual QA:** inspect every rendered page at full size. Use the
+6. **Manual visual QA:** inspect every rendered page at full size. Use the
    contact sheet for document flow only. Check text against paths and symbols,
    hierarchy, contrast, clipping, and scientific meaning.
-6. **Disposition:** classify scientific logic as `exact`, `schematic`,
+7. **Disposition:** classify scientific logic as `exact`, `schematic`,
    `needs-source`, or `failed`; then record `keep`, `simplify`, `split`, or
    `reject`. Rebuild and repeat the affected gates after a correction.
 
@@ -121,7 +122,7 @@ Use `--profile standalone` for an isolated figure. `--warnings-as-errors` is
 useful only after the repository has calibrated the conservative warnings
 against its own accepted documents.
 
-The runner depends on Poppler's `pdftotext` and `pdftoppm` plus MuPDF's
+The runner depends on Poppler's `pdffonts`, `pdftotext`, and `pdftoppm` plus MuPDF's
 `mutool`; use `pdfinfo` separately for document metadata. `montage` is
 required only with `--contact-sheet`. Seeded clean and overlapping sources under
 `tests/fixtures/latex-visual-qa/` keep the overlap gate exercised.

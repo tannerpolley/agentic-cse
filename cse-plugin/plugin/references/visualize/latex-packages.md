@@ -37,7 +37,7 @@ already selected another route.
 
 | Capability | Selected default | Why | Competing choice and exception |
 | --- | --- | --- | --- |
-| Engine and fonts | LuaLaTeX with `fontspec` and `unicode-math` | Unicode input and OpenType text and mathematics | Use the venue engine. Under pdfLaTeX, omit both and use the template font stack. |
+| Engine and fonts | LuaLaTeX with `fontspec` and `unicode-math` | Unicode input and OpenType text and mathematics | Prefer LuaLaTeX or XeLaTeX when the venue class supports it. Use pdfLaTeX when required; omit both packages and ensure Type 1 coverage for every encoding and family (for T1 Computer Modern, install `cm-super` or use `lmodern`). |
 | Author-controlled class | KOMA-Script `scrartcl` or `scrreprt` | Integrated headings and page furniture; manuscript type area without competing layout packages | The analysis-notebook profile uses its one explicit Quarto margin owner. Use the venue class when required. With a classic `article` or `report` class, `geometry` and `fancyhdr` remain conditional choices. |
 | Mathematics | `mathtools` and `derivative` | Equation structures plus explicit derivative notation | Add `amsthm` and `thmtools` only for theorem-like exposition. |
 | Bold mathematics | `\symbf` from `unicode-math` | Matches the selected Unicode math architecture | Use `bm` in a traditional font workflow, not as a LuaLaTeX default. |
@@ -53,6 +53,13 @@ already selected another route.
 | Molecular structures | `chemfig` | Document-native two-dimensional molecular drawings | Use an external reviewed vector figure when the structure is too complex or already authoritative elsewhere. |
 | Process diagrams | TikZ; `chemplants` for PFD symbols; `chempid` for P&IDs | Keeps the abstraction level explicit | Use `schemabloc` only when an existing control-diagram source already depends on it. |
 | Revision comparison | Git plus `latexdiff` | The source history remains authoritative and the comparison is generated | Use `changes` only for a required manual tracked-changes workflow. |
+
+For T1 venue classes under any engine, set Latin Modern sans and typewriter immediately after `\documentclass`:
+
+```latex
+\renewcommand{\sfdefault}{lmss}
+\renewcommand{\ttdefault}{lmtt}
+```
 
 ## Document profiles
 

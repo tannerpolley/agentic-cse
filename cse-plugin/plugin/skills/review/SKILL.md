@@ -24,6 +24,7 @@ Use a fresh reviewer for design readiness before Build and a separate fresh
 reviewer for delivered acceptance. Neither reviewer authored the material it
 checks. CSE requires independence but selects no model, transport, staffing
 pattern, or review cascade; the active coordination guidance owns those choices.
+The manuscript structure review in [scientific-projects](../../references/workflow/scientific-projects.md) specifies independent review jobs; host guidance assigns them.
 
 ## Design readiness
 
