@@ -32,3 +32,9 @@ printf 'CSE LaTeX toolchain ready\n'
 printf 'distribution: TinyTeX (%s)\n' "$active_root"
 printf 'engine: %s\n' "$(lualatex --version | sed -n '1p')"
 printf 'manager: Quarto %s\n' "$(quarto --version)"
+
+if kpsewhich sfrm1000.pfb >/dev/null; then
+  printf 'cm-super: present\n'
+else
+  printf 'cm-super: missing; pdfLaTeX T1 Computer Modern may fall back to bitmap fonts without Type 1 coverage (install cm-super or use lmodern).\n' >&2
+fi
