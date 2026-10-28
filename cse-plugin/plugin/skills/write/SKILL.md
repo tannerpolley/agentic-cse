@@ -1,6 +1,6 @@
 ---
 name: write
-description: "Turn accepted scientific evidence into manuscript, report, appendix, caption, or equation prose, changing only diagnosed spans. Use when asked to \"draft the paper\", \"write the methods section\", or \"fix this paragraph\". Read-only critique goes to prose; compiling to latex or quarto."
+description: "Write scientific manuscripts, reports, and captions from accepted evidence. Use when drafting, handling a rejected draft, restructuring a manuscript that reads like a report, or making routine wording or citation edits. Read-only critique goes to prose; compiling to latex or quarto."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -16,6 +16,7 @@ metadata:
 Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
 
 Activate [scientific-projects](../../references/workflow/scientific-projects.md) for project writing rules and retained paths.
+Use its manuscript structure review before a new or rejected manuscript, a journal retarget, or a material restructure.
 Use the committed bibliography snapshot read-only; an approved refresh belongs
 to CSE source after the Zotero capability is checked.
 
