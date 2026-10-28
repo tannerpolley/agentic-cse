@@ -469,7 +469,7 @@ test("Zotero sign-in fallback during a job hands off without a window; outside a
   assert.equal(await r.Zotero.API.authorize(), "native-auth");
 });
 
-test("replacement requires confirmation and retains the old PDF on invalid replacement", async () => {
+test("internal CLI replacement retains the old PDF on invalid relationships", async () => {
   const erased = [];
   const parent = { id: 1, key: "PARENT", isRegularItem: () => true };
   const attachment = key => ({ key, parentItemID: 1, isAttachment: () => true,
@@ -489,12 +489,27 @@ test("replacement requires confirmation and retains the old PDF on invalid repla
   const data = { action: "replace", item_key: "PARENT", old_key: "OLD", new_key: "NEW" };
   const preview = await call(data);
   assert.equal(preview.mode, "dry-run");
-  assert.equal((await call({ ...data, mode: "apply" })).error, "approval_required");
+  assert.equal(preview.applyToken, undefined);
   assert.deepEqual(erased, []);
   fresh.parentItemID = 2;
-  assert.equal((await call({ ...data, mode: "apply", applyToken: preview.applyToken })).error, "invalid_replacement");
+  assert.equal((await call({ ...data, mode: "apply" })).error, "invalid_replacement");
   assert.deepEqual(erased, []);
   fresh.parentItemID = 1;
-  assert.equal((await call({ ...data, mode: "apply", applyToken: preview.applyToken })).attachment_key, "NEW");
+  assert.equal((await call({ ...data, mode: "apply" })).attachment_key, "NEW");
   assert.deepEqual(erased, ["OLD"]);
+});
+
+
+test("Connector hands off on two fresh PDFs in either order and retains the old article", async () => {
+  for (const keys of [["SUPPLEMENT", "MAIN_PDF"], ["MAIN_PDF", "SUPPLEMENT"]]) {
+    const r = desktopFixture();
+    r.Zotero.Items.getAsync = async () => keys.map(key => ({ key, attachmentContentType: "application/pdf" }));
+    const result = await r.call("acquire-connector", {
+      mode: "apply", session_id: "SESSION", existing_key: "OLD", doi: "10.1234/test", collection: "COLL"
+    });
+    assert.match(result.handoff, /several PDFs/);
+    assert.equal(result.attachment_key, undefined);
+    assert.ok(!r.calls.some(call => ["merge", "erase"].includes(call[0])));
+    assert.deepEqual(r.old.children, [4]);
+  }
 });

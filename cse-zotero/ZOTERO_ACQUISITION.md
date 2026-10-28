@@ -62,14 +62,26 @@ Elsevier requests explicitly use `view=FULL`; the [Article Retrieval docs](https
 list response formats and view selection but no PDF coverage response header.
 The shared page check therefore remains necessary.
 
-`acquire --refetch` previews recovery when existing PDFs fail this check; it
-makes no acquisition or attachment writes. Review the returned parent, old
+`acquire --refetch` previews recovery for confirmed truncation only; uncertain
+existing attachments hand off for inspection and are never removed. Explicit
+single-page ranges such as `123-123` or `S10-S10` are usable; lone numbers and
+article numbers cannot establish a one-page paper. The shared verifier uses
+Zotero pages when Crossref has no usable range.
+
+The preview makes no acquisition or attachment writes. Review the returned parent, old
 attachment keys, failure reasons and `preview_sha256`, then obtain owner
 approval before running the same command with `--apply --preview-sha256 <digest>`.
 The digest binds the old files, page range, collection and route; changes require
 a fresh preview. The new attachment is saved and verified before the old PDFs
 are removed. Acquisition or verification failure retains the old attachments. A complete existing PDF is
 reused even with `--refetch`.
+
+Replacement is supported only through the CLI. The add-on replacement endpoint
+is an internal operation, not an independently approved write interface: it
+checks parent/attachment relationships, while the CLI owns the approved preview
+digest, old-file hash checks and completeness verification. No constant token
+provides approval. Connector sessions with several fresh PDFs hand off without
+selecting one or removing an existing attachment.
 
 Tokens live in mode-0600 files under `~/.config/zotero-companion/`:
 `elsevier-api-key`, optional `elsevier-insttoken`, and `wiley-tdm-token`.

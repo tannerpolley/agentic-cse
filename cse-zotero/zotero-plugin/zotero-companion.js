@@ -418,10 +418,9 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
           old.attachmentContentType !== "application/pdf" || fresh.attachmentContentType !== "application/pdf" ||
           !await fresh.getFilePathAsync()) return response(422, { error: "invalid_replacement" });
       if (data.mode !== "apply") return response(200, {
-        mode: "dry-run", item_key: parent.key, old_key: old.key, new_key: fresh.key,
-        applyToken: "replace-incomplete-pdf"
+        mode: "dry-run", item_key: parent.key, old_key: old.key, new_key: fresh.key
       });
-      if (data.applyToken !== "replace-incomplete-pdf") return response(409, { error: "approval_required" });
+      // Internal CLI operation: approval and completeness verification belong to acquire.py.
       await old.eraseTx();
       return response(200, { mode: "apply", item_key: parent.key, attachment_key: fresh.key });
     }
@@ -471,7 +470,11 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     const actual = zotero.Utilities.cleanDOI(fresh.getField("DOI") || "");
     if (doi && actual && doi.toLowerCase() !== actual.toLowerCase()) return response(422, { error: "connector_doi_differs" });
     const freshChildren = await zotero.Items.getAsync(fresh.getAttachments());
-    const pdf = freshChildren.find(item => item.attachmentContentType === "application/pdf");
+    const pdfs = freshChildren.filter(item => item.attachmentContentType === "application/pdf");
+    if (pdfs.length > 1) return response(200, {
+      handoff: "Zotero Connector saved several PDFs; select the article PDF manually; existing attachments retained"
+    });
+    const pdf = pdfs[0];
     const parent = existing && !existing.deleted ? existing : fresh;
     if (target.collection) parent.addToCollection(target.collection.id);
     await parent.saveTx();

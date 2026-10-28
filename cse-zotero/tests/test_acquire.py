@@ -565,7 +565,7 @@ def test_connector_empty_session_hands_off_without_losing_existing_key(runtime, 
 
 
 @pytest.mark.parametrize('pages,article_range,accepted', [(1, '10-19', False), (3, '10-19', False),
-    (6, '10-19', True), (1, '', False), (1, 'S10-S10', True), (4, '143279', True)])
+    (6, '10-19', True), (1, '123-123', True), (1, 'S10-S10', True), (4, '143279', True)])
 def test_pdf_completeness(pages, article_range, accepted):
     body = fixture_pdf(pages)
     if accepted:
@@ -573,6 +573,57 @@ def test_pdf_completeness(pages, article_range, accepted):
     else:
         with pytest.raises(mod.IncompletePDF):
             mod.pdf_bytes(body, article_range)
+
+
+@pytest.mark.parametrize('pages', ['123', 'e123', '143279', ''])
+def test_short_paper_without_range_is_uncertain_and_never_replaceable(runtime, monkeypatch, pages):
+    current, calls, root = runtime
+    current['doi'] = '10.1371/test'
+    (root / 'retained.pdf').write_bytes(fixture_pdf(1))
+    monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda *a, **k: [
+        {'key': 'PARENT', 'data': {'itemType': 'journalArticle', 'DOI': current['doi']}}])
+    original = mod.request
+    monkeypatch.setattr(mod, 'request', lambda url, **kw:
+        json.dumps({'message': {'page': pages}}).encode() if 'crossref' in url else original(url, **kw))
+    with pytest.raises(mod.UncertainPDF):
+        mod.pdf_bytes(fixture_pdf(1), pages)
+    for refetch in (False, True):
+        result = mod.acquire(current['doi'], refetch=refetch)
+        assert not result['ok'] and 'Uncertain' in result['stop_reason']
+        assert result['unverified_attachments'][0]['attachment_key'] == 'PDFKEY'
+        assert 'replacement' not in result and 'incomplete_attachments' not in result
+    assert not any(mode == 'apply' or path == 'connector-visit' for path, mode in calls)
+
+
+@pytest.mark.parametrize('existing', [True, False])
+def test_acquire_uses_zotero_single_page_range_when_crossref_has_article_number(runtime, monkeypatch, existing):
+    current, calls, root = runtime
+    current['doi'] = '10.1371/test'
+    (root / 'retained.pdf').write_bytes(fixture_pdf(1))
+    if existing:
+        monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda *a, **k: [
+            {'key': 'PARENT', 'data': {'itemType': 'journalArticle', 'DOI': current['doi']}}])
+    original_get = mod.ZoteroLocalAPI.get
+    def get(self, path):
+        result = original_get(self, path)
+        if not path.endswith('children'):
+            result['data']['pages'] = '123-123'
+        return result
+    monkeypatch.setattr(mod.ZoteroLocalAPI, 'get', get)
+    original_plugin = mod.ZoteroPluginClient._request
+    def plugin(self, path, **kw):
+        result = original_plugin(self, path, **kw)
+        if path.endswith('metadata'):
+            result['metadata']['pages'] = '123-123'
+        return result
+    monkeypatch.setattr(mod.ZoteroPluginClient, '_request', plugin)
+    original = mod.request
+    monkeypatch.setattr(mod, 'request', lambda url, **kw:
+        b'{"message":{"page":"e123"}}' if 'crossref' in url else original(url, **kw))
+    result = mod.acquire(current['doi'])
+    assert result['ok'] and result['verified']
+    assert result['route'] == ('existing' if existing else 'connector')
+    assert 'replacement' not in result
 
 
 @pytest.mark.parametrize('route', ['unpaywall', 'pmc-cloud', 'elsevier-api', 'wiley-api', 'connector'])
@@ -611,6 +662,7 @@ def test_preview_falls_through_or_hands_off(runtime, monkeypatch, route):
 def test_refetch_previews_then_verifies_before_removing(runtime, monkeypatch, route, outcome):
     current, calls, root = runtime
     current.update(doi='10.1371/test')
+    (root / 'retained.pdf').write_bytes(fixture_pdf(6))
     old_path = root / 'old.pdf'
     old_path.write_bytes(fixture_pdf(1))
     original_get = mod.ZoteroLocalAPI.get
@@ -628,6 +680,8 @@ def test_refetch_previews_then_verifies_before_removing(runtime, monkeypatch, ro
     current['has_pdf'] = False
     original = mod.request
     def request(url, **kwargs):
+        if 'crossref' in url:
+            return b'{"message":{"page":"10-19"}}'
         if 'unpaywall' in url:
             return b'{"oa_locations":[{"url_for_pdf":"https://repository.example/paper.pdf"}]}'
         return original(url, **kwargs)

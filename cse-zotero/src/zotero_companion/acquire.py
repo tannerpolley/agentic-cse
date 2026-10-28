@@ -139,6 +139,25 @@ class IncompletePDF(AcquireStop):
     pass
 
 
+class UncertainPDF(AcquireStop):
+    pass
+
+
+def expected_pages(pages):
+    # A lone number may be an article number; only an explicit range is usable.
+    match = re.fullmatch(r"\s*([A-Za-z]*)(\d+)\s*[-–—]\s*([A-Za-z]*)(\d+)\s*", str(pages))
+    if match and (not match[3] or match[1].lower() == match[3].lower()):
+        count = int(match[4]) - int(match[2]) + 1
+        if count > 0:
+            return count
+    return None
+
+
+def verification_pages(crossref, metadata):
+    pages = crossref.get("page", "")
+    return pages if expected_pages(pages) is not None else metadata.get("pages", "")
+
+
 def pdf_bytes(body, pages=""):
     if not body.startswith(b"%PDF"):
         raise AcquireStop("Non-PDF bytes where a PDF was expected")
@@ -146,15 +165,12 @@ def pdf_bytes(body, pages=""):
         info = subprocess.run(["pdfinfo", "-"], input=body, capture_output=True, timeout=15, check=True)
         count = int(re.search(rb"(?m)^Pages:\s+(\d+)", info.stdout)[1])
     except (OSError, subprocess.SubprocessError, TypeError, ValueError):
-        raise IncompletePDF("PDF page count unavailable; install Poppler pdfinfo or inspect the PDF") from None
-    match = re.fullmatch(r"\s*([A-Za-z]*)(\d+)\s*[-–—]\s*([A-Za-z]*)(\d+)\s*", str(pages))
-    expected = None
-    if match and (not match[3] or match[1].lower() == match[3].lower()):
-        expected = int(match[4]) - int(match[2]) + 1
-        if expected < 1:
-            expected = None
-    if (count == 1 and expected != 1) or (expected and count * 2 < expected):
-        raise IncompletePDF(f"Incomplete or uncertain PDF: {count} pages; article page range: {pages or 'unknown'}")
+        raise UncertainPDF("PDF page count unavailable; install Poppler pdfinfo or inspect the PDF") from None
+    expected = expected_pages(pages)
+    if expected and ((count == 1 and expected > 1) or count * 2 < expected):
+        raise IncompletePDF(f"Incomplete PDF: {count} pages; article page range: {pages}")
+    if count == 1 and expected is None:
+        raise UncertainPDF(f"Uncertain PDF: {count} page; article page range: {pages or 'unknown'}")
     return body
 
 
@@ -408,15 +424,21 @@ def use_existing_parent(api, result, key, pages, *, refetch=False):
     result["item_key"] = key
     children = api.get(f"/api/users/0/items/{key}/children")
     failures = []
+    uncertain = []
     for child in children:
         if child["data"].get("contentType") != "application/pdf":
             continue
         try:
             local_pdf(api, child["key"], pages)
         except (AcquireStop, OSError, RuntimeError) as exc:
-            failures.append({"attachment_key": child["key"], "reason": str(exc)})
+            target = failures if isinstance(exc, IncompletePDF) else uncertain
+            target.append({"attachment_key": child["key"], "reason": str(exc)})
             continue
         result.update(ok=True, attachment_key=child["key"], route="existing", verified=True, handoff_url=None)
+        return True
+    if uncertain:
+        result["unverified_attachments"] = uncertain
+        result["stop_reason"] = uncertain[0]["reason"] + "; inspect the existing attachment before recovery"
         return True
     if failures:
         result["incomplete_attachments"] = failures
@@ -459,9 +481,8 @@ def acquire(value, *, collection=None, dry_run=False, route="auto", refetch=Fals
             if doi:
                 raw = request("https://api.crossref.org/works/" + quote(doi, safe=""), safety=safety)
                 crossref = json.loads(raw)["message"] if raw else {}
-            pages = crossref.get("page", "")
             if existing:
-                pages = pages or api.get(f"/api/users/0/items/{existing}")["data"].get("pages", "")
+                pages = verification_pages(crossref, api.get(f"/api/users/0/items/{existing}")["data"])
                 if use_existing_parent(api, result, existing, pages, refetch=refetch):
                     return result
             pub = publisher(doi, crossref.get("member", ""))
@@ -476,7 +497,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto", refetch=Fals
                 metadata = plugin._request("/zotero-companion/acquire-metadata", method="POST",
                                            payload={"identifier": ident, "collection": collection, "mode": "dry-run"})
                 result["collection_key"] = metadata.get("collection_key")
-                if metadata.get("existing") and use_existing_parent(api, result, metadata["item_key"], crossref.get("page") or metadata["metadata"].get("pages", ""), refetch=refetch):
+                if metadata.get("existing") and use_existing_parent(api, result, metadata["item_key"], verification_pages(crossref, metadata["metadata"]), refetch=refetch):
                     return result
             if not doi:
                 native = (metadata or {}).get("metadata", {})
@@ -491,7 +512,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto", refetch=Fals
                     target = native["url"].replace("http://", "https://", 1)
                     checked_url(target)
                     result["handoff_url"] = target
-            pages = crossref.get("page") or (metadata or {}).get("metadata", {}).get("pages", "")
+            pages = verification_pages(crossref, (metadata or {}).get("metadata", {}))
             replacements = result.get("incomplete_attachments", [])
             if replacements:
                 plan = {"item_key": result["item_key"], "attachments": [
@@ -508,7 +529,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto", refetch=Fals
                     return None
                 try:
                     return pdf_bytes(body, pages)
-                except IncompletePDF as exc:
+                except (IncompletePDF, UncertainPDF) as exc:
                     result.setdefault("skipped_routes", []).append(route_name + ": " + str(exc))
                     return None
             if dry_run:
@@ -616,7 +637,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto", refetch=Fals
                     raise AcquireStop("Old attachment changed during acquisition; retained both PDFs")
             for old in replacements:
                 plugin._request("/zotero-companion/acquire-attachment", method="POST", payload={
-                    "action": "replace", "mode": "apply", "applyToken": "replace-incomplete-pdf",
+                    "action": "replace", "mode": "apply",
                     "item_key": result["item_key"], "old_key": old["attachment_key"], "new_key": result["attachment_key"]})
             result.update(ok=True, verified=True, handoff_url=None)
         except (AcquireStop, OSError, ValueError, KeyError, RuntimeError) as exc:
