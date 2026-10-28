@@ -112,24 +112,24 @@ def read_json(data: bytes, path: Path) -> dict:
 
 
 
-def is_group(entry: dict) -> bool:
+def is_group(entry: dict, title_only: list[str] = ()) -> bool:
     """A group section holds page sections; a page section holds links."""
-    return "section" in entry["contents"][0]
+    return bool(entry.get("contents")) and ("section" in entry["contents"][0] or entry["contents"][0].get("href") in title_only)
 
 
-def flatten(entries: list[dict]) -> list[dict]:
+def flatten(entries: list[dict], title_only: list[str] = ()) -> list[dict]:
     """Page sections in sidebar order, descending through (possibly nested) groups."""
-    return [page for entry in entries for page in (flatten(entry["contents"]) if is_group(entry) else [entry])]
+    return [page for entry in entries for page in (flatten(entry["contents"], title_only) if is_group(entry, title_only) else [entry])]
 
 
 def page_sections(state: dict) -> list[dict]:
     """Home and notebook sections in sidebar order, with groups flattened."""
-    return flatten(state["website"]["sidebar"]["contents"])
+    return flatten(state["website"]["sidebar"]["contents"], state.get("cse-title-only", []))
 
 
 def notebooks(state: dict) -> list[dict]:
     """Included notebooks in sidebar order, each ``{"text": title, "href": notebook}``."""
-    return [{"text": entry["section"], "href": entry["contents"][0]["href"].split("#")[0]}
+    return [{"text": entry.get("section", entry.get("text")), "href": (entry["contents"][0]["href"] if "contents" in entry else entry["href"]).split("#")[0]}
             for entry in page_sections(state)[1:]]
 
 
@@ -187,13 +187,17 @@ def home_section(root: Path, text: bytes | None = None) -> dict:
 def refresh_sections(root: Path, state: dict, files: dict[str, bytes] | None = None) -> None:
     """Recompute every page's sidebar links from its headings, keeping titles and groups."""
     for entry in page_sections(state):
-        page = entry["contents"][0]["href"].split("#")[0]
-        entry["contents"] = sections(root, page, (files or {}).get(page))
+        if "contents" in entry:
+            page = entry["contents"][0]["href"].split("#")[0]
+            entry["contents"] = sections(root, page, (files or {}).get(page))
 
 
 def metadata(data: bytes, path: Path) -> dict:
     state = read_json(data, path)
-    require(set(state) == {"project", "website"}, path, "unsupported membership fields")
+    require(set(state) in ({"project", "website"}, {"project", "website", "cse-title-only"}), path, "unsupported membership fields")
+    title_only = state.get("cse-title-only", [])
+    require(isinstance(title_only, list) and all(isinstance(p, str) for p in title_only)
+            and len(title_only) == len(set(title_only)), path, "invalid title-only pages")
     project, website = state["project"], state["website"]
     require(isinstance(project, dict) and set(project) == {"render"}
             and isinstance(website, dict) and set(website) == {"sidebar"}, path, "invalid membership owners")
@@ -211,23 +215,25 @@ def metadata(data: bytes, path: Path) -> dict:
 
     def check(entries: list) -> None:
         for entry in entries:
-            require(section(entry), path, "invalid sidebar section")
-            if is_group(entry):
-                require(all(section(c) for c in entry["contents"]), path, "a group holds only sections")
+            require(section(entry) or (isinstance(entry, dict) and set(entry) == {"text", "href"}
+                    and all(isinstance(v, str) and v.strip() for v in entry.values())), path, "invalid sidebar section")
+            if is_group(entry, title_only):
+                require(all(section(c) or (isinstance(c, dict) and set(c) == {"text", "href"}) for c in entry["contents"]), path, "a group holds only sections or pages")
                 check(entry["contents"])
 
     check(sidebar["contents"])
-    require(not is_group(sidebar["contents"][0]), path, "sidebar must start with the home page")
+    require(not is_group(sidebar["contents"][0], title_only), path, "sidebar must start with the home page")
     for entry in page_sections(state):
-        require(isinstance(entry, dict) and set(entry) == {"section", "contents"}
+        require("href" in entry or (isinstance(entry, dict) and set(entry) == {"section", "contents"}
                 and isinstance(entry["section"], str) and entry["section"].strip()
                 and isinstance(entry["contents"], list) and entry["contents"]
                 and all(isinstance(c, dict) and set(c) == {"text", "href"}
                         and all(isinstance(v, str) and v.strip() for v in c.values()) for c in entry["contents"])
-                and len({c["href"].split("#")[0] for c in entry["contents"]}) == 1,
+                and len({c["href"].split("#")[0] for c in entry["contents"]}) == 1),
                 path, "invalid page section")
     require(sidebar["contents"][0]["contents"][0]["href"] == "index.qmd", path, "sidebar must start with the home page")
     require(render == ["index.qmd", *[n["href"] for n in notebooks(state)]], path, "ordered memberships disagree")
+    require(set(title_only) == {e["href"] for e in page_sections(state) if "href" in e}, path, "title-only membership disagrees")
     return state
 
 
@@ -388,10 +394,10 @@ def validate_root(root: Path, pending: dict[str, bytes] | None = None) -> dict:
         files[name] = pending[name] if name in pending else read_file(root / name)
         require(files[name].strip(), root / name, "empty publication source")
     for entry in page_sections(state):
-        page = entry["contents"][0]["href"]
+        page = entry["contents"][0]["href"] if "contents" in entry else entry["href"]
         require(re.fullmatch(r"[A-Za-z0-9._/-]+", page), root / page,
                 "page path may contain only letters, digits, '.', '_', '-', and '/'")
-        require(entry["contents"] == sections(root, page, files[page]), root / page,
+        require("contents" not in entry or entry["contents"] == sections(root, page, files[page]), root / page,
                 "sidebar sections no longer match the page headings; run `python3 manuscript.py sync .`")
     inspect_config(root, files, state)
     return state
@@ -481,17 +487,18 @@ def notebook_argument(root: Path, value: Path) -> str:
     return relative
 
 
-def include(root: Path, notebook: Path, title: str, group: str | None = None) -> Path:
+def include(root: Path, notebook: Path, title: str, group: str | None = None, title_only: bool = False) -> Path:
     root = root_path(root)
     require(title.strip() and (group is None or group.strip()), notebook, "empty notebook title or group")
     relative = notebook_argument(root, notebook)
     # Read the membership directly: include is what repairs stale sidebar sections.
     state = metadata(read_file(root / "_cse-manuscript.json"), root / "_cse-manuscript.json")
-    entry = {"section": title, "contents": [{"text": "Overview", "href": relative}]}
+    title_only_pages = state.get("cse-title-only", [])
+    entry = {"text": title, "href": relative} if title_only else {"section": title, "contents": [{"text": "Overview", "href": relative}]}
     contents = state["website"]["sidebar"]["contents"]
     def locate(entries: list) -> tuple[list, int] | None:
         for i, e in enumerate(entries):
-            hit = locate(e["contents"]) if is_group(e) else (entries, i) if e["contents"][0]["href"] == relative else None
+            hit = locate(e["contents"]) if is_group(e, title_only_pages) else (entries, i) if (e["contents"][0]["href"] if "contents" in e else e["href"]) == relative else None
             if hit:
                 return hit
         return None
@@ -499,9 +506,9 @@ def include(root: Path, notebook: Path, title: str, group: str | None = None) ->
     def prune(entries: list) -> list:
         kept = []
         for e in entries:
-            if not e["contents"] or is_group(e):
+            if "contents" in e and (not e["contents"] or is_group(e, title_only_pages)):
                 e["contents"] = prune(e["contents"])
-            if e["contents"]:
+            if "contents" not in e or e["contents"]:
                 kept.append(e)
         return kept
 
@@ -509,8 +516,8 @@ def include(root: Path, notebook: Path, title: str, group: str | None = None) ->
     target = contents
     for name in [part.strip() for part in group.split("/")] if group is not None else []:
         require(name, notebook, "empty group name")
-        found = next((e for e in target[1 if target is contents else 0:] if e["section"] == name and e["contents"]
-                      and is_group(e)), None)
+        found = next((e for e in target[1 if target is contents else 0:] if e.get("section") == name and e["contents"]
+                      and is_group(e, title_only_pages)), None)
         if found is None:
             found = {"section": name, "contents": []}
             target.append(found)
@@ -521,7 +528,16 @@ def include(root: Path, notebook: Path, title: str, group: str | None = None) ->
         if current:
             del current[0][current[1]]
         target.append(entry)
+    if title_only and relative not in title_only_pages:
+        title_only_pages.append(relative)
     contents[1:] = prune(contents[1:])
+    title_only_pages = [p for p in title_only_pages if p != relative]
+    if title_only:
+        title_only_pages.append(relative)
+    if title_only_pages:
+        state["cse-title-only"] = title_only_pages
+    else:
+        state.pop("cse-title-only", None)
     refresh_sections(root, state)
     state["project"]["render"] = ["index.qmd", *[n["href"] for n in notebooks(state)]]
     data = json_bytes(state)
@@ -1021,6 +1037,7 @@ def main() -> int:
             command.add_argument("notebook", type=Path)
         if name == "include":
             command.add_argument("--title", required=True)
+            command.add_argument("--title-only", action="store_true", help="list the page without heading links")
             command.add_argument("--group", help="optional sidebar group; nest with '/', e.g. 'Bundle/Active formulation'")
         if name == "preview":
             command.add_argument("--host", default="127.0.0.1")
@@ -1037,7 +1054,7 @@ def main() -> int:
             for name in replaced:
                 print(f"replaced: {root / name}")
         elif args.command == "include":
-            print(include(args.root, args.notebook, args.title, args.group))
+            print(include(args.root, args.notebook, args.title, args.group, args.title_only))
         elif args.command == "sync":
             sync(args.root)
             print("synced")

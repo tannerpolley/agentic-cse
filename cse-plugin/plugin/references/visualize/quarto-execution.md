@@ -40,7 +40,8 @@ and full page layout, so numbered equations and cross-references
 work on every page. The home page is the sidebar section "Home", and each included
 notebook is a collapsed section titled by `include --title`. A section title only
 expands it; its children are an Overview link and one link per heading at the
-page's highest level outside `:::` blocks, with the anchors Pandoc assigns.
+page's highest level outside `:::` blocks, with the anchors Pandoc assigns. Use `include --title-only` to list a page by title
+as a single link without heading children; repeat the flag when re-including it.
 `manuscript.py sync <root>` recomputes those links from the current headings while
 keeping titles and groups; `include`, `refresh`, `preview`, the service, and
 `render.sh` run it first, and `validate` reports stale links. Included files count as part of the page;

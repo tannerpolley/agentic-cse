@@ -40,6 +40,8 @@ Use a high-contrast, color-vision-safe palette. A restrained Okabe–Ito-style s
 
 Label every axis with the quantity and unit. Use linear axes by default, and use log or symlog only when multiplicative behavior, orders of magnitude, or signed dynamic range makes the linear view misleading. Keep legends, grids, annotations, and significant digits purposeful.
 
+For Matplotlib PDF figures, default to `pdf.fonttype: 42` for TrueType embedding.
+
 ## Reproducible outputs
 
 Generate data and render figures in separate stages. The render stage reads an exact plotted-data snapshot and does not rerun an expensive model. Keep the vector/raster figure, exact plotted values, and provenance together in the project’s established results layout. Re-rendering must be deterministic and must not change the underlying scientific result.

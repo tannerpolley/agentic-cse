@@ -30,7 +30,9 @@ writes keep their existing previews and approvals.
 Try Unpaywall's declared open-access PDF locations, PMC Cloud, an official
 Elsevier/Wiley API when configured, then the everyday-Chrome Connector. The
 first PDF wins; an incomplete acquisition hands back the DOI or article link.
-DOI metadata uses Zotero's Crossref translator. Do not invent PDF URLs.
+DOI metadata uses Zotero's Crossref translator. If lookup fails (including a DOI
+registered outside Crossref), return the translator reason and DOI link for a
+landing-page handoff through web translators. Do not invent PDF URLs.
 
 Unattended acquisition works for open access and official APIs with working
 tokens and entitlement. Springer is verified through the Connector. Elsevier,
