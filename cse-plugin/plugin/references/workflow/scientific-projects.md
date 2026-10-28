@@ -276,6 +276,34 @@ prose unchanged, invents no specificity or evidence, preserves supported
 content, and performs one verification read. Do not iterate toward a style or
 detector score.
 
+### Manuscript structure review
+
+For a new manuscript, rejected draft, new target journal, or material change to
+section order or argument spine, review the structure before writing. Routine
+wording, citation, and formatting edits do not trigger this review.
+
+Give three independent read-only structure reviewers the same brief and distinct
+identities. One reviewer is enough for a small journal retarget without a
+structural change. Supply the target journal, owner-named model papers, prior
+accepted version, source collection, owner rules, and accepted evidence. Each
+reviewer returns a diagnosis tracing the root cause to planning records, a map
+of the model paper, lessons from similar papers, a literature plan with existing
+citation keys, an outline, a jargon list, and only blocking questions.
+
+The accountable lead checks each proposal: citation keys exist in the
+bibliography, linked PDFs exist, quoted numbers are correct, and claims do not
+overreach. Merge the strongest supported parts into one plan and publish it in
+the task's GitHub issue. Put story order in that plan, not in `STYLE.md`. One
+writer then rewrites from the plan.
+
+After the rewrite, two independent reviewers work in parallel. The science-support
+reviewer applies Review's Result lens to every displayed number and cited claim
+against retained files and cited sources, providing exact replacement text. The
+reader-story reviewer applies the final manuscript checkpoint below and checks
+figures, tables, abstract, paragraph placement, and internal language. Write
+applies their fixes as given; science support wins a conflict. Write then makes
+one verification read.
+
 ### Final manuscript checkpoint
 
 Routine revisions and builds need only the project's existing structural and
