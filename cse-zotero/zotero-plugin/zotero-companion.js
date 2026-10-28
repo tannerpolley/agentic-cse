@@ -331,15 +331,26 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     if (!identifier) return response(422, { error: "unsupported_identifier" });
     const translate = new zotero.Translate.Search();
     if (identifier.DOI) {
-      translate.setSearch({ itemType: "journalArticle", DOI: identifier.DOI });
+      // Crossref REST interpolates this into ?filter=doi: without escaping query values.
+      translate.setSearch({ itemType: "journalArticle", DOI: identifier.DOI.replace(/\+/g, "%2B") });
       translate.setTranslator(CROSSREF_TRANSLATOR);
     } else {
       translate.setIdentifier(identifier);
       const translators = await translate.getTranslators();
       translate.setTranslator(translators);
     }
-    const translated = await translate.translate({ libraryID: false, saveAttachments: false });
-    if (!translated || !translated.length) return response(404, { error: "metadata_not_found" });
+    let translated;
+    try {
+      translated = await translate.translate({ libraryID: false, saveAttachments: false });
+      if (!translated || !translated.length) {
+        if (!identifier.DOI) return response(404, { error: "metadata_not_found" });
+        throw new Error("No metadata returned by translator");
+      }
+    } catch (error) {
+      if (!identifier.DOI) throw error;
+      throw new Error(`Crossref metadata lookup failed for ${identifier.DOI}: ${error.message || error}. ` +
+        "Hand off the DOI landing page to web translators; the DOI may be registered outside Crossref.");
+    }
     const source = translated[0];
     const metadata = metadataJSON(source);
     const existing = await existingItem(metadata);
@@ -503,6 +514,21 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
     return response(200, { ok: true });
   }
 
+  async function metadataError(error) {
+    let message = String(error.message || error);
+    const home = services.dirsvc.get("Home", Components.interfaces.nsIFile).path;
+    for (const name of ["local-api-key", "elsevier-api-key", "elsevier-insttoken", "wiley-tdm-token"]) {
+      try {
+        const value = (await zotero.File.getContentsAsync(home + "/.config/zotero-companion/" + name)).trim();
+        if (value) message = message.split(value).join("[redacted]");
+      } catch (_) { /* An unconfigured token has no value to redact. */ }
+    }
+    message = message.replace(/(Bearer\s+)[^\s"'<>]+/gi, "$1[redacted]")
+      .replace(/((?:api[-_]?key|access[-_]?token|insttoken|tdm[-_]?token|authorization)["']?\s*[:=]\s*["']?)[^\s&"'<>]+/gi,
+        "$1[redacted]");
+    return response(500, { error: "metadata_acquisition_failed", message });
+  }
+
   function endpointError(error) {
     return response(500, { error });
   }
@@ -653,7 +679,7 @@ var ZoteroCompanion = (function (zotero, plan, organize, services) {
         if (data === null) return response(400, { error: "invalid_json" });
         if (metadataInFlight) return response(409, { error: "metadata_acquisition_busy" });
         metadataInFlight = true;
-        return quietAcquisition(acquireMetadata, data).catch(() => endpointError("metadata_acquisition_failed"))
+        return quietAcquisition(acquireMetadata, data).catch(metadataError)
           .finally(() => { metadataInFlight = false; });
       }
     };

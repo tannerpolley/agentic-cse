@@ -109,6 +109,7 @@ test("metadata acquisition previews without writes and applies one attachment-fr
   const calls = [];
   const saved = [];
   let pendingTranslation = null;
+  let noResults = false;
   class Search {
     setSearch(search) { this.search = search; }
     setIdentifier(identifier) { this.identifier = identifier; }
@@ -116,6 +117,7 @@ test("metadata acquisition previews without writes and applies one attachment-fr
     async translate(options) {
       calls.push({ search: this.search, identifier: this.identifier, translatorID: this.translatorID, options });
       if (pendingTranslation) await pendingTranslation;
+      if (noResults) return [];
       return [{ toJSON: () => ({
         itemType: "journalArticle", title: "An Example Paper", DOI: "10.1234/example",
         attachments: [{ title: "publisher PDF" }]
@@ -135,7 +137,7 @@ test("metadata acquisition previews without writes and applies one attachment-fr
     Collections: { getByLibrary: () => [collection] },
     getActiveZoteroPane: () => ({ getSelectedLibraryIDs: () => [1], getSelectedCollections: () => [collection] }),
     Utilities: {
-      extractIdentifiers: text => text === "10.1234/example" ? [{ DOI: "10.1234/example" }] : [],
+      extractIdentifiers: text => /^10\./.test(text) ? [{ DOI: text }] : [],
       cleanDOI: text => text.toLowerCase()
     },
     Translate: { Search }, Item, ItemFields: { getID: field => field === "DOI" ? 1 : 2 },
@@ -144,9 +146,13 @@ test("metadata acquisition previews without writes and applies one attachment-fr
       assert.equal(params.length, (sql.match(/\?/g) || []).length);
       return [];
     } },
-    Items: { getAsync: async () => false }
+    Items: { getAsync: async () => false },
+    File: { getContentsAsync: async path => {
+      if (path.endsWith("elsevier-api-key")) return "test-secret-value\n";
+      throw new Error("unconfigured");
+    } }
   };
-  const context = vm.createContext({ Zotero, Services: {}, Components: {} });
+  const context = vm.createContext({ Zotero, Services: { dirsvc: { get: () => ({ path: "/home/test" }) } }, Components: { interfaces: {} } });
   for (const name of ["cleanup-plan.js", "organize-plan.js", "zotero-companion.js"])
     vm.runInContext(readFileSync(new URL(`../zotero-plugin/${name}`, import.meta.url), "utf8"), context);
   vm.runInContext("ZoteroCompanion.start()", context);
@@ -165,6 +171,13 @@ test("metadata acquisition previews without writes and applies one attachment-fr
   assert.equal(calls[0].translatorID, "0a61e167-de9a-4f93-a68a-628b48855909");
   assert.equal(calls[0].options.libraryID, false);
   assert.equal(calls[0].options.saveAttachments, false);
+  assert.equal(saved.length, 0);
+
+  const plus = await call({ identifier: "10.1021/je960141+" });
+  assert.equal(plus.status, 200);
+  // Reproduce Crossref REST's query construction: a literal + becomes a space.
+  const query = new URLSearchParams("filter=doi:" + calls.at(-1).search.DOI);
+  assert.equal(query.get("filter"), "doi:10.1021/je960141+");
   assert.equal(saved.length, 0);
 
   const applied = await call({ identifier: "10.1234/example", collection: "Papers", mode: "apply" });
@@ -201,10 +214,22 @@ test("metadata acquisition previews without writes and applies one attachment-fr
   pendingTranslation = new Promise((_resolve, fail) => { reject = fail; });
   const failing = call({ identifier: "10.1234/example" });
   assert.equal((await call({ identifier: "10.1234/example" })).status, 409);
-  reject(new Error("native translation failure"));
-  assert.equal((await failing).status, 500);
+  reject(new Error("native translation failure: test-secret-value api_key=unknown-secret Bearer bearer-secret"));
+  const failure = await failing;
+  assert.equal(failure.status, 500);
+  assert.match(failure.body.message, /native translation failure/);
+  for (const secret of ["test-secret-value", "unknown-secret", "bearer-secret"])
+    assert.ok(!JSON.stringify(failure.body).includes(secret));
   pendingTranslation = null;
   assert.equal((await call({ identifier: "10.1234/example" })).status, 200);
+  assert.equal(saved.length, 1);
+
+  noResults = true;
+  const nonCrossref = await call({ identifier: "10.22034/ijche.2024.450400.1526" });
+  assert.equal(nonCrossref.status, 500);
+  assert.match(nonCrossref.body.message, /No metadata returned by translator/);
+  assert.match(nonCrossref.body.message, /Hand off the DOI landing page to web translators/);
+  assert.match(nonCrossref.body.message, /10\.22034\/ijche/);
   assert.equal(saved.length, 1);
 });
 
