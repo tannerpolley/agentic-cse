@@ -563,3 +563,45 @@ def test_connector_empty_session_hands_off_without_losing_existing_key(runtime, 
     assert result['attachment_key'] == None
     assert 'saved no parent item' in result['stop_reason'] and '422' not in result['stop_reason']
     assert result['handoff_url'] == 'https://doi.org/' + current['doi']
+
+
+def test_auto_wiley_pmc_lookup_does_not_activate_vpn(runtime, monkeypatch):
+    current, calls, _ = runtime
+    current.update(doi='10.1002/test', member=311)
+    vpn_calls = []
+    monkeypatch.setattr(mod, 'require_vpn', lambda: vpn_calls.append(True))
+    monkeypatch.setattr(mod.time, 'sleep', lambda _: None)
+    original = mod.request
+    def request_with_gate(url, **kwargs):
+        if 'idconv' in url:
+            kwargs['safety'].before(kwargs['pub'], url, 'api')
+        return original(url, **kwargs)
+    monkeypatch.setattr(mod, 'request', request_with_gate)
+    result = mod.acquire(current['doi'])
+    assert result['ok'] and result['route'] == 'connector'
+    assert any('idconv' in url for url, _ in calls)
+    assert not vpn_calls
+
+
+@pytest.mark.parametrize('vpn_on', [False, True])
+@pytest.mark.parametrize('translated', [False, True])
+def test_wiley_society_host_overrides_unrelated_doi(runtime, monkeypatch, vpn_on, translated):
+    current, calls, _ = runtime
+    current.update(doi='10.5555/test', member=999)
+    url = 'https://aiche.onlinelibrary.wiley.com/doi/10.5555/test'
+    if translated:
+        original = mod.ZoteroPluginClient._request
+        def metadata_with_url(self, path, **kwargs):
+            result = original(self, path, **kwargs)
+            if path.endswith('metadata'):
+                result['metadata']['url'] = url
+            return result
+        monkeypatch.setattr(mod.ZoteroPluginClient, '_request', metadata_with_url)
+    monkeypatch.setattr(mod, 'vpn_active', lambda: vpn_on)
+    result = mod.acquire(current['doi'] if translated else url, route='browser')
+    assert result['publisher'] == 'wiley'
+    if vpn_on:
+        assert 'VPN is on' in result['stop_reason']
+        assert ('connector-visit', None) not in calls
+    else:
+        assert result['ok'] and ('connector-visit', None) in calls
