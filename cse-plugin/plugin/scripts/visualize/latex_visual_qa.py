@@ -361,16 +361,63 @@ def make_contact_sheet(pages: list[Path], output: Path, montage: str) -> None:
         raise RuntimeError(result.stderr.strip() or "contact-sheet generation failed")
 
 
+
+def lint_tables(path: Path) -> list[str]:
+    """Inspect simple tabular/longtable sources; complex TeX needs visual review."""
+    source = re.sub(r"(?<!\\)%[^\n]*", "", path.read_text())
+    findings = []
+    # shortcut: nested column modifiers and generated rows require manual review.
+    table = r"\\begin\{(?:tabular|longtable)\}\{((?:[^{}]|\{[^{}]*\})*)\}(.*?)\\end\{(?:tabular|longtable)\}"
+    for match in re.finditer(table, source, re.S):
+        spec, body = match.groups()
+        columns = []
+        remaining = spec
+        token = r"\s*(?:(?:[><@!]\{[^{}]*\}|\|)|([lcrS]|p\{[^{}]*\})(?:\[[^][{}]*\]|\{[^{}]*\})*)"
+        while remaining.strip():
+            part = re.match(token, remaining)
+            if not part:
+                break
+            if part.group(1):
+                columns.append(part.group(1))
+            remaining = remaining[part.end():]
+        if remaining.strip():
+            continue
+        for row in re.finditer(r"(.*?)(?:\\\\(?:\[[^]]*\])?)", body, re.S):
+            for index, cell in enumerate(row.group(1).split("&")):
+                offset = row.start(1) + row.group(1).find(cell)
+                offset += len(cell) - len(cell.lstrip())
+                line = source.count("\n", 0, match.start(2) + offset) + 1
+                text = re.sub(r"\\caption(?:\[[^][{}]*\])?\{(?:[^{}]|\{[^{}]*\})*\}", "", cell)
+                text = re.sub(r"(\\[A-Za-z]+)\[[^][{}]*\]", r"\1", text)
+                pairs = re.findall(r"\b[A-Za-z][A-Za-z0-9_]*\s*=\s*[-+−]?\d", text)
+                if len(pairs) >= 2:
+                    findings.append(f"{path}:{line}: packed values; put one value in each column")
+                value = re.sub(r"\\(?:toprule|midrule|bottomrule)\b", "", cell).strip()
+                value = re.sub(r"^\\num(?:\[[^][{}]*\])?\{([^{}]*)\}$", r"\1", value)
+                if index < len(columns) and columns[index].startswith("p{") and re.fullmatch(r"\$?\s*[-+−]?\d+(?:\.\d+)?(?:[eE][-+]?\d+)?\s*\$?", value):
+                    findings.append(f"{path}:{line}: numeric p{{}} cell; use an aligned S or right-aligned column")
+    return findings
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("pdf", type=Path)
-    parser.add_argument("--profile", choices=PROFILES, required=True)
-    parser.add_argument("--output-dir", type=Path, required=True)
+    parser.add_argument("pdf", type=Path, nargs="?")
+    parser.add_argument("--tex", type=Path, nargs="+", help="lint table sources instead of a PDF")
+    parser.add_argument("--profile", choices=PROFILES)
+    parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--dpi", type=int, default=180)
     parser.add_argument("--contact-sheet", action="store_true")
     parser.add_argument("--warnings-as-errors", action="store_true")
     arguments = parser.parse_args()
 
+    if arguments.tex:
+        try:
+            findings = [finding for path in arguments.tex for finding in lint_tables(path)]
+        except OSError as error:
+            parser.error(str(error))
+        print("\n".join(findings))
+        return 1 if findings and arguments.warnings_as_errors else 0
+    if not arguments.pdf or not arguments.profile or not arguments.output_dir:
+        parser.error("PDF, --profile and --output-dir are required unless --tex is used")
     if not arguments.pdf.is_file() or not arguments.pdf.stat().st_size:
         parser.error(f"PDF is missing or empty: {arguments.pdf}")
     if arguments.dpi < 72:
