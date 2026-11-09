@@ -598,7 +598,8 @@ class QuartoManagerTests(unittest.TestCase):
                 output = io.StringIO()
                 with contextlib.redirect_stdout(output):
                     MANUSCRIPT.status(root)
-                self.assertIn(f"state: running\nport: {port}\nurl: http://127.0.0.1:{port}/", output.getvalue())
+                self.assertIn(f"state: running\nport: {port}\nurl: http://127.0.0.1:{port}/\nanswering: no (a running",
+                              output.getvalue())
                 with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "main-checkout service is always on"):
                     MANUSCRIPT.stop(repository)
                 with contextlib.redirect_stdout(io.StringIO()):
@@ -698,9 +699,19 @@ class QuartoManagerTests(unittest.TestCase):
             self.assertEqual((text, ["show-environment", "daemon-reload", "enable", "restart"]), (unit.read_text(), systemctl))
 
             output = io.StringIO()
-            with contextlib.redirect_stdout(output):
-                MANUSCRIPT.status(repository / "analyses")
-            self.assertIn(f"unit: {unit.name}\nstate: active\nport: {port}\nurl: http://127.0.0.1:{port}/", output.getvalue())
+            with contextlib.redirect_stdout(output), patch.object(MANUSCRIPT, "listening", side_effect=[False, True, None]):
+                for _ in range(3):
+                    MANUSCRIPT.status(repository / "analyses")
+            shown = f"unit: {unit.name}\nstate: active\nport: {port}\nurl: http://127.0.0.1:{port}/\n"
+            self.assertEqual(shown + "answering: no (a running preview renders every page before it answers; "
+                             "failures are in its log)\n" + shown + "answering: yes\n" + shown, output.getvalue())
+            with socket.create_server(("127.0.0.1", 0)) as server:
+                address = server.getsockname()
+                self.assertIs(True, MANUSCRIPT.listening(*address))
+            self.assertIs(False, MANUSCRIPT.listening(*address))
+            with patch.object(MANUSCRIPT.socket, "getaddrinfo", side_effect=AssertionError("no name lookup")):
+                for host, bad_port in (("localhost", address[1]), ("127.0.0.1", 99999), (None, None), ("fe80::1%1", 80)):
+                    self.assertIsNone(MANUSCRIPT.listening(host, bad_port))
 
             state["busy"].clear()
             other = state["units"] / "cse-preview-other-00000000.service"

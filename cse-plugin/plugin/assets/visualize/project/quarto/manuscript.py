@@ -6,6 +6,7 @@ import argparse
 import contextlib
 import html
 import io
+import ipaddress
 import urllib.parse
 import hashlib
 import json
@@ -1145,6 +1146,20 @@ def preview_record(root: Path) -> dict | None:
     return state if state["identity"] is not None and process_identity(state["pid"]) == state["identity"] else None
 
 
+def listening(host, port) -> bool | None:
+    """Whether the address accepts a connection within one second; None when that cannot be asked."""
+    try:
+        # One literal address and one attempt bound the wait; a host name would need an unbounded lookup.
+        address = ipaddress.ip_address("127.0.0.1" if host in {"0.0.0.0", "::", ""} else host)
+        if getattr(address, "scope_id", None):
+            return None
+        with socket.socket(socket.AF_INET6 if address.version == 6 else socket.AF_INET) as probe:
+            probe.settimeout(1)
+            return probe.connect_ex((str(address), port)) == 0
+    except Exception:
+        return None
+
+
 def status(root: Path) -> int:
     root = root_path(root)
     repository = git_path(root, "--show-toplevel")
@@ -1153,6 +1168,7 @@ def status(root: Path) -> int:
         print(f"unit: none (worktree)\nstate: {'running' if state else 'stopped'}")
         port = state["port"] if state else None
         host = state["host"] if state else "127.0.0.1"
+        alive = bool(state)
     else:
         unit = service_unit(repository)
         port = service_port(unit)
@@ -1163,8 +1179,13 @@ def status(root: Path) -> int:
             unit_state = result.stdout.strip()
         print(f"unit: {unit.name}\nstate: {unit_state}")
         host = "127.0.0.1"
+        alive = unit_state == "active"
     print(f"port: {port if port is not None else 'unassigned'}\n"
           f"url: {f'http://{host}:{port}/' if port is not None else 'unassigned'}")
+    # The state above says only that the process is alive; probing the address says whether pages are served.
+    if port is not None and (answer := listening(host, port)) is not None:
+        waiting = " (a running preview renders every page before it answers; failures are in its log)"
+        print(f"answering: {'yes' if answer else 'no' + waiting * alive}")
     return 0
 
 

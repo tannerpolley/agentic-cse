@@ -226,6 +226,14 @@ within a bounded start limit. Outside approved Setup, agents leave this service
 running and use `manuscript.py status analyses/` to report its unit state, URL,
 and port.
 
+`status` also probes the address and prints `answering: yes` or `no`. The unit
+state says only that the process is alive. A start checks every workflow and
+renders every page before the address answers, which takes minutes on a large
+site, so `active` with `answering: no` is normal during a start and `service`
+can report "not answering" for a healthy one. If it persists, read the unit's
+journal. The probe is one connection attempt of at most one second to a
+literal address; a preview bound to a host name gets no `answering` line.
+
 The service uses the checkout's `.venv/bin/python`, never the interpreter that
 happened to run `service`. An explicit `--python <path>` must also belong to
 that project. Prepare that environment with packages providing `jupyter_core`,
