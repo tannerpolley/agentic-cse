@@ -26,9 +26,10 @@ not to ask questions does not change the general project doctrine.
   choice, one confirmed repository role (`analysis` or `tool`), and the
   confirmed agent role with its responsibilities; it links to project vocabulary.
   Scoped or exception-bearing writing rules live under `## Prose avoid rules`.
-- Root `GLOSSARY.md` owns vocabulary in Matt Pocock's format, with CSE's
-  required `Source:` and optional `Scope:` lines. Read every glossary linked by
-  an existing `GLOSSARY-MAP.md`; CSE never creates a map or requires Matt's skills.
+- Root `GLOSSARY.md` owns vocabulary entries: term, definition, required
+  `Source:`, and optional `Scope:`. Read every glossary linked by an existing
+  `GLOSSARY-MAP.md`; CSE never creates a map or requires a companion skills
+  plugin.
 - Optional `formulation.md`, `methods.md`, `evidence.md`, `decisions/`, and
   `writing/` records are Markdown and are created only when selected.
 - LaTeX is reserved for manuscript sources under `latex/`; it is never a

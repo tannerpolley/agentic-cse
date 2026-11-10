@@ -141,7 +141,7 @@ full language references unless they create durable prose or the relevant rule
 is in question.
 
 Keep CSE self-contained. Never substitute a generic workflow family. Separate
-where work runs from where changes are tracked: a private GitHub remote, issue,
+where work runs from where changes are tracked: a private Git remote, issue,
 pull request, or branch rule does not imply public users, deployment,
 compatibility support, or release work. Preserve repository and user authority
 for all remote and destructive actions.

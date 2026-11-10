@@ -74,6 +74,10 @@ class PluginBehaviorTests(unittest.TestCase):
             json.loads((ROOT / ".claude-plugin/marketplace.json").read_text()),
         )
         self.assertEqual("cse", json.loads((PLUGIN / ".claude-plugin/plugin.json").read_text())["name"])
+        root_catalog = json.loads((ROOT.parent / ".claude-plugin/marketplace.json").read_text())
+        self.assertEqual("cse", root_catalog["name"])
+        self.assertEqual(["cse"], [entry["name"] for entry in root_catalog["plugins"]])
+        self.assertEqual(PLUGIN, (ROOT.parent / root_catalog["plugins"][0]["source"]).resolve())
         for skill in SKILLS:
             frontmatter = yaml.safe_load((PLUGIN / "skills" / skill / "SKILL.md").read_text().split("---", 2)[1])
             self.assertEqual(skill, frontmatter["name"])

@@ -35,6 +35,27 @@ has loaded it or that hooks are trusted and active.
 
 ## Install and update
 
+Add the Git marketplace, then install its `cse` entry:
+
+```bash
+codex plugin marketplace add https://github.com/tannerpolley/agentic-cse.git
+codex plugin add cse@cse
+```
+
+The repository-root `.claude-plugin/marketplace.json` points to
+`./cse-plugin/plugin`. The catalog under `cse-plugin/` remains available for
+local checkouts. Use one catalog per host; both identify the same `cse@cse`.
+These commands require read access to the repository; they do not change its
+visibility.
+
+Confirmed on 2026-11-10 by reading OpenAI's
+[plugin packaging documentation](https://developers.openai.com/plugins/build/plugins#how-local-marketplaces-work)
+and [CLI commands](https://learn.chatgpt.com/docs/developer-commands?surface=cli),
+and checking local `codex plugin --help`, `codex plugin add --help`, and
+`codex plugin marketplace add --help`. Codex accepts Git URLs and a root Claude-compatible catalog. Sparse
+paths limit checkout content; no catalog-subfolder selector was confirmed.
+A fresh remote installation of this change has not been tested.
+
 Codex reads the same native local marketplace catalog in the `cse-plugin/`
 folder as Claude Code. Install CSE as `cse@cse` with that folder's absolute path:
 
@@ -99,9 +120,9 @@ only prompt-specific skill routing. The semantic Stop review runs after every
 turn that ends with a message. Prose checks and the test-file advisory still run at every Stop. A
 changed installed runtime requires the explicit `--replace-runtime` guard.
 
-Codex never runs a hook that lacks persisted trust, and T3 Code has no hook
-review screen. After registering, the installer therefore asks `codex
-app-server` (`hooks/list`, then one `config/value/write` upsert under
+Codex never runs a hook that lacks persisted trust. If using T3 Code, which
+has no hook review screen, use the installer's trust step below. After
+registering, the installer asks `codex app-server` (`hooks/list`, then one `config/value/write` upsert under
 `hooks.state`) to record trust for exactly the CSE hooks it wrote to the
 selected registration source, and prints which it trusted. It never trusts
 other hooks. Codex ignores project hooks until the project itself is trusted;

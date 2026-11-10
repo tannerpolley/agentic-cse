@@ -14,7 +14,7 @@ Start with `cse-zotero doctor --json` (`zotero-companion` is an equivalent alias
 - `mathpix-on-demand-v1` for last-resort PDF conversion;
 - `zotero-linked-companion-v1` for separately approved Markdown attachment writes.
 
-If the executable, configuration, or capability is absent, report that exact condition. Do not fall back to Project Truss, Superpowers, Matt Pocock skills, or generic Zotero/Mathpix skills at runtime. A green `doctor` result certifies the software path, not a populated project view, an intact dataset, or scientific suitability.
+If the executable, configuration, or capability is absent, report that exact condition. Do not switch to unrelated workflow plugins or generic Zotero/Mathpix skills at runtime. A green `doctor` result certifies the software path, not a populated project view, an intact dataset, or scientific suitability.
 
 ## Three ordinary operations
 

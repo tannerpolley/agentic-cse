@@ -647,11 +647,13 @@ class QuartoManagerTests(unittest.TestCase):
             python.write_text("")
             python.chmod(0o755)
             state = {"base": base, "repository": repository, "python": python, "units": base / "config/systemd/user",
-                     "systemctl": [], "busy": set(), "missing": False}
+                     "systemctl": [], "busy": set(), "missing": False, "manager_available": True}
 
             def run(command, *args, **kwargs):
                 if command[0] == "systemctl":
                     state["systemctl"].append(command[2])
+                    if command[2] == "show-environment" and not state["manager_available"]:
+                        raise subprocess.CalledProcessError(1, command, stderr="Failed to connect to bus")
                     return subprocess.CompletedProcess(command, 0, stdout="active\n")
                 if command[0] == str(python):
                     return subprocess.CompletedProcess(command, int(state["missing"]),
@@ -755,6 +757,19 @@ class QuartoManagerTests(unittest.TestCase):
                 with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "No module named 'snakemake'"):
                     state["install"]()
             self.assertEqual([], state["systemctl"])
+
+    def test_service_names_preview_command_when_systemd_user_manager_is_unavailable(self):
+        with self.preview_service() as state:
+            state["manager_available"] = False
+            root = state["repository"] / "analyses"
+            with contextlib.chdir(root), self.assertRaises(MANUSCRIPT.ManuscriptError) as error:
+                state["install"](root=Path("."))
+            self.assertEqual(
+                f"systemd user manager unavailable; run `python3 {root}/manuscript.py preview {root}` instead",
+                str(error.exception),
+            )
+            self.assertEqual(["show-environment"], state["systemctl"])
+            self.assertFalse(state["units"].exists())
 
     def test_preview_service_refuses_unit_unsafe_manuscript_and_path_values(self):
         with self.preview_service() as state:

@@ -571,9 +571,9 @@ METADATA_LABELS = ("Source:", "Scope:", "_Avoid_:")
 
 
 def matt_format(text: str) -> bool:
-    """Matt Pocock's domain glossary: a `## Language` section, even before its first term.
+    """Recognize the vocabulary owner format, including an empty `## Language` section.
 
-    Fenced examples are ignored, so a scientific context that shows the format is not Matt's.
+    Fenced examples are ignored, so a scientific context that shows the format is not mistaken for one.
     """
     text = re.sub(r"^```.*?^```[^\n]*$", "", text, flags=re.MULTILINE | re.DOTALL)
     return bool(re.search(r"^## Language\s*$", text, re.MULTILINE)) or bool(glossary_entries(text, ""))
@@ -745,8 +745,8 @@ def plan_text(plan: dict) -> str:
         lines += ["", "Vocabulary migration into root `GLOSSARY.md`: preserve definitions and sources; add missing terms and exact synonyms.",
                   "", plan["merged_glossary"]]
     for old, new in plan["matt_upgrades"].items():
-        lines += ["", f"Matt Pocock's skills 1.3 read `{Path(new).name}`; run `git mv {old} {new}`.",
-                  "CSE leaves this Matt-owned file untouched."]
+        lines += ["", f"If Matt Pocock's skills plugin is installed, Matt Pocock's skills 1.3 read `{Path(new).name}`; run `git mv {old} {new}`.",
+                  "CSE leaves this file and its links untouched."]
     for name, text in plan["glossary_updates"].items():
         if name != "GLOSSARY.md":
             lines += ["", f"Exact synonym additions to `{name}`:", text]

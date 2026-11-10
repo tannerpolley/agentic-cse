@@ -6,8 +6,8 @@ MUST use the installed CSE skills and MUST read `docs/scientific/README.md` and
 
 CSE execution mode: direct.
 
-Use native host delegation for bounded independent work when useful, including
-T3 Code delegated tasks. The current task remains accountable for the result.
+Use native host delegation for bounded independent work when useful. The
+current task remains accountable for the result.
 
 This is a private computational research project, not a public package. Before
 the first scientific write, state the question, intended use, starting CSE

@@ -15,9 +15,8 @@ metadata:
 Read first: [operating-model](../../references/workflow/operating-model.md), [BANNED](../../BANNED.md).
 
 For a requested session retrospective, read [retrospective](../../references/workflow/retrospective.md)
-and use its session-based science categories with Matt's `/retro` when available.
-Report candidates only; change nothing until the user picks one. CSE needs no
-other plugin to read the reference.
+and use its science categories. If `/retro` is available, pair it with those
+categories. Report candidates only; change nothing until the user picks one.
 
 For an ordinary audit, inspect the requested repository or folder read-only. This is a CSE-practice
 audit, not scientific Review: judge whether the work stays centered on the
@@ -88,4 +87,4 @@ End with `net:` followed by estimated files and lines removed or renamed, unique
 values preserved or moved, and unresolved investigations. Report no
 score, compliance state, audit JSON, or new audit machinery. If nothing material
 is found, say `CSE practice is lean.` When implementation is requested, route grouped
-findings to `cse:design` as one bounded issue proposal.
+findings to `cse:design` as one bounded plan proposal.

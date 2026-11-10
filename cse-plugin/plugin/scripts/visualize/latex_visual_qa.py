@@ -366,7 +366,7 @@ def lint_tables(path: Path) -> list[str]:
     """Inspect simple tabular/longtable sources; complex TeX needs visual review."""
     source = re.sub(r"(?<!\\)%[^\n]*", "", path.read_text())
     findings = []
-    # shortcut: nested column modifiers and generated rows require manual review.
+    # ponytail: nested column modifiers and generated rows require manual review.
     table = r"\\begin\{(?:tabular|longtable)\}\{((?:[^{}]|\{[^{}]*\})*)\}(.*?)\\end\{(?:tabular|longtable)\}"
     for match in re.finditer(table, source, re.S):
         spec, body = match.groups()

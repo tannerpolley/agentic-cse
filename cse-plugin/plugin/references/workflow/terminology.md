@@ -16,9 +16,9 @@ scoped or exception-bearing writing rules under `## Prose avoid rules`.
 - Preserve a quotation when exact wording matters, but use canonical language
   in the surrounding explanation and durable record.
 - Add a new term here only after the plugin-wide meaning is settled. Record
-  project-only terms in the project's `GLOSSARY.md` instead, using Matt Pocock's
-  `**Term**:`, short definition, and `_Avoid_: a, b` format. CSE requires a
-  `Source:` line (`sourceless` when missing) and accepts optional `Scope:` paths.
+  project-only terms in the project's `GLOSSARY.md` instead, using `**Term**:`,
+  a short definition, and `_Avoid_: a, b`. CSE requires a `Source:` line
+  (`sourceless` when missing) and accepts optional `Scope:` paths.
 
 ## Workflow and tools
 

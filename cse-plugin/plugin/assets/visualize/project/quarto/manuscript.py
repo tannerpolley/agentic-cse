@@ -13,6 +13,7 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import signal
 import shutil
 import socket
@@ -1269,7 +1270,9 @@ def service(root: Path, port: int | None, dry_run: bool, python: Path | None = N
     try:
         subprocess.run(["systemctl", "--user", "show-environment"], check=True, capture_output=True)
     except (OSError, subprocess.CalledProcessError) as exc:
-        raise ManuscriptError(f"systemd user manager unavailable (systemctl --user show-environment failed: {exc})")
+        command = " ".join(shlex.quote(value) for value in (
+            "python3", str(root / "manuscript.py"), "preview", str(root)))
+        raise ManuscriptError(f"systemd user manager unavailable; run `{command}` instead") from exc
     if text != existing:
         unit.parent.mkdir(parents=True, exist_ok=True)
         atomic_write(unit, text.encode())

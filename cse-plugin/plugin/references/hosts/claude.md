@@ -48,6 +48,27 @@ load.
 
 ## Install and update
 
+Add the Git marketplace, then install its `cse` entry:
+
+```bash
+claude plugin marketplace add https://github.com/tannerpolley/agentic-cse.git
+claude plugin install cse@cse
+```
+
+The repository-root `.claude-plugin/marketplace.json` points to
+`./cse-plugin/plugin`. The catalog under `cse-plugin/` remains available for
+local checkouts. Use one catalog per host; both identify the same `cse@cse`.
+These commands require read access to the repository; they do not change its
+visibility.
+
+Confirmed on 2026-11-10 by reading the official
+[marketplace command reference](https://code.claude.com/docs/en/plugins/cli-reference#plugin-marketplace-add)
+and [relative plugin source rules](https://code.claude.com/docs/en/plugins/marketplace-reference#relative-path-plugin-source),
+and checking local `claude plugin marketplace add --help`. Git URLs load a
+root catalog; entry paths resolve from that root. No catalog-subfolder selector
+was confirmed, so the root catalog supplies the Git route. A fresh remote
+installation of this change has not been tested.
+
 The `cse-plugin/` folder contains the native local marketplace catalog. With
 that folder's absolute path, use Claude Code's marketplace commands:
 

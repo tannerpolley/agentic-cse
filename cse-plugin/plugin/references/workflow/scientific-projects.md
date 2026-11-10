@@ -3,7 +3,7 @@
 Use `docs/scientific/CONTEXT.md` as the short scientific map. It owns one
 investigator-confirmed `repository role: analysis` or `repository role: tool`;
 Setup recommends a role from purpose and owners and confirms it on every run.
-Project vocabulary belongs in root `GLOSSARY.md`, using Matt Pocock's format:
+Project vocabulary belongs in root `GLOSSARY.md`, using this format:
 
 ```markdown
 # Heat transfer
@@ -24,7 +24,7 @@ scopes are repository-relative POSIX globs in code spans, separated by semicolon
 The avoid list uses commas; omit an empty list. A sourced term is allowed only
 within its scope. If root `GLOSSARY-MAP.md` exists, read every present glossary
 it links, as well as any root glossary. A missing mapped file is absent because
-Matt creates glossaries lazily. CSE never creates a map or needs Matt's skills.
+glossaries are created lazily. CSE never creates a map.
 
 A synonym with its own scope, exceptions, or other writing information is not
 vocabulary. Keep it in `docs/scientific/CONTEXT.md` under `## Prose avoid rules`,
@@ -181,11 +181,12 @@ place; the preview lists each retained row and why. A source file with unmapped
 rows remains, and its prose is not copied into the scientific context.
 New entries stay inside `## Language`, before any later second-level section, so repeated Setup cannot add unread duplicates.
 
-Matt owns glossary files and maps, including pre-1.3 Matt-format `CONTEXT.md`
-and `CONTEXT-MAP.md`. CSE never moves, renames, or merges them. The preview only
-reports Matt's upgrade command: `git mv <path> <same dir>/GLOSSARY.md`, or
-`GLOSSARY-MAP.md` for a map. These files stay untouched, even when the new name
-already exists, and are not CSE stray contexts. Relationships stay with Matt.
+Recognized `GLOSSARY.md`, `GLOSSARY-MAP.md`, `CONTEXT.md`, and
+`CONTEXT-MAP.md` files have independent ownership. CSE never moves, renames,
+or merges them as stray records. For a pre-1.3 glossary, the preview reports
+the owner-specific upgrade step; see
+[personal tool integrations](personal-tool-integrations.md). Keep file
+contents, relationships, and links untouched.
 Caller rewriting remains main's literal replacement behavior; changing it is
 outside this migration.
 
@@ -292,9 +293,8 @@ citation keys, an outline, a jargon list, and only blocking questions.
 
 The accountable lead checks each proposal: citation keys exist in the
 bibliography, linked PDFs exist, quoted numbers are correct, and claims do not
-overreach. Merge the strongest supported parts into one plan and publish it in
-the task's GitHub issue. Put story order in that plan, not in `STYLE.md`. One
-writer then rewrites from the plan.
+overreach. Merge the strongest supported parts into the task's accepted plan.
+Put story order there, not in `STYLE.md`. One writer then rewrites from the plan.
 
 After the rewrite, two independent reviewers work in parallel. The science-support
 reviewer applies Review's Result lens to every displayed number and cited claim

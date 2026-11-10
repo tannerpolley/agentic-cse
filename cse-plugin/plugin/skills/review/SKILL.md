@@ -28,7 +28,7 @@ The manuscript structure review in [scientific-projects](../../references/workfl
 
 ## Design readiness
 
-Inspect the proposed issue and decisive evidence for scientific justification
+Inspect the proposed plan and decisive evidence for scientific justification
 and unnecessary complexity. Check the named numerical owner; question and
 intended use; equations or method; inputs, units, domain,
 and assumptions; independent reference case or falsifiable relation; metric and

@@ -217,8 +217,11 @@ Sources and retained results stay in place.
 
 ## Main-checkout preview service
 
-During an approved Setup action, run
+During an approved Setup action, first check that `systemctl --user
+show-environment` succeeds. Only then run
 `python3 analyses/manuscript.py service analyses/` once from the main checkout.
+Without a systemd user manager, skip `service` and use the foreground
+`python3 analyses/manuscript.py preview analyses/` fallback.
 It installs and restarts a systemd user unit
 `cse-preview-<repository>-<path hash>.service` that keeps `manuscript.py preview`
 running on `127.0.0.1`, with `Nice=10`, `CPUWeight=10`, and restart on failure
@@ -257,8 +260,8 @@ The port is chosen once from the repository path in the 8800–9799 range,
 skipping ports that are bound or claimed by another preview unit, unless
 `--port` is given. Reruns keep the port and refuse a unit the command did not
 write for that repository. `--dry-run` prints the unit without writing or
-enabling it. Without `systemctl --user`, the command reports that missing
-capability and writes no unit. It reports `serving <url>` only after the URL
+enabling it. Without `systemctl --user`, the command names the foreground
+`manuscript.py preview` fallback and writes no unit. It reports `serving <url>` only after the URL
 answers, otherwise the unit's journal command. User services stop at logout
 unless lingering is enabled (`loginctl enable-linger`).
 

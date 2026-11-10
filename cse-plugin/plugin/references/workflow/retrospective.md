@@ -1,9 +1,9 @@
 # Science findings for a retrospective
 
-For a requested Matt Pocock `/retro` in a CSE repository, include these
-categories alongside its engineering findings. Every candidate must trace to
-a specific moment in the session. Present candidates by severity; change
-nothing until the user picks one.
+For a requested `/retro` session retrospective, include these categories
+alongside engineering findings. Every candidate must trace to a specific
+moment in the session. Present candidates by severity; change nothing until
+the user picks one.
 
 | Session finding | CSE owner for the fix |
 |---|---|
