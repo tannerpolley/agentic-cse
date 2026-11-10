@@ -1,0 +1,6 @@
+source_table,source_row,temperature_K,pressure_kPa
+2,1,298.2,6.2
+2,2,303.2,8.0
+2,3,308.2,10.2
+2,4,313.1,12.4
+2,5,318.2,15.6

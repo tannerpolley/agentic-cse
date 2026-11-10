@@ -1,0 +1,1 @@
+The maximum absolute residual is **0.336 kPa**, the root mean square residual is **0.235 kPa**, and the mean absolute relative residual is **2.03%** across 4 measurements.

@@ -1,0 +1,9 @@
+{
+  "points": 4,
+  "excluded_source_rows": [
+    1
+  ],
+  "max_absolute_residual_kPa": 0.33554129898775464,
+  "root_mean_square_residual_kPa": 0.23536603642719997,
+  "mean_absolute_relative_residual_percent": 2.028582956202576
+}

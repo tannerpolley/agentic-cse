@@ -1,0 +1,10 @@
+{
+  "equation_id": "VP-1",
+  "A": 6.90342,
+  "B": 1268.636,
+  "C": 216.951,
+  "temperature_min_C": 25.9,
+  "temperature_max_C": 99.3,
+  "kelvin_offset": 273.15,
+  "mmHg_to_kPa": 0.1333224
+}

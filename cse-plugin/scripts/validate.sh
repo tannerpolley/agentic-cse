@@ -18,11 +18,12 @@ else
 import sys
 try:
     import yaml
+    import numpy
 except ImportError as exc:
-    raise SystemExit(f"PyYAML is unavailable: {exc}")
+    raise SystemExit(f"PyYAML or NumPy is unavailable: {exc}")
 if sys.version_info < (3, 11):
     raise SystemExit(f"Python >=3.11 is required (found {sys.version.split()[0]})")
-print(f"Python {sys.version.split()[0]} with PyYAML {yaml.__version__}")
+print(f"Python {sys.version.split()[0]} with PyYAML {yaml.__version__} and NumPy {numpy.__version__}")
 ' 2>&1)"; then
     missing+=("$python_details")
   fi

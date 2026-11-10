@@ -1,0 +1,83 @@
+---
+title: "Heptane vapor pressure: a fixed correlation against measurements"
+format:
+  html:
+    embed-resources: true
+---
+
+## Question and basis
+
+Does the unchanged 1945 Antoine correlation reproduce the four published
+heptane vapor pressures inside its stated range? This is **physical
+validation**, comparing a model with independent observations. The accompanying
+test protects the numerical comparison; agreement alone is not code verification.
+The intended use is a reproducible teaching example, not equipment design.
+
+Willingham et al. give VP-1 in equation (2), pp. 233–234, and its coefficients
+in Table 3, p. 239, n-Heptane row:
+
+\[
+p/\mathrm{kPa}=0.1333224\,10^{6.90342-1268.636/(216.951+t/{}^\circ\mathrm C)},
+\qquad t/{}^\circ\mathrm C=T/\mathrm K-273.15.
+\]
+
+The measurements are Busch et al., Table 2, heptane rows 2–5 (PDF p. 8,
+letter H), in K and kPa. Row 1 is retained in the input but excluded because
+298.2 K is below the model's 25.9 °C lower bound. No in-domain row is omitted
+and no coefficient is adjusted. This is nominal pure heptane; the source's
+supplier purity is ≥0.998 g g⁻¹ (Table 1). No composition conversion is made.
+
+## Agreement found
+
+{{< include results/summary.qmd >}}
+
+{{< include results/comparison.qmd >}}
+
+![Published heptane pressures (points) and unchanged VP-1 (line). Horizontal and vertical bars are the source's expanded measurement uncertainties, k=2; table rounding is additional. The line uses 151 retained model evaluations over the compared temperature interval.](figures/vapor-pressure.svg){#fig-vapor-pressure}
+
+The model underpredicts every selected measurement. The residual magnitudes
+remain below the 0.55 kPa teaching allowance derived in
+[scientific context](../../docs/scientific/CONTEXT.md). The common negative sign may
+reflect systematic measurement effects or correlation discrepancy; four
+rounded observations cannot distinguish them. No fitting is used to remove it.
+Pressure uncertainty and table rounding are comparable to the discrepancy, so
+this comparison cannot establish sub-percent accuracy.
+
+## Uncertainty and limits
+
+Table 2 footnote a gives U(p)=0.3 kPa and
+U(T)=0.115 K + 0.002|t/°C| K, both with coverage factor k=2. Rounding the
+printed table adds up to 0.05 kPa and 0.05 K. The acceptance allowance adds
+these contributions conservatively after bounding temperature sensitivity;
+it is not a statistical confidence interval or a process-design specification.
+The source provides no covariance for the 1945 coefficients. Historical
+temperature-scale differences are not corrected, and no raw instrument record
+is available in this example. The calculation is direct algebra; there is no
+iterative solve or discretization to refine.
+
+The four states support a limited physical comparison over 303.2–318.2 K.
+They do not validate mixtures, extrapolation, critical-region behavior,
+impurity effects, or general property-package accuracy. The modern paper also
+compares its observations with NIST correlation values, so this reproduction
+does not claim a new scientific finding.
+
+## Reproducibility and sources
+
+This notebook reads retained results only. `scripts/run.py` owns evaluation;
+`scripts/present.py` reads `results/comparison.csv`, `results/model-curve.csv`,
+and `results/summary.json` to prepare the single figure and includes above.
+The table's extra calculated digits permit auditing and are not measurement
+precision. See [input provenance](inputs/provenance.md) for original units,
+row locators, download addresses, SHA-256 hashes, licence findings, and source
+access notes. No source acquisition or numerical model runs during rendering.
+
+- Busch, Kasterke, Brands, Bardow, and Flake (2026),
+  [DOI 10.1021/acs.jced.5c00843](https://doi.org/10.1021/acs.jced.5c00843),
+  Table 2. Measurements adapted under [CC BY 4.0](https://creativecommons.org/licenses/by/4.0/).
+- Willingham, Taylor, Pignocco, and Rossini (1945),
+  [DOI 10.6028/jres.035.009](https://doi.org/10.6028/jres.035.009),
+  equation (2), Table 3. NBS model parameters; public-domain finding in provenance.
+- NIST SP 811, Chapter 4 and Appendix B.8, supplies the unit conventions.
+
+Independent scientific review is pending with the orchestrator. This notebook
+has not been promoted for manuscript use.
