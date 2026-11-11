@@ -5,7 +5,7 @@ from pathlib import Path
 import duckdb
 import pytest
 
-from zotero_companion.catalog import build_catalog
+from zotero_companion.catalog import build_catalog, render_page
 from zotero_companion.scientific_data import query_table, ScientificDataError
 
 
@@ -155,3 +155,13 @@ def test_generated_trees_are_excluded_or_results(tmp_path, monkeypatch):
     assert report['counts']['points'] == report['counts']['parameters'] == 0
     assert report['project_kind'] == {'fixture / result': 2, 'fixture / parameters': 1}
     assert query_table(Path(report['database']), "SELECT mapped,reason FROM datasets WHERE path LIKE '%parameters_legacy.json'")['rows'] == [{'mapped': False, 'reason': 'unsupported JSON layout'}]
+
+
+def test_page_escapes_embedded_data():
+    hostile = '</script><img src=x onerror=alert(1)>'
+    tables = {name: [] for name in ('datasets', 'points', 'parameters', 'sources', 'results')}
+    tables['datasets'] = [{'path': hostile, 'project': hostile}]
+    page = render_page(tables, [(hostile, Path('/tmp') / hostile)])
+    assert hostile not in page
+    assert '\\u003c/script>' in page
+    assert 'innerHTML' not in page

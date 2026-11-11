@@ -476,7 +476,7 @@ def build_catalog(roots, output, *, corpus=None):
                     payload.write_text(json.dumps([{k: r.get(k) for k in fields} for r in tables[name]], ensure_ascii=False))
                     connection.execute(f'INSERT INTO {name} BY NAME SELECT * FROM read_json(?, auto_detect=true, maximum_object_size=67108864)', [str(payload)])
         page = Path(staging) / 'catalog.html'
-        page.write_text(render_page(tables), encoding='utf-8')
+        page.write_text(render_page(tables, roots), encoding='utf-8')
         os.replace(database, output / database.name)
         os.replace(page, output / page.name)
     return dict(database=str(output / 'catalog.duckdb'), page=str(output / 'catalog.html'),
@@ -489,43 +489,62 @@ def build_catalog(roots, output, *, corpus=None):
                 hash_limit_bytes=HASH_LIMIT, seconds=round(time.monotonic() - started, 3), warnings=warnings)
 
 
-def render_page(tables):
+def render_page(tables, roots=()):
     page_tables = {**tables, 'datasets': [{k: v for k, v in row.items() if k != 'metadata'}
                                          for row in tables['datasets']]}
     columns = {name: [part.split(':')[0] for part in spec.split()
                       if not (name == 'datasets' and part == 'metadata')]
                for name, spec in SCHEMA.items()}
     payload = json.dumps(page_tables, ensure_ascii=False, separators=(',', ':')).replace('<', '\\u003c')
+    root_paths = json.dumps([(project, str(root)) for project, root in roots], ensure_ascii=False).replace('<', '\\u003c')
     return '''<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Chemical engineering data catalog</title><style>
-:root{color-scheme:light dark;font:15px system-ui}body{margin:1rem}button,input,select{font:inherit;padding:.4rem;margin:.2rem}nav{display:flex;flex-wrap:wrap}#viewport{overflow:auto;max-height:65vh}table{border-collapse:collapse;white-space:nowrap}th,td{border:1px solid #8886;padding:.4rem;max-width:25rem;overflow:hidden;text-overflow:ellipsis}th{position:sticky;top:0;background:Canvas}pre{white-space:pre-wrap;overflow-wrap:anywhere}button{cursor:pointer}#details{border:1px solid #888;padding:1rem}button:focus-visible{outline:3px solid Highlight}</style>
+:root{color-scheme:light dark;font:14px/1.5 system-ui;--bg:#f5f7fa;--panel:#fff;--ink:#202c3d;--muted:#546478;--line:#dce2e9;--accent:#245bb3;--hover:#eef4fc}
+@media(prefers-color-scheme:dark){:root{--bg:#131a24;--panel:#1c2633;--ink:#e1e8f2;--muted:#aab9cb;--line:#354356;--accent:#9cc3ff;--hover:#27384e}}
+[hidden]{display:none!important}*{box-sizing:border-box}body{margin:0;padding:clamp(16px,3vw,40px);background:var(--bg);color:var(--ink)}h1{font-size:clamp(23px,3vw,32px);letter-spacing:-.03em;margin:0 0 8px}p{color:var(--muted);margin:8px 0 20px}button,input,select{font:inherit;color:inherit;background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:6px 10px}button{cursor:pointer}button:hover{background:var(--hover)}:focus-visible{outline:3px solid var(--accent);outline-offset:2px}button:disabled{opacity:.45;cursor:default}nav{display:flex;gap:6px;flex-wrap:wrap;margin:24px 0 16px}nav button[aria-pressed=true]{background:var(--ink);color:var(--panel);border-color:var(--ink)}#toolbar,#filters,.paging{display:flex;align-items:center;gap:10px 16px;flex-wrap:wrap}#filters{display:contents}#toolbar{background:var(--panel);padding:16px;border:1px solid var(--line);border-radius:10px}label{display:flex;align-items:center;gap:7px;color:var(--muted);font-size:13px;min-width:0}select{max-width:150px;text-overflow:ellipsis}input[type=search]{width:230px;max-width:100%;min-width:0}#result-control{margin:14px 0}#count{margin:0}.paging{justify-content:space-between;margin:18px 0 10px}.paging div{display:flex;gap:8px}#viewport{overflow:auto;max-height:58vh;border:1px solid var(--line);border-radius:8px;background:var(--panel)}table{border-collapse:collapse;width:100%;white-space:nowrap;text-align:left}th,td{border-bottom:1px solid var(--line);padding:10px 14px;max-width:180px;overflow:hidden;text-overflow:ellipsis}th{position:sticky;top:0;background:var(--panel);z-index:1;font-size:12px;color:var(--muted)}th button{border:0;padding:0;background:transparent;font-weight:600;white-space:nowrap}.number{text-align:right;font-variant-numeric:tabular-nums}tbody tr{cursor:pointer}tbody tr:hover,tbody tr[aria-selected=true]{background:var(--hover)}td.file{max-width:none;font-size:12px;font-family:ui-monospace,monospace}h2{font-size:18px;margin:24px 0 10px}#details{padding:18px;background:var(--panel);border:1px solid var(--line);border-radius:8px;overflow-wrap:anywhere}dl{margin:0;display:grid;grid-template-columns:150px minmax(0,1fr);gap:10px 20px}dt{color:var(--muted)}dd{margin:0;white-space:pre-wrap}#details table{table-layout:fixed;white-space:normal;font-size:13px}#details th{position:static;width:40%;overflow-wrap:anywhere}#details td{overflow-wrap:anywhere}a{color:var(--accent)}@media(max-width:600px){#toolbar{padding:12px}#filters{gap:10px}label{flex-wrap:wrap}select{max-width:100px}dl{grid-template-columns:1fr;gap:4px}dd{margin-bottom:10px}.paging{align-items:flex-start}th,td{padding:9px 12px}}
+</style>
 <h1>Chemical engineering data catalog</h1><p>Values, units and sources are exact copies of what files state; kind labels and column selection are automatic and approximate. Each row’s file path is the authority.</p>
-<nav aria-label="Tables" id="tabs"></nav><div id="filters"></div><label>Search <input id="search" type="search"></label>
-<p id="count" aria-live="polite"></p><button id="prev">Previous 100</button><button id="next">Next 100</button><div id="viewport"><table><thead id="head"></thead><tbody id="body"></tbody></table></div><h2>Row details</h2><div id="details">Select a row.</div>
-<script id="data" type="application/json">''' + payload + '</script><script id="schema" type="application/json">' + json.dumps(columns) + '''</script><script>
-const get=id=>document.getElementById(id),data=JSON.parse(get('data').textContent),columns=JSON.parse(get('schema').textContent);
+<nav aria-label="Tables" id="tabs"></nav><div id="toolbar"><label>Search <input id="search" type="search" placeholder="Search all fields"></label><div id="filters"></div><button id="clear">Clear filters</button></div>
+<label id="result-control"><input id="include-results" type="checkbox"><span id="result-label"></span></label>
+<div class="paging"><p id="count" aria-live="polite"></p><div><button id="prev">Previous 100</button><button id="next">Next 100</button></div></div><div id="viewport" tabindex="0" aria-label="Catalog rows; scroll for more columns"><table><thead id="head"></thead><tbody id="body"></tbody></table></div><h2>Row details</h2><div id="details" tabindex="-1">Select a row to see all fields and its full file path.</div>
+<script id="data" type="application/json">''' + payload + '</script><script id="schema" type="application/json">' + json.dumps(columns) + '</script><script id="roots" type="application/json">' + root_paths + '''</script><script>
+const get=id=>document.getElementById(id),data=JSON.parse(get('data').textContent),columns=JSON.parse(get('schema').textContent),roots=JSON.parse(get('roots').textContent);
 const collator=new Intl.Collator(undefined,{numeric:true}),valueCache=new Map();
-let tab='datasets',sort='',direction=1,offset=0,rows=[],filtered=[],timer;const filters={};
+const titles={dataset:'Internal identifier',project:'Project',kind:'Kind',system:'System',property:'Property',source_key:'Source',row_count:'Rows',path:'File',value:'Value',unit:'Unit',unit_source:'Unit from',component:'Component',family:'Family',locator:'Locator',doi:'DOI',zotero_key:'Zotero key',title:'Title',datasets:'Datasets',points:'Points',count:'Files',size:'Bytes',modified:'Modified',columns:'Columns',duplicate_of:'Duplicate of'};
+const visible={datasets:['project','kind','system','property','source_key','row_count','path'],points:['system','property','value','unit','source_key','locator','project'],parameters:['component','family','value','unit','source_key','project'],sources:['source_key','title','doi','project','datasets','points'],results:['project','kind','system','property','source_key','path','count','size']};
+const numeric=new Set(['value','row_count','row','size','count','datasets','points','modified']);
+let tab='datasets',sort='',direction=1,offset=0,rows=[],filtered=[],timer;const filters={},tabs={};
 function element(tag,text){const e=document.createElement(tag);e.textContent=text??'';return e}
+function title(key){return titles[key]||key.replaceAll('_',' ').replace(/^./,c=>c.toUpperCase())}
 function values(r,key){const raw=r[key];if(raw==null)return [];const v=String(raw);if(!v.startsWith('['))return [v];
 if(!valueCache.has(v)){let parsed;try{parsed=JSON.parse(v)}catch{parsed=v}valueCache.set(v,(Array.isArray(parsed)?parsed:[parsed]).map(String))}return valueCache.get(v)}
-function choose(name){tab=name;rows=data[tab];sort='';offset=0;get('filters').replaceChildren();
-for(const key of ['project','kind','system','property','source_key','unit_source']){const label=element('label',key+' '),s=element('select');s.setAttribute('aria-label',key);s.append(element('option','All'));s.firstChild.value='';
-for(const value of [...new Set(rows.flatMap(r=>values(r,key)).filter(Boolean))].sort()){const o=element('option',value);o.value=value;s.append(o)}
+function relativePath(r){const path=r.path||'';const root=roots.find(([project,root])=>project===r.project&&path.startsWith(root+'/'));return root?path.slice(root[1].length+1):path}
+function display(r,key){if(key==='path'){const path=relativePath(r);return path.length>42?path.slice(0,10)+'…'+path.slice(-31):path}if(key==='unit'&&r.unit_source==='column name')return 'in column name';return values(r,key).join(', ')}
+function choose(name){tab=name;rows=data[tab];sort='';direction=1;offset=0;get('filters').replaceChildren();for(const key of Object.keys(filters))delete filters[key];
+for(const key of ['project','kind','system','property','source_key','unit_source']){const options=[...new Set(rows.flatMap(r=>values(r,key)).filter(Boolean))].sort();if(!options.length)continue;
+const label=element('label',title(key)+' '),s=element('select');s.setAttribute('aria-label',title(key));s.append(element('option','All'));s.firstChild.value='';
+for(const value of options){const o=element('option',value);o.value=value;s.append(o)}
 filters[key]=s;label.append(s);get('filters').append(label);s.onchange=()=>{offset=0;update()}}
-update()}
-function update(){const q=get('search').value.toLowerCase(),active=Object.entries(filters).filter(([k,s])=>s.value);
-filtered=!q&&!active.length?rows.slice():rows.filter(r=>active.every(([k,s])=>values(r,k).includes(s.value))&&(!q||JSON.stringify(r).toLowerCase().includes(q)));
+for(const [name,b] of Object.entries(tabs))b.setAttribute('aria-pressed',String(name===tab));
+get('result-control').hidden=tab!=='datasets';get('details').replaceChildren(element('span','Select a row to see all fields and its full file path.'));update()}
+function update(){const q=get('search').value.toLowerCase(),active=Object.entries(filters).filter(([k,s])=>s.value),hideResults=tab==='datasets'&&!get('include-results').checked;
+filtered=!q&&!active.length&&!hideResults?rows.slice():rows.filter(r=>(!hideResults||r.kind!=='result')&&active.every(([k,s])=>values(r,k).includes(s.value))&&(!q||JSON.stringify(r).toLowerCase().includes(q)));
 if(sort==='value'){const keyed=filtered.map(row=>({row,value:Number(row.value)}));
 if(keyed.every(x=>Number.isFinite(x.value)))keyed.sort((a,b)=>direction*(a.value-b.value));
 else keyed.sort((a,b)=>direction*collator.compare(a.row.value,b.row.value));filtered=keyed.map(x=>x.row)}
 else if(sort)filtered.sort((a,b)=>{const x=a[sort]??'',y=b[sort]??'';return direction*(typeof x==='number'&&typeof y==='number'?x-y:collator.compare(String(x),String(y)))});draw()}
-function draw(){get('count').textContent=filtered.length+' matching rows; showing '+(filtered.length?offset+1:0)+'–'+Math.min(offset+100,filtered.length);get('head').replaceChildren();get('body').replaceChildren();
-const cols=columns[tab],tr=element('tr','');for(const key of cols){const th=element('th',''),b=element('button',key);b.onclick=()=>{direction=sort===key?-direction:1;sort=key;update()};th.append(b);tr.append(th)}get('head').append(tr);
-for(const r of filtered.slice(offset,offset+100)){const tr=element('tr','');for(const key of cols){const td=element('td',''),b=element('button',key==='unit'&&r.unit_source==='column name'?'in column name':r[key]);b.onclick=()=>details(r);td.append(b);tr.append(td)}get('body').append(tr)}
+function draw(){get('count').textContent=filtered.length.toLocaleString()+' matching rows · '+(filtered.length?offset+1:0)+'–'+Math.min(offset+100,filtered.length).toLocaleString();get('head').replaceChildren();get('body').replaceChildren();
+const hidden=data.datasets.filter(r=>r.kind==='result').length;get('result-label').textContent=get('include-results').checked?'Include model results':'Include model results ('+hidden.toLocaleString()+' hidden)';
+const cols=visible[tab],tr=element('tr','');for(const key of cols){const th=element('th',''),b=element('button',title(key)+(sort===key?(direction===1?' ↑':' ↓'):''));th.setAttribute('scope','col');if(sort===key)th.setAttribute('aria-sort',direction===1?'ascending':'descending');if(numeric.has(key))th.className='number';b.onclick=()=>{direction=sort===key?-direction:1;sort=key;offset=0;update()};th.append(b);tr.append(th)}get('head').append(tr);
+for(const r of filtered.slice(offset,offset+100)){const tr=element('tr','');tr.tabIndex=0;tr.setAttribute('aria-label','Details: '+cols.map(k=>display(r,k)).join(', '));tr.onclick=()=>{for(const row of get('body').children)row.setAttribute('aria-selected',String(row===tr));details(r)};tr.onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();tr.onclick();get('details').focus()}};
+for(const key of cols){const td=element('td',display(r,key));td.title=String(r[key]??'');if(numeric.has(key))td.className='number';if(key==='path')td.className='file';tr.append(td)}get('body').append(tr)}
 get('prev').disabled=offset===0;get('next').disabled=offset+100>=filtered.length}
-function details(r){get('details').replaceChildren(element('pre',JSON.stringify(r,null,2)));let dois=r.doi||'';try{dois=JSON.parse(dois)}catch{}for(const doi of Array.isArray(dois)?dois:[dois]){if(/^10\\.\\d{4,9}\\//.test(doi)){const a=element('a',doi);a.href='https://doi.org/'+encodeURI(doi);a.rel='noreferrer';get('details').append(a)}}}
-for(const name of Object.keys(data)){const b=element('button',name);b.onclick=()=>choose(name);get('tabs').append(b)}
+function details(r){const dl=element('dl','');for(const key of columns[tab]){const dd=element('dd','');dl.append(element('dt',title(key)),dd);
+if(key==='conditions'){let original;try{original=JSON.parse(r[key])}catch{}if(original&&typeof original==='object'){const table=element('table','');for(const [field,value] of Object.entries(original)){const row=element('tr','');row.append(element('th',field),element('td',typeof value==='object'?JSON.stringify(value):value));table.append(row)}dd.append(table);continue}}
+if(key==='doi'){for(const doi of values(r,key)){if(/^10\\.\\d{4,9}\\//.test(doi)){const a=element('a',doi);a.href='https://doi.org/'+encodeURI(doi);a.rel='noreferrer';dd.append(a,element('span',' '))}else dd.append(element('span',doi))}}else dd.textContent=key==='unit'&&r.unit_source==='column name'?'in column name':values(r,key).join(', ')}get('details').replaceChildren(dl)}
+for(const name of Object.keys(data)){const b=element('button',title(name)+' ('+data[name].length.toLocaleString()+')');b.onclick=()=>choose(name);tabs[name]=b;get('tabs').append(b)}
 get('search').oninput=()=>{clearTimeout(timer);timer=setTimeout(()=>{offset=0;update()},180)};
+get('include-results').onchange=()=>{offset=0;update()};
+get('clear').onclick=()=>{clearTimeout(timer);get('search').value='';get('include-results').checked=false;for(const s of Object.values(filters))s.value='';offset=0;update()};
 get('prev').onclick=()=>{offset=Math.max(0,offset-100);draw()};get('next').onclick=()=>{offset+=100;draw()};choose(tab);
 </script></html>'''
