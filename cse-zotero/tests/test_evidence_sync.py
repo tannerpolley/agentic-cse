@@ -210,3 +210,24 @@ def test_companion_linked_in_place_is_adopted_and_different_file_conflicts(tmp_p
     assert (bundle / "supporting-information.mmd").read_bytes() == b"# unrelated file\n"
     assert supporting.read_bytes().startswith(b"# SI")
     assert sync_evidence(root, api=api)["actions"] == {"conflict": 1, "unchanged": 1}
+
+
+def test_sync_promotes_pending_attachment_without_duplicate_entry(tmp_path):
+    import hashlib
+    root, api, article, supporting, _pdf = _materialized(tmp_path)
+    bundle = root / 'evidence/PARENT123'
+    bundle.mkdir(parents=True)
+    (bundle / 'article.md').write_bytes(article.read_bytes())
+    (bundle / 'manifest.json').write_text(json.dumps({
+        'schema_version': 1, 'parent_zotero_key': 'PARENT123',
+        'files': [{'path': 'article.md', 'status': 'pending_attachment',
+                   'sha256': hashlib.sha256(article.read_bytes()).hexdigest()}],
+    }))
+    plan = sync_evidence(root, api=api)
+    assert plan['actions'] == {'adopt': 1, 'copy': 1}
+    sync_evidence(root, api=api, apply=True)
+    entries = json.loads((bundle / 'manifest.json').read_text())['files']
+    article_entries = [entry for entry in entries if entry['path'] == 'article.md']
+    assert len(article_entries) == 1
+    assert article_entries[0]['zotero_attachment_key'] == 'MD123456'
+    assert 'status' not in article_entries[0]

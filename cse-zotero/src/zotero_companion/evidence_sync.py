@@ -246,7 +246,8 @@ def _plan_candidate(root: Path, candidate: dict[str, Any], record: Mapping[str, 
     entries = [entry for entry in manifest.get("files", []) if isinstance(entry, Mapping)]
     attachment_key = str(candidate["zotero_attachment_key"])
     matching = next(
-        (dict(entry) for entry in entries if str(entry.get("zotero_attachment_key", "")) == attachment_key),
+        (dict(entry) for entry in entries if str(entry.get("zotero_attachment_key", "")) == attachment_key
+         or (entry.get("status") == "pending_attachment" and entry.get("path") == candidate["source_filename"])),
         None,
     )
     if matching is not None:
@@ -268,7 +269,7 @@ def _plan_candidate(root: Path, candidate: dict[str, Any], record: Mapping[str, 
                 candidate["action"] = "conflict"
                 candidate["reason"] = "existing evidence file differs from Zotero companion"
                 return
-            candidate["action"] = "unchanged"
+            candidate["action"] = "adopt" if matching.get("status") == "pending_attachment" else "unchanged"
             candidate["reason"] = "companion already materialized with matching hash"
             return
         candidate["action"] = "copy"
@@ -320,7 +321,8 @@ def _updated_manifest(
     }
     replaced = False
     for index, entry in enumerate(files):
-        if str(entry.get("zotero_attachment_key", "")) == str(candidate["zotero_attachment_key"]):
+        if (str(entry.get("zotero_attachment_key", "")) == str(candidate["zotero_attachment_key"])
+                or (entry.get("status") == "pending_attachment" and entry.get("path") == candidate["manifest_path"])):
             files[index] = new_entry
             replaced = True
             break

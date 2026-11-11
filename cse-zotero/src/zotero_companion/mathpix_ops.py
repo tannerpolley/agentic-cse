@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import shutil
 import subprocess
@@ -107,6 +108,8 @@ def mathpix_conversion(
     destination = Path(destination or (config.wiki_root / "evidence" / parent_key / f"{source.stem}.mmd")).resolve()
     if destination.suffix.casefold() not in {".md", ".mmd"}:
         raise MathpixOperationError("Mathpix destination must use .md or .mmd")
+    if destination.parent == (config.wiki_root / "evidence" / parent_key).resolve() and (destination.parent / "manifest.json").exists():
+        raise MathpixOperationError("Evidence bundle already has a manifest; refusing to overwrite it")
     if destination.exists():
         raise MathpixOperationError(f"Mathpix destination already exists: {destination}")
     payload: dict[str, Any] = {
@@ -128,6 +131,11 @@ def mathpix_conversion(
         (converter or _run_mpx)(source, destination)
         if not destination.is_file() or not destination.stat().st_size:
             raise MathpixOperationError("Mathpix conversion did not create a nonempty companion")
+        if destination.parent == (config.wiki_root / "evidence" / parent_key).resolve():
+            _write_pending_manifest(destination, _pending_manifest(parent_key, destination, {
+                "mode": "mathpix", "pdf_attachment_key": pdf_key,
+                "source_sha256": payload["source_sha256"],
+            }))
         payload.update(
             {
                 "written": True,
@@ -137,3 +145,53 @@ def mathpix_conversion(
             }
         )
     return payload
+
+
+def _pending_manifest(parent_key: str, destination: Path, conversion: dict[str, Any]) -> dict[str, Any]:
+    return {
+        "schema_version": 1,
+        "parent_zotero_key": parent_key,
+        "conversion": conversion,
+        "files": [{"path": destination.name, "format": "mathpix-markdown", "role": "transcription",
+                   "status": "pending_attachment", "sha256": _sha256(destination)}],
+    }
+
+
+def _write_pending_manifest(destination: Path, manifest: dict[str, Any]) -> None:
+    # Exclusive creation keeps retained evidence manifests immutable.
+    with (destination.parent / "manifest.json").open("x", encoding="utf-8") as handle:
+        json.dump(manifest, handle, indent=2)
+        handle.write("\n")
+
+
+def repair_mathpix_bundle(parent_key: str, config: CompanionConfig, *, apply: bool = False,
+                          api: ZoteroLocalAPI | None = None) -> dict[str, Any]:
+    """Declare one retained transcription pending attachment, without conversion or Zotero writes."""
+    if not parent_key.isalnum():
+        raise MathpixOperationError("Invalid Zotero parent key")
+    bundle = config.wiki_root / "evidence" / parent_key
+    if bundle.is_symlink() or (bundle / "manifest.json").exists():
+        raise MathpixOperationError("Refusing a symlink bundle or an existing manifest")
+    files = list(bundle.iterdir())
+    if len(files) != 1 or files[0].is_symlink() or files[0].suffix.lower() not in {".md", ".mmd"}:
+        raise MathpixOperationError("Repair requires exactly one retained Markdown transcription")
+    destination = files[0]
+    if not destination.is_file() or not destination.read_text(encoding="utf-8").strip():
+        raise MathpixOperationError("Retained transcription is empty or unreadable")
+    api = api or ZoteroLocalAPI()
+    children = source_children(parent_key, api=api)["items"]
+    if any(Path(str(item.get("data", {}).get("filename", ""))).suffix.lower() in {".md", ".mmd"}
+           for item in children):
+        raise MathpixOperationError("Markdown child already exists; use wiki-evidence-sync")
+    pdfs = [item for item in children if item.get("data", {}).get("contentType") == "application/pdf"]
+    if not pdfs:
+        raise MathpixOperationError("Repair requires a PDF child")
+    manifest = _pending_manifest(parent_key, destination, {
+        "mode": "retained-transcription", "original_pdf_provenance": "unrecorded",
+        "current_pdf_attachment_keys": sorted(item["key"] for item in pdfs),
+    })
+    if apply:
+        _write_pending_manifest(destination, manifest)
+    return {"ok": True, "mode": "apply" if apply else "dry-run", "parent_key": parent_key,
+            "destination": str(destination), "manifest": manifest, "zotero_mutation": False,
+            "mathpix_call": False}

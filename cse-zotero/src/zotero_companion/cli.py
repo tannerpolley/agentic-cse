@@ -25,7 +25,7 @@ from .coverage import CoverageError, coverage_report
 from .evidence_sync import EvidenceSyncError, sync_evidence
 from .local_api import LocalAPIError, ZoteroLocalAPI
 from .maintenance import maintain_wiki
-from .mathpix_ops import MathpixOperationError, mathpix_conversion
+from .mathpix_ops import MathpixOperationError, mathpix_conversion, repair_mathpix_bundle
 from .manifests import ManifestError, lint_manifests, load_manifests, manifest_lookup
 from .plugin_client import PluginClientError, ZoteroPluginClient
 from .projects import (
@@ -256,6 +256,11 @@ def main() -> int:
     mathpix_convert.add_argument("--config", type=Path, default=default_config_path())
     mathpix_convert.add_argument("--apply", action="store_true")
     mathpix_convert.add_argument("--json", action="store_true")
+    repair = subparsers.add_parser("mathpix-repair", help="plan or declare a retained transcription pending attachment")
+    repair.add_argument("parent_key")
+    repair.add_argument("--config", type=Path, default=default_config_path())
+    repair.add_argument("--apply", action="store_true")
+    repair.add_argument("--json", action="store_true")
     zotero_attach = subparsers.add_parser("zotero-attach-companion", help="plan or attach one linked Markdown child")
     zotero_attach.add_argument("parent_key")
     zotero_attach.add_argument("companion", type=Path)
@@ -642,6 +647,7 @@ def main() -> int:
         "zotero-children",
         "zotero-attachment-path",
         "mathpix-convert",
+        "mathpix-repair",
         "zotero-attach-companion",
     }:
         try:
@@ -651,6 +657,8 @@ def main() -> int:
                 payload = source_children(args.parent_key)
             elif args.command == "zotero-attachment-path":
                 payload = attachment_path(args.attachment_key)
+            elif args.command == "mathpix-repair":
+                payload = repair_mathpix_bundle(args.parent_key, load_config(args.config), apply=args.apply)
             elif args.command == "mathpix-convert":
                 payload = mathpix_conversion(
                     args.parent_key,

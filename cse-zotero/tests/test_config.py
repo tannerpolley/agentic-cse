@@ -344,3 +344,15 @@ def test_init_refuses_to_edit_unsupported_toml_structure(tmp_path):
         )
 
     assert path.read_bytes() == original
+
+
+def test_vpn_setting_survives_init_path_and_consent_changes(tmp_path):
+    config = replace(_existing(tmp_path), vpn_connection='Institution VPN')
+    path = tmp_path / 'config.toml'
+    write_config(config, path)
+    retained = load_config(path)
+    assert retained.vpn_connection == 'Institution VPN'
+    proposed = proposed_config(existing=retained, corpus_root=tmp_path / 'new-corpus', mathpix_library_consent=False)
+    write_config(proposed, path, expected_sha256=hashlib.sha256(path.read_bytes()).hexdigest())
+    assert load_config(path) == proposed
+    assert load_config(path).vpn_connection == 'Institution VPN'

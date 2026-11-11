@@ -17,6 +17,34 @@ Each scientific project declares its own data authority, formats, lineage,
 retention, versioning, and recovery strategy. CSE Zotero does not prescribe a
 dataset versioning system.
 
+## Install the command
+
+With [uv](https://docs.astral.sh/uv/) and Python 3.11 or newer, run from
+this repository's root checkout:
+
+```bash
+uv tool install ./cse-zotero
+```
+
+With only the Git address, install the monorepo's package directly:
+
+```bash
+uv tool install 'git+https://github.com/tannerpolley/agentic-cse.git#subdirectory=cse-zotero'
+```
+
+These are uv's [tool install](https://docs.astral.sh/uv/guides/tools/#installing-tools)
+and [Git subdirectory](https://docs.astral.sh/uv/concepts/projects/dependencies/#git) routes.
+Ensure uv's tool bin directory is on your PATH (`uv tool update-shell` if needed).
+Then run `cse-zotero doctor --json` to check the installation. A new install
+also needs the explicit `init` choices described below; installing the command
+does not initialize or migrate user state or install the separate Zotero add-on.
+
+Configuration and private API key files live under `~/.config/zotero-companion/`;
+the default retained corpus lives under `~/.local/share/zotero-companion/corpus/`.
+The config and data roots respect `XDG_CONFIG_HOME` and `XDG_DATA_HOME`.
+Acquisition pacing state lives at `~/.local/state/cse-zotero/acquire.json`.
+Package upgrades leave user state in place.
+
 ## Contributor entry points
 
 Edit Python in `src/zotero_companion/`, packaged schemas in
@@ -597,3 +625,29 @@ local API provides one. For local records with an empty item version, the
 writer uses the library `Last-Modified-Version` returned by the same read as
 the request-level precondition. Saved-search creation uses the same library
 precondition. A stale precondition stops the operation.
+
+## Pending Mathpix transcriptions
+
+`mathpix-convert` writes a hashed evidence manifest for its default corpus
+bundle with `status: pending_attachment`. `doctor --json` lists these under
+`readiness.retained_corpus.pending_attachments`; pending attachment alone does not make
+the corpus unready. Missing manifests, missing files, empty transcriptions and
+hash mismatches still fail offline verification. Custom `--out` paths outside
+the default bundle remain standalone output files.
+
+For an older bundle containing exactly one transcription and no manifest,
+preview a repair without conversion or Zotero writes:
+
+```bash
+uv run cse-zotero mathpix-repair PARENT_KEY --json
+```
+
+The repair checks the parent's live children, refuses an existing Markdown
+child or a parent without a PDF, and declares the retained file pending.
+Legacy repairs mark original PDF provenance as unrecorded and list current
+PDF children; they do not infer which PDF was originally converted.
+After reviewing the plan, `--apply` writes only the local manifest. Attaching
+the file with `zotero-attach-companion` remains a separate approved Zotero
+write. After attachment, `wiki-evidence-sync` can adopt the matching file and
+replace its pending declaration with the Zotero attachment key. Preview sync
+before applying it.

@@ -89,6 +89,7 @@ class CompanionConfig:
     mathpix_library_consent: bool = False
     denied_tags: tuple[str, ...] = ("confidential", "proprietary", "restricted")
     denied_collections: tuple[str, ...] = ()
+    vpn_connection: str | None = None
 
     @property
     def wiki_root(self) -> Path:
@@ -137,6 +138,12 @@ def _config_from_text(text: str) -> CompanionConfig:
         raise ConfigError(f"Invalid CSE Zotero configuration: {exc}") from exc
     paths = data.get("paths", {})
     mathpix = data.get("mathpix", {})
+    acquisition = data.get("acquisition", {})
+    if not isinstance(acquisition, dict):
+        raise ConfigError("CSE Zotero configuration [acquisition] must be a table")
+    vpn_connection = acquisition.get("vpn_connection")
+    if vpn_connection is not None and (not isinstance(vpn_connection, str) or not vpn_connection.strip()):
+        raise ConfigError("acquisition.vpn_connection must be a nonempty string")
     if not isinstance(paths, dict):
         raise ConfigError("CSE Zotero configuration [paths] must be a table")
     if not isinstance(mathpix, dict):
@@ -160,6 +167,7 @@ def _config_from_text(text: str) -> CompanionConfig:
         corpus_root=Path(paths["corpus_root"]).expanduser().resolve(),
         zotero_data_dir=Path(paths["zotero_data_dir"]).expanduser().resolve(),
         bibliography_export=Path(paths["bibliography_export"]).expanduser().resolve(),
+        vpn_connection=vpn_connection,
         mathpix_library_consent=consent,
         denied_tags=tuple(denied_tags),
         denied_collections=tuple(denied_collections),
@@ -375,6 +383,7 @@ def config_payload(config: CompanionConfig, path: Path, *, mode: str) -> dict[st
         "data_root": str(config.data_root),
         "zotero_data_dir": str(config.zotero_data_dir),
         "bibliography_export": str(config.bibliography_export),
+        "vpn_connection": config.vpn_connection,
         "mathpix_library_consent": config.mathpix_library_consent,
         "denied_tags": list(config.denied_tags),
         "denied_collections": list(config.denied_collections),
@@ -442,6 +451,8 @@ def write_config(
             f"denied_tags = {json.dumps(list(config.denied_tags))}\n"
             f"denied_collections = {json.dumps(list(config.denied_collections))}\n"
         )
+    if not exists and config.vpn_connection is not None:
+        text += f"\n[acquisition]\nvpn_connection = {json.dumps(config.vpn_connection)}\n"
     path.parent.mkdir(parents=True, exist_ok=True)
     config.corpus_root.mkdir(parents=True, exist_ok=True)
     config.wiki_root.mkdir(parents=True, exist_ok=True)

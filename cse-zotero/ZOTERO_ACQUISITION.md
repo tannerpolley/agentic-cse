@@ -92,12 +92,26 @@ status only. Credentials do not follow cross-host redirects.
 
 The CLI is the single trust boundary for agent input: require HTTPS and public
 hosts; reject loopback, private, link-local, `.local`, `.internal` and single-label
-hosts. Require `CAEDM IKEv2 VPN` for publisher/API/repository access except Wiley,
-which needs the VPN off for BYU library login; if it is active, hand back the
-Wiley link without a browser attempt or disconnecting it. The existing
-NetworkManager connection may be activated and checked automatically; do not
-rotate or reconfigure networks, discover public IPs, or change browser identity.
-Crossref and Unpaywall metadata do not require the VPN.
+hosts. The optional setting in `~/.config/zotero-companion/config.toml` is:
+
+```toml
+[acquisition]
+vpn_connection = "Your NetworkManager connection name"
+```
+
+When configured, require that connection for non-public publisher/API/repository
+access except Wiley, which needs it off for institutional login. If it is
+active, hand back the Wiley link without a browser attempt or disconnecting it.
+The existing NetworkManager connection may be activated and checked automatically;
+do not rotate or reconfigure networks, discover public IPs, or change browser
+identity. Public metadata requests do not require the VPN.
+
+When the setting is absent, acquisition never calls NetworkManager or requires
+a VPN. Users without institutional access can acquire verified open-access
+copies and use APIs for which they have valid tokens and entitlement. Removing
+the setting grants no subscription access: restricted papers still need an
+entitled institutional login or return a link for handoff. Publisher route
+restrictions, challenge refusals, completeness checks and pacing still apply.
 
 A process lock serializes acquisition. Persist pacing, daily counts and the
 last stop reason in `~/.local/state/cse-zotero/acquire.json`; unreadable state

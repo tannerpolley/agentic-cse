@@ -20,6 +20,7 @@ from urllib.parse import urlencode
 from urllib.request import HTTPRedirectHandler, Request, build_opener
 from xml.etree import ElementTree as ET
 
+from .config import default_config_path, load_config
 from .local_api import ZoteroLocalAPI
 from .source_ops import attachment_path
 from .plugin_client import ZoteroPluginClient
@@ -64,25 +65,34 @@ def configured_tokens():
     return result
 
 
+def vpn_connection():
+    path = default_config_path()
+    return load_config(path).vpn_connection if path.is_file() else None
+
+
 def vpn_active():
+    connection = vpn_connection()
+    if connection is None:
+        return False
     try:
         names = subprocess.run(["nmcli", "-t", "-f", "NAME", "connection", "show", "--active"],
                                capture_output=True, text=True, timeout=5, check=True).stdout.splitlines()
     except (OSError, subprocess.SubprocessError):
-        raise AcquireStop("VPN status unavailable") from None
-    return "CAEDM IKEv2 VPN" in names
+        raise AcquireStop(f"VPN status unavailable for {connection}") from None
+    return connection in names
 
 
 def require_vpn():
-    if vpn_active():
+    connection = vpn_connection()
+    if connection is None or vpn_active():
         return
     try:
-        subprocess.run(["nmcli", "--wait", "25", "con", "up", "CAEDM IKEv2 VPN"],
+        subprocess.run(["nmcli", "--wait", "25", "con", "up", connection],
                        capture_output=True, text=True, timeout=30, check=True)
     except (OSError, subprocess.SubprocessError):
-        raise AcquireStop("Unable to activate CAEDM IKEv2 VPN; publisher access refused") from None
+        raise AcquireStop(f"Unable to activate {connection}; publisher access refused") from None
     if not vpn_active():
-        raise AcquireStop("CAEDM IKEv2 VPN did not become active; publisher access refused")
+        raise AcquireStop(f"{connection} did not become active; publisher access refused")
 
 
 def publisher(doi="", member=""):
@@ -599,7 +609,7 @@ def acquire(value, *, collection=None, dry_run=False, route="auto", refetch=Fals
                         result["route"] = pub + "-api"
             if not body and result["handoff_url"]:
                 if pub == "wiley" and vpn_active():
-                    raise AcquireStop("Wiley needs the BYU login with the CAEDM VPN off; the VPN is on")
+                    raise AcquireStop(f"Wiley needs institutional login with {vpn_connection()} off; the VPN is on")
                 from .connector_job import connector_save
                 preflight = plugin._request("/zotero-companion/acquire-connector", method="POST",
                                             payload={"collection": collection, "mode": "dry-run"})

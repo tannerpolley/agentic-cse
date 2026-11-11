@@ -28,6 +28,7 @@ def fixture_pdf(pages=4):
 
 @pytest.fixture
 def runtime(monkeypatch, tmp_path):
+    monkeypatch.setattr(mod, "vpn_connection", lambda: "Test VPN")
     real_safety = mod.Safety
     monkeypatch.setattr(mod, "Safety", lambda: real_safety(tmp_path / 'state.json'))
     monkeypatch.setattr(mod, "require_vpn", lambda: None)
@@ -132,7 +133,7 @@ def test_wiley_skips_vpn_while_elsevier_requires_it(runtime, monkeypatch):
     monkeypatch.setattr(mod, "vpn_active", lambda: True)
     current.update(doi="10.1002/test", member=311, has_pdf=False)
     result = mod.acquire(current["doi"], route="browser")
-    assert result["stop_reason"] == "Wiley needs the BYU login with the CAEDM VPN off; the VPN is on"
+    assert result["stop_reason"] == "Wiley needs institutional login with Test VPN off; the VPN is on"
     assert result["handoff_url"] == "https://doi.org/10.1002/test"
     assert ("connector-visit", None) not in calls
     monkeypatch.setattr(mod, "vpn_active", lambda: False)
@@ -458,8 +459,12 @@ def test_redirect_final_url_trailing_dot_and_cdn_hosts_are_refused(monkeypatch, 
 
 
 @pytest.mark.parametrize("outcome", ["active", "activated", "failed", "not_active"])
-def test_vpn_activation_is_bounded_and_rechecked(monkeypatch, outcome):
+def test_vpn_activation_is_bounded_and_rechecked(monkeypatch, tmp_path, outcome):
     from types import SimpleNamespace
+    from zotero_companion.config import CompanionConfig, write_config
+    config_path = tmp_path / "config.toml"
+    write_config(CompanionConfig(tmp_path / "corpus", tmp_path / "Zotero", tmp_path / "refs.bib", vpn_connection="Test VPN"), config_path)
+    monkeypatch.setattr(mod, "default_config_path", lambda: config_path)
     commands = []
     def run(command, **kwargs):
         commands.append((command, kwargs["timeout"]))
@@ -468,7 +473,7 @@ def test_vpn_activation_is_bounded_and_rechecked(monkeypatch, outcome):
                 raise mod.subprocess.TimeoutExpired(command, kwargs["timeout"])
             return SimpleNamespace(stdout="")
         up_done = any("up" in cmd for cmd, _ in commands)
-        return SimpleNamespace(stdout="CAEDM IKEv2 VPN\n" if outcome == "active" or (up_done and outcome == "activated") else "")
+        return SimpleNamespace(stdout="Test VPN\n" if outcome == "active" or (up_done and outcome == "activated") else "")
     monkeypatch.setattr(mod.subprocess, "run", run)
     if outcome in {"failed", "not_active"}:
         with pytest.raises(mod.AcquireStop):
@@ -773,3 +778,18 @@ def test_refetch_previews_then_verifies_before_removing(runtime, monkeypatch, ro
     assert result['ok'] == (outcome == 'success')
     if outcome == 'stale':
         assert 'preview changed' in result['stop_reason']
+
+
+def test_absent_vpn_setting_never_calls_nmcli(monkeypatch, tmp_path):
+    from zotero_companion.config import CompanionConfig, write_config
+    config_path = tmp_path / 'config.toml'
+    write_config(CompanionConfig(tmp_path / 'corpus', tmp_path / 'Zotero', tmp_path / 'refs.bib'), config_path)
+    monkeypatch.setattr(mod, 'default_config_path', lambda: config_path)
+    monkeypatch.setattr(mod.subprocess, 'run', lambda *a, **kw: pytest.fail('nmcli called without a VPN setting'))
+    assert mod.vpn_active() is False
+    mod.require_vpn()
+    with mod.Safety(tmp_path / 'state.json') as safety:
+        safety.before('elsevier', 'https://api.elsevier.com/article', 'api', api=True)
+        assert 'last_api' in safety.data
+        with pytest.raises(mod.AcquireStop, match='Connector or official API'):
+            safety.before('elsevier', 'https://www.sciencedirect.com/article', 'api')

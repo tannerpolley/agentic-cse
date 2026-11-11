@@ -967,6 +967,7 @@ def _collect_evidence_chunks(
                 "zotero_key": zotero_key,
                 "zotero_attachment_key": str(entry.get("zotero_attachment_key", "")),
                 "path": _display_path(root, file_path),
+                "status": str(entry.get("status", "")),
                 "role": str(entry.get("role", "")),
                 "format": str(entry.get("format", "")),
                 "source_filename": str(entry.get("source_filename", "")),
@@ -977,6 +978,8 @@ def _collect_evidence_chunks(
                 "chunk_count": 0,
             }
             files.append(file_info)
+            if file_info["status"] == "pending_attachment" and (file_info["zotero_attachment_key"] or not file_info["declared_sha256"]):
+                warnings.append(f"Invalid pending transcription declaration: {manifest_path}")
             if not file_path.exists():
                 warnings.append(f"Evidence companion is missing: {file_path}")
                 continue
@@ -989,6 +992,8 @@ def _collect_evidence_chunks(
             except (OSError, UnicodeDecodeError) as exc:
                 warnings.append(f"Could not read evidence companion {file_path}: {exc}")
                 continue
+            if not text.strip():
+                warnings.append(f"Evidence companion is empty: {file_path}")
             content_sha256 = _sha256(raw)
             declared_sha256 = file_info["declared_sha256"]
             hash_matches = (

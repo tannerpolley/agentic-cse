@@ -195,6 +195,10 @@ def _offline_corpus(config: CompanionConfig | None) -> dict[str, Any]:
     try:
         _, evidence_files, evidence_warnings = _collect_evidence_chunks(root)
         details["evidence_files"] = len(evidence_files)
+        details["pending_attachments"] = [
+            {"zotero_key": entry["zotero_key"], "path": entry["path"], "status": "pending_attachment"}
+            for entry in evidence_files if entry.get("status") == "pending_attachment"
+        ]
         errors.extend(str(warning) for warning in evidence_warnings)
     except Exception as exc:  # pragma: no cover - user-owned corpus boundary
         errors.append(f"offline evidence verification failed: {exc}")
