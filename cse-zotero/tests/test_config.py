@@ -346,13 +346,28 @@ def test_init_refuses_to_edit_unsupported_toml_structure(tmp_path):
     assert path.read_bytes() == original
 
 
-def test_vpn_setting_survives_init_path_and_consent_changes(tmp_path):
-    config = replace(_existing(tmp_path), vpn_connection='Institution VPN')
+@pytest.mark.parametrize('email', [None, 'contact@example.org'])
+@pytest.mark.parametrize('vpn', [None, 'Institution VPN'])
+def test_acquisition_settings_survive_init_path_and_consent_changes(tmp_path, email, vpn):
+    config = replace(_existing(tmp_path), vpn_connection=vpn, contact_email=email)
     path = tmp_path / 'config.toml'
     write_config(config, path)
     retained = load_config(path)
-    assert retained.vpn_connection == 'Institution VPN'
+    assert retained.vpn_connection == vpn
+    assert retained.contact_email == email
+    assert config_payload(retained, path, mode='dry-run')['contact_email'] == email
     proposed = proposed_config(existing=retained, corpus_root=tmp_path / 'new-corpus', mathpix_library_consent=False)
     write_config(proposed, path, expected_sha256=hashlib.sha256(path.read_bytes()).hexdigest())
     assert load_config(path) == proposed
-    assert load_config(path).vpn_connection == 'Institution VPN'
+    assert load_config(path).vpn_connection == vpn
+    assert load_config(path).contact_email == email
+
+
+@pytest.mark.parametrize('value', ['""', '"   "', '42', 'false', '[]', '{}'])
+def test_contact_email_rejects_empty_and_non_string_values(tmp_path, value):
+    path = tmp_path / 'config.toml'
+    write_config(_existing(tmp_path), path)
+    with path.open('a') as handle:
+        handle.write('\n[acquisition]\ncontact_email = ' + value + '\n')
+    with pytest.raises(ConfigError, match='acquisition.contact_email must be a nonempty string'):
+        load_config(path)

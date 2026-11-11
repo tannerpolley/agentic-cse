@@ -92,15 +92,27 @@ status only. Credentials do not follow cross-host redirects.
 
 The CLI is the single trust boundary for agent input: require HTTPS and public
 hosts; reject loopback, private, link-local, `.local`, `.internal` and single-label
-hosts. The optional setting in `~/.config/zotero-companion/config.toml` is:
+hosts. The optional settings in `~/.config/zotero-companion/config.toml` are:
 
 ```toml
 [acquisition]
 vpn_connection = "Your NetworkManager connection name"
+contact_email = "<your address>"
 ```
 
-When configured, require that connection for non-public publisher/API/repository
-access except Wiley, which needs it off for institutional login. If it is
+`contact_email` must be a nonempty string when present. It supplies the
+`mailto:` portion of the acquisition User-Agent and the email parameters for
+Unpaywall and PMC identifier conversion. Without it, no address is sent and
+Unpaywall discovery is skipped with a message naming `acquisition.contact_email`.
+PMC identifier conversion and PMC Cloud retrieval, official publisher APIs,
+and Connector acquisition remain available subject to their usual access rules;
+open-access copies found only through Unpaywall cannot be discovered.
+[Unpaywall requires an email](https://unpaywall.org/api); the
+[PMC ID Converter requests one but does not require it](https://pmc.ncbi.nlm.nih.gov/tools/id-converter-api/).
+No placeholder address is sent by default.
+
+When `vpn_connection` is configured, require that connection for non-public
+publisher/API/repository access except Wiley, which needs it off for institutional login. If it is
 active, hand back the Wiley link without a browser attempt or disconnecting it.
 The existing NetworkManager connection may be activated and checked automatically;
 do not rotate or reconfigure networks, discover public IPs, or change browser

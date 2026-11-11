@@ -25,8 +25,6 @@ from .local_api import ZoteroLocalAPI
 from .source_ops import attachment_path
 from .plugin_client import ZoteroPluginClient
 
-EMAIL = "42780259+tannerpolley@users.noreply.github.com"
-USER_AGENT = f"cse-zotero/1.0 (mailto:{EMAIL})"
 STATE = Path.home() / ".local/state/cse-zotero/acquire.json"
 CONFIG = Path.home() / ".config/zotero-companion"
 TOKENS = ("elsevier-api-key", "elsevier-insttoken", "wiley-tdm-token")
@@ -63,6 +61,11 @@ def configured_tokens():
         except (OSError, AcquireStop):
             result[name] = "invalid_permissions_or_format"
     return result
+
+
+def contact_email():
+    path = default_config_path()
+    return load_config(path).contact_email if path.is_file() else None
 
 
 def vpn_connection():
@@ -294,6 +297,8 @@ class NoRedirect(HTTPRedirectHandler):
 
 
 def request(url, *, safety=None, pub="", route="oa", headers=None, is_pdf=False, allowed_hosts=None):
+    email = contact_email()
+    user_agent = f"cse-zotero/1.0 (mailto:{email})" if email else "cse-zotero/1.0"
     opener = build_opener(NoRedirect())
     for _ in range(8):
         host = checked_url(url)
@@ -305,7 +310,7 @@ def request(url, *, safety=None, pub="", route="oa", headers=None, is_pdf=False,
         elif not public:
             raise AcquireStop("Remote publisher access requires the acquisition safety gate")
         try:
-            response = opener.open(Request(url, headers={"User-Agent": USER_AGENT, **(headers or {})}), timeout=30)
+            response = opener.open(Request(url, headers={"User-Agent": user_agent, **(headers or {})}), timeout=30)
         except HTTPError as exc:
             response = exc
         except (URLError, TimeoutError):
@@ -366,8 +371,11 @@ def pmc_id(location):
 def pmc_pdf(pmcid, doi, safety, pub):
     pmc_pub = "wiley" if pub == "wiley" else "ncbi-pmc"
     if not pmcid:
-        url = "https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/?" + urlencode(
-            {"ids": doi, "idtype": "doi", "format": "json", "tool": "cse-zotero", "email": EMAIL})
+        params = {"ids": doi, "idtype": "doi", "format": "json", "tool": "cse-zotero"}
+        email = contact_email()
+        if email:
+            params["email"] = email
+        url = "https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/?" + urlencode(params)
         raw = request(url, safety=safety, pub=pmc_pub, allowed_hosts={"pmc.ncbi.nlm.nih.gov"})
         records = json.loads(raw).get("records", []) if raw else []
         pmcid = next((r.get("pmcid") for r in records if r.get("doi", "").lower() == doi), None)
@@ -557,7 +565,13 @@ def acquire(value, *, collection=None, dry_run=False, route="auto", refetch=Fals
                         "tokens": configured_tokens(), "planned_routes": ["oa", "api", "connector", "handoff"]}
             body = None
             if doi and route == "auto":
-                raw = request("https://api.unpaywall.org/v2/" + quote(doi, safe="") + "?email=" + EMAIL, safety=safety)
+                email = contact_email()
+                raw = None
+                if email:
+                    raw = request("https://api.unpaywall.org/v2/" + quote(doi, safe="") + "?email=" + email, safety=safety)
+                else:
+                    result.setdefault("skipped_routes", []).append(
+                        "Unpaywall skipped: configure acquisition.contact_email")
                 oa = json.loads(raw) if raw else {}
                 locations = [oa.get("best_oa_location")] + oa.get("oa_locations", [])
                 seen = set()

@@ -26,8 +26,16 @@ def fixture_pdf(pages=4):
     return body + f"trailer\n<< /Size {len(offsets)} /Root 1 0 R >>\nstartxref\n{start}\n%%EOF\n".encode()
 
 
+@pytest.fixture(autouse=True)
+def isolated_config(monkeypatch, tmp_path):
+    monkeypatch.setattr(mod, "default_config_path", lambda: tmp_path / "config.toml")
+
+
 @pytest.fixture
 def runtime(monkeypatch, tmp_path):
+    from zotero_companion.config import CompanionConfig, write_config
+    write_config(CompanionConfig(tmp_path / "corpus", tmp_path / "Zotero", tmp_path / "refs.bib",
+                                 contact_email="contact@example.org"), tmp_path / "config.toml")
     monkeypatch.setattr(mod, "vpn_connection", lambda: "Test VPN")
     real_safety = mod.Safety
     monkeypatch.setattr(mod, "Safety", lambda: real_safety(tmp_path / 'state.json'))
@@ -185,13 +193,20 @@ def test_oa_pdf_stops_further_requests(runtime, monkeypatch):
     assert result['ok'] and result['verified'] and result['route'] == 'unpaywall'
 
 
-@pytest.mark.parametrize('source', ['location', 'landing', 'converter', 'outside-oa'])
-def test_pmc_cloud_selects_declared_main_pdf(runtime, monkeypatch, source):
+@pytest.mark.parametrize('source,email', [
+    ('location', 'contact@example.org'), ('landing', 'contact@example.org'),
+    ('converter', 'contact@example.org'), ('outside-oa', 'contact@example.org'),
+    ('converter', None),
+])
+def test_pmc_cloud_selects_declared_main_pdf(runtime, monkeypatch, source, email):
     import base64
     import io
     from urllib.parse import parse_qs, urlsplit
     current, calls, root = runtime
     current.update(doi='10.1371/test', member=340, has_pdf=False)
+    if email is None:
+        config_path = root / 'config.toml'
+        config_path.write_text(config_path.read_text().replace('contact_email = "contact@example.org"\n', ''))
     monkeypatch.setattr(mod.ZoteroLocalAPI, 'items', lambda self, **kwargs: [
         {'key': 'EXISTING', 'data': {'itemType': 'journalArticle', 'DOI': current['doi']}}])
     clock = [1000000.0]
@@ -207,17 +222,20 @@ def test_pmc_cloud_selects_declared_main_pdf(runtime, monkeypatch, source):
             url = request.full_url
             urls.append(url)
             times.append(clock[0])
-            assert 'cse-zotero' in request.get_header('User-agent') and mod.EMAIL in request.get_header('User-agent')
+            assert request.get_header('User-agent') == (
+                f'cse-zotero/1.0 (mailto:{email})' if email else 'cse-zotero/1.0')
             if 'crossref.org' in url:
                 body = json.dumps({'message': {'member': 340}}).encode()
             elif 'unpaywall.org' in url:
+                assert url == 'https://api.unpaywall.org/v2/10.1371%2Ftest?email=contact@example.org'
                 locations = [] if source == 'converter' else [location]
                 if source == 'outside-oa':
                     locations.append({'url_for_pdf': 'https://repository.example/alternative.pdf'})
                 body = json.dumps({'oa_locations': locations}).encode()
             elif 'idconv' in url:
-                params = parse_qs(urlsplit(url).query)
-                assert params['ids'] == [current['doi']] and params['tool'] == ['cse-zotero'] and params['email'] == [mod.EMAIL]
+                expected = ('https://pmc.ncbi.nlm.nih.gov/tools/idconv/api/v1/articles/'
+                            '?ids=10.1371%2Ftest&idtype=doi&format=json&tool=cse-zotero')
+                assert url == expected + ('&email=contact%40example.org' if email else '')
                 body = json.dumps({'records': [{'doi': current['doi'], 'pmcid': 'PMC123'}]}).encode()
             elif 'list-type=2' in url:
                 assert parse_qs(urlsplit(url).query)['prefix'] == ['metadata/PMC123.']
@@ -246,6 +264,9 @@ def test_pmc_cloud_selects_declared_main_pdf(runtime, monkeypatch, source):
     result = mod.acquire(current['doi'])
     assert result['ok'] and result['verified'] and result['attachment_key'] == 'PDFKEY'
     assert result['route'] == ('unpaywall' if source == 'outside-oa' else 'pmc-cloud')
+    if email is None:
+        assert not any('unpaywall' in url or 'email=' in url or '@' in url for url in urls)
+        assert result['skipped_routes'] == ['Unpaywall skipped: configure acquisition.contact_email']
     assert all(b - a >= 1 for a, b in zip(times, times[1:]))
     assert not any('/pdf/' in url or 'supplement.pdf' in url for url in urls)
     with mod.Safety() as safety:
@@ -793,3 +814,15 @@ def test_absent_vpn_setting_never_calls_nmcli(monkeypatch, tmp_path):
         assert 'last_api' in safety.data
         with pytest.raises(mod.AcquireStop, match='Connector or official API'):
             safety.before('elsevier', 'https://www.sciencedirect.com/article', 'api')
+
+
+def test_missing_contact_skips_unpaywall_and_continues_to_connector(runtime):
+    current, calls, root = runtime
+    (root / 'config.toml').unlink()
+    current.update(doi='10.1371/test', member=340)
+    assert mod.contact_email() is None
+    result = mod.acquire(current['doi'])
+    assert result['ok'] and result['route'] == 'connector'
+    assert result['skipped_routes'] == ['Unpaywall skipped: configure acquisition.contact_email']
+    assert not any('unpaywall' in url or 'email=' in url for url, _ in calls)
+    assert any('idconv' in url for url, _ in calls)
