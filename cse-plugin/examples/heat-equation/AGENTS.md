@@ -23,7 +23,7 @@ space semidiscrete reference, and each scheme's amplification factor distinct.
 Do not promote code or solution verification into physical model validation.
 
 Zotero owns bibliographic metadata and attachments. Generate the project-only
-snapshot from `/home/user/Zotero/exports/references.bib` with
+snapshot from `~/Zotero/exports/references.bib` with
 `scripts/sync_bibliography.sh`. Never hand-edit
 `docs/scientific/latex/references.bib`,
 and never add local attachment paths to it.

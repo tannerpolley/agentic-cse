@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, symlink, writeFile } from "node:fs/promises";
+import { homedir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 import { runSandbox } from "../src/sandbox.ts";
@@ -18,7 +19,7 @@ async function sandboxFixture() {
 test("Bubblewrap denies host home and network", async () => {
   const data = await sandboxFixture();
   try {
-    const result = await runSandbox("test ! -e /home/user && python3 -c 'import socket; socket.create_connection((\"1.1.1.1\",53),.2)'", data.root, 5000, 4096, undefined, data.options);
+    const result = await runSandbox(`test ! -e ${JSON.stringify(homedir())} && python3 -c 'import socket; socket.create_connection(("1.1.1.1",53),.2)'`, data.root, 5000, 4096, undefined, data.options);
     assert.notEqual(result.evidence.exit_code, 0); assert.match(result.output, /Network is unreachable/);
   } finally { await data.cleanup(); }
 });
@@ -36,7 +37,7 @@ test("Bubblewrap cancellation kills the process group", async () => {
 });
 test("Bubblewrap scrubs supervisor secrets from environment and proc", async () => {
   const data = await sandboxFixture(); const prior = process.env.CSE_PI_SYNTHETIC_SECRET; process.env.CSE_PI_SYNTHETIC_SECRET = "do-not-leak";
-  try { const result = await runSandbox("test -z \"$CSE_PI_SYNTHETIC_SECRET\" && ! grep -a -q CSE_PI_SYNTHETIC_SECRET /proc/1/environ && test ! -e /home/user/.ssh", data.root, 3000, 1024, undefined, data.options); assert.equal(result.evidence.exit_code, 0); }
+  try { const result = await runSandbox(`test -z "$CSE_PI_SYNTHETIC_SECRET" && ! grep -a -q CSE_PI_SYNTHETIC_SECRET /proc/1/environ && test ! -e ${JSON.stringify(join(homedir(), ".ssh"))}`, data.root, 3000, 1024, undefined, data.options); assert.equal(result.evidence.exit_code, 0); }
   finally { if (prior === undefined) delete process.env.CSE_PI_SYNTHETIC_SECRET; else process.env.CSE_PI_SYNTHETIC_SECRET = prior; await data.cleanup(); }
 });
 test("workspace file checks reject symlinked ancestor components", async () => {

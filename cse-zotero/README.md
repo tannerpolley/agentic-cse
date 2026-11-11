@@ -275,7 +275,7 @@ Then, in your everyday Chrome:
 1. Open `chrome://extensions` and turn on **Developer mode**.
 2. Turn **off** the existing Zotero Connector.
 3. Click **Load unpacked** and select
-   `/home/user/.local/share/cse/zotero/zotero-connector-agent/`.
+   `~/.local/share/cse/zotero/zotero-connector-agent/`.
 4. Confirm **Zotero Connector (agent)** is enabled and has no errors; keep
    Zotero Desktop running. Run
    `cse-zotero doctor --json`; `acquisition.connector.ready` should be `true`
