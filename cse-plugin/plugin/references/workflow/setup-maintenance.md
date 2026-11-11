@@ -4,7 +4,7 @@ Load this reference for existing scientific records, migration, vocabulary,
 tracker reconciliation, a Quarto site, or requested hooks. Preserve accepted
 setup and revise only the unresolved subset. Confirm `analysis` or `tool` on
 reconciliation runs; continuing handoffs inherit an answer. Use
-[scientific-projects](scientific-projects.md) for record ownership and migration,
+[scientific-projects](scientific-projects.md) for record ownership,
 and [skill families](skill-families.md) when installed engineering skills overlap.
 
 ## Preview and apply
@@ -28,33 +28,45 @@ sets use `analyses/<short-id>/{inputs,scripts,results,figures}`.
 Setup creates no substantive per-analysis report; Summarize owns it.
 
 Merge content from CSE-format stray `CONTEXT.md` files only when those files
-will be removed. Do not copy prose from files that stay in place. Preserve
-ownership with exact caller and link updates; use `git mv` where practical
-and leave no alias, duplicate, or redirect. Keep the existing caller rewriting;
-literal rewrites miss code-built paths and fixed parent-directory climbs,
-which need manual checks after approved moves.
+will be removed. Do not copy prose from files that stay in place.
+
+During Setup in an established repository, detect every competing CSE-created
+record owner, including `docs/`, `docs/latex/`, alternate decision-record
+directories, central notebooks, superseded analysis metadata, generated
+reports, and repository-native equivalents. Preview the exact source-to-target
+moves, caller and link updates, retained inputs and outputs, and displaced
+owners to remove. Obtain approval before mutation. Use `git mv` where practical
+to preserve history and ownership, update every real caller and link, verify
+the destination, render selected documents, and remove displaced owners in the
+same change. Leave no alias, duplicate, or redirect and never retain two
+accepted decision record or notebook locations.
+
+Keep the existing literal caller rewriting; changing it is outside this
+migration. Literal rewrites miss code-built paths and fixed parent-directory
+climbs, which need manual checks after approved moves.
 
 ## Vocabulary and managed guidance
 
-Only CSE-owned tables under `## Glossary` and `## Avoid` are migration
-candidates. Move a glossary row only when every column maps exactly to the
-project vocabulary format: term, definition, required `Source:`, and optional
-code-span `Scope:` paths. Mark missing sources `sourceless`; preserve existing
-definitions and sources. A plain synonym becomes `_Avoid_:` only when its
-scope matches the term and it has no exceptions or other information to lose.
-Move other complete avoid rules, with every column, into
-`## Prose avoid rules` in `docs/scientific/CONTEXT.md`, creating that section
-if absent. Keep unrelated tables, malformed rows, and conflicting definitions
-in place; preview each retained row and its reason. Never delete a file that
-still holds unmapped vocabulary.
+Only `--approve` writes the previewed plan. Only CSE-owned tables under
+`## Glossary` and `## Avoid` supply migration candidates. Parse escaped pipes,
+and move a glossary row only if all columns map exactly. Preserve existing definitions and sources.
+A synonym becomes `_Avoid_:` only when its scope matches the term, it has no
+exceptions, and no other information would be lost. Otherwise retain the full
+rule in the existing `## Prose avoid rules` section, or create it if absent.
+Keep every unrelated table, unsupported row, and conflicting definition in
+place; the preview lists each retained row and why. A source file with unmapped
+rows remains, and its prose is not copied into the scientific context.
+New entries stay inside `## Language`, before any later second-level section, so repeated Setup cannot add unread duplicates.
 
-Existing `GLOSSARY.md`, `GLOSSARY-MAP.md`, and vocabulary-format `CONTEXT.md`
-and `CONTEXT-MAP.md` files have independent ownership. Never move, rename,
-or merge them as CSE stray records or create a map. Report the applicable
-[optional integration's upgrade step](personal-tool-integrations.md) for
-pre-1.3 files; leave contents, relationships, and links untouched. Read existing
-mapped glossaries; missing ones are lazy, not configuration errors. Without
-explicit scope, a mapped glossary applies in its own directory. The scientific context
+Recognized `GLOSSARY.md`, `GLOSSARY-MAP.md`, `CONTEXT.md`, and
+`CONTEXT-MAP.md` files have independent ownership. CSE never moves, renames,
+or merges them as stray records. For a pre-1.3 glossary, the preview reports
+the owner-specific upgrade step; see
+[personal tool integrations](personal-tool-integrations.md). Keep file
+contents, relationships, and links untouched.
+
+Read existing mapped glossaries as directed by
+[scientific-projects](scientific-projects.md). The scientific context
 links to vocabulary and owns project prose rules.
 
 Audit root `AGENTS.md` for exactly one managed CSE Protocol section between

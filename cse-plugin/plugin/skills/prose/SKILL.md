@@ -6,16 +6,16 @@ metadata:
   cse-family: "supporting"
   cse-tags: "writing-inspection"
   cse-routing:
-    direct: [operating-model, scientific-projects, BANNED]
+    direct: [operating-model, scientific-writing, BANNED]
     conditional: []
 ---
 
 # Inspect scientific prose
 
-Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-projects](../../references/workflow/scientific-projects.md), [BANNED](../../BANNED.md).
+Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-writing](../../references/workflow/scientific-writing.md), [BANNED](../../BANNED.md).
 
 Identify the exact paragraph, section, manuscript, report, reviewer response, or
-original-and-revision pair and apply the shared rules in [scientific-projects](../../references/workflow/scientific-projects.md).
+original-and-revision pair and apply the shared rules in [scientific-writing](../../references/workflow/scientific-writing.md).
 For a new or rejected manuscript, journal retarget, or material restructure, use its manuscript structure review.
 Default to inspection only. For file-backed input, run the existing deterministic
 prose check with available repository and personal authorities before semantic
@@ -36,6 +36,6 @@ request one verification inspection after its minimum effective change.
 For an explicit final manuscript check, inspect the authoritative assembled
 source and use the source-identity, complete identifier coverage,
 sentence-to-paragraph-to-section judgments, and argument-spine checkpoint in
-[scientific-projects](../../references/workflow/scientific-projects.md). Return **Revise** with exact identifiers for stale
+[scientific-writing](../../references/workflow/scientific-writing.md). Return **Revise** with exact identifiers for stale
 identity, missing coverage, or unresolved weak or broken relationships. The
 routine clear message is not a final-check result.

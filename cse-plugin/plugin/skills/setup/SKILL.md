@@ -8,7 +8,7 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model]
-    conditional: [scientific-projects, github-and-git, skill-families]
+    conditional: [scientific-projects, setup-maintenance, github-and-git, skill-families, analysis-sets]
 ---
 
 # Prepare a first scientific project
@@ -18,6 +18,9 @@ Run the read-only readiness command from the plugin root:
 `python3 scripts/workflow/check_readiness.py`. Report missing capabilities;
 never silently install them. Paths below are relative to that root (prefix
 `plugin/` from a contributor checkout).
+
+For record ownership, load [scientific-projects](../../references/workflow/scientific-projects.md);
+for analysis sets and site ownership, load [analysis-sets](../../references/workflow/analysis-sets.md).
 
 1. Inspect repository guidance, Git state, scientific records, vocabulary,
    inputs, analyses, documents, and available commands. Recommend `analysis`

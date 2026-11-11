@@ -235,7 +235,7 @@ sentence-per-line layout, blank-line boundaries, and LaTeX references and
 citations. A prose edit does not require an agent review.
 
 At a requested final check or publication handoff, invoke `cse:prose` and use
-the manuscript checkpoint in `references/workflow/scientific-projects.md`.
+the manuscript checkpoint in `references/workflow/scientific-writing.md`.
 That rule follows sentence ideas and roles through paragraph themes, section
 claims, adjacent transitions, and one manuscript argument. Material story
 changes invalidate an earlier final review; local wording changes do not

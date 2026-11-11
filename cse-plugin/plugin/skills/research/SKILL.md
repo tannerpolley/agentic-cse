@@ -15,7 +15,7 @@ metadata:
 
 Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
 
-Use `cse:zotero`, `cse:mathpix`,
+Use `cse:zotero`,
 `cse:data`, or `cse:digitize` after checking the requested external capability
 owns the unresolved source operation.
 

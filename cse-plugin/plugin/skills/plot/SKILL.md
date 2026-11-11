@@ -1,6 +1,6 @@
 ---
 name: plot
-description: "Create or review claim-led Python figures from retained scientific values, with lines for continuous relations and points for observations. Use when asked to \"plot this CSV\" or \"make a model-vs-data figure\". LaTeX-native plots go to pgfplots; diagrams to tikz."
+description: "Create or review claim-led Python figures from retained scientific values, with lines for continuous relations and points for observations. Use when asked to \"plot this CSV\" or \"make a model-vs-data figure\". LaTeX-native plots and diagrams go to tikz."
 metadata:
   cse-kind: "tool"
   cse-family: "visualize"

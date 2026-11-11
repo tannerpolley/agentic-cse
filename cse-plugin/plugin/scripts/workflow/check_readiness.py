@@ -101,13 +101,13 @@ def report() -> str:
         f"  latexmk: {'present' if latexmk else 'missing'}",
         f"  LaTeX toolchain check: {latex_status}",
         f"  Snakemake: {'present' if snakemake else 'missing'}; used by optional Snakemake workflows in cse:setup and cse:analyze",
-        "  LaTeX document skills: cse:latex, cse:beamer, cse:tikz, cse:pgfplots",
+        "  LaTeX document skills: cse:latex, cse:beamer, cse:tikz",
         f"Sources — {sources_state}",
     ]
     if zotero is None:
         lines.append(f"  Zotero companion: unavailable ({doctor_error})")
         lines.append("  Source skills: cse:research, cse:zotero, cse:data")
-        lines.append("  Mathpix: not checked; cse:mathpix")
+        lines.append("  Mathpix: not checked; cse:zotero")
     else:
         if not zotero_identified:
             lines.append("  Zotero companion: doctor response did not identify cse-zotero")
@@ -122,7 +122,7 @@ def report() -> str:
             mathpix_state = f"not ready ({mathpix_entry['reason']})"
         else:
             mathpix_state = "not reported"
-        lines.append(f"  Mathpix: {mathpix_state}; used by cse:mathpix (no conversion is run by this check)")
+        lines.append(f"  Mathpix: {mathpix_state}; used by cse:zotero (no conversion is run by this check)")
     return "\n".join(lines)
 
 

@@ -116,12 +116,11 @@ safety rules here.
 Metadata corrections and collection changes need a reviewed preview but no
 approval: apply them and report what changed. Other writes still require a
 reviewed preview and native approval immediately before applying them:
-deletions, bibliography refreshes, Mathpix conversions, and companion
-attachments. Treat paper acquisition as its own operation, separate from those
+deletions, bibliography refreshes, and companion attachments. Treat paper acquisition as its own operation, separate from those
 writes.
 
 The canonical full-library Better BibTeX export is reported by `doctor` and refreshed by `bibliography-export --apply`. Companion enforces omission of `file` fields. Project snapshots contain only cited records, flow one way from that export, and are never hand-edited. Do not update bibliography consumers until the new export has been verified.
 
 When Companion or the export capability is unavailable, an existing committed project snapshot may still support read-only writing and compilation. First verify that it contains every already-approved citation key needed by the manuscript, contains no local attachment paths, and resolves in the rendered document. Disclose that the snapshot was not refreshed. Block only bibliography refreshes, metadata corrections, and claims that require a source absent from the verified snapshot.
 
-Mathpix is on demand only after every Zotero child has been checked and no usable Markdown companion exists. Respect the configured consent denylist. Treat output as fallible transcription. Attaching it to Zotero requires a separate preview, approval, and verification.
+For PDF transcription, activate [Mathpix transcription](mathpix-transcription.md).

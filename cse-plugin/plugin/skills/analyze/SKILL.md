@@ -8,7 +8,7 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model, scientific-method]
-    conditional: [numerical-testing, failure-triage, scientific-projects]
+    conditional: [numerical-testing, failure-triage, analysis-sets]
 ---
 
 # Analyze results
@@ -17,7 +17,7 @@ Read first: [operating-model](../../references/workflow/operating-model.md), [sc
 
 Activate [numerical-testing](../../references/workflow/numerical-testing.md) for reference, invariant, convergence, or
 tolerance checks; [failure-triage](../../references/workflow/failure-triage.md) for incomplete or failed cases; and
-[scientific-projects](../../references/workflow/scientific-projects.md) for retained analysis ownership.
+[analysis-sets](../../references/workflow/analysis-sets.md) for retained analysis ownership.
 Use
 `cse:plot` when an installed rendering capability is required and
 `cse:data` after checking the data capability and retained-input authority, columns,
@@ -47,7 +47,7 @@ rendering, retain exact plotted values, run only analyses needed by the
 question, and distinguish numerical error, source uncertainty, model
 discrepancy, and named limits for the intended use.
 
-Apply the claim-led figure rule in [scientific-projects](../../references/workflow/scientific-projects.md) to retained comparisons.
+Apply the claim-led figure rule in [analysis-sets](../../references/workflow/analysis-sets.md) to retained comparisons.
 
 Project-selected output formats are sufficient; do not require PDF, PNG, and
 SVG together. Without CSE rendering, retain the numerical values and

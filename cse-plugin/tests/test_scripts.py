@@ -476,7 +476,7 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertEqual(0, result.returncode, result.stderr)
                 identity = json.loads(result.stdout)
                 self.assertEqual("cse", identity["pluginId"])
-                self.assertEqual(22, len(identity["payloadSkills"]))
+                self.assertEqual(19, len(identity["payloadSkills"]))
                 self.assertIn("prose", identity["payloadSkills"])
                 for excluded in ("tests", "docs", "examples", "AGENTS.md", ".claude-plugin/marketplace.json"):
                     self.assertFalse((destination / excluded).exists(), excluded)

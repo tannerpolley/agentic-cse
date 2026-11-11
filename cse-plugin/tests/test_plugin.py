@@ -14,8 +14,8 @@ ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugin"
 SKILLS = {
     "setup", "research", "diagnose", "design", "build", "analyze", "summarize",
-    "review", "write", "prose", "workflow", "audit", "zotero", "mathpix", "data", "digitize",
-    "plot", "tikz", "pgfplots", "latex", "quarto", "beamer",
+    "review", "write", "prose", "audit", "zotero", "data", "digitize",
+    "plot", "tikz", "latex", "quarto", "beamer",
 }
 
 
@@ -121,7 +121,7 @@ class PluginBehaviorTests(unittest.TestCase):
             self.assertIn(phase.replace(" or ", " / "), interface["display_name"])
         prose = yaml.safe_load((PLUGIN / "skills/prose/SKILL.md").read_text().split("---", 2)[1])
         self.assertEqual("supporting", prose["metadata"]["cse-kind"])
-        workflow = (PLUGIN / "skills/workflow/SKILL.md").read_text()
+        workflow = (PLUGIN / "references/workflow/operating-model.md").read_text()
         normalized_workflow = " ".join(workflow.split())
         for phrase in (
             "CSE owns its scientific stages, evidence, and acceptance",
@@ -129,20 +129,18 @@ class PluginBehaviorTests(unittest.TestCase):
             "native host delegation",
         ):
             self.assertIn(phrase, normalized_workflow)
-        frontmatter = yaml.safe_load(workflow.split("---", 2)[1])
-        self.assertEqual({"github-and-git"}, set(frontmatter["metadata"]["cse-routing"]["conditional"]))
-        build = yaml.safe_load((PLUGIN / "skills/build/SKILL.md").read_text().split("---", 2)[1])
-        self.assertIn("cse-pi-worker", build["metadata"]["cse-routing"]["conditional"])
-        for skill in ("diagnose", "analyze", "review", "workflow"):
-            metadata = yaml.safe_load((PLUGIN / "skills" / skill / "SKILL.md").read_text().split("---", 2)[1])
-            self.assertNotIn("cse-pi-worker", metadata["metadata"]["cse-routing"]["conditional"])
         self.assertNotIn("wait_threads", workflow)
         self.assertNotIn("send_message_to_thread", workflow)
+        build = yaml.safe_load((PLUGIN / "skills/build/SKILL.md").read_text().split("---", 2)[1])
+        self.assertIn("cse-pi-worker", build["metadata"]["cse-routing"]["conditional"])
+        for skill in ("diagnose", "analyze", "review"):
+            metadata = yaml.safe_load((PLUGIN / "skills" / skill / "SKILL.md").read_text().split("---", 2)[1])
+            self.assertNotIn("cse-pi-worker", metadata["metadata"]["cse-routing"]["conditional"])
         self.assertFalse((PLUGIN / "references/workflow/execution-modes.md").exists())
         setup = (PLUGIN / "skills/setup/SKILL.md").read_text()
         self.assertIn("CSE execution mode: direct.", setup)
         self.assertNotIn("CSE execution mode: baton.", setup)
-        projects = (PLUGIN / "references/workflow/scientific-projects.md").read_text()
+        projects = (PLUGIN / "references/workflow/analysis-sets.md").read_text()
         self.assertIn("required renderer executable", projects)
         self.assertNotIn("Visualize is absent", projects)
 

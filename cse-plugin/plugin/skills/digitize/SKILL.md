@@ -1,6 +1,6 @@
 ---
 name: digitize
-description: "Recover calibrated values from a figure image (XY, bar, or ternary plot) into a CSV with provenance and a QA overlay. Use when asked to \"digitize this plot\", \"extract data from this figure\", or \"get the points off this graph\". PDF text and equations go to mathpix."
+description: "Recover calibrated values from a figure image (XY, bar, or ternary plot) into a CSV with provenance and a QA overlay. Use when asked to \"digitize this plot\", \"extract data from this figure\", or \"get the points off this graph\". PDF text and equations go to zotero."
 metadata:
   cse-kind: "tool"
   cse-family: "sources"

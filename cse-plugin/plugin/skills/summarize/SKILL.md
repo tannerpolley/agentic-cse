@@ -7,13 +7,16 @@ metadata:
   cse-order: "06"
   cse-tags: "workflow"
   cse-routing:
-    direct: [operating-model, scientific-projects]
-    conditional: [scientific-method]
+    direct: [operating-model, analysis-sets]
+    conditional: [scientific-method, scientific-writing]
 ---
 
 # Summarize results
 
-Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-projects](../../references/workflow/scientific-projects.md).
+Read first: [operating-model](../../references/workflow/operating-model.md), [analysis-sets](../../references/workflow/analysis-sets.md).
+
+Activate [scientific-writing](../../references/workflow/scientific-writing.md)
+when preparing or revising notebook prose.
 
 Activate [scientific-method](../../references/workflow/scientific-method.md) for interpretation, verification, validation, or
 uncertainty. Return a chat summary of the main points and research
@@ -30,7 +33,7 @@ diagnostics, and existing notebook. A poor result may continue when values and
 diagnostics answer or bound the question. The notebook preserves provenance,
 units, uncertainty, limitations, and point-versus-line meaning, and must not
 rerun the model. Reject empty displays, unsupported curves, unsupported
-statistics, and unexplained failures. Follow [scientific-projects](../../references/workflow/scientific-projects.md) for the
+statistics, and unexplained failures. Follow [analysis-sets](../../references/workflow/analysis-sets.md) for the
 claim-led figure requirement and its table-only exceptions.
 
 The chat summary states the outcome, basis and conditions, supported quantities

@@ -6,7 +6,8 @@ supporting tools serve that spine and do not replace it.
 
 ## Smallest sufficient route
 
-Use the smallest clear route that supports the scientific claim. Reuse an
+Use the smallest clear route that supports the scientific claim and reaches the
+investigator's endpoint. Reuse an
 existing skill, reference case, standard-library or native capability before
 adding code, records, dependencies, or outputs. Keep evidence, validation,
 provenance, uncertainty, failure meaning, and data safety when simplifying.
@@ -27,10 +28,9 @@ to run every stage. Review independently checks design readiness before Build
 and delivered results or capabilities afterward. Audit and Prose are supporting
 tools, not execution phases.
 
-Use the smallest clear section route that supports the scientific claim. Direct
-tool requests return to the stage that owns the question or claim.
+Direct tool requests return to the stage that owns the question or claim.
 
-All 22 `cse:<skill>` skills are exposed by one plugin. Source skills supply
+All 19 `cse:<skill>` skills are exposed by one plugin. Source skills supply
 evidence, rendering skills consume retained values or supported claims, and
 Prose inspects scientific writing without authoring it.
 Inspect the requested external capability; never infer Zotero, corpus,
@@ -39,6 +39,27 @@ plugin caches. Any stage that finds a relevant paper missing from the project's
 Zotero library adds it through `cse:zotero`
 [acquisition](../sources/zotero-companion.md#writes-acquisition-and-bibliography)
 without asking.
+
+## Coordinate work across stages
+
+Direct execution is the default: keep the accountable lead in the current task and
+continue through the applicable stages. Use native host delegation for bounded
+independent work when useful, and follow the host's return and wait behavior.
+No fixed role hierarchy or separate coordination records are required.
+
+CSE owns its scientific stages, evidence, and acceptance. Design and Review
+retain their specialized safeguards; no generic coordination rule replaces them.
+
+The current accountable task owns authorized Git and tracker writes. Helpers
+read the accepted Design handoff and return findings and evidence to that task. Activate
+[github-and-git](github-and-git.md) for issue, branch, or delivery work.
+
+For host-specific invocation, native structured questions and subagents,
+instruction discovery, installation, and diagnostics, read the applicable
+[Codex host reference](../hosts/codex.md) or
+[Claude Code host reference](../hosts/claude.md). The shared
+workflow remains host-independent and does not require the other host or a
+host-specific coordination wrapper.
 
 ## Explore and Promote
 

@@ -8,7 +8,7 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model]
-    conditional: [code-surface-review, scientific-method, numerical-testing, failure-triage, scientific-projects, dependent-scientific-changes]
+    conditional: [code-surface-review, scientific-method, numerical-testing, failure-triage, scientific-writing, analysis-sets, dependent-scientific-changes]
 ---
 
 # Review scientific work
@@ -24,7 +24,7 @@ Use a fresh reviewer for design readiness before Build and a separate fresh
 reviewer for delivered acceptance. Neither reviewer authored the material it
 checks. CSE requires independence but selects no model, transport, staffing
 pattern, or review cascade; the active coordination guidance owns those choices.
-The manuscript structure review in [scientific-projects](../../references/workflow/scientific-projects.md) specifies independent review jobs; host guidance assigns them.
+The manuscript structure review in [scientific-writing](../../references/workflow/scientific-writing.md) specifies independent review jobs; host guidance assigns them.
 
 ## Design readiness
 
@@ -52,7 +52,7 @@ the next stage: Write, Diagnose, Research, Design, or stop.
 **Result lens —** inspect the complete research notebook, retained values, and
 selected renders. Establish whether each claim follows from the numbers,
 provenance, units, uncertainty, and intended-use limits. For figures and
-table-only exceptions, activate the rule's owner, [scientific-projects](../../references/workflow/scientific-projects.md).
+table-only exceptions, activate the rule's owner, [analysis-sets](../../references/workflow/analysis-sets.md).
 
 **Capability lens —** inspect the final implementation tree, complete changed functions,
 and direct callers and callees using [code-surface-review](../../references/workflow/code-surface-review.md). Check

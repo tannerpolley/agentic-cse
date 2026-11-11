@@ -21,8 +21,7 @@ libraries.
 | `pgfplots` | Small or moderate table-driven curves, convergence plots, model-versus-data figures, and axis-based comparisons | Expensive fits, millions of points, dense fields, or arbitrary shell commands |
 | `plot` with Python/Matplotlib | Large, computational, statistical, heatmap, 3-D, or specialized figures | Recreating a simple document-native diagram that TikZ handles directly |
 
-Use `cse:tikz` for a LaTeX-native diagram and `cse:pgfplots` for a
-LaTeX-native quantitative plot. Use `cse:plot` to select the backend when the
+Use `cse:tikz` for a LaTeX-native diagram or quantitative plot. Use `cse:plot` to select the backend when the
 user asks for a figure without specifying one.
 
 ## Source and data requirements

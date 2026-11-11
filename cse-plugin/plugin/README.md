@@ -5,7 +5,7 @@ numerical work, checked results, and a readable explanation. It suits chemical
 engineers and other researchers who work in Git repositories and want to
 check what a calculation can support. You are the **investigator**: the person
 who chooses the question, approves material decisions, and judges whether the
-result is useful. The plugin supplies 22 skills as `cse:<skill>` for Claude
+result is useful. The plugin supplies 19 skills as `cse:<skill>` for Claude
 Code and Codex; external scientific software remains project-specific.
 
 ## Install

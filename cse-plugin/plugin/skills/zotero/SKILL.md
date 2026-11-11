@@ -1,13 +1,13 @@
 ---
 name: zotero
-description: "Find, inspect, and add Zotero sources. Use when asked to cite, sync the bibliography, or search the library, or to add a paper the user named or the work found relevant. Only deletions, bibliography refreshes, Mathpix and attachments need approval. Source selection goes to research."
+description: "Find, inspect, add, and cite Zotero sources. Use when asked to sync the bibliography, search the library, add a paper, \"extract the equations from this PDF\", or \"OCR this paper into Markdown\". Source selection goes to research; figure values to digitize."
 metadata:
   cse-kind: "tool"
   cse-family: "sources"
   cse-tags: "source-pipeline, zotero"
   cse-routing:
     direct: [source-operations, zotero-companion]
-    conditional: []
+    conditional: [mathpix-transcription]
 ---
 
 # Zotero source tool
@@ -41,7 +41,10 @@ for route eligibility and publisher/browser boundaries.
 
 For metadata corrections and collection changes, preview each mutation, apply
 it without asking, and report what changed. For deletions, bibliography
-refreshes, Mathpix conversions, and companion attachments, preview each mutation
+refreshes, and companion attachments, preview each mutation
 and use native approval immediately before applying it, including after a
 blanket deletion request. Return keys, locators, authority, and limitations to the
 invoking stage.
+
+For PDF transcription, activate [mathpix-transcription](../../references/sources/mathpix-transcription.md)
+only when a transcription is needed.

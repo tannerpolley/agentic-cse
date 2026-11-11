@@ -8,14 +8,14 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model, scientific-method]
-    conditional: [scientific-projects]
+    conditional: [scientific-writing]
 ---
 
 # Write papers
 
 Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
 
-Activate [scientific-projects](../../references/workflow/scientific-projects.md) for project writing rules and retained paths.
+Activate [scientific-writing](../../references/workflow/scientific-writing.md) for project writing rules and retained paths.
 Use its manuscript structure review before a new or rejected manuscript, a journal retarget, or a material restructure.
 Use the committed bibliography snapshot read-only; an approved refresh belongs
 to CSE source after the Zotero capability is checked.
@@ -29,7 +29,7 @@ prose. Check terminology and banned language on every durable edit.
 
 Routine wording, citations, formatting, and local clarity edits remain here;
 rendering does not require a Prose cohesion inspection. Apply the
-minimal-intervention and fidelity rules in [scientific-projects](../../references/workflow/scientific-projects.md): change only
+minimal-intervention and fidelity rules in [scientific-writing](../../references/workflow/scientific-writing.md): change only
 diagnosed spans, leave clear prose unchanged, invent no specificity, preserve
 supported content, and perform one verification read. Route explicit wording,
 AI-pattern, comparison, or final manuscript checks to `cse:prose`. A material
@@ -45,7 +45,7 @@ promotion from Review Pass and do not create a status file or decision record.
 
 After checking the renderer capability, use the selected `cse:latex`,
 `cse:quarto`, `cse:beamer`, `cse:tikz`,
-`cse:pgfplots`, or `cse:plot` tool for rendering.
+or `cse:plot` tool for rendering.
 Synchronize a bibliography only through `cse:zotero` with its
 approval gate, never by hand.
 If rendering or source refresh is unavailable, retain accepted prose and report

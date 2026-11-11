@@ -18,9 +18,9 @@ PACKAGES = (
         "name": "cse",
         "root": "plugin",
         "skills": (
-            "audit", "workflow", "setup", "research", "diagnose", "design", "build",
-            "analyze", "summarize", "review", "write", "prose", "zotero", "mathpix", "data",
-            "digitize", "plot", "tikz", "pgfplots", "latex", "quarto", "beamer",
+            "audit", "setup", "research", "diagnose", "design", "build",
+            "analyze", "summarize", "review", "write", "prose", "zotero", "data",
+            "digitize", "plot", "tikz", "latex", "quarto", "beamer",
         ),
         "include": (
             ".codex-plugin", ".claude-plugin", "BANNED.md", "LICENSE", "README.md",

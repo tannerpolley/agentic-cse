@@ -1,7 +1,7 @@
 # Codex host reference
 
 The CSE plugin is one shared payload for Codex and Claude Code. Codex exposes
-the same 22 `cse:<skill>` skills, shared `references/`, and scientific assets;
+the same `cse:<skill>` skills, shared `references/`, and scientific assets;
 this file records only Codex invocation, native interaction, installation, and
 diagnostics. It does not add a second skill tree or require another host.
 

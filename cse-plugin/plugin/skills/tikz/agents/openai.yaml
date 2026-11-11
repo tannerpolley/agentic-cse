@@ -1,4 +1,4 @@
 interface:
   display_name: "CSE: Rendering — TikZ"
-  short_description: "Draw document-native scientific diagrams"
-  default_prompt: "Use $cse:tikz to create a LaTeX-native scientific diagram."
+  short_description: "Draw LaTeX-native diagrams and data plots"
+  default_prompt: "Use $cse:tikz to create a LaTeX-native scientific diagram or table-driven PGFPlots plot."

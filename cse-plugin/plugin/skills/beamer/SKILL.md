@@ -23,7 +23,7 @@ figures, and [quarto-execution](../../references/visualize/quarto-execution.md) 
 Inspect audience, purpose, source format, theme, aspect ratio, placement,
 figures, notes, and build route. Give each frame one scientific purpose and
 use overlays only when their sequence explains a relation. Design shared
-figures at the narrower placement and use `cse:tikz` or `cse:pgfplots` as
+figures at the narrower placement and use `cse:tikz` as
 appropriate. Do not repair crowding with automatic shrink.
 
 Compile the selected PDF, run visual QA, inspect every frame at full size and
