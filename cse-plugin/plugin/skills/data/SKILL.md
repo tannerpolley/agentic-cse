@@ -29,3 +29,7 @@ silently, and never promote a review-stage record to a project conclusion.
 Read-only requests do not mutate datasets, manifests, registries, or generated
 source layers. Return approved configuration or migration to `cse:setup`, and
 use `cse:zotero` for Zotero records or acquisition.
+
+For questions spanning projects, look in the catalog first: `cse-zotero data-catalog`
+rebuilds it; `cse-zotero data-query /path/to/catalog.duckdb --sql "SELECT * FROM datasets" --json`
+queries it read-only. The repository file remains the authority.

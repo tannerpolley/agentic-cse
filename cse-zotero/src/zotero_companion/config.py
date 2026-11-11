@@ -90,6 +90,7 @@ class CompanionConfig:
     denied_tags: tuple[str, ...] = ("confidential", "proprietary", "restricted")
     denied_collections: tuple[str, ...] = ()
     vpn_connection: str | None = None
+    catalog_extra_roots: tuple[Path, ...] = ()
 
     @property
     def wiki_root(self) -> Path:
@@ -163,7 +164,11 @@ def _config_from_text(text: str) -> CompanionConfig:
         isinstance(value, str) for value in denied_collections
     ):
         raise ConfigError("CSE Zotero configuration mathpix.denied_collections must be an array of strings")
+    extra_roots = paths.get("catalog_extra_roots", [])
+    if not isinstance(extra_roots, list) or not all(isinstance(value, str) and value.strip() for value in extra_roots):
+        raise ConfigError("paths.catalog_extra_roots must be an array of nonempty paths")
     return CompanionConfig(
+        catalog_extra_roots=tuple(Path(value).expanduser().resolve() for value in extra_roots),
         corpus_root=Path(paths["corpus_root"]).expanduser().resolve(),
         zotero_data_dir=Path(paths["zotero_data_dir"]).expanduser().resolve(),
         bibliography_export=Path(paths["bibliography_export"]).expanduser().resolve(),

@@ -1281,18 +1281,21 @@ def query_table(table: Path, sql: str, limit: int = 100) -> dict[str, Any]:
         raise ScientificDataError("limit must be between 1 and 10000")
 
     suffix = table.suffix.casefold()
-    if suffix not in {".csv", ".parquet", ".json", ".jsonl"}:
+    if suffix not in {".csv", ".parquet", ".json", ".jsonl", ".duckdb"}:
         raise ScientificDataError(f"Unsupported table type: {suffix}")
 
-    connection = duckdb.connect(":memory:")
+    connection = duckdb.connect(str(table), read_only=True) if suffix == ".duckdb" else duckdb.connect(":memory:")
     try:
-        if suffix == ".csv":
+        if suffix == ".duckdb":
+            relation = None
+        elif suffix == ".csv":
             relation = connection.read_csv(str(table))
         elif suffix == ".parquet":
             relation = connection.from_parquet(str(table))
         else:
             relation = connection.read_json(str(table))
-        relation.create("records")
+        if relation is not None:
+            relation.create("records")
         connection.execute("SET enable_external_access = false")
         connection.execute("SET lock_configuration = true")
         cursor = connection.execute(f"SELECT * FROM ({statement}) AS result LIMIT ?", [limit])

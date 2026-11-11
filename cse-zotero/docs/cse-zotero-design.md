@@ -531,9 +531,11 @@ all twenty tasks read-only. No vector,
 graph-database, MCP, or service layer is justified by this result.
 
 Measure retrieval recall, context size, answer audit time, stale-report volume,
-and query latency. Add vector or graph retrieval, DuckDB/Parquet compilation,
-or a service layer only when measurements show the indexed Markdown/SQLite
-path is insufficient. Do not introduce infrastructure because the architecture
+and query latency. On 2026-11-10 the owner chose a rebuildable DuckDB catalog
+and self-contained local HTML page for cross-project scientific data (#42).
+Repository files remain authoritative; the compiled catalog is disposable.
+Add vector or graph retrieval or a service layer only when measurements show
+the indexed Markdown/SQLite path is insufficient. Do not introduce infrastructure because the architecture
 looks fashionable.
 
 Exit: each added subsystem has a recorded failure mode, benchmark, and removal

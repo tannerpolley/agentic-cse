@@ -651,3 +651,35 @@ the file with `zotero-attach-companion` remains a separate approved Zotero
 write. After attachment, `wiki-evidence-sync` can adopt the matching file and
 replace its pending declaration with the Zotero attachment key. Preview sync
 before applying it.
+
+### Cross-project scientific data catalog
+
+Values, units and sources are exact copies of what the files state. Kind labels
+and the choice of listed columns are automatic and approximate; the file path
+on each row is the authority. Remaining mislabels can be corrected when noticed.
+
+Run `uv run cse-zotero data-catalog` to rebuild `catalog.duckdb` and
+`catalog.html` beside the configured corpus. Open the HTML file directly;
+it needs no server or network. Registered project repositories and the registry
+snapshot's dataset packages are read only. Add optional repositories with
+`paths.catalog_extra_roots = ["/absolute/repository"]` in config.toml (inside
+`[paths]`, use `catalog_extra_roots = [...]`), or repeat `--extra-root PATH`.
+Use `--output-dir PATH` for a disposable trial build outside the source roots.
+
+Query with `uv run cse-zotero data-query /path/to/catalog.duckdb --sql
+"SELECT project, kind, count(*) FROM datasets GROUP BY ALL" --json`.
+The catalog stores original value text, not converted numbers. `row` counts data
+records after the header (JSON parameters count extracted parameter records).
+`conditions` retains original row fields and their basis declarations; packet
+`units_basis` stays in `datasets.metadata`. Digitized tables follow the same
+mapping rules and their points carry kind `digitized`. Units come only from unit columns or sidecars (`unit_source` is
+`declared`); otherwise values keep the full column name as their property, the
+unit stays empty, and `unit_source` is `column name`. The page shows “in column
+name” for that unit and offers a `unit_source` filter. `mapped` means at least one value was mapped; it does not certify every
+column.
+Legacy or ambiguous tables remain listed with reasons. Binary `.xls` files are
+listed with unknown row counts; `.xlsx` worksheets are inventoried together.
+Generated analysis figure outputs are results, including their parameter JSON
+files. Results are never value-mapped; result files over 64 MiB are not hashed.
+Other result artifacts are summarized by analysis. Duplicate hashes are links,
+never deduplication. Missing roots fail the build; unreadable tables are reported.

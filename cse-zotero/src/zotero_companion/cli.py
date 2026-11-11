@@ -283,6 +283,11 @@ def main() -> int:
     )
     schema_validate.add_argument("--class", dest="target_class", default="CompanionCatalog")
     schema_validate.add_argument("--json", action="store_true")
+    catalog = subparsers.add_parser("data-catalog", help="rebuild the read-only cross-project catalog and local page")
+    catalog.add_argument("--output-dir", type=Path)
+    catalog.add_argument("--extra-root", action="append", type=Path, default=[])
+    catalog.add_argument("--json", action="store_true")
+
     data_query = subparsers.add_parser(
         "data-query", help="run a bounded read-only DuckDB query over a retained table"
     )
@@ -778,6 +783,18 @@ def main() -> int:
             parser.error(str(exc))
         emit_json(payload)
         return 0 if payload.get("ok", True) else 1
+    if args.command == "data-catalog":
+        from .catalog import build_catalog
+        try:
+            config = load_config()
+            registry = load_registry()
+            roots = [(slug, Path(entry["repository"])) for slug, entry in registry["projects"].items() if entry.get("repository")]
+            roots += [(path.name, path) for path in (*config.catalog_extra_roots, *args.extra_root)]
+            payload = build_catalog(roots, args.output_dir or config.corpus_root.parent, corpus=config.corpus_root)
+        except (ConfigError, ProjectError, OSError, ValueError) as exc:
+            parser.error(str(exc))
+        emit_json(payload)
+        return 0
     if args.command in {
         "schema-validate",
         "data-query",
