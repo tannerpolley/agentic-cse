@@ -4,7 +4,9 @@ import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import subprocess
+import sys
 import tempfile
 import textwrap
 import unittest
@@ -205,13 +207,41 @@ class InstallationBehaviorTests(unittest.TestCase):
             self.git_fixture(repository)
             home = root / "home"
             home.mkdir()
+            identity = subprocess.run(
+                ["python3", str(source / "scripts/package_inventory.py"), "stage", "cse", str(root / "payload"), "--commit", "0" * 40],
+                text=True, capture_output=True, check=True,
+            )
+            digest = json.loads(identity.stdout)["runtimeTreeSha256"]
+            for name, value in (("behind", digest), ("current", "different-payload"), ("missing", None)):
+                manuscript = root / name / "reports"
+                manuscript.mkdir(parents=True)
+                for filename in ("_quarto-presentation.yml", "render.sh", "manuscript.py", "preview.service"):
+                    shutil.copy2(source / "plugin/assets/visualize/project/quarto" / filename, manuscript / filename)
+                if value is not None:
+                    (manuscript / ".cse-quarto-source.json").write_text(json.dumps({"runtimeTreeSha256": value}))
+            (root / "behind/reports/render.sh").write_text("older tooling\n")
+            command_dir = root / "bin"
+            command_dir.mkdir()
+            systemctl = command_dir / "systemctl"
+            systemctl.write_text(textwrap.dedent(f'''\
+                #!/usr/bin/env python3
+                import sys
+                if "list-units" in sys.argv:
+                    for name in ("behind", "current", "missing"):
+                        print(f"cse-preview-{{name}}.service loaded active running")
+                else:
+                    name = sys.argv[3].removeprefix("cse-preview-").removesuffix(".service")
+                    print(f"WorkingDirectory={root}/{{name}}")
+                    print("ExecStart={{ path=/usr/bin/python3 ; argv[]=/usr/bin/python3 reports/manuscript.py preview reports --port 1234 ; }}")
+            '''))
+            systemctl.chmod(0o755)
             uv_cache = os.environ.get("UV_CACHE_DIR") or subprocess.run(
                 ["uv", "cache", "dir"], text=True, capture_output=True, check=True,
             ).stdout.strip()
             result = subprocess.run(
                 ["bash", "scripts/sync-live.sh", "--check"],
                 cwd=source,
-                env={**os.environ, "HOME": str(home), "UV_CACHE_DIR": uv_cache},
+                env={**os.environ, "HOME": str(home), "UV_CACHE_DIR": uv_cache, "PATH": f"{command_dir}:{os.environ['PATH']}"},
                 text=True, capture_output=True, check=False,
             )
 
@@ -219,8 +249,29 @@ class InstallationBehaviorTests(unittest.TestCase):
             identity = json.loads(next(line for line in result.stdout.splitlines() if "pluginCommit" in line))
             self.assertEqual(identity["pluginCommit"], identity["zoteroCommit"])
             self.assertIn("data-register/data-select/query lineage checks passed", identity["runtime"])
+            lines = [line for line in result.stdout.splitlines() if line.startswith("Preview ")]
+            self.assertEqual(2, len(lines), lines)
+            self.assertIn(f"Preview {root / 'behind/reports'}: older tooling: render.sh; upgrade: ", lines[0])
+            self.assertIn(f"Preview {root / 'missing/reports'}: unreadable or missing source record; upgrade: ", lines[1])
+            self.assertTrue(all("--runtime-tree-sha256 " + digest in line for line in lines))
             self.assertFalse((home / ".codex/plugins/cse").exists())
             self.assertFalse((home / ".local/share/cse/zotero").exists())
+
+            python = command_dir / "python3"
+            python.write_text(
+                '#!/usr/bin/env bash\n'
+                'if [[ "$1" == "-" && "${2:-}" == */cse-plugin/plugin ]]; then exit 17; fi\n'
+                f'exec {shlex.quote(sys.executable)} "$@"\n'
+            )
+            python.chmod(0o755)
+            failed_report = subprocess.run(
+                ["bash", "scripts/sync-live.sh", "--check"], cwd=source,
+                env={**os.environ, "HOME": str(home), "UV_CACHE_DIR": uv_cache, "PATH": f"{command_dir}:{os.environ['PATH']}"},
+                text=True, capture_output=True, check=False,
+            )
+            self.assertEqual(0, failed_report.returncode, failed_report.stderr)
+            self.assertEqual(1, failed_report.stderr.count("Preview-root report did not run (exit 17)."))
+            self.assertIn("data-register/data-select/query lineage checks passed", failed_report.stdout)
 
 
 if __name__ == "__main__":
