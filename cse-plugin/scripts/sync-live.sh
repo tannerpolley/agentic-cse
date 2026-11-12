@@ -130,6 +130,12 @@ for line in units.splitlines():
     print(f"Preview {root}: {reason}; upgrade: {command}")
 PY
 }
+# Refresh user-level hook files only when they are already installed; the
+# installer without --user or --repo leaves every settings registration alone.
+refresh_installed_hooks() {
+  [[ -d "$HOME/.local/share/cse/hooks" ]] || return 0
+  python3 "$repository_root/plugin/scripts/workflow/install_cse_hooks.py" --replace-runtime
+}
 identity_json() {
   python3 -c 'import json,sys; print(json.dumps({"payloadSha256":sys.argv[1],"pluginCommit":sys.argv[2],"runtime":sys.argv[3],"zoteroCommit":sys.argv[4]}, sort_keys=True))' "$payload_sha256" "$plugin_commit" "$1" "$zotero_commit"
 }
@@ -311,6 +317,7 @@ fi
 
 python3 "$repository_root/scripts/check-installed.py"
 committed=1
+refresh_installed_hooks || echo "Installed CSE hook refresh failed (exit $?); installation itself succeeded." >&2
 report_preview_roots || echo "Preview-root report did not run (exit $?)." >&2
 identity_json "installed wheel and schema checks passed"
 echo "Installed cse@cse from the repository marketplace and the Zotero runtime."
