@@ -45,7 +45,9 @@ results, and claim limits. Check balances, residuals, invariants, convergence,
 and failed cases before interpretation. Separate data generation from
 rendering, retain exact plotted values, run only analyses needed by the
 question, and distinguish numerical error, source uncertainty, model
-discrepancy, and named limits for the intended use.
+discrepancy, and named limits for the intended use. Show the best useful result
+(figure and numbers) with its error and comparisons even when it misses a
+target; see [numerical-testing](../../references/workflow/numerical-testing.md#tolerances).
 
 Apply the claim-led figure rule in [analysis-sets](../../references/workflow/analysis-sets.md) to retained comparisons.
 

@@ -30,7 +30,8 @@ calculate a missing result. Read the [Snakemake workflow reference](../../refere
 
 Inspect the useful method-specific result, retained values, figures,
 diagnostics, and existing notebook. A poor result may continue when values and
-diagnostics answer or bound the question. The notebook preserves provenance,
+diagnostics answer or bound the question; show the best useful result with its
+error and comparisons even when it misses a target. The notebook preserves provenance,
 units, uncertainty, limitations, and point-versus-line meaning, and must not
 rerun the model. Reject empty displays, unsupported curves, unsupported
 statistics, and unexplained failures. Follow [analysis-sets](../../references/workflow/analysis-sets.md) for the

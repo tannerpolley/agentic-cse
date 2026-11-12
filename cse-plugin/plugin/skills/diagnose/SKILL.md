@@ -28,11 +28,17 @@ the narrowest runnable command. A skipped case, timeout, subprocess failure,
 missing value, or solver message is not evidence that the physical model or
 formulation is wrong.
 
+When a result misses a limit, first trace where the limit came from (file,
+commit, issue, or source). If it has no named origin under
+[numerical-testing](../../references/workflow/numerical-testing.md#tolerances),
+stop diagnosing and report the result with its error and comparisons: Diagnose
+is for wrong or missing numbers, not imperfect ones.
+
 Use [failure-triage](../../references/workflow/failure-triage.md) to decide whether the method returned a useful numerical
 result and to bound what an incomplete case can establish. Rank a small set of
 falsifiable explanations, test them with bounded probes, and preserve the exact
 stopping point and diagnostics without imposing a fixed record template.
-Do not change implementation, weaken a tolerance, or
+Do not change implementation, silently loosen a limit with a named origin, or
 reinterpret a claim until the cause or accepted correction boundary is
 established. Test a candidate root-cause fix, such as scaling, higher
 precision, or a better-resolved reference, as a disposable bounded probe that

@@ -21,8 +21,9 @@ Research and design -- readiness Review --> Execute and deliver -- delivered Rev
 ```
 
 Research and design contains Setup when needed, Research, Diagnose, and Design.
-It loops until the question, equations, and numerical falsifier are settled;
-nothing is built there. Execute and deliver contains Build, Analyze, Summarize,
+It loops until the question, equations, any correctness check, and the
+comparisons a result will be reported against are settled; nothing is built
+there. Execute and deliver contains Build, Analyze, Summarize,
 and authorized Write and delivery. These are ownership groupings, not a demand
 to run every stage. Review independently checks design readiness before Build
 and delivered results or capabilities afterward. Audit and Prose are supporting

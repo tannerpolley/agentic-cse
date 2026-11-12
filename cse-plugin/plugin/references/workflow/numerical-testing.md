@@ -10,7 +10,7 @@ Before implementation when feasible, define a complete reference case or falsifi
 - expected value, trend, invariant, relation, or convergence behavior;
 - exact source or derivation;
 - comparison metric;
-- tolerance and tolerance rationale;
+- tolerance and its named origin;
 - failure meaning.
 
 Preferred references are literature values and accepted experiments. Analytic solutions, standards, independently implemented methods, limiting behavior, conservation relations, and repository-approved baselines are also valid when their independence and limits are clear.
@@ -76,11 +76,23 @@ Assign each failure to the smallest durable check that can expose it:
 | figure regeneration or visual completeness | figure validation command |
 | LaTeX, citation, cross-reference, or PDF freshness | manuscript build command |
 
-Before adding a helper, fixture, abstraction, or test, ask whether an existing result-level check or reference case already covers the distinct failure. Keep one check per distinct scientific risk, merge cases with the same oracle and tolerance, and move expensive breadth to an explicit validation command. Simplify by removing duplication, never by weakening a tolerance or deleting validation that protects the claim.
+Before adding a helper, fixture, abstraction, or test, ask whether an existing result-level check or reference case already covers the distinct failure. Keep one check per distinct scientific risk, merge cases with the same oracle and tolerance, and move expensive breadth to an explicit validation command. Simplify by removing duplication, never by silently loosening a limit with a named origin or deleting validation that protects the claim. A limit without one is relabelled a target and the result is shown.
 
 ## Tolerances
 
-The agent proposes; the user or repository decides. Separate:
+A limit may fail a result only when its origin is named: measurement or
+reference uncertainty, a literature model's error on the same data, numerical
+or solver precision, or an explicit owner or repository decision recorded where
+the limit lives. Any other limit is a target: report a miss with the achieved
+error, never as a failure.
+
+- **Correctness checks** require code to reproduce an analytic, reference, or
+  independent value within numerical precision. They pass or fail.
+- **Agreement with data**, such as fit quality, is a reported comparison, never
+  a gate. Report it against named comparisons: data uncertainty, the literature
+  model's error on the same data, and the previous model or fit.
+
+The agent proposes a limit; the user or repository decides. Separate:
 
 - source rounding and digitization;
 - measurement and reference uncertainty;
