@@ -1,6 +1,6 @@
 ---
 name: design
-description: "Define and hand off a scientific plan: question, model, method, reference case, tolerance, falsifier, and claim limits. Use when acting as a scientific design sub-agent, or planning a numerical study, model change, or scientific-tool correction (\"plan this study\")."
+description: "Define and hand off a scientific plan: question, model, method, correctness checks, comparisons a result is reported against, and claim limits. Use when acting as a scientific design sub-agent, or planning a numerical study, model change, or scientific-tool correction (\"plan this study\")."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -8,7 +8,7 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model, scientific-method]
-    conditional: [code-surface-review, github-and-git, decision-records, dependent-scientific-changes]
+    conditional: [code-surface-review, github-and-git, decision-records, dependent-scientific-changes, numerical-testing]
 ---
 
 # Design work
@@ -22,13 +22,16 @@ dependencies. Activate [github-and-git](../../references/workflow/github-and-git
 endpoint.
 
 Define the question, model, assumptions, inputs, domain, method, sources,
-reference cases, tolerances, outputs, claims, limitations, and checks. Preserve
+reference cases, outputs, claims, limitations, and checks. Name a correctness
+check where code correctness is at stake and the comparisons a result will be
+reported against; do not invent an acceptance number for agreement with data
+(see the [limit-origin rule](../../references/workflow/numerical-testing.md#tolerances)). Preserve
 a physical finding that meets the [fix-before-negative rule](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition). Trace each changed responsibility from public input
 through mapping, numerical owner, result, failure, and output; restore accepted
 ownership and failure meaning in the same issue.
 
 Apply the shared [decision-frontier rule](../../references/workflow/operating-model.md#decision-frontier-handoff-and-reference-reuse) to question, method, scope, and
-falsifier before Build; settled Design proceeds under authority without ritual
+checks before Build; settled Design proceeds under authority without ritual
 gate.
 
 ## Choose the work plan shape
@@ -38,12 +41,13 @@ otherwise map repository role: `analysis` → result, `tool` → capability. A
 task-level opposite shape remains valid.
 
 - **Experiment plan (result):** question, model, inputs, domain or sweep,
-  independent reference comparison, expected notebook outputs, and claim
+  named comparisons for the result, expected notebook outputs, and claim
   limits. It ends at Summarize and Review under the Result lens.
 - **Tool plan (capability):** defect or missing capability stated as a
-  numerical falsifier with input, expected value or relation, tolerance, source,
-  existing owner, passing reference cases, and what gets removed. It ends when
-  the falsifier and reference cases pass under the Capability lens. Do not add
+  correctness check with input, expected value or relation, tolerance and its
+  origin, source, existing owner, passing reference cases, and what gets
+  removed. It ends when that check and the reference cases pass under the
+  Capability lens. Do not add
   software-product concerns to this shape.
 
 The plan resolves consequential scientific and architectural decisions and

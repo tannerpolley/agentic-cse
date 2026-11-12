@@ -31,8 +31,8 @@ The manuscript structure review in [scientific-writing](../../references/workflo
 Inspect the proposed plan and decisive evidence for scientific justification
 and unnecessary complexity. Check the named numerical owner; question and
 intended use; equations or method; inputs, units, domain,
-and assumptions; independent reference case or falsifiable relation; metric and
-justified tolerance; runnable checks; failure meaning; provenance, uncertainty,
+and assumptions; independent reference case or falsifiable relation; metric,
+tolerance origin, and named comparisons for agreement with data; runnable checks; failure meaning; provenance, uncertainty,
 claim limits, complete changed surface, removal, and integration as applicable.
 An instruction-only change uses observable routing and preservation checks, not
 invented numerical targets. Return **Ready**, **Revise**, or **Block** with the
@@ -59,14 +59,20 @@ and direct callers and callees using [code-surface-review](../../references/work
 that calculations stay with the accepted numerical owner; each result field
 has a named meaning, producer, unit or basis, and availability rule; distinct fields do not reuse one value without identity evidence; missing inputs and silent exits preserve causes and valid outputs; and repeated constants,
 limits, defaults, and tolerances use their existing scientific owner. Confirm
-the accepted falsifier fails without the fix. Passing tests or line accounting
+the accepted correctness check fails without the fix. Passing tests or line accounting
 cannot replace these checks.
 
-For any refused, failed, unavailable, unresolved, tolerance-gated, or negative
+For any refused, failed, unavailable, unresolved, limit-gated, or negative
 disposition in either lens, ask whether it could be fixed: return **Not
 supported** unless the retained evidence shows the diagnosis and attempted
 root-cause fix required by
 [failure-triage](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition).
+Before treating a missed limit as **Not supported**, check its
+[origin](../../references/workflow/numerical-testing.md#tolerances). A claim
+stated by what the numbers show, such as "reproduces the data with 8% average
+error, comparable to the literature model's 7%", is **Supported** with its
+limits even when an earlier target was tighter. Ask for the result to be shown,
+not hidden behind a failed gate.
 
 Review advises on the stated use; it does not promote a notebook to manuscript
 use. Optional hardening does not expand accepted scope. A correction invalidates

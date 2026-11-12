@@ -26,9 +26,12 @@ Do not report the analysis complete or create a notebook or empty figure.
 ## Fix before a negative disposition
 
 A result may not close as refused, failed, unavailable, reference unresolved,
-tolerance gated, or a supported negative result until its cause is diagnosed
-and a root-cause fix has been attempted and shown impossible, or the case is
-shown to lie outside the stated physical domain, with retained evidence. Never
+limit gated, or a supported negative result until its cause is diagnosed and a
+root-cause fix has been attempted and shown impossible, or the case is shown to
+lie outside the stated physical domain, with retained evidence. An imperfect
+but useful result reported with its error and comparisons is not a negative
+disposition, and missing a limit without a
+[named origin](numerical-testing.md#tolerances) does not make it one. Never
 invent a value to avoid a negative outcome.
 
 - **Physical finding.** A model that, after diagnosis and fix attempts, still

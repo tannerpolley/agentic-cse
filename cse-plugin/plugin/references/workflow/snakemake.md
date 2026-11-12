@@ -17,9 +17,8 @@ The `present` entry is loaded without calculation rules. It reads the retained
 result set, verifies its completion identity and file hashes, and writes the
 table or include fragment. Missing, incomplete, or mismatched retained results
 fail with a diagnostic; presentation never manufactures a result or runs a
-model. A converged result with poor physical agreement remains retained with
-the false quantity-specific check, its diagnosis, and the fixes tried, as a
-physical finding under
+model. A converged result with poor physical agreement remains retained and
+reported with its error and comparisons as a physical finding under
 [failure-triage](failure-triage.md#fix-before-a-negative-disposition).
 
 Calculation writes to a temporary staging location and promotes the validated

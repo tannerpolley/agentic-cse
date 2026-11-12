@@ -99,10 +99,12 @@ def data_table(curve_path: Path) -> list[str]:
 def check_lines(summary: dict) -> tuple[str, list[str]]:
     fit, checks = summary["fit"], summary["checks"]
     verdict = "passed" if all(checks.values()) else "not passed; diagnose before any negative disposition (failure-triage)"
+    share = 100.0 * fit["residual_rmse_degC"] / fit["observed_range_degC"] if fit["observed_range_degC"] else float("nan")
     lines = [
         f"- Residual RMSE {inline_math(tex_number(fit['residual_rmse_degC'], 3))} {DEGREE_CELSIUS} "
-        f"against the data-scaled bound {inline_math(tex_number(fit['rmse_bound_degC'], 3))} {DEGREE_CELSIUS}: "
-        f"**{'passed' if checks['rmse_below_data_scaled_bound'] else 'not passed'}**.",
+        f"is {share:.2g} % of the observed temperature range "
+        f"{inline_math(tex_number(fit['observed_range_degC'], 3))} {DEGREE_CELSIUS}; "
+        "the observations carry no measurement uncertainty to compare it with.",
         f"- Refit from a second initial guess differs by {inline_math(tex_number(fit['refit_difference_per_s'], 2))} {PER_SECOND} "
         f"against the tolerance {inline_math(tex_number(fit['refit_tolerance_per_s'], 2))} {PER_SECOND}: "
         f"**{'passed' if checks['refit_consistent'] else 'not passed'}**.",
@@ -285,12 +287,11 @@ def present(args: argparse.Namespace) -> None:
 
     required = (
         "cooling_rate_per_s", "cooling_rate_standard_error_per_s", "cooling_rate_ci95_per_s",
-        "time_constant_s", "residual_rmse_degC", "rmse_bound_degC", "refit_difference_per_s",
+        "time_constant_s", "residual_rmse_degC", "observed_range_degC", "refit_difference_per_s",
         "refit_tolerance_per_s", "observation_count", "degrees_of_freedom",
     )
     fit = summary.get("fit", {})
-    if any(fit.get(quantity) is None for quantity in required) or not {
-        "rmse_below_data_scaled_bound", "refit_consistent"} <= checks.keys():
+    if any(fit.get(quantity) is None for quantity in required) or "refit_consistent" not in checks:
         refuse("the retained fit is missing a required quantity or check")
 
     figure, residual = generated_paths["figure"], generated_paths["residual_figure"]

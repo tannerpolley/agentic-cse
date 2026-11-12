@@ -64,8 +64,10 @@ or replacing a distinct scientific algorithm or model; changing issue
 dependencies or siblings; changing the scientific owner, governing equation,
 or numerical method; removing a required dependency, precision path, or exact
 representation; changing public scientific behavior, units, conventions,
-branches, or safeguards; or materially changing an acceptance threshold,
-evidence requirement, or claim boundary. Present the evidence, recommended
+branches, or safeguards; or materially changing an acceptance threshold
+with a [named origin](numerical-testing.md#tolerances), evidence requirement, or
+claim boundary. Relabelling an untraced limit as a target needs no
+authorization. Present the evidence, recommended
 choice, credible alternatives, and effects on scope and evidence. An
 unconfirmed material choice returns **Block**. Restoring an already authorized
 invariant needs no redundant confirmation unless the correction changes one of

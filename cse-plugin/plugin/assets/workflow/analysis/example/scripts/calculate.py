@@ -165,7 +165,6 @@ def calculate(args: argparse.Namespace) -> None:
                 if key != "fitted_temperature"
             },
             "checks": {
-                "rmse_below_data_scaled_bound": fit["rmse_below_data_scaled_bound"],
                 "refit_consistent": fit["refit_consistent"],
             },
             "inputs": {

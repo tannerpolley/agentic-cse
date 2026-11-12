@@ -65,10 +65,11 @@ adoption, no Snakemake, and an analysis site only when Quarto is present.
 
 Then start one bounded study:
 
-1. `cse:design`: state the question, equations, method, a reference case to
-   compare against, and an allowed numerical difference (the tolerance). Name
-   a **falsifier**: an observation or check that would show the proposed claim
-   is wrong. Accept the complete plan before execution.
+1. `cse:design`: state the question, equations, method, a correctness check
+   where code correctness is at stake, and the comparisons a result will be
+   reported against, such as data uncertainty or a literature model. A limit
+   fails a result only when its origin is named. Accept the complete plan
+   before execution.
 2. `cse:build`: implement the agreed calculation and its checks.
 3. `cse:analyze`: run it and inspect balances, residuals, convergence, and
    failed cases. Keep **retained values**: saved numerical inputs and results

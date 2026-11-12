@@ -4,8 +4,9 @@ The repository's tracker is the one provided by the Git host named in `origin`:
 use `gh` for GitHub and `fj` for Forgejo. For another host, inspect its live
 command help before using its tracker. If no tracker exists, Design presents
 the complete plan in the conversation; the investigator's acceptance there is
-the handoff, and the commit message records the question, reference case, and
-tolerance. Create no additional record file or lifecycle store.
+the handoff, and the commit message records the question, reference case,
+tolerance and its origin for a correctness check, and comparisons for agreement
+with data. Create no additional record file or lifecycle store.
 
 ## Issue plans
 

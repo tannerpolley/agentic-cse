@@ -11,7 +11,7 @@ Use a scientific decision record only when all four conditions hold:
 
 A reversible library choice does not pass this threshold. A numerical-method
 choice that fixes an algorithm, independent reference case, and tolerance
-rationale normally does. Offer the record; the authorized scientific owner
+origin normally does. Offer the record; the authorized scientific owner
 accepts the scientific judgment.
 
 An analysis-local fit, transform, uncertainty estimate, or figure choice fully
