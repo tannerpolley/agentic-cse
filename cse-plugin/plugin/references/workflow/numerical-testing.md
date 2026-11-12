@@ -20,7 +20,7 @@ Preferred references are literature values and accepted experiments. Analytic so
 
 Use the smallest set that can expose plausible scientific corruption:
 
-- literature or experimental reproduction;
+- reproduction of published model values (agreement with experimental data is a reported comparison, not a test);
 - analytic or manufactured solutions;
 - conservation and dimensional invariants;
 - symmetry, limiting behavior, monotonicity, and other metamorphic relations;
