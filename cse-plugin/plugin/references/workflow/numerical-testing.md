@@ -82,9 +82,10 @@ Before adding a helper, fixture, abstraction, or test, ask whether an existing r
 
 A limit may fail a result only when its origin is named: measurement or
 reference uncertainty, a literature model's error on the same data, numerical
-or solver precision, or an explicit owner or repository decision recorded where
-the limit lives. Any other limit is a target: report a miss with the achieved
-error, never as a failure.
+or solver precision, or a value the owner set. A number an agent chose is not
+an origin, even once written into a plan, issue, test, or configuration. Any
+other limit is a target: report a miss with the achieved error, never as a
+failure.
 
 - **Correctness checks** require code to reproduce an analytic, reference, or
   independent value within numerical precision. They pass or fail.
