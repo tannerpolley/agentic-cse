@@ -10,7 +10,8 @@ Before implementation when feasible, define a complete reference case or falsifi
 - expected value, trend, invariant, relation, or convergence behavior;
 - exact source or derivation;
 - comparison metric;
-- tolerance and its named origin;
+- for a correctness check, a tolerance and its origin; for agreement with data,
+  the comparisons it is reported against instead;
 - failure meaning.
 
 Preferred references are literature values and accepted experiments. Analytic solutions, standards, independently implemented methods, limiting behavior, conservation relations, and repository-approved baselines are also valid when their independence and limits are clear.
@@ -71,7 +72,8 @@ Assign each failure to the smallest durable check that can expose it:
 | termination, residual, feasibility, or constraints | numerical test |
 | refinement, tolerance, initialization, scaling, or seed sensitivity | sentinel case or explicit validation sweep |
 | conservation, bounds, normalization, symmetry, stability, or limits | scientific invariant test |
-| disagreement with an analytic, independent, published, or experimental reference | reference test |
+| disagreement with an analytic, independent, or published model value | reference test |
+| agreement with experimental data | reported comparison in the analysis, not a test |
 | changed persisted metric or manuscript number | claim-recomputation test |
 | figure regeneration or visual completeness | figure validation command |
 | LaTeX, citation, cross-reference, or PDF freshness | manuscript build command |
@@ -80,20 +82,23 @@ Before adding a helper, fixture, abstraction, or test, ask whether an existing r
 
 ## Tolerances
 
-A limit may fail a result only when its origin is named: measurement or
-reference uncertainty, a literature model's error on the same data, numerical
-or solver precision, or a value the owner set. A number an agent chose is not
-an origin, even once written into a plan, issue, test, or configuration. Any
-other limit is a target: report a miss with the achieved error, never as a
-failure.
+A limit may fail a result only when its origin is named. A number an agent
+chose is not an origin, even once written into a plan, issue, test, or
+configuration. Any other limit is a target: report a miss with the achieved
+error, never as a failure.
 
-- **Correctness checks** require code to reproduce an analytic, reference, or
-  independent value within numerical precision. They pass or fail.
-- **Agreement with data**, such as fit quality, is a reported comparison, never
-  a gate. Report it against named comparisons: data uncertainty, the literature
-  model's error on the same data, and the previous model or fit.
+- **Correctness checks** pass or fail: code reproduces an analytic, reference,
+  published-model, or independent value; a result converges under grid, step,
+  or solver refinement; or legitimate methods agree. The tolerance's origin is
+  numerical or solver precision, discretization or sampling error, variation
+  between legitimate methods, or a value the owner set.
+- **Agreement with data**, such as fit quality or agreement with experimental
+  or literature measurements, is never a gate unless the owner set the value.
+  Report it against named comparisons: measurement uncertainty, a literature
+  model's error on the same data, and the previous model or fit. These are
+  comparisons, not origins that fail it.
 
-The agent proposes a limit; the user or repository decides. Separate:
+The agent proposes a limit; it gates only once the owner sets it. Separate:
 
 - source rounding and digitization;
 - measurement and reference uncertainty;

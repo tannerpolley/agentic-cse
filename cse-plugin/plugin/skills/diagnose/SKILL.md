@@ -30,9 +30,11 @@ formulation is wrong.
 
 When a result misses a limit, first trace where the limit came from (file,
 commit, issue, or source). If it has no named origin under
-[numerical-testing](../../references/workflow/numerical-testing.md#tolerances),
-stop diagnosing and report the result with its error and comparisons: Diagnose
-is for wrong or missing numbers, not imperfect ones.
+[numerical-testing](../../references/workflow/numerical-testing.md#tolerances)
+and the number is physically plausible in units, sign, magnitude, trend, and
+balances, stop diagnosing and report the result with its error and
+comparisons. An implausible number is diagnosed regardless of any limit:
+Diagnose is for wrong or missing numbers, not imperfect ones.
 
 Use [failure-triage](../../references/workflow/failure-triage.md) to decide whether the method returned a useful numerical
 result and to bound what an incomplete case can establish. Rank a small set of

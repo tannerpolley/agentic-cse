@@ -47,18 +47,16 @@ def fit_rate(
     standard_error = float(np.sqrt(residual_variance / np.dot(jacobian, jacobian)))
     half_width = float(student_t.ppf(0.975, degrees_of_freedom)) * standard_error
 
-    # Both checks scale from this data set and fitted quantity; no external
-    # benchmark value or solver tolerance is an acceptance oracle.
-    rmse_bound = max(float(np.ptp(observed_temperature)) * 0.05, np.finfo(float).eps)
+    # Agreement with data is reported, not gated: the RMSE is compared with the
+    # observed temperature range because these observations carry no measurement
+    # uncertainty. The refit check is a correctness check whose tolerance comes
+    # from numerical precision at the fitted rate.
+    observed_range = float(np.ptp(observed_temperature))
     refit_difference = abs(cooling_rate - refit_rate)
     refit_tolerance = max(
         abs(cooling_rate) * 1e-9,
         np.finfo(float).eps * max(1.0, abs(cooling_rate)) * 100.0,
     )
-    checks = {
-        "rmse_below_data_scaled_bound": rmse < rmse_bound,
-        "refit_consistent": refit_difference <= refit_tolerance,
-    }
 
     return {
         "cooling_rate_per_s": cooling_rate,
@@ -69,10 +67,9 @@ def fit_rate(
         "observation_count": int(time_s.size),
         "degrees_of_freedom": degrees_of_freedom,
         "residual_rmse_degC": rmse,
-        "rmse_bound_degC": rmse_bound,
+        "observed_range_degC": observed_range,
         "refit_difference_per_s": refit_difference,
         "refit_tolerance_per_s": refit_tolerance,
-        "rmse_below_data_scaled_bound": checks["rmse_below_data_scaled_bound"],
-        "refit_consistent": checks["refit_consistent"],
+        "refit_consistent": refit_difference <= refit_tolerance,
         "fitted_temperature": fitted_temperature,
     }

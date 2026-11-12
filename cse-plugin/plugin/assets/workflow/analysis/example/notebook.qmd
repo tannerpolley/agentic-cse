@@ -90,9 +90,9 @@ $$ {#eq-rate-standard-error}
 
 and the 95 % interval in @tbl-cooling-parameters is
 $\hat{k} \pm t_{0.975,\,n-1}\,\mathrm{SE}(\hat{k})$ from @eq-rate-standard-error.[^linearized]
-The residual RMSE bound used by the numerical check is 5 % of the observed
-temperature range; the refit tolerance scales with $\hat{k}$ (see the model
-source below).
+The residual RMSE is reported against the observed temperature range, not
+gated, because the observations carry no measurement uncertainty; the refit
+tolerance scales with $\hat{k}$ (see the model source below).
 
 [^linearized]: This estimate linearizes the model around $\hat{k}$ and omits
     any uncertainty in $T_a$ and $T_0$, so the full uncertainty of $k$ can be

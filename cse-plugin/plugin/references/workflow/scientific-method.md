@@ -11,7 +11,7 @@ For substantive work, establish:
 - inputs, data sources, and source locators;
 - the numerical or analytical method;
 - reference cases and independent comparisons;
-- metrics, tolerances, and their rationale;
+- metrics, tolerances and their origin for correctness checks, and comparisons for agreement with data;
 - sensitivity, convergence, uncertainty, and comparison studies;
 - claims the work may support and claims it cannot support;
 - known limitations and unresolved questions.

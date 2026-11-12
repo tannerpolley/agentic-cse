@@ -73,7 +73,7 @@ def write_retained_set(root: Path, *, rate: float = 0.005, keep_inputs: bool = F
     write(paths["residual_figure"], png(100))
     summary = {
         "complete": True,
-        "checks": {"rmse_below_data_scaled_bound": True, "refit_consistent": True},
+        "checks": {"refit_consistent": True},
         "environment": {"python": "3.13.14", "packages": {"numpy": "2.5.3"}},
         "parameters": {"ambient_temperature_degC": 22.0, "initial_temperature_degC": 90.0},
         "inputs": {f"{name}_sha256": sha256(root / paths[name])
@@ -81,7 +81,7 @@ def write_retained_set(root: Path, *, rate: float = 0.005, keep_inputs: bool = F
         "fit": {
             "cooling_rate_per_s": rate, "cooling_rate_standard_error_per_s": rate / 100,
             "cooling_rate_ci95_per_s": [rate * 0.98, rate * 1.02], "time_constant_s": 1 / rate,
-            "residual_rmse_degC": 0.1, "rmse_bound_degC": 3.4, "refit_difference_per_s": 1e-16,
+            "residual_rmse_degC": 0.1, "observed_range_degC": 17.5, "refit_difference_per_s": 1e-16,
             "refit_tolerance_per_s": 1e-12, "observation_count": 2, "degrees_of_freedom": 1,
         },
         "generated_files": {name: {"path": paths[name], "sha256": sha256(root / paths[name])}
