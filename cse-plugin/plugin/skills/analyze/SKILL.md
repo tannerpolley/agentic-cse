@@ -16,7 +16,9 @@ metadata:
 Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
 
 Activate [numerical-testing](../../references/workflow/numerical-testing.md) for reference, invariant, convergence, or
-tolerance checks; [failure-triage](../../references/workflow/failure-triage.md) for incomplete or failed cases; and
+tolerance checks; [failure-triage](../../references/workflow/failure-triage.md) for incomplete or failed cases,
+and its [run-cost rule](../../references/workflow/failure-triage.md#run-cost-plausibility)
+for expensive or unexpectedly slow runs; and
 [analysis-sets](../../references/workflow/analysis-sets.md) for retained analysis ownership.
 Use
 `cse:plot` when an installed rendering capability is required and

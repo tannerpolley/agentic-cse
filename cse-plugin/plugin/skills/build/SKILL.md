@@ -17,7 +17,9 @@ Read first: [operating-model](../../references/workflow/operating-model.md), [co
 
 Activate [scientific-method](../../references/workflow/scientific-method.md) for equations, conventions, or validity;
 [numerical-testing](../../references/workflow/numerical-testing.md) for the result-level reference or invariant; and
-[failure-triage](../../references/workflow/failure-triage.md) when failures or incomplete cases are in scope. Activate
+[failure-triage](../../references/workflow/failure-triage.md) when failures or incomplete cases are in scope,
+and its [run-cost rule](../../references/workflow/failure-triage.md#run-cost-plausibility)
+for expensive or unexpectedly slow builds or validation runs. Activate
 [github-and-git](../../references/workflow/github-and-git.md) for
 the issue, branch, or integration authority.
 
