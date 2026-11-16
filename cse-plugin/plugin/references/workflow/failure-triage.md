@@ -65,3 +65,22 @@ in the retained analysis to bound coverage. Distinguish execution boundaries,
 numerical nonconvergence, invalid physical states, and disagreement with a
 reference. A longer run is a deliberate numerical experiment, not an
 automatic retry.
+
+## Run cost plausibility
+
+Before an expensive fit, sweep, engine build, or other run, estimate elapsed
+time from a small representative timed probe or comparable prior runs. State
+the evidence, workload, scaling assumptions, and uncertainty in the existing
+task record. Check whether the estimate itself is plausible for the work; a
+slow prior run is not sufficient justification.
+
+Treat an expected or observed duration far beyond that estimate, or beyond
+what the work plausibly needs, as a defect to diagnose before launching or
+continuing the full run. Use bounded profiling to locate repeated work,
+avoidable rebuilds, or a costly numerical step. Reuse an engine or wheel
+already built for the current source and compatible build settings and
+environment.
+
+Revise the estimate only with evidence. Do not merely extend the wait or
+relax scientific checks. An unexpectedly slow run needs diagnosis even when
+its numerical result is useful; runtime alone does not invalidate that result.

@@ -1,6 +1,6 @@
 ---
 name: diagnose
-description: "Diagnose unexpected scientific or numerical results through reproduction and bounded probes before changing a calculation. Use when asked \"why does my solver diverge\" or \"why doesn't this match the reference\", or about numerical NaNs and non-convergence. Software bugs go to diagnosing-bugs."
+description: "Diagnose scientific failures or implausible run times through reproduction and bounded probes. Use when asked \"why does my solver diverge\", \"why is this run so slow\", or \"why doesn't this match the reference\", or about numerical NaNs and non-convergence. Other software bugs go to diagnosing-bugs."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -15,6 +15,9 @@ metadata:
 
 Read first: [operating-model](../../references/workflow/operating-model.md), [failure-triage](../../references/workflow/failure-triage.md).
 
+For expensive or unexpectedly slow runs, apply the
+[run-cost rule](../../references/workflow/failure-triage.md#run-cost-plausibility).
+
 Apply the shared [decision-frontier rule](../../references/workflow/operating-model.md#decision-frontier-handoff-and-reference-reuse) after inspection to an unresolved causal
 distinction or the smallest bounded next probe.
 
@@ -28,13 +31,13 @@ the narrowest runnable command. A skipped case, timeout, subprocess failure,
 missing value, or solver message is not evidence that the physical model or
 formulation is wrong.
 
-When a result misses a limit, first trace where the limit came from (file,
-commit, issue, or source). If it has no named origin under
+When a numerical result misses a limit, first trace where the limit came from
+(file, commit, issue, or source). If it has no named origin under
 [numerical-testing](../../references/workflow/numerical-testing.md#tolerances)
 and the number is physically plausible in units, sign, magnitude, trend, and
 balances, stop diagnosing and report the result with its error and
-comparisons. An implausible number is diagnosed regardless of any limit:
-Diagnose is for wrong or missing numbers, not imperfect ones.
+comparisons. An implausible numerical value is diagnosed regardless of any
+limit; an imperfect but physically plausible result alone needs no diagnosis.
 
 Use [failure-triage](../../references/workflow/failure-triage.md) to decide whether the method returned a useful numerical
 result and to bound what an incomplete case can establish. Rank a small set of
