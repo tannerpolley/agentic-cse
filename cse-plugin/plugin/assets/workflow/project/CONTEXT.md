@@ -18,8 +18,6 @@ State the scientific question, intended decision or use, and the domain in which
 Name the accountable owners for the scientific question, source data, model,
 analysis, and writing.
 
-Project vocabulary: [GLOSSARY.md](../../GLOSSARY.md).
-
 ## Scientific map
 
 - Formulation: `docs/scientific/formulation.md` when enabled

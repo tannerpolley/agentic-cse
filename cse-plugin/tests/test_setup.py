@@ -46,8 +46,8 @@ and numerical evidence before changing a calculation. Reuse accepted decisions.
 Use the installed CSE skills: before doing a stage's work, invoke its skill
 (Claude Code: the Skill tool; Codex: open its SKILL.md). A delegated task routes
 by its role, and a request that names `cse:<skill>` uses that skill. Read
-`docs/scientific/README.md` and `docs/scientific/CONTEXT.md` before selecting the
-evidence-justified route.
+`docs/scientific/README.md` and the sections of `docs/scientific/CONTEXT.md`
+the task needs before selecting the evidence-justified route.
 
 {ROUTES}
 
@@ -116,6 +116,7 @@ class ManagedProtocolTests(unittest.TestCase):
                 agents = (root / "AGENTS.md").read_text()
                 self.assertIn("<!-- CSE:BEGIN PROTOCOL -->", agents)
                 self.assertIn(f"**Agent role:** Work as {AGENT_ROLE}.", agents)
+                self.assertIn("the sections of `docs/scientific/CONTEXT.md`\nthe task needs", agents)
                 readme = (root / "docs/scientific/README.md").read_text()
                 self.assertIn("Research before Design or Build", readme)
                 self.assertIn("Diagnose first", readme)
@@ -350,6 +351,17 @@ class ManagedProtocolTests(unittest.TestCase):
             self.assertTrue((root / "docs/scientific/README.md").is_file())
             self.assertFalse((root / ".codex/hooks.json").exists())
             self.assertFalse((root / ".claude/settings.json").exists())
+
+    def test_reconciliation_links_only_existing_or_created_root_glossary(self):
+        for exists in (False, True):
+            with self.subTest(exists=exists), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                if exists:
+                    (root / "GLOSSARY.md").write_text("# Vocabulary\n")
+                setup.apply_reconciliation(root, setup.plan_reconciliation(root, "analysis"), "analysis", ROLE)
+                context = (root / "docs/scientific/CONTEXT.md").read_text()
+                self.assertEqual(exists, setup.GLOSSARY_LINK in context)
+                self.assertEqual(exists, (root / "GLOSSARY.md").exists())
 
     def test_reconciliation_migrates_context_tables_to_root_glossary(self):
         root = self.repo

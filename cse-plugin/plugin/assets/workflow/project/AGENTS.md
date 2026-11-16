@@ -2,7 +2,8 @@
 
 This is a CSE project. Every agent performing scientific or engineering work
 MUST use the installed CSE skills and MUST read `docs/scientific/README.md` and
-`docs/scientific/CONTEXT.md` before selecting the evidence-justified CSE route.
+the sections of `docs/scientific/CONTEXT.md` the task needs before selecting
+the evidence-justified CSE route.
 
 CSE execution mode: direct.
 

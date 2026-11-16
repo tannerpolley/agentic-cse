@@ -620,7 +620,7 @@ def plan_reconciliation(repo: Path, role: str | None = None,
               else (ASSETS / "CONTEXT.md").read_text(encoding="utf-8"))
     if not target.is_file() and agent_role_state(all_context_text)["role"]:
         merged = AGENT_ROLE_SECTION.sub("", merged)
-    if GLOSSARY_LINK not in merged:
+    if ((repo / "GLOSSARY.md").is_file() or "GLOSSARY.md" in migration["updates"]) and GLOSSARY_LINK not in merged:
         heading = re.search(r"(?m)^## ", merged)
         position = heading.start() if heading else len(merged)
         merged = merged[:position].rstrip() + "\n\n" + GLOSSARY_LINK + "\n\n" + merged[position:]
