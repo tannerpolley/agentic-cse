@@ -99,8 +99,9 @@ _Avoid_: “regression test” in CSE prose.
 
 **CSE audit**:
 A read-only inspection for generic software-engineering ceremony that displaces
-scientific questions, methods, numerical work, and interpretation. It does not
-judge scientific truth or replace Review.
+scientific questions, methods, numerical work, and interpretation, and for
+numerical limits without traced origins. It does not judge scientific truth
+or replace Review.
 
 **Provenance**:
 The recorded origin, transformation, and identity of a source, input, result,

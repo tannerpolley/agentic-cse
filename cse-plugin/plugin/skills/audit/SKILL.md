@@ -1,18 +1,19 @@
 ---
 name: audit
-description: "Audit scientific repositories read-only for software ceremony, duplicated values, misplaced records, and unsourced scientific names. Use when asked \"what can I delete\" or \"audit this scientific repo\". Scientific support goes to review; writing to prose."
+description: "Audit scientific repositories read-only for software ceremony, duplicated values, misplaced records, unsourced names, and untraced limits or tolerances. Use when asked \"what can I delete\", \"audit this repo\", or \"find hard-coded tolerances\". Scientific support goes to review; writing to prose."
 metadata:
   cse-kind: "supporting"
   cse-family: "supporting"
   cse-tags: "audit"
   cse-routing:
     direct: [operating-model, BANNED]
-    conditional: [retrospective]
+    conditional: [retrospective, numerical-testing]
 ---
 
 # Audit CSE practice
 
 Read first: [operating-model](../../references/workflow/operating-model.md), [BANNED](../../BANNED.md).
+When inspecting limits, read [Tolerances](../../references/workflow/numerical-testing.md#tolerances), the sole limit-origin rule owner.
 
 For a requested session retrospective, read [retrospective](../../references/workflow/retrospective.md)
 and use its science categories. If `/retro` is available, pair it with those
@@ -41,6 +42,7 @@ Hunt for:
 - scientific calculations or transformations outside the designated owner;
 - result mapping that duplicates, fabricates, drops, or changes the meaning of a produced value; silent exits that erase failure or unavailability causes;
 - duplicated equations, physical limits, constants, defaults, or tolerances;
+- numerical limits with no traced origin, using the procedure below;
 - semantically distinct fields populated from one source without identity evidence;
 - unique values, inputs, provenance, or interpretation stored under the wrong
   owner;
@@ -51,7 +53,38 @@ Hunt for:
 - existing generators, templates, or check seams that repeatedly recreate or
   permit the same problem.
 
-Before reporting a change, establish the actual owner and readers or callers,
+## Trace numerical limits
+
+Inventory active languages; search semantic names (tol, eps, max_iter, bounds,
+floors, ceilings, cutoffs, retries) and control sites: comparisons, loops/ranges,
+solver arguments/defaults, min/max/clip, and numeric tables. Include integers
+such as 7, signed/scientific notation, expressions, and named/default/derived
+values controlling convergence, counts, bounds, clipping, or thresholds.
+Searches yield candidates; read surrounding functions and trace definitions,
+configuration overrides, and consumers with available code-navigation tools.
+
+For each candidate, establish quantity/units where discoverable, actual stopping
+or admission predicate, definition/use sites, and the record supporting that
+value for that use. Follow comments, policy entries, upstream expressions,
+methods/equations, source locators, and owner decisions. A name, constants file,
+issue number, source field, or nearby citation alone is insufficient; inspect
+the evidence and applicability, including every derived multiplier.
+
+Apply the linked rule: distinguish **traced limit** (applicable origin and exact
+locator; provenance, not scientific endorsement), **untraced limit** (say “no
+named origin found in the inspected scope,” with searched evidence and missing
+justification), and **unresolved** (ambiguous role or unavailable evidence;
+retain `investigate` and name what is missing). Documented guesses/provisional
+values remain visible, not justified by being recorded. Establish physical
+constants' roles, units, and sources where present; exclude ordinary equation
+constants and unit conversions from untraced-limit findings. Equation-imposed
+domain bounds are limits traced to their derivation; physical constants do not
+justify unexplained threshold multipliers. Report evidence without replacement
+numbers, automatic safeguard changes, or scientific correctness verdicts.
+
+## Report
+
+For cleanup suggestions, establish the actual owner and readers or callers,
 whether the suspect path contains unique scientific values, the duplication or
 absence evidence, the exact authoritative destination or replacement, and the
 smallest check that proves preservation. For a repeated problem, identify the
@@ -65,7 +98,7 @@ limits, source provenance, units, numerical safeguards, method diagnostics,
 uncertainty, and approved persistent behavior checks when they serve an actual
 need. An exact official filename or code identifier is not a finding by itself.
 
-Group findings by the root generator or ownership mistake. Rank scientific
+Group cleanup findings by the root generator or ownership mistake. Rank scientific
 displacement first, then estimated removable files or lines; put wording-only
 findings last. Use these tags:
 
@@ -77,14 +110,26 @@ findings last. Use these tags:
 - `prevent`: change one existing generator or check seam that caused repeated
   findings;
 - `keep`: record why a tempting construct is scientifically necessary; and
-- `investigate`: state the unresolved ownership evidence.
+- `investigate`: state missing origin or unresolved ownership/tracing evidence.
 
-Write each finding on one line:
+Write each cleanup finding on one line:
 
 `tag: <evidence>; <exact action, authoritative owner, and preservation check>. <estimated files or lines removed>. [paths]`
 
-End with `net:` followed by estimated files and lines removed or renamed, unique
-values preserved or moved, and unresolved investigations. Report no
-score, compliance state, audit JSON, or new audit machinery. If nothing material
-is found, say `CSE practice is lean.` When implementation is requested, route grouped
-findings to `cse:design` as one bounded plan proposal.
+Add a separate limits section grouped by definition file (use file for inline
+literals), combining repeated uses and citing consumers. Use `investigate` for
+untraced/unresolved limits and `keep` for traced exclusions:
+
+`tag: <definition path:line>; <symbol, literal/expression, resolved value if available>; <use path:line and effect>; <trace classification>; <origin locator or searched/missing evidence>.`
+
+Briefly summarize traced and physical-constant exclusions with representative
+evidence. Limits need no removal estimate or deletion recommendation.
+
+End with inspected scope/exclusions and unresolved tracing. For cleanup, include
+`net:` estimates of files/lines removed or renamed, unique values preserved or
+moved, and unresolved investigations. Report no score, compliance state, audit
+JSON, or new audit machinery. A limits-only audit without findings says “no
+untraced limits found in the inspected scope.” Say `CSE practice is lean.` only
+for a completed ordinary cleanup audit without material findings; never give an
+all-clear with unchecked files or origins. When implementation is requested,
+route grouped findings to `cse:design` as one bounded plan proposal.
