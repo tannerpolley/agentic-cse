@@ -33,3 +33,6 @@ Compile the selected PDF, run visual QA, inspect every frame at full size and
 in grayscale, and reject errors, unresolved references, clipping, substitutions,
 or unexplained overfull boxes. Material changes return to core CSE Review;
 successful rendering is not Review Pass.
+
+For source, figure, and deck identifier advisories, follow the shared
+[reader-facing identifier check](../../references/workflow/scientific-writing.md#reader-facing-identifiers).

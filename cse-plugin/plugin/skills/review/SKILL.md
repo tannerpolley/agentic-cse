@@ -84,3 +84,6 @@ Review advises on the stated use; it does not promote a notebook to manuscript
 use. Optional hardening does not expand accepted scope. A correction invalidates
 the affected final-tree conclusion and requires the complete applicable lens
 again; preserve still-valid evidence.
+
+For source, figure, and deck identifier advisories, follow the shared
+[reader-facing identifier check](../../references/workflow/scientific-writing.md#reader-facing-identifiers).

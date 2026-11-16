@@ -3,6 +3,9 @@
 
 from __future__ import annotations
 
+import ast
+import zipfile
+from xml.etree import ElementTree as ET
 import argparse
 import fnmatch
 from pathlib import Path
@@ -236,6 +239,192 @@ def violations(paths: list[Path], *, rules: list[dict] | None = None,
     return failures
 
 
+IDENTIFIER_SUFFIXES = {".md", ".qmd", ".tex", ".py", ".pptx"}
+IDENTIFIERS = {
+    "issue/PR": r"(?i:\b(?:issue|pr)\s*#?\s*\d+\b)",
+    "run/fit label": r"(?<![\w/])(?:F|A)\d+(?:[-–](?:[FA])?\d+)?(?![\w/])",
+    "hash": r"(?i:\b(?:commit|sha-?256)(?:\s+(?:hash|prefix))?\s*[:=]?\s*[0-9a-f]{6,64}\b|(?<!\w)(?:[0-9a-f]{40}|[0-9a-f]{64})(?!\w))",
+    "repository path": r"(?<![\w/:])(?:\.{1,2}/|/)?(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+(?![\w/])",
+}
+
+
+def hide(pattern, text, flags=0):
+    return re.sub(pattern, lambda m: re.sub(r"[^\n]", " ", m[0]), text, flags=flags)
+
+
+def visible_lines(text, suffix):
+    """Bounded source extraction; masking retains source line numbers."""
+    text = hide(r"<!--.*?-->", text, re.S) if suffix != ".tex" else text
+    text = hide(r"(?s)\$\$.*?\$\$|(?<!\\)\$[^$]*\$|\\\(.*?\\\)|\\\[.*?\\\]", text)
+    fence = environment = None
+    metadata = False
+    caption = False
+    for number, line in enumerate(text.splitlines(), 1):
+        if suffix == ".tex":
+            line = hide(r"(?<!\\)%.*", line)
+            prefix = ""
+            if environment:
+                end = re.search(r"\\end\{" + re.escape(environment) + r"\}", line)
+                if not end:
+                    continue
+                line, environment = line[end.end():], None
+            begin = re.search(r"\\begin\{(verbatim\*?|lstlisting|minted|equation\*?|align\*?|gather\*?|displaymath|math)\}", line)
+            if begin:
+                prefix, environment = line[:begin.start()], begin[1]
+                end = re.search(r"\\end\{" + re.escape(environment) + r"\}", line[begin.end():])
+                line = prefix + (line[begin.end() + end.end():] if end else "")
+                if end:
+                    environment = None
+            # shortcut: single-line arguments only; inspect assembled output for macros or multiline arguments.
+            line = re.sub(r"\\[A-Za-z]*cite[A-Za-z]*\*?(?:\[([^]]*)\])?\{[^}]*\}", lambda m: m[1] or "", line)
+            line = hide(r"\\(?:label|(?:eq|auto|page|[cC])?ref|[A-Za-z]*cite[A-Za-z]*|include(?:graphics)?|input|bibliography|usepackage|(?:re)?newcommand|providecommand)\*?(?:\[[^]]*\])*\{[^}]*\}(?:\[[^]]*\])?(?:\{[^}]*\})?", line)
+            line = hide(r"\\(?:ce|ch|si|SI|unit)(?:\[[^]]*\])*\{[^}]*\}(?:\{[^}]*\})?", line)
+            line = hide(r"\\href\{[^}]*\}", line)
+            line = hide(r"\\[A-Za-z]+\*?\{", line).replace("}", " ")
+            line = line.replace(r"\#", "#").replace(r"\_", "_")
+        else:
+            if number == 1 and line.strip() == "---":
+                metadata = True
+                continue
+            if metadata and line.strip() in {"---", "..."}:
+                metadata = caption = False
+                continue
+            marker = re.match(r"^\s*(`{3,}|~{3,})", line)
+            if marker:
+                fence = None if fence == marker[1][0] else marker[1][0]
+                continue
+            option = re.match(r"\s*#\|\s*(.*)", line)
+            if metadata or option:
+                field = re.match(r"\s*([\w-]+):\s*(.*)", option[1] if option else line)
+                if field:
+                    caption = field[1] in {"title", "subtitle", "fig-cap", "tbl-cap", "fig-alt"}
+                    line = field[2] if caption else ""
+                elif option and caption:
+                    line = option[1]
+                elif not caption or not line.startswith((" ", "\t")):
+                    continue
+            elif fence or line.startswith(("    ", "\t")):
+                continue
+            line = hide(r"`[^`]*(?:[A-Za-z_]\w*\(|\s=\s)[^`]*`", line)
+            line = hide(r"`+(?:\{[rR]|\{python|python[\d.]*\s|bash\s|git\s|codex\s|uv\s|quarto\s|rg\s)[^`]*`+", line)
+            line = hide(r"(?<=\])\([^)]*\)|(?<=\])\[[^]]*\]|^\s{0,3}\[(?!\^)[^]]+\]:.*|\{[^}]*#[^}]*\}|(?<!\w)@[\w:.-]+", line)
+        yield str(number), line
+
+
+def figure_text(path):
+    tree = ast.parse(path.read_text(encoding="utf-8"))
+    def literals(node):
+        if isinstance(node, ast.Constant) and isinstance(node.value, str):
+            return node.value, False
+        if isinstance(node, (ast.List, ast.Tuple, ast.JoinedStr)):
+            pieces = [literals(item) for item in (node.values if isinstance(node, ast.JoinedStr) else node.elts)]
+            return ("" if isinstance(node, ast.JoinedStr) else " ").join(p[0] for p in pieces), any(p[1] for p in pieces)
+        return " ", True
+    for call in ast.walk(tree):
+        if not isinstance(call, ast.Call):
+            continue
+        name = getattr(call.func, "attr", getattr(call.func, "id", ""))
+        nodes = [kw.value for kw in call.keywords if kw.arg in {"xlabel", "ylabel", "title", "label"}
+                 or (name == "legend" and kw.arg == "labels") or (name in {"text", "annotate"} and kw.arg in {"s", "text"})]
+        position = 2 if name == "text" else 0
+        if name in {"xlabel", "ylabel", "title", "suptitle", "set_xlabel", "set_ylabel", "set_title", "text", "annotate", "set_xticklabels", "set_yticklabels"} and len(call.args) > position:
+            nodes.append(call.args[position])
+        for node in nodes:
+            text, dynamic = literals(node)
+            yield str(node.lineno), text
+            if dynamic:
+                yield str(node.lineno), None
+
+
+def slide_text(path):
+    with zipfile.ZipFile(path) as archive:
+        for part in sorted(archive.namelist()):
+            if not re.fullmatch(r"ppt/slides/slide\d+\.xml", part):
+                continue
+            ns = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
+            for number, paragraph in enumerate(ET.fromstring(archive.read(part)).iter(ns + "p"), 1):
+                text = "".join(
+                    "\n" if el.tag == ns + "br" else el.text or ""
+                    for el in paragraph.iter() if el.tag in {ns + "t", ns + "br"})
+                yield f"{part}:paragraph {number}", text
+
+
+def scientific_approvals(root, path, warnings):
+    style = root / "docs/scientific/writing/STYLE.md"
+    approved, sources = set(), []
+    if not style.is_file():
+        return approved
+    relative = relative_path(path, root)
+    def matches(patterns):
+        return any(fnmatch.fnmatchcase(relative, p) for p in patterns)
+    def scopes(value):
+        values = [p.strip().strip("`") for p in value.split(";") if p.strip()]
+        if any(p.startswith("/") or ".." in Path(p).parts for p in values):
+            warnings.append(f"{style}: incomplete scan: invalid approval path")
+            return []
+        return values
+    for number, line in enumerate(style.read_text(encoding="utf-8").splitlines(), 1):
+        if line.startswith("## "):
+            sources = []
+        if line.startswith("Sources:"):
+            sources = scopes(line.partition(":")[2])
+        if not matches(sources):
+            continue
+        if "Approved scientific labels:" in line:
+            cells = [c.strip() for c in line.strip().strip("|").split("|")]
+            if len(cells) != 3 or not cells[1].startswith("Approved scientific labels:") or not cells[2] or not re.search(r"`[^`]+`", cells[1]):
+                warnings.append(f"{style}:{number}: incomplete scan: malformed scientific-label approval")
+            elif matches(scopes(cells[0])):
+                approved.update(re.findall(r"`([^`]+)`", cells[1]))
+        elif re.search(r"(?i)\b(pointer|external|brief)\b", line):
+            warnings.append(f"{style}:{number}: incomplete scan: external editorial approval requires inspection")
+    return approved
+
+
+def identifier_warnings(paths, *, root=None):
+    root = root or Path.cwd()
+    warnings = []
+    files = (item for path in paths for item in (path.rglob("*") if path.is_dir() else [path]))
+    for path in files:
+        if not path.is_file() or path.suffix.lower() not in IDENTIFIER_SUFFIXES or path.resolve() == (root / "docs/scientific/writing/STYLE.md").resolve():
+            continue
+        try:
+            approved = scientific_approvals(root, path, warnings)
+            suffix = path.suffix.lower()
+            if suffix == ".pptx":
+                lines = slide_text(path)
+            elif suffix == ".py":
+                lines = figure_text(path)
+            else:
+                lines = visible_lines(path.read_text(encoding="utf-8"), suffix)
+            for location, line in lines:
+                if line is None:
+                    warnings.append(f"{path}:{location}: incomplete scan: dynamic figure label; inspect assembled figure")
+                    continue
+                line = hide(r"(?:[A-Za-z][\w+.-]*://|www\.)\S+|\b10\.\d{4,9}/[^\s}]+", line)
+                for category, pattern in IDENTIFIERS.items():
+                    for match in re.finditer(pattern, line):
+                        value = match[0]
+                        if category == "run/fit label" and value in approved:
+                            continue
+                        if category == "hash" and re.fullmatch(r"[0-9a-fA-F]+", value) and not (re.search(r"\d", value) and re.search(r"[a-f]", value, re.I)):
+                            continue
+                        if category == "repository path":
+                            known_start = value.startswith((
+                                "./", "../", "/", "analyses/", "docs/", "scripts/", "src/",
+                                "tests/", "results/", "data/", "plugin/"))
+                            known_suffix = Path(value).suffix in {
+                                ".py", ".tex", ".qmd", ".md", ".csv", ".tsv", ".json", ".yaml",
+                                ".yml", ".toml", ".parquet", ".npz", ".npy", ".pdf", ".png",
+                                ".svg", ".pptx", ".whl"}
+                            if not (known_start or known_suffix):
+                                continue
+                        warnings.append(f"{path}:{location}: warning: {category} {value!r} (scientific-writing.md#reader-facing-identifiers)")
+        except (OSError, UnicodeError, ValueError, SyntaxError, zipfile.BadZipFile, ET.ParseError, RuntimeError) as error:
+            warnings.append(f"{path}: incomplete scan: {error}")
+    return warnings
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("paths", nargs="+", type=Path)
@@ -258,10 +447,13 @@ def main() -> int:
         print(f"configuration error: {error}")
         return 2
 
+    warnings = identifier_warnings(args.paths, root=args.root)
+    if warnings:
+        print("\n".join(warnings))
     if failures:
         print("\n".join(failures))
         return 1
-    print("Prose check passed for plugin-wide and scoped rules.")
+    print("Identifier advisories require inspection; terminology checks passed." if warnings else "Prose check passed for plugin-wide and scoped rules.")
     return 0
 
 

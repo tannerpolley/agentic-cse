@@ -12,7 +12,7 @@ import subprocess
 import sys
 
 from cse_hook_common import agent_role_state, nearest_context, repository_role
-from check_prose import violations
+from check_prose import IDENTIFIER_SUFFIXES, identifier_warnings, violations
 
 
 SOURCE_STANCE = Path(__file__).resolve().parents[2] / "assets/workflow/scientific-stance.txt"
@@ -37,7 +37,7 @@ ROLE_CORRECTION = ("Repository role is not confirmed in docs/scientific/CONTEXT.
 AGENT_ROLE_CORRECTION = "Setup diagnostic: agent role not confirmed; cse:setup records it."
 CLAUDE_WRITE_TOOLS = {"Edit", "Write", "MultiEdit", "NotebookEdit"}
 PATCH_TARGET = re.compile(r"\*\*\* (?:Add File|Update File|Move to): (.+?)(?:\\n|\n|$)")
-PROSE_PATH = r"([^\s'\"\\<>|;&()]+\.(?:md|qmd|tex))\b"
+PROSE_PATH = r"([^\s'\"\\<>|;&()]+\.(?:md|qmd|tex|py|pptx))\b"
 SHELL_TARGET = re.compile(r"(?:>>?|\btee(?:\s+-a)?)\s*['\"]?" + PROSE_PATH)
 IN_PLACE = re.compile(r"\b(?:sed|perl)\s+(?:-\S+\s+)*-\w*i")
 WORKDIR = re.compile(r"['\"]?workdir['\"]?\s*:\s*['\"]([^'\"]+)")
@@ -294,7 +294,7 @@ def written_prose(repository: Path, project: Path, refs: dict[str, str]) -> list
             for item in sorted(names - {b""}):
                 relative = item.decode(errors="surrogateescape")
                 path = worktree / relative
-                if path.suffix.lower() not in {".md", ".qmd", ".tex"} or not path.is_file() or path.is_symlink():
+                if path.suffix.lower() not in IDENTIFIER_SUFFIXES or not path.is_file() or path.is_symlink():
                     continue
                 content = git(worktree, "hash-object", "--", relative).decode().strip()
                 if all(blob(worktree, anchor, relative) != content for anchor in anchors):
@@ -463,6 +463,7 @@ def main() -> int:
                 for owner, paths in groups.items():
                     root = owner / prefix
                     failures += violations(paths, root=root)
+                    warnings += identifier_warnings(paths, root=root)
             except (OSError, UnicodeError, ValueError, HookError, subprocess.TimeoutExpired) as exc:
                 failures = []
                 warnings.append(f"CSE prose check did not run: {exc}")

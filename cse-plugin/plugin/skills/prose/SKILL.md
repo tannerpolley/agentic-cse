@@ -42,3 +42,6 @@ identity, missing coverage, or unresolved weak or broken relationships. The
 routine clear message is not a final-check result. Report exact
 [editorial violations](../../references/workflow/scientific-writing.md#editorial-compliance) and follow the shared
 [final-check coordination](../../references/workflow/scientific-writing.md#final-manuscript-checkpoint).
+
+For source, figure, and deck identifier advisories, follow the shared
+[reader-facing identifier check](../../references/workflow/scientific-writing.md#reader-facing-identifiers).

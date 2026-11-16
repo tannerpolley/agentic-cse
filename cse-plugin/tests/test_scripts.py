@@ -22,6 +22,33 @@ def setUpModule() -> None:
 
 
 class ScriptBehaviorTests(unittest.TestCase):
+    def test_installed_hook_identifier_advisories_never_block(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.hook_fixture(root, 'tool')
+            result = self.run_script('plugin/scripts/workflow/install_cse_hooks.py', '--home', str(root / 'home'), '--repo', str(root), '--agent', 'claude')
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            hook = root / 'home/.local/share/cse/hooks/cse-test-gate.py'
+            def event(name):
+                result = subprocess.run([sys.executable, str(hook), name], cwd=root,
+                    input=json.dumps({'cwd': str(root), 'session_id': 'installed', 'stop_hook_active': True}), text=True, capture_output=True)
+                self.assertEqual(0, result.returncode, result.stderr)
+                return json.loads(result.stdout) if result.stdout else {}
+            event('SessionStart')
+            (root / 'plot.py').write_text('ax.set_title("F2")')
+            (root / 'deck.pptx').write_bytes(b'bad archive')
+            result = event('Stop')
+            self.assertNotIn('decision', result)
+            self.assertIn("run/fit label 'F2'", result['systemMessage'])
+            self.assertIn('deck.pptx: incomplete scan:', result['systemMessage'])
+            (root / 'paper.md').write_text('The schema changed with A1.')
+            result = event('Stop')
+            self.assertEqual('block', result.get('decision'))
+            self.assertIn('schema', result['reason'])
+            self.assertNotIn('run/fit label', result['reason'])
+            self.assertIn("run/fit label 'A1'", result['systemMessage'])
+
+
     def run_script(self, path: str, *args: str, env: dict[str, str] | None = None, cwd: Path = ROOT):
         return subprocess.run(
             ["bash", str(ROOT / path), *args] if path.endswith(".sh") else [sys.executable, str(ROOT / path), *args],

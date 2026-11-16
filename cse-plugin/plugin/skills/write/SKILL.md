@@ -51,3 +51,6 @@ Synchronize a bibliography only through `cse:zotero` with its
 approval gate, never by hand.
 If rendering or source refresh is unavailable, retain accepted prose and report
 the exact missing capability; neither becomes a hidden workflow gate.
+
+For source, figure, and deck identifier advisories, follow the shared
+[reader-facing identifier check](../../references/workflow/scientific-writing.md#reader-facing-identifiers).
