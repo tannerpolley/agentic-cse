@@ -9,8 +9,8 @@ separately inspects writing and final manuscript cohesion. The investigator
 alone promotes reviewed notebooks for manuscript use.
 
 This is a CSE project. For scientific or engineering work, use the installed
-CSE skills and read this file plus `CONTEXT.md` before selecting the smallest
-evidence-justified route:
+CSE skills and read this file plus the sections of `CONTEXT.md` the task needs
+before selecting the smallest evidence-justified route:
 
 - use Research before Design or Build when equations, sources, assumptions, or
   methods are not yet supported;
@@ -24,7 +24,8 @@ not to ask questions does not change the general project doctrine.
 
 - `CONTEXT.md` owns the question, intended use, owners, source/data adoption
   choice, one confirmed repository role (`analysis` or `tool`), and the
-  confirmed agent role with its responsibilities; it links to project vocabulary.
+  confirmed agent role with its responsibilities; it links to project vocabulary
+  when a root glossary exists.
   Scoped or exception-bearing writing rules live under `## Prose avoid rules`.
 - Root `GLOSSARY.md` owns vocabulary entries: term, definition, required
   `Source:`, and optional `Scope:`. Read every glossary linked by an existing
