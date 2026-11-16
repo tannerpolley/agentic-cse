@@ -1,0 +1,33 @@
+# Adoption, semantics and presentation sizing: references/visualize/plotting.md.
+figure.facecolor: white
+axes.facecolor: white
+savefig.facecolor: white
+text.color: black
+axes.labelcolor: black
+axes.edgecolor: black
+xtick.color: black
+ytick.color: black
+font.family: DejaVu Sans
+text.usetex: False
+axes.prop_cycle: cycler('color', ['0072B2', 'D55E00', '009E73', 'CC79A7']) + cycler('linestyle', ['-', '--', '-.', ':']) + cycler('marker', ['o', 's', '^', 'D'])
+figure.figsize: 3.4, 2.55
+font.size: 10
+axes.labelsize: 10
+axes.titlesize: 11
+xtick.labelsize: 9
+ytick.labelsize: 9
+legend.fontsize: 9
+lines.linewidth: 1.5
+lines.markersize: 5
+lines.markeredgewidth: 1
+lines.markerfacecolor: none
+figure.constrained_layout.use: True
+xtick.direction: out
+ytick.direction: out
+axes.spines.top: False
+axes.spines.right: False
+legend.frameon: False
+axes.grid: False
+pdf.fonttype: 42
+ps.fonttype: 42
+savefig.dpi: 300

@@ -1,6 +1,6 @@
 ---
 name: latex
-description: "Choose the build path for a scientific LaTeX document or standalone figure or table, then compile and verify it. Use when asked to \"build the paper PDF\", \"my LaTeX won't compile\", or about overfull boxes. Slides go to beamer; .qmd sources to quarto; figures to tikz."
+description: "Build and check scientific LaTeX PDFs. Use when asked for \"manuscript revision\" in LaTeX, \"build the paper PDF\", \"fix the manuscript layout\", \"my LaTeX won't compile\", or overfull boxes. Prose edits use write; slides go to beamer; .qmd to quarto; native figures to tikz."
 metadata:
   cse-kind: "tool"
   cse-family: "visualize"
