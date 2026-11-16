@@ -1,6 +1,6 @@
 ---
 name: audit
-description: "Audit scientific repositories read-only for software ceremony, duplicated values, misplaced records, unsourced names, and untraced limits or tolerances. Use when asked \"what can I delete\", \"audit this repo\", or \"find hard-coded tolerances\". Scientific support goes to review; writing to prose."
+description: "Audit scientific repos and owner history read-only: ceremony, duplicated values, misplaced records, unsourced names, untraced limits. Use when asked \"what can I delete\", \"audit this repo\", \"audit owner history\", or \"find hard-coded tolerances\". Scientific support goes to review; writing to prose."
 metadata:
   cse-kind: "supporting"
   cse-family: "supporting"
@@ -17,7 +17,10 @@ When inspecting limits, read [Tolerances](../../references/workflow/numerical-te
 
 For a requested session retrospective, read [retrospective](../../references/workflow/retrospective.md)
 and use its science categories. If `/retro` is available, pair it with those
-categories. Report candidates only; change nothing until the user picks one.
+categories. For a requested cross-session or owner-history audit, follow
+[Cross-session history audit](../../references/workflow/retrospective.md#cross-session-history-audit)
+and use that section’s report, without cleanup removal estimates. Report
+candidates only; change nothing until the user picks one.
 
 For an ordinary audit, inspect the requested repository or folder read-only. This is a CSE-practice
 audit, not scientific Review: judge whether the work stays centered on the

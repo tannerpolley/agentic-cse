@@ -57,6 +57,11 @@ algorithms, or pseudocode when they remove a real ambiguity. Leave ordinary
 local coding choices to Build; do not prescribe unnecessary abstractions or
 prewrite the implementation.
 
+Report effort from measured prior work with its source and comparable scope.
+Available scope may describe work quantities; it does not establish elapsed
+time or person-days. Without measured duration evidence, report duration as
+“unmeasured”; never invent a person-day estimate.
+
 ## Pre-Build review
 
 Invoke `cse:review` for an independent design-readiness checkpoint against the
