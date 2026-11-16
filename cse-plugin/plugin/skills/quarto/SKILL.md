@@ -55,4 +55,7 @@ Follow [quarto-execution](../../references/visualize/quarto-execution.md) for JS
 
 Render each selected format from the same source revision and compare values,
 conditions, uncertainty, interpretation, limitations, citations, and figure
-sources. Material output changes return to `cse:review`.
+sources. For manuscript/deck releases, follow
+[release build verification](../../references/visualize/rendering-guide.md#release-build-verification);
+TeX diagnostics apply only to TeX outputs, not HTML-only previews.
+Material output changes return to `cse:review`.
