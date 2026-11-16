@@ -32,6 +32,86 @@ class RenderingBehaviorTests(unittest.TestCase):
             cwd=cwd, env=env or os.environ.copy(), text=True, capture_output=True, check=False,
         )
 
+    def test_matplotlib_project_style_renders_scoped_group_mapping(self):
+        if importlib.util.find_spec("matplotlib") is None:
+            self.skipTest("matplotlib is required for the selected style rendering check")
+        import warnings
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        import numpy as np
+        from matplotlib.colors import to_rgb
+
+        source = ROOT / "plugin/assets/visualize/project/matplotlib/cse.mplstyle"
+        x = np.linspace(0, 1, 41)
+        observed_x = x[::8].copy()
+        curves = [np.exp(-x) + group for group in range(4)]
+        observations = [y[::8].copy() + 0.03 for y in curves]
+        deck = {
+            "figure.figsize": (12, 5), "font.size": 22, "axes.labelsize": 22,
+            "axes.titlesize": 24, "xtick.labelsize": 20, "ytick.labelsize": 20,
+            "legend.fontsize": 20, "lines.linewidth": 2.5, "lines.markersize": 8,
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            style = project / "docs/scientific/figures/cse.mplstyle"
+            style.parent.mkdir(parents=True)
+            shutil.copyfile(source, style)
+            with warnings.catch_warnings(record=True) as caught, self.assertNoLogs("matplotlib", level="WARNING"):
+                warnings.simplefilter("always")
+                loaded = matplotlib.rc_params_from_file(style, fail_on_error=True, use_default_template=False)
+                before = {key: plt.rcParams[key] for key in loaded}
+                for name, overrides in (("manuscript", {}), ("deck", deck)):
+                    with self.subTest(placement=name), plt.style.context(style):
+                        plt.rcParams.update(overrides)
+                        groups = dict(zip(range(4), plt.rcParams["axes.prop_cycle"]))
+                        background = np.array(to_rgb(plt.rcParams["axes.facecolor"]))
+                        def luminance(rgb):
+                            linear = np.where(rgb <= 0.04045, rgb / 12.92, ((rgb + 0.055) / 1.055) ** 2.4)
+                            return float(linear @ [0.2126, 0.7152, 0.0722])
+                        for entry in groups.values():
+                            light, dark = sorted((luminance(np.array(to_rgb(entry["color"]))), luminance(background)))
+                            self.assertGreaterEqual((dark + 0.05) / (light + 0.05), 3)
+                        fig, ax = plt.subplots()
+                        try:
+                            lines, points = [], []
+                            for group, entry in groups.items():
+                                curve_style = {**entry, "marker": "None"}
+                                point_style = {**entry, "linestyle": "None"}
+                                line, = ax.plot(x, curves[group], **curve_style)
+                                point, = ax.plot(observed_x, observations[group], **point_style)
+                                lines.append(line)
+                                points.append(point)
+                                np.testing.assert_array_equal(x, line.get_xdata())
+                                np.testing.assert_array_equal(curves[group], line.get_ydata())
+                                np.testing.assert_array_equal(observed_x, point.get_xdata())
+                                np.testing.assert_array_equal(observations[group], point.get_ydata())
+                                self.assertEqual("None", line.get_marker())
+                                self.assertEqual("None", point.get_linestyle())
+                                self.assertEqual(line.get_color(), point.get_color())
+                                self.assertEqual("none", point.get_markerfacecolor())
+                            self.assertEqual(4, len({line.get_linestyle() for line in lines}))
+                            self.assertEqual(4, len({point.get_marker() for point in points}))
+                            ax.set_xlabel("Time (s)")
+                            ax.set_ylabel("Synthetic response (mol kg⁻¹)")
+                            for extension in ("png", "pdf"):
+                                output = project / f"{name}.{extension}"
+                                fig.savefig(output)
+                                self.assertGreater(output.stat().st_size, 0)
+                            np.testing.assert_array_equal(fig.get_size_inches(), overrides.get("figure.figsize", (3.4, 2.55)))
+                            self.assertEqual(overrides.get("font.size", 10), plt.rcParams["font.size"])
+                        finally:
+                            plt.close(fig)
+                    self.assertEqual(before, {key: plt.rcParams[key] for key in loaded})
+                # A preserved project customization overrides the shipped starter.
+                project_override = project / "project.mplstyle"
+                project_override.write_text("font.size: 13\nlines.linewidth: 2\n")
+                with plt.style.context([style, project_override]):
+                    self.assertEqual(13, plt.rcParams["font.size"])
+                    self.assertEqual(2, plt.rcParams["lines.linewidth"])
+                self.assertEqual(before, {key: plt.rcParams[key] for key in loaded})
+                self.assertEqual([], [str(warning.message) for warning in caught])
+
     def test_title_only_sidebar_round_trip(self):
         if shutil.which("quarto") is None:
             self.skipTest("quarto is required")

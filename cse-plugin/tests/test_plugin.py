@@ -295,6 +295,8 @@ ax.plot(x, y, label="A3")
             self.assertEqual(0, result.returncode, result.stderr)
             identity = json.loads(result.stdout)
             self.assertEqual(sorted(SKILLS), sorted(identity["payloadSkills"]))
+            style = Path("assets/visualize/project/matplotlib/cse.mplstyle")
+            self.assertEqual((PLUGIN / style).read_bytes(), (destination / style).read_bytes())
             self.assertFalse((destination / "tests").exists())
             self.assertFalse((destination / "extensions").exists())
 
