@@ -33,8 +33,9 @@ retained data authority and one interpretation; rendering never authorizes
 model execution. Apply [latex-layout-and-qa](../../references/visualize/latex-layout-and-qa.md) to every selected PDF and inspect
 the complete output at intended size.
 
-Compile, reject material warnings, verify embedded fonts are vector using the
-[font check](../../references/visualize/latex-layout-and-qa.md#release-sequence), run the selected visual checks, and inspect
-the complete output at intended size. Return sources, outputs, commands,
-retained paths, and limitations. Material document or figure changes return to
-core CSE Review.
+For manuscript release completion, follow
+[release build verification](../../references/visualize/rendering-guide.md#release-build-verification).
+Verify embedded fonts are vector using the
+[font check](../../references/visualize/latex-layout-and-qa.md#release-sequence).
+Return sources, outputs, commands, retained paths, and limitations. Material
+document or figure changes return to core CSE Review.

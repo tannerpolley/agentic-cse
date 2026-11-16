@@ -282,22 +282,24 @@ when the figure needs a TikZ or PGFPlots library beyond the base layer.
 
 ## Build and verification
 
-The supported user toolchain is TinyTeX with LuaLaTeX. Quarto is the document
-manager and uses its built-in PDF build wrapper. Verify the active installation
-before document work:
+TinyTeX with LuaLaTeX is the default profile; Quarto uses its built-in PDF
+build wrapper for that route. Existing pdfLaTeX, XeLaTeX and LuaLaTeX projects
+keep their selected installations and check their actual dependencies. For the
+TinyTeX profile only, verify the active installation with:
 
 ```bash
 scripts/visualize/check-latex-toolchain.sh
 ```
 
-If the check fails because TinyTeX is absent or inactive, use the one supported
-setup route and restart the terminal or Codex task:
+When setting up that profile, if TinyTeX is absent or inactive, its setup route
+is:
 
 ```bash
 quarto install tinytex --update-path
 ```
 
-Preflight the selected route rather than installing a broad collection:
+The following preflight is for the TinyTeX/LuaLaTeX profile; adapt dependency
+checks to the selected project route:
 
 ```bash
 kpsewhich siunitx.sty
@@ -310,7 +312,8 @@ command -v biber
 
 Add the checks implied by optional modules, such as `makeglossaries`,
 `latexminted`, `inkscape`, or `latexdiff`. Compile using the repository wrapper;
-for an isolated author-controlled source, the narrow fallback is:
+for an isolated author-controlled source using this LuaLaTeX profile, the
+fallback is:
 
 ```bash
 latexmk -lualatex -interaction=nonstopmode -halt-on-error main.tex
@@ -321,7 +324,8 @@ the PDF, including equations, unit spacing, reaction notation, numeric column
 alignment, captions, links, bookmarks, bibliography, glossary, diagrams,
 fonts, clipping, and page breaks. A package decision is complete only when the
 source declares one owner for every overlapping capability and the assembled
-document passes these checks.
+document passes these checks. Manuscript/deck release acceptance follows
+[release build verification](rendering-guide.md#release-build-verification).
 
 ## Scientific tables
 
