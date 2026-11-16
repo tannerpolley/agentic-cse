@@ -7,7 +7,7 @@ metadata:
   cse-tags: "matplotlib, latex-toolbox"
   cse-routing:
     direct: [rendering-guide, plotting]
-    conditional: [latex-figures]
+    conditional: [latex-figures, scientific-writing]
 ---
 
 # Plotting tool
@@ -17,6 +17,10 @@ Read first: [rendering-guide](../../references/visualize/rendering-guide.md), [p
 Inherit core scientific, numerical,
 project, and language decisions. Activate [latex-figures](../../references/visualize/latex-figures.md) only for a
 document-native backend.
+
+For manuscript/deck figures, activate [scientific-writing's standing-decision protocol](../../references/workflow/scientific-writing.md#standing-editorial-decisions)
+before editing, including capture of new owner directions. Unrelated
+exploratory plots do not load manuscript rules.
 
 Name the question, intended use, units, data authority, and series roles. Add a
 comparison limit only when a named authority supplies one. Use a line only for

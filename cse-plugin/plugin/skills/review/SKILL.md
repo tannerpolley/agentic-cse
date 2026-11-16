@@ -54,6 +54,12 @@ selected renders. Establish whether each claim follows from the numbers,
 provenance, units, uncertainty, and intended-use limits. For figures and
 table-only exceptions, activate the rule's owner, [analysis-sets](../../references/workflow/analysis-sets.md).
 
+For manuscripts/decks, the Result lens activates scientific-writing's
+[standing decisions](../../references/workflow/scientific-writing.md#standing-editorial-decisions),
+[editorial compliance](../../references/workflow/scientific-writing.md#editorial-compliance), and
+[manuscript reference coverage](../../references/workflow/scientific-writing.md#manuscript-reference-coverage).
+Return Supported/Not supported with concrete evidence and limitations.
+
 **Capability lens —** inspect the final implementation tree, complete changed functions,
 and direct callers and callees using [code-surface-review](../../references/workflow/code-surface-review.md). Check
 that calculations stay with the accepted numerical owner; each result field

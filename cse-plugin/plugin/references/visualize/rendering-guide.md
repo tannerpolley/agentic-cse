@@ -4,6 +4,11 @@ Rendering skills consume retained values and selected document sources. They
 do not run scientific models, mutate retained results, or decide scientific
 claim support.
 
+For manuscript/deck sources and associated figures, follow the
+[standing editorial decision protocol](../workflow/scientific-writing.md#standing-editorial-decisions)
+before editing; build-only invocations read applicable decisions without
+inventing or rewriting them.
+
 Report the actual renderer, source paths, outputs, checks, warnings, and
 limitations. A missing renderer is a specific capability error with the
 setup step needed to resolve it.

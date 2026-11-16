@@ -16,6 +16,7 @@ Read first: [operating-model](../../references/workflow/operating-model.md), [sc
 
 Identify the exact paragraph, section, manuscript, report, reviewer response, or
 original-and-revision pair and apply the shared rules in [scientific-writing](../../references/workflow/scientific-writing.md).
+Read the applicable [standing editorial decisions](../../references/workflow/scientific-writing.md#standing-editorial-decisions) without editing them.
 For a new or rejected manuscript, journal retarget, or material restructure, use its manuscript structure review.
 Default to inspection only. For file-backed input, run the existing deterministic
 prose check with available repository and personal authorities before semantic
@@ -38,4 +39,6 @@ source and use the source-identity, complete identifier coverage,
 sentence-to-paragraph-to-section judgments, and argument-spine checkpoint in
 [scientific-writing](../../references/workflow/scientific-writing.md). Return **Revise** with exact identifiers for stale
 identity, missing coverage, or unresolved weak or broken relationships. The
-routine clear message is not a final-check result.
+routine clear message is not a final-check result. Report exact
+[editorial violations](../../references/workflow/scientific-writing.md#editorial-compliance) and follow the shared
+[final-check coordination](../../references/workflow/scientific-writing.md#final-manuscript-checkpoint).
