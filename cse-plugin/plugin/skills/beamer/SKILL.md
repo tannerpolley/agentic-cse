@@ -7,7 +7,7 @@ metadata:
   cse-tags: "quarto-pipeline, latex-toolbox"
   cse-routing:
     direct: [rendering-guide, latex-layout-and-qa]
-    conditional: [latex-packages, latex-figures, quarto-execution]
+    conditional: [latex-packages, latex-figures, quarto-execution, scientific-writing]
 ---
 
 # Beamer presentation tool
@@ -19,6 +19,9 @@ language decisions.
 
 Activate [latex-packages](../../references/visualize/latex-packages.md) for package choices, [latex-figures](../../references/visualize/latex-figures.md) for shared
 figures, and [quarto-execution](../../references/visualize/quarto-execution.md) for a `.qmd`.
+
+For deck work, activate [scientific-writing's standing-decision read/update protocol](../../references/workflow/scientific-writing.md#standing-editorial-decisions)
+before editing.
 
 Inspect audience, purpose, source format, theme, aspect ratio, placement,
 figures, notes, and build route. Give each frame one scientific purpose and

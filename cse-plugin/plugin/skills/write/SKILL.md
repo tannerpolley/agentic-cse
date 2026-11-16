@@ -16,6 +16,7 @@ metadata:
 Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
 
 Activate [scientific-writing](../../references/workflow/scientific-writing.md) for project writing rules and retained paths.
+Before manuscript edits, follow its [standing-decision read/update protocol](../../references/workflow/scientific-writing.md#standing-editorial-decisions).
 Use its manuscript structure review before a new or rejected manuscript, a journal retarget, or a material restructure.
 Use the committed bibliography snapshot read-only; an approved refresh belongs
 to CSE source after the Zotero capability is checked.

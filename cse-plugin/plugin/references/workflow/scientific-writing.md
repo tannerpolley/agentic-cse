@@ -16,9 +16,9 @@ bibliography snapshot by a portable relative path.
 
 ### Scientific prose
 
-Use `docs/scientific/writing/STYLE.md` for house style and `RULES.md` for
-deterministic project writing rules. Do not duplicate terminology preferences
-there. Apply plugin-wide and scoped prose checks, citations, structure, and the
+Use `docs/scientific/writing/STYLE.md` for project-wide house style and
+document-scoped standing editorial decisions, and `RULES.md` for deterministic
+project writing rules. Do not duplicate terminology preferences there. Apply plugin-wide and scoped prose checks, citations, structure, and the
 selected document profile when a notebook or manuscript is prepared.
 Write direct, active, specific prose and preserve scientific meaning,
 uncertainty, provenance, and limitations.
@@ -74,6 +74,61 @@ prose unchanged, invents no specificity or evidence, preserves supported
 content, and performs one verification read. Do not iterate toward a style or
 detector score.
 
+### Standing editorial decisions
+
+Before manuscript or deck work, discover existing project guidance. Keep one
+named section per manuscript or deck in `docs/scientific/writing/STYLE.md`,
+identified by repository-relative authoritative source, supplement, and
+associated figure paths. Keep project-wide choices outside document sections.
+If an established manuscript brief or editorial record already owns the
+choices, put only its pointer in the STYLE section; do not copy the decisions.
+Dated revision reports and the current draft are not automatically standing
+owner instructions. Create the section when document work begins; if there
+are no standing directions, state that none have been recorded.
+
+Use this minimal format, with actual document paths and owner directions:
+
+```markdown
+## Manuscript or deck title
+Sources: repository-relative main source; supplement; associated figures
+| Scope | Standing owner decision | Authority |
+| --- | --- | --- |
+```
+
+Rows can cover precision, exclusions, audience, and the main-text/supplement
+split. Record only explicit owner directions and preserve their exact meaning:
+decimal places and significant digits differ. Use an authority link when
+available; otherwise retain the date and a short exact owner quotation. Do not
+promote agent or reviewer suggestions, or choices inferred from the draft,
+into owner policy. Routine editorial choices do not broaden the scientific
+choice threshold in [decision-records](decision-records.md); `evidence.md`
+owns scientific evidence, not editorial preferences. Task-specific story order
+stays in the accepted issue plan under manuscript structure review.
+
+Before editing, Write, Plot, Beamer, and renderers editing document sources or
+associated figures load both project-wide choices and the applicable document
+record. Capture new explicit owner directions there before applying them.
+A later explicit owner correction replaces only the active scoped row with
+its new authority; Git retains history. Conflicting or ambiguous directions
+need a scoped owner decision, without asking again about settled choices.
+Expose any conflict with scientific support, attribution, or required
+limitations; editorial preferences cannot remove those obligations. Build-only
+invocations read applicable decisions without inventing or rewriting them.
+
+Prose and Review remain read-only: read and check the applicable record and
+return missing owner decisions for the authoring task to capture. They do not
+edit the record or turn their own advice into owner policy.
+
+### Editorial compliance
+
+At the final checkpoint, Prose and Review check the applicable standing
+editorial decisions against the assembled document, including its supplement,
+figures, and tables. Report exact violations with the source identifier,
+record path, scoped decision and authority, consequence, and smallest
+correction. Missing or ambiguous directions return to authoring or the owner;
+reviewers do not invent them. Coordinate with the final checkpoint and
+reference-coverage result for the same source revision.
+
 ### Manuscript structure review
 
 For a new manuscript, rejected draft, new target journal, or material change to
@@ -95,11 +150,64 @@ Put story order there, not in `STYLE.md`. One writer then rewrites from the plan
 
 After the rewrite, two independent reviewers work in parallel. The science-support
 reviewer applies Review's Result lens to every displayed number and cited claim
-against retained files and cited sources, providing exact replacement text. The
+against retained files and cited sources, providing exact replacement text,
+and checks [manuscript reference coverage](#manuscript-reference-coverage). The
 reader-story reviewer applies the final manuscript checkpoint below and checks
 figures, tables, abstract, paragraph placement, and internal language. Write
 applies their fixes as given; science support wins a conflict. Write then makes
 one verification read.
+
+### Manuscript reference coverage
+
+At a final manuscript check, submission, or named publication handoff, Review
+inspects assembled main text, selected supplement/appendices, figure and table
+captions, bibliography snapshot, and available build diagnostics at the same
+source identity as Prose. For decks, inspect frames, notes, and their sources.
+Reuse existing checks; compilation proves neither support nor coverage.
+
+1. **Resolution and support:** identify unresolved citation keys, missing
+   bibliography entries, unresolved cross-reference targets, and placeholders
+   from source and build evidence. Check source-dependent claims, equations,
+   data, methods, and comparisons against the actual cited source and locator.
+   A resolved citation with irrelevant support still fails that claim.
+2. **Thin coverage:** map central claims and substantive sections to needed
+   evidence: foundational method, data provenance, relevant alternatives or
+   comparison methods, and claimed novelty or current field position, as
+   applicable. Compare with inspected owner-named model papers and
+   field-relevant primary literature/reviews for the same subject and intended
+   use. Name a missing claim/evidence category and concrete sources or a bounded
+   research question. Reference counts alone are never a defect or acceptance
+   threshold; similar-paper counts can only orient investigation.
+3. **Dated coverage:** inspect whether later relevant primary work changes a
+   method, comparison, uncertainty, or current/novelty claim. Search the
+   configured corpus/library first; route current literature beyond it to
+   Research. Record search date, scope, and inspected source identifiers in the
+   review output. Old foundational citations remain valid; use no age cutoff
+   or recent-paper percentage. If current literature cannot be checked, report
+   the exact limitation and affected conclusion as unverified, never passed.
+4. **Bare cross-references:** inspect “see Supplement §…” and “see Part 1”
+   semantically. Verify the target exists and that the main manuscript supplies
+   the definition, essential method/conditions, result, or interpretation its
+   argument needs. Flag the exact span and missing content when a pointer
+   substitutes for it. A concise self-contained explanation plus a valid
+   pointer for derivation or supporting detail is acceptable; do not ban
+   cross-references or require wholesale duplication.
+5. **Decision and remediation:** in existing review output, report source
+   identity, record path, exact paragraph/frame/key, evidence or missing
+   support, consequence, and smallest correction. Separate required corrections
+   from optional broader reading. Demonstrated unsupported claims or missing
+   essential content prevent support for the intended final use; a merely
+   short or old list does not. Apply the [limit-origin rule](numerical-testing.md#tolerances):
+   invent no reference-count, citation-age, or coverage-percentage gate. Use
+   Review's existing Supported/Not supported outcomes with evidence and
+   limitations. Route discovery to Research, approved bibliography work to
+   Zotero, and prose fixes to Write. Never manually edit the bibliography
+   snapshot or bypass its existing refresh approval.
+
+Bind the conclusion to the reviewed revision. Changed claims, citations,
+sources, or editorial directions require affected conclusions to be refreshed
+at the next final checkpoint; reuse unaffected evidence. This adds no
+literature-search gate to routine rendering.
 
 ### Final manuscript checkpoint
 
@@ -107,6 +215,11 @@ Routine revisions and builds need only the project's existing structural and
 rendering checks: stable unique paragraph identifiers, reconstructable order,
 one sentence per source line, blank-line paragraph boundaries, and resolved
 references, labels, and citations. These checks do not judge the argument.
+
+At this checkpoint, require [editorial compliance](#editorial-compliance) and
+Review's [reference-coverage result](#manuscript-reference-coverage) for the
+same source revision as Prose. Refresh affected conclusions when claims,
+citations, sources, or editorial directions change; reuse unaffected evidence.
 
 Prose performs one agent-led cohesion inspection when the user asks for a final check, before
 submission or a named publication handoff. A material change to central claims,
