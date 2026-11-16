@@ -126,8 +126,7 @@ editorial decisions against the assembled document, including its supplement,
 figures, and tables. Report exact violations with the source identifier,
 record path, scoped decision and authority, consequence, and smallest
 correction. Missing or ambiguous directions return to authoring or the owner;
-reviewers do not invent them. Coordinate with the final checkpoint and
-reference-coverage result for the same source revision.
+reviewers do not invent them.
 
 ### Manuscript structure review
 
@@ -218,8 +217,7 @@ references, labels, and citations. These checks do not judge the argument.
 
 At this checkpoint, require [editorial compliance](#editorial-compliance) and
 Review's [reference-coverage result](#manuscript-reference-coverage) for the
-same source revision as Prose. Refresh affected conclusions when claims,
-citations, sources, or editorial directions change; reuse unaffected evidence.
+same source revision as Prose.
 
 Prose performs one agent-led cohesion inspection when the user asks for a final check, before
 submission or a named publication handoff. A material change to central claims,
