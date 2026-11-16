@@ -89,18 +89,18 @@ Run these gates in order. A later gate does not excuse an earlier failure.
 
 1. **Source:** inspect node anchors, label zones, connector order, explicit
    dimensions, data paths, and the smallest intended profile width.
-2. **Build:** render the real Quarto targets and inspect generated `.tex` when
-   Pandoc, package order, or class behavior is uncertain.
-3. **Log:** reject TeX errors, unresolved references, font substitutions, and
-   unexplained overfull boxes.
-4. **Fonts:** require `pdffonts <pdf> | grep -c 'Type 3'` to report 0. Attribute any Type 3 font to its source, including embedded figures, and fix it before release. For pdfLaTeX, `grep -E '\.[0-9]+pk' <build>.log` helps diagnose bitmap fallback but cannot check other engines.
-5. **Automated visual QA:** run `scripts/visualize/latex_visual_qa.py` on each final PDF.
+2. **Build/logs:** render the selected repository targets, following
+   [release build verification](rendering-guide.md#release-build-verification)
+   for manuscript/deck releases. Inspect generated `.tex` when Pandoc, package
+   order, or class behavior is uncertain; reject font substitutions.
+3. **Fonts:** require `pdffonts <pdf> | grep -c 'Type 3'` to report 0. Attribute any Type 3 font to its source, including embedded figures, and fix it before release. For pdfLaTeX, `grep -E '\.[0-9]+pk' <build>.log` helps diagnose bitmap fallback but cannot check other engines.
+4. **Automated visual QA:** run `scripts/visualize/latex_visual_qa.py` on each final PDF.
    It checks text-to-text and text-to-vector geometry, renders color and
    grayscale pages, and writes `report.json`.
-6. **Manual visual QA:** inspect every rendered page at full size. Use the
+5. **Manual visual QA:** inspect every rendered page at full size. Use the
    contact sheet for document flow only. Check text against paths and symbols,
    hierarchy, contrast, clipping, and scientific meaning.
-7. **Disposition:** classify scientific logic as `exact`, `schematic`,
+6. **Disposition:** classify scientific logic as `exact`, `schematic`,
    `needs-source`, or `failed`; then record `keep`, `simplify`, `split`, or
    `reject`. Rebuild and repeat the affected gates after a correction.
 
@@ -110,7 +110,6 @@ Useful commands:
 command -v pdftotext pdftoppm mutool
 ./render.sh article.qmd
 ./render.sh deck.qmd
-rg -n 'Overfull|undefined|Warning' article.log deck.log
 pdfinfo builds/article.pdf
 python3 scripts/visualize/latex_visual_qa.py builds/article.pdf \
   --profile article --output-dir builds/visual-qa/article --contact-sheet
@@ -164,8 +163,9 @@ Use these temporarily and remove them from the release source:
 
 ## Completion criterion
 
-The source and every intended output profile compile, all references resolve,
-the automated report records completed text, vector, and raster checks with no
+Manuscript/deck releases pass
+[release build verification](rendering-guide.md#release-build-verification).
+The automated report records completed text, vector, and raster checks with no
 error, every page has been inspected at full size in color and grayscale, and
 the recorded disposition is not `unreviewed`.
 No unintended overlap, clipping, ambiguous connector, blank plot, unreadable

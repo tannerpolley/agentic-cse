@@ -38,8 +38,13 @@ rerun the model. Reject empty displays, unsupported curves, unsupported
 statistics, and unexplained failures. Follow [analysis-sets](../../references/workflow/analysis-sets.md) for the
 claim-led figure requirement and its table-only exceptions.
 
-The chat summary states the outcome, basis and conditions, supported quantities
-and units, physical interpretation, uncertainty and limits, whether evidence is
+When results are compared, lead the chat summary with a short comparison table
+of retained results, the named comparison, quantities and units, and supported
+difference or uncertainty where available. Do not fabricate missing results or
+force a table when there is no comparison. Follow with concise interpretation
+and the decision. The chat summary states the outcome, basis and conditions,
+supported quantities and units, physical interpretation, uncertainty and limits,
+whether evidence is
 prediction, numerical verification, or physical validation, and the affected
 decision. If no physical or numerical result exists, say so and state the
 scientific consequence or next decision; software status is provenance.
