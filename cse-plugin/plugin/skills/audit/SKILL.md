@@ -1,6 +1,6 @@
 ---
 name: audit
-description: "Audit scientific repositories read-only for software ceremony, duplicated values, misplaced records, unsourced names, and hard-coded or untraced limits and tolerances. Use when asked for cleanup or numerical-limit inspection. Scientific support goes to review; writing to prose."
+description: "Audit scientific repositories read-only for software ceremony, duplicated values, misplaced records, unsourced names, and untraced limits or tolerances. Use when asked \"what can I delete\", \"audit this repo\", or \"find hard-coded tolerances\". Scientific support goes to review; writing to prose."
 metadata:
   cse-kind: "supporting"
   cse-family: "supporting"
