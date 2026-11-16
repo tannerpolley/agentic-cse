@@ -38,3 +38,6 @@ Apply that reference’s distinct-comparison and intended-size/grayscale checks.
 Return the figure, actual comparison, visible disagreement, limitation, and
 checks to the invoking stage. An unexplained disagreement or unsupported curve
 returns to `cse:analyze` or `cse:diagnose`.
+
+For source, figure, and deck identifier advisories, follow the shared
+[reader-facing identifier check](../../references/workflow/scientific-writing.md#reader-facing-identifiers).

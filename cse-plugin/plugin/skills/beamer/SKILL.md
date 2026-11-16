@@ -33,3 +33,6 @@ For release completion, follow
 [release build verification](../../references/visualize/rendering-guide.md#release-build-verification)
 and [frame-by-frame visual QA](../../references/visualize/latex-layout-and-qa.md#release-sequence).
 Material changes return to core CSE Review; successful rendering is not Review Pass.
+
+For source, figure, and deck identifier advisories, follow the shared
+[reader-facing identifier check](../../references/workflow/scientific-writing.md#reader-facing-identifiers).

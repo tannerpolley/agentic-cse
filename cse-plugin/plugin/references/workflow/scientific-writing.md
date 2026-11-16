@@ -74,6 +74,50 @@ prose unchanged, invents no specificity or evidence, preserves supported
 content, and performs one verification read. Do not iterate toward a style or
 detector score.
 
+### Reader-facing identifiers
+
+Use scientific descriptions in prose, captions, table cells, legends, axis
+labels, and slides. Internal run/fit codes, issue or pull-request numbers,
+commit hashes, and repository paths need reader-facing inspection. A warning
+is a judgment call, not proof that a scientific label is wrong.
+
+Run `python3 <plugin>/scripts/workflow/check_prose.py --root <project> <sources>`
+on explicit manuscript sources, figure scripts, and deck `.tex`/`.pptx` files.
+The scan does not expand TeX includes; name supplements and included sources.
+Identifier advisories never change CLI success or block the Stop hook. Existing
+terminology failures still do. The hook attributes changed files to the session,
+but may miss script-generated outputs; run this explicit scan before delivery.
+
+Only explicit owner approval can exempt an exact run/fit label. In the existing
+named STYLE section, use repository-relative paths/globs in both `Sources:` and
+Scope, separated by semicolons, and a nonempty Authority:
+
+```markdown
+## Example manuscript
+Sources: manuscript/*.tex; figures/plot.py
+| Scope | Standing owner decision | Authority |
+| --- | --- | --- |
+| manuscript/*.tex; figures/plot.py | Approved scientific labels: `F2`; `A1` | Dated explicit owner approval, meaning and source |
+```
+
+Both Sources and Scope must match. Approval is case-sensitive and exact: F4 does
+not approve F4-0. It cannot suppress issue/path/hash findings or terminology
+failures. Missing STYLE implies no approvals. Malformed approval rows warn and
+suppress nothing. Pointer-only records stay valid; external editorial approval
+requires semantic inspection and is not followed or copied automatically.
+
+Extraction is deliberately bounded: TeX uses line-based command stripping and
+begin/end tracking; multiline command arguments and arbitrary macros require
+assembled-document inspection. Markdown/Quarto keeps visible link text, quoted
+prose and simple monospace labels but hides code, math and non-caption metadata.
+Python inspects literal text at figure-label calls without executing code or
+propagating variables; dynamic expressions and invalid Python produce explicit
+incomplete-scan advisories. PowerPoint joins text runs in slide paragraphs and
+table cells; malformed archives warn. Images, embedded chart/SmartArt labels,
+notes and macro-expanded text require visual inspection. Inspect the assembled
+figure/deck even when the source scan is quiet. Executable patterns live only
+in the checker; this section owns the editorial rule and approval requirements.
+
 ### Standing editorial decisions
 
 Before manuscript or deck work, discover existing project guidance. Keep one

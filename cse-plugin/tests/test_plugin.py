@@ -20,6 +20,123 @@ SKILLS = {
 
 
 class PluginBehaviorTests(unittest.TestCase):
+    def test_identifier_cli_visible_boundaries(self):
+        cases = {
+            '.tex': (r'''\caption{F2 and A1} \label{F3} % F4
+F4-0 & \texttt{issue \#13} & \nolinkurl{commit abc123} commit abcdef
+\texttt{docs/fit\_table.csv}
+\cite[F6]{A8} \ref{F8} \includegraphics{docs/F9.png}
+\href{https://host/docs/F8.py}{F5}
+\ce{F8} \SI{A8}{F9} $F8$ \(A8\)
+\begin{verbatim}
+F8
+\end{verbatim}
+$$
+F8
+$$
+''', ['F2', 'A1', 'F4-0', 'issue #13', 'commit abc123', 'commit abcdef', 'docs/fit_table.csv', 'F6', 'F5']),
+            '.md': ('''# F2
+> "A1" and `F4-0` [F5](docs/F8.py)
+`git show F8` <!-- F8 --> [@F8] {#F8}
+```python
+F8
+```
+    F8
+$F8$ [safe][F8]
+[F8]: docs/F8.py
+''', ['F2', 'A1', 'F4-0', 'F5']),
+            '.qmd': ('''---
+title: F2
+subtitle: |
+  A1
+other: F8
+---
+```{python}
+#| fig-cap: F4-0
+print("F8")
+```
+''', ['F2', 'A1', 'F4-0']),
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for suffix, (text, expected) in cases.items():
+                path = root / ('paper' + suffix)
+                path.write_text(text + '\nCO2 H2O Li/Na TBAC/DA/TOPO PrOMMiS/IDAES https://host/docs/F8.py 10.1234/docs/F8.py\n')
+                result = subprocess.run([sys.executable, str(PLUGIN / 'scripts/workflow/check_prose.py'), '--root', str(root), str(path)], capture_output=True, text=True)
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+                for value in expected:
+                    self.assertIn(repr(value), result.stdout)
+                self.assertNotIn('F8', result.stdout)
+                self.assertIn(f'{path}:2:', result.stdout)
+                self.assertEqual(len(expected), result.stdout.count(': warning:'))
+            path.write_text('The schema changed with F2.\n')
+            result = subprocess.run([sys.executable, str(PLUGIN / 'scripts/workflow/check_prose.py'), str(path)], capture_output=True, text=True)
+            self.assertEqual(1, result.returncode)
+            self.assertIn('warning: run/fit label', result.stdout)
+
+    def test_identifier_scientific_approval_isolation(self):
+        sys.path.insert(0, str(PLUGIN / 'scripts/workflow'))
+        from check_prose import identifier_warnings
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = [root / name for name in ('one.md', 'two.md', 'plot.py')]
+            for path in paths:
+                path.write_text('ax.set(title="F2 F4-0 issue #13 docs/file.py")' if path.suffix == '.py' else 'F2 F4-0 issue #13 docs/file.py')
+            style = root / 'docs/scientific/writing/STYLE.md'
+            style.parent.mkdir(parents=True)
+            style.write_text('''## One
+Sources: one.md; plot.py
+| Scope | Standing owner decision | Authority |
+| --- | --- | --- |
+| *.md; *.py | Approved scientific labels: `F2`; `F4` | Owner, dated |
+| *.md | Approved scientific labels: `F4-0` | |
+## Two
+Sources: two.md
+External brief pointer: editorial.md
+''')
+            result = '\n'.join(identifier_warnings(paths + [style], root=root))
+            self.assertNotIn("one.md:1: warning: run/fit label 'F2'", result)
+            self.assertNotIn("plot.py:1: warning: run/fit label 'F2'", result)
+            self.assertIn("two.md:1: warning: run/fit label 'F2'", result)
+            self.assertEqual(3, result.count("run/fit label 'F4-0'"))
+            self.assertEqual(3, result.count("issue/PR 'issue #13'"))
+            self.assertEqual(3, result.count("repository path 'docs/file.py'"))
+            self.assertIn('malformed scientific-label approval', result)
+            self.assertIn('external editorial approval', result)
+            style.unlink()
+            self.assertEqual(3, '\n'.join(identifier_warnings(paths, root=root)).count("run/fit label 'F2'"))
+
+    def test_identifier_figure_and_deck_extraction(self):
+        import zipfile
+        sys.path.insert(0, str(PLUGIN / 'scripts/workflow'))
+        from check_prose import identifier_warnings
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            script, deck = root / 'plot.py', root / 'deck.pptx'
+            script.write_text('''# F8
+filename = "F8"
+ax.set(title="F2", xlabel="A1")
+ax.set_xticklabels(["F3", "F4-0"])
+ax.text(0, 0, f"F5 {value}")
+ax.annotate(dynamic)
+ax.set_title(f"F{value}8")
+ax.legend(labels=("A2",))
+ax.plot(x, y, label="A3")
+''')
+            with zipfile.ZipFile(deck, 'w') as archive:
+                archive.writestr('ppt/slides/slide1.xml', '<s xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><a:p><a:r><a:t>F</a:t></a:r><a:r><a:t>2</a:t></a:r></a:p><table><a:p><a:r><a:t>A1</a:t></a:r></a:p></table></s>')
+                archive.writestr('docProps/core.xml', '<text>F8</text>')
+            result = '\n'.join(identifier_warnings([script, deck], root=root))
+            self.assertNotIn('F8', result)
+            for value in ('F2', 'A1', 'F3', 'F4-0', 'F5', 'A2', 'A3'):
+                self.assertIn(repr(value), result)
+            self.assertEqual(3, result.count('dynamic figure label'))
+            self.assertIn('deck.pptx:ppt/slides/slide1.xml:paragraph 1:', result)
+            script.write_text('not valid python !')
+            deck.write_bytes(b'broken zip')
+            self.assertEqual(2, '\n'.join(identifier_warnings([script, deck], root=root)).count('incomplete scan:'))
+
+
     def test_accepted_pi_reference_passes_prose_check(self):
         result = subprocess.run(
             [sys.executable, str(PLUGIN / "scripts/workflow/check_prose.py"),
