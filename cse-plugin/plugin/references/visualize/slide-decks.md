@@ -8,6 +8,8 @@ and guidance about avoiding title rules and color bars only when neither a
 project theme nor a brand template exists. The `pptx` skill owns PowerPoint
 file validation, font substitutions, generators, and image conversion.
 
+Use an existing project Beamer theme. Otherwise copy the [16:9 Moloch starter](../../assets/visualize/project/beamer/deck-header.tex) once into the project and maintain that copy.
+
 Read the [standing editorial decisions](../workflow/scientific-writing.md#standing-editorial-decisions)
 before editing and use the shared [reader-facing identifier check](../workflow/scientific-writing.md#reader-facing-identifiers)
 and [editorial compliance check](../workflow/scientific-writing.md#editorial-compliance)
