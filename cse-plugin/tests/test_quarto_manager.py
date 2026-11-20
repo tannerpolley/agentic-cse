@@ -1,224 +1,90 @@
-from __future__ import annotations
-
-import contextlib
-import io
-import importlib.util
 import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
-from unittest.mock import patch
 
-
-ROOT = Path(__file__).resolve().parents[1]
-SCRIPT = ROOT / "plugin/assets/visualize/project/quarto/manuscript.py"
-SPEC = importlib.util.spec_from_file_location("cse_manuscript", SCRIPT)
-assert SPEC and SPEC.loader
-MANUSCRIPT = importlib.util.module_from_spec(SPEC)
-SPEC.loader.exec_module(MANUSCRIPT)
+SCRIPT = Path(__file__).resolve().parents[1] / "plugin/assets/visualize/project/quarto/manuscript.py"
 
 
 class QuartoManagerTests(unittest.TestCase):
-    def test_only_the_recognized_presentation_hook_is_allowed(self):
-        path = Path("_quarto-presentation.yml")
-        allowed = {"project": {"pre-render": MANUSCRIPT.PRESENTATION_PRE_RENDER}}
-        MANUSCRIPT.check_owners(allowed, path, allow_presentation_hook=True)
+    def setUp(self):
+        directory = tempfile.TemporaryDirectory()
+        self.addCleanup(directory.cleanup)
+        self.root = Path(directory.name)
+        self.write("index.qmd", "# Synthesis\n")
+        self.membership = self.root / "_cse-manuscript.json"
 
-        for value in (
-            {"project": {"pre-render": "snakemake --cores 1 calculate"}},
-            {"project": {"pre-render": [MANUSCRIPT.PRESENTATION_PRE_RENDER, "other"]}},
-            {"project": {"post-render": MANUSCRIPT.PRESENTATION_PRE_RENDER}},
-            {"project": {"pre-render": MANUSCRIPT.PRESENTATION_PRE_RENDER}},
-        ):
-            with self.subTest(value=value):
-                with self.assertRaises(MANUSCRIPT.ManuscriptError):
-                    MANUSCRIPT.check_owners(value, path, allow_presentation_hook=value is allowed)
+    def write(self, name, text):
+        (self.root / name).write_text(text)
 
-    def test_earlier_manuscript_root_is_refused_with_rebuild_steps(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "_quarto.yml").write_text('{"project": {"type": "manuscript", "output-dir": "_site"}}\n')
-            with self.assertRaisesRegex(MANUSCRIPT.ManuscriptError, "rerunning init"):
-                MANUSCRIPT.check_boundary(root)
+    def command(self, name, *arguments, status=0, env=None):
+        result = subprocess.run([sys.executable, str(SCRIPT), name, ".", *arguments], cwd=self.root,
+                                text=True, capture_output=True, env=env)
+        self.assertEqual(status, result.returncode, result.stderr)
+        return result
 
-    def test_init_on_a_managed_root_replaces_only_plugin_tooling(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "analyses"
-            root.mkdir()
-            retired_unit = root / Path("preview").with_suffix(".service")
-            retired_unit.write_text("older plugin copy\n")
-            owned = {"_quarto.yml": json.dumps(MANUSCRIPT.SITE_CONFIG), "_cse-manuscript.json": '{"project": 1}\n',
-                     "site.css": "body { color: teal; }\n", "index.qmd": "# Synthesis\n",
-                     ".gitignore": "\n".join((*MANUSCRIPT.REQUIRED_IGNORES, "/scratch/")) + "\n"}
-            for name in MANUSCRIPT.TOOLING_FILES:
-                (root / name).write_text("older plugin copy\n")
-            for name, text in owned.items():
-                (root / name).write_text(text)
-            with (patch.object(MANUSCRIPT, "home_section", return_value={}),
-                  patch.object(MANUSCRIPT, "validate_root")):
-                _, replaced = MANUSCRIPT.init(root, root / "index.qmd", "c" * 40, "d" * 64)
+    def test_init_preserves_project_files_and_upgrades_old_sidebar(self):
+        self.write("render.sh", "foreign")
+        self.assertIn("refusing to overwrite", self.command("init", status=1).stderr)
+        self.assertEqual("foreign", (self.root / "render.sh").read_text())
+        (self.root / "render.sh").unlink()
 
-            self.assertFalse(retired_unit.exists())
-            self.assertEqual(sorted(MANUSCRIPT.TOOLING_FILES), sorted(replaced))
-            for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py"):
-                self.assertEqual((SCRIPT.parent / name).read_bytes(), (root / name).read_bytes())
-            self.assertEqual("c" * 40, json.loads((root / ".cse-quarto-source.json").read_text())["sourceCommit"])
-            self.assertEqual(owned, {name: (root / name).read_text() for name in owned})
+        self.command("init")
+        owned = {"_quarto.yml": "custom config", "site.css": "custom css", "index.qmd": "# Revised",
+                 ".gitignore": (self.root / ".gitignore").read_text() + "local\n"}
+        retired = ("preview.service", "_quarto-presentation.yml", ".cse-quarto-source.json")
+        old_tooling = dict.fromkeys(("manuscript.py", "render.sh", *retired), "old")
+        for name, content in {**owned, **old_tooling}.items():
+            self.write(name, content)
+        old_home = {"section": "Home", "contents": [{"text": "Overview", "href": "index.qmd"}]}
+        title_page = {"text": "Title only", "href": "title.qmd"}
+        old_report = {"section": "Report", "contents": [
+            {"text": "Overview", "href": "report.qmd"}, {"text": "Results", "href": "report.qmd#results"}]}
+        group = {"section": "Cases", "contents": [title_page, old_report]}
+        self.write(self.membership.name, json.dumps({"project": {"render": ["index.qmd", "title.qmd", "report.qmd"]},
+            "website": {"sidebar": {"contents": [old_home, group]}}, "cse-title-only": ["title.qmd"]}))
+        self.command("init")
+        state = json.loads(self.membership.read_text())
+        self.assertEqual([{"text": "Home", "href": "index.qmd"}, {"section": "Cases", "contents": [
+            title_page, {"text": "Report", "href": "report.qmd"}]}], state["website"]["sidebar"]["contents"])
+        self.assertEqual(["index.qmd", "title.qmd", "report.qmd"], state["project"]["render"])
+        self.assertFalse(any((self.root / name).exists() for name in retired))
+        expected = {**owned, **{name: (SCRIPT.parent / name).read_text() for name in ("manuscript.py", "render.sh")}}
+        self.assertEqual(expected, {name: (self.root / name).read_text() for name in expected})
 
-    def test_refresh_renders_notebook_then_root_with_presentation_cache_refresh(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            notebook = root / "case" / "notebook.qmd"
-            notebook.parent.mkdir()
-            notebook.write_text("notebook\n")
-            state = {"project": {"render": ["index.qmd", "case/notebook.qmd"]}}
-            completed = subprocess.CompletedProcess([], 0)
-            events = []
+    def test_include_moves_pages_and_removes_empty_groups(self):
+        self.command("init")
+        for name in ("first.qmd", "second.qmd"):
+            self.write(name, "# Report\n")
+            self.command("include", name, "--title", name, "--group", "Cases")
+        self.command("include", "first.qmd", "--title", "First")
+        state = json.loads(self.membership.read_text())
+        self.assertEqual(["index.qmd", "second.qmd", "first.qmd"], state["project"]["render"])
+        self.command("include", "second.qmd", "--title", "Second")
+        state = json.loads(self.membership.read_text())
+        contents = state["website"]["sidebar"]["contents"]
+        self.assertEqual(["Home", "First", "Second"], [entry["text"] for entry in contents])
+        self.assertEqual([entry["href"] for entry in contents], state["project"]["render"])
+        for invalid in ("index.qmd", str(SCRIPT.parent / "example/notebook.qmd")):
+            self.command("include", invalid, "--title", "Invalid", status=1)
 
-            def prepared(value):
-                events.append("prepare")
-                return 0
-
-            def rendered(*args, **kwargs):
-                events.append("render")
-                return completed
-
-            with (
-                patch.object(MANUSCRIPT, "sync", return_value=state),
-                patch.object(MANUSCRIPT, "notebook_argument", return_value="case/notebook.qmd"),
-                patch.object(MANUSCRIPT, "prepare", side_effect=prepared),
-                patch.object(MANUSCRIPT.subprocess, "run", side_effect=rendered) as run,
-            ):
-                self.assertEqual(0, MANUSCRIPT.refresh(root, notebook))
-
-            self.assertEqual(["prepare", "render", "render"], events)
-            self.assertEqual(
-                [
-                    ["quarto", "render", "case/notebook.qmd", "--to", "html", "--profile", "presentation", "--cache-refresh"],
-                    ["quarto", "render", "index.qmd", "--to", "html", "--profile", "presentation", "--cache-refresh"],
-                ],
-                [call.args[0] for call in run.call_args_list],
-            )
-
-    def test_prepare_invokes_only_the_presentation_target(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            analysis = root / "case"
-            analysis.mkdir()
-            dry_run = subprocess.CompletedProcess(
-                [], 0,
-                stdout=(
-                    "Building DAG of jobs...\n"
-                    '{"nodes": [{"id": 0, "value": {"jobid": 0, "label": "present", "rule": "present"}}], "edges": []}\n'
-                ),
-                stderr="",
-            )
-            completed = subprocess.CompletedProcess([], 0)
-            with (
-                patch.object(MANUSCRIPT, "presentation_workflows", return_value=[analysis]),
-                patch.object(MANUSCRIPT.subprocess, "run", side_effect=[dry_run, completed]) as run,
-            ):
-                self.assertEqual(0, MANUSCRIPT.prepare(root))
-
-            self.assertEqual(
-                [
-                    ["snakemake", "--cores", "1", "--dry-run", "--quiet", "--d3dag", "present"],
-                    ["snakemake", "--cores", "1", "present"],
-                ],
-                [item.args[0] for item in run.call_args_list],
-            )
-            run.assert_any_call(
-                ["snakemake", "--cores", "1", "present"], cwd=analysis, check=False
-            )
-
-    def test_prepare_limits_incremental_render_to_the_requested_analysis(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            first = root / "first"
-            second = root / "second"
-            first.mkdir()
-            second.mkdir()
-            dry_run = subprocess.CompletedProcess(
-                [], 0, stdout=json.dumps({"nodes": [{"value": {"rule": "present"}}]}), stderr=""
-            )
-            completed = subprocess.CompletedProcess([], 0)
-            with (
-                patch.dict(os.environ, {"QUARTO_PROJECT_INPUT_FILES": "first/notebook.qmd"}),
-                patch.object(MANUSCRIPT, "presentation_workflows", return_value=[first, second]),
-                patch.object(MANUSCRIPT.subprocess, "run", side_effect=[dry_run, completed]) as run,
-            ):
-                self.assertEqual(0, MANUSCRIPT.prepare(root))
-
-            self.assertEqual(2, run.call_count)
-            run.assert_any_call(
-                ["snakemake", "--cores", "1", "present"], cwd=first, check=False
-            )
-
-    def test_prepare_stops_after_a_failed_presentation(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            first = root / "first"
-            second = root / "second"
-            first.mkdir()
-            second.mkdir()
-            dry_run = subprocess.CompletedProcess(
-                [], 0, stdout=json.dumps({"nodes": [{"value": {"rule": "present"}}]}), stderr=""
-            )
-            failed = subprocess.CompletedProcess([], 7)
-            with (
-                patch.object(MANUSCRIPT, "presentation_workflows", return_value=[first, second]),
-                patch.object(MANUSCRIPT.subprocess, "run", side_effect=[dry_run, failed]) as run,
-            ):
-                self.assertEqual(7, MANUSCRIPT.prepare(root))
-
-            self.assertEqual(2, run.call_count)
-            run.assert_any_call(
-                ["snakemake", "--cores", "1", "present"], cwd=first, check=False
-            )
-
-    def test_prepare_refuses_a_calculation_job_in_the_dry_run_plan(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            analysis = root / "case"
-            analysis.mkdir()
-            dry_run = subprocess.CompletedProcess(
-                [], 0,
-                stdout=json.dumps({"nodes": [
-                    {"value": {"rule": "present"}},
-                    {"value": {"rule": "calculate"}},
-                ]}),
-                stderr="",
-            )
-            output = io.StringIO()
-            with (
-                patch.object(MANUSCRIPT, "presentation_workflows", return_value=[analysis]),
-                patch.object(MANUSCRIPT.subprocess, "run", return_value=dry_run) as run,
-                contextlib.redirect_stderr(output),
-            ):
-                self.assertNotEqual(0, MANUSCRIPT.prepare(root))
-
-            run.assert_called_once()
-            self.assertIn("calculate", output.getvalue())
-            self.assertIn("extra jobs refused", output.getvalue())
-
-    def test_only_results_includes_are_adopted_as_source_inputs(self):
-        with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory)
-            (root / "case" / "results").mkdir(parents=True)
-            source = root / "case" / "notebook.qmd"
-            fragment = root / "case" / "results" / "table.qmd"
-            source.write_text("{{< include results/table.qmd >}}\n")
-            fragment.write_text("| value |\n| --- |\n| 1 |\n")
-            files = {"case/notebook.qmd": source.read_bytes()}
-            included = MANUSCRIPT.included_files(root, files, ["case/notebook.qmd"])
-            self.assertEqual({"case/results/table.qmd"}, set(included))
-
-            source.write_text("{{< include notes/table.qmd >}}\n")
-            with self.assertRaises(MANUSCRIPT.ManuscriptError):
-                MANUSCRIPT.included_files(root, {"case/notebook.qmd": source.read_bytes()}, ["case/notebook.qmd"])
-
-
-if __name__ == "__main__":
-    unittest.main()
+    def test_refresh_uses_only_a_local_present_rule_and_stops_on_failure(self):
+        self.command("init")
+        (self.root / "case").mkdir()
+        self.write("case/report.qmd", "# Report\n")
+        self.command("include", "case/report.qmd", "--title", "Report")
+        self.write("render.sh", 'echo "render $1"\n')
+        self.write("snakemake", '#!/bin/bash\necho "${PWD##*/} $*"\nexit "$PRESENT_STATUS"\n')
+        (self.root / "snakemake").chmod(0o755)
+        env = {**os.environ, "PATH": f"{self.root}:{os.environ['PATH']}", "PRESENT_STATUS": "7"}
+        rendered = "render ./case/report.qmd\nrender ./index.qmd\n"
+        self.write("Snakefile", "ignored")
+        self.assertEqual(rendered, self.command("refresh", "case/report.qmd", env=env).stdout)
+        self.write("case/Snakefile", "local")
+        present = "case --cores 1 --allowed-rules present -- present\n"
+        self.assertEqual(present, self.command("refresh", "case/report.qmd", env=env, status=7).stdout)
+        self.assertEqual(present + rendered, self.command("refresh", "case/report.qmd",
+                                                         env={**env, "PRESENT_STATUS": "0"}).stdout)

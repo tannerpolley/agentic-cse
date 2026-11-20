@@ -653,7 +653,7 @@ class ScriptBehaviorTests(unittest.TestCase):
             wrapper = project / "render.sh"
             shutil.copyfile(ROOT / "plugin/assets/visualize/project/quarto/render.sh", wrapper)
             (project / "_cse-manuscript.json").write_text("{}\n")
-            (project / "manuscript.py").write_text("from pathlib import Path\nPath('synced').touch()\n")
+            (project / "_quarto.yml").write_text("project:\n  type: website\n")
             quarto = root / "quarto"
             quarto.write_text(f"#!{sys.executable}\nimport os\nprint(os.getcwd())\n")
             quarto.chmod(0o755)
@@ -661,7 +661,16 @@ class ScriptBehaviorTests(unittest.TestCase):
                                     env={**os.environ, "PATH": str(root) + os.pathsep + os.environ["PATH"]})
             self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.strip(), str(project))
-            self.assertTrue((project / "synced").is_file())
+
+    def test_quarto_render_refuses_managed_project_hooks(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "_cse-manuscript.json").touch()
+            for config in ('{"project": {"pre-render": "prepare.sh"}}', "project:\n  post-render: cleanup.sh\n"):
+                (root / "_quarto.yml").write_text(config)
+                result = self.run_script("plugin/assets/visualize/project/quarto/render.sh", cwd=root)
+                self.assertEqual(result.returncode, 1, result.stderr)
+                self.assertIn("without pre-render and post-render hooks", result.stderr)
 
     def test_visual_qa_rejects_type3_fonts(self):
         for tool in ("pdflatex", "kpsewhich", "pdffonts", "pdftotext", "pdftoppm", "mutool"):

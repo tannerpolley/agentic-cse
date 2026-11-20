@@ -6,8 +6,10 @@ if [[ -f "$project_directory/_cse-manuscript.json" ]]; then
   cd "$project_directory"
 fi
 
-if [[ -f manuscript.py || -f _cse-manuscript.json ]]; then
-  python3 ./manuscript.py sync .
+if [[ -f _cse-manuscript.json ]] && { [[ ! -f _quarto.yml || ! -r _quarto.yml ]] ||
+  grep -Eq "(^|[[:space:]{,])['\"]?(pre-render|post-render)['\"]?[[:space:]]*:" _quarto.yml; }; then
+  echo "CSE Quarto render failed: provide a readable _quarto.yml without pre-render and post-render hooks" >&2
+  exit 1
 fi
 
 runtime_root="$(mktemp -d "${TMPDIR:-/tmp}/cse-quarto.XXXXXX")"

@@ -54,8 +54,8 @@ retained evidence before Review. A confirmed analysis repository normally
 publishes one root Quarto analysis site under `analyses/`; include the report
 exactly once with its native management command, use
 `python3 analyses/manuscript.py refresh analyses analyses/<id>/notebook.qmd`
-to rebuild the notebook page and the home page on request. Refresh runs
-presentation preparation and invalidates the presentation cache. State that the report has
+to run the report folder's `present` rule if it has a Snakefile, then render
+the report and home page. State that the report has
 not been independently reviewed or promoted for the separate raw-LaTeX
 submission route. If a renderer is absent, finish the report and core summary,
 then report the exact missing capability. Rendering never establishes a claim. Send the report,

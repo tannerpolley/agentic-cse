@@ -38,9 +38,8 @@ snakemake --cores 1 calculate
 python3 analyses/manuscript.py refresh analyses analyses/<id>/notebook.qmd
 ```
 
-Refresh runs the presentation-only `present` entry before the notebook/root
-handoff; it never runs calculation, source acquisition, or model-backed
-interpretation.
+Refresh runs the report folder's `present` rule if it has a Snakefile, then
+renders the report and home page from retained results.
 
 Inspect the accepted question, model, inputs, method, compute path, prior
 results, and claim limits. Check balances, residuals, invariants, convergence,
