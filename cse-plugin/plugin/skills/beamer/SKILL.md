@@ -1,6 +1,6 @@
 ---
 name: beamer
-description: "Build or revise scientific Beamer slide PDFs with frame-by-frame checks. Use when asked to \"revise the slide deck\", \"update the presentation\", \"make slides\", \"build a Beamer talk\", or \"fix this overflowing slide\". Article PDFs go to latex; HTML .qmd views to quarto."
+description: "Build or revise scientific Beamer slide PDFs with frame-by-frame checks. Use when asked to build a Beamer talk, revise a Beamer deck, or fix an overflowing Beamer slide. Article PDFs go to latex. HTML .qmd views go to quarto. PowerPoint .pptx decks go to pptx."
 metadata:
   cse-kind: "tool"
   cse-family: "visualize"
@@ -11,6 +11,8 @@ metadata:
 ---
 
 # Beamer presentation tool
+
+For PowerPoint decks (`.pptx` or `.potx`), use the `pptx` skill to read slides, generate thumbnails, validate the file, or make edits.
 
 Read first: [rendering-guide](../../references/visualize/rendering-guide.md), [latex-layout-and-qa](../../references/visualize/latex-layout-and-qa.md).
 

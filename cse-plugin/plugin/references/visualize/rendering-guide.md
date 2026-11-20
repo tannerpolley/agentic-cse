@@ -48,6 +48,7 @@ calculations, toolchain replacement or pin repairs.
    record its exact log/source/page locator and specific visual justification;
    no blanket ignores or point-size allowances. Apply the
    [font and visual checks](latex-layout-and-qa.md#release-sequence).
+   For `.pptx` outputs, use the `pptx` skill to validate the file, generate thumbnails, and inspect slides at full size (if missing, install with `npx skills add https://github.com/anthropics/skills --skill pptx -g`).
 5. **Check pins.** Discover the host's listing capability; in T3 use
    `t3_project_artifacts_list` for the relevant project and inspect resolved paths,
    existence and checkout. A worktree PDF cannot validate a main-checkout pin.

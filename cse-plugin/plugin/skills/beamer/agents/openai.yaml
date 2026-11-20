@@ -1,4 +1,4 @@
 interface:
   display_name: "CSE: Rendering — Beamer"
-  short_description: "Build fixed-layout scientific PDF presentations"
-  default_prompt: "Use $cse:beamer to create or revise this scientific PDF presentation."
+  short_description: "Build scientific Beamer slide PDFs"
+  default_prompt: "Use $cse:beamer to create or revise this scientific Beamer deck."

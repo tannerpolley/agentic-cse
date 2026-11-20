@@ -53,6 +53,8 @@ and never calculation. Keep the full customizable LaTeX manuscript route
 separate.
 Follow [quarto-execution](../../references/visualize/quarto-execution.md) for JSON-compatible configuration adoption.
 
+For a selected `.pptx` presentation view, build with the project's own route (including its reference deck and finishing scripts when configured) and load the `pptx` skill to inspect and validate the rendered file.
+
 Render each selected format from the same source revision and compare values,
 conditions, uncertainty, interpretation, limitations, citations, and figure
 sources. For manuscript/deck releases, follow
