@@ -1,0 +1,40 @@
+% Use with \documentclass[aspectratio=169]{beamer}, or set aspectratio: 169
+% in a Quarto Beamer format and include this file in the preamble.
+\usetheme{moloch}
+\usepackage{bookmark}
+
+\setbeamersize{text margin left=0.75cm,text margin right=0.75cm}
+\setbeamerfont{itemize/enumerate subbody}{size=\normalsize}
+\setbeamerfont{itemize/enumerate subsubbody}{size=\normalsize}
+\setbeamerfont{frametitle}{size=\Large,series=\bfseries}
+\setbeamertemplate{navigation symbols}{}
+\setbeamertemplate{page number in head/foot}[framenumber]
+
+\newlength{\CSEFrameTitleWidth}
+\setbeamertemplate{frametitle}{%
+  \nointerlineskip
+  \begin{beamercolorbox}[wd=\paperwidth,center]{frametitle}%
+    \usebeamerfont{frametitle}%
+    \settowidth{\CSEFrameTitleWidth}{\insertframetitle}%
+    \ifdim\CSEFrameTitleWidth>\textwidth\large\fi
+    % Reserve the same space for one- and two-line titles.
+    \parbox[t][1.5cm][t]{\textwidth}{%
+      \vspace*{0.15cm}%
+      \raggedright\strut\insertframetitle\strut\par
+      \ifnum\prevgraf>2\relax
+        \PackageError{cse-deck-header}{Frame title exceeds two lines}{Shorten the frame title.}%
+      \fi
+    }%
+  \end{beamercolorbox}%
+}
+
+% The background runs on plain frames as well as titled frames.
+\addtobeamertemplate{background canvas}{}{%
+  \ifnum\insertslidenumber=1\relax
+    \ifx\insertframetitle\empty
+      \bookmark[level=0,page=\insertpagenumber,view=Fit]{Frame \insertframenumber}%
+    \else
+      \bookmark[level=0,page=\insertpagenumber,view=Fit]{\insertframetitle}%
+    \fi
+  \fi
+}
