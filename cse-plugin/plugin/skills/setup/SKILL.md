@@ -56,6 +56,8 @@ for analysis sets and site ownership, load [analysis-sets](../../references/work
    automatic guidance loading.
 4. Verify both core records are readable and `--check-routing` reports the
    correct protocol and roles. Finish approved optional work using Setup
-   maintenance. Rebuild analysis pages on request with `render.sh` or
-   `manuscript.py refresh`. Report the files, choices, missing capabilities,
+   maintenance. For an approved analysis site, run the plugin's
+   `manuscript.py init analyses/` after the synthesis exists at `analyses/index.qmd`.
+   Rebuild pages on request with `render.sh` or `manuscript.py refresh`. Report
+   the files, choices, missing capabilities,
    and next study step (`cse:design`, or `cse:research` / `cse:diagnose` if needed).

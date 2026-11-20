@@ -4,8 +4,8 @@ bibliography: cooling-fit/references.bib
 ---
 
 <!--
-Example root article for `manuscript.py init analyses --article-source
-article.qmd`. Paths assume this example analysis is copied to
+Copy this article to `analyses/index.qmd` before running
+`manuscript.py init analyses`. Paths assume this example analysis is copied to
 analyses/cooling-fit and included with `manuscript.py include`. Figures and the
 parameter table are embedded from the notebook of retained views that
 `snakemake --cores 1 present` writes; nothing here executes the model.

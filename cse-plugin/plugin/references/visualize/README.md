@@ -18,12 +18,10 @@ specialist:
   promoted PDF profile.
 - `beamer` renders a fixed-layout scientific presentation PDF.
 
-The package assets provide a guarded root Quarto analysis site command at
-`assets/visualize/project/quarto/manuscript.py` and a compact standalone HTML/PDF example
-under `assets/visualize/project/quarto/example/`. Initialize a confirmed analysis root
-with a populated article, include substantive `.qmd` reports explicitly, and
-validate before rendering. The command preserves retained files, refuses
-unsafe adoption, and leaves unregistered `.qmd` files out of the render. The
+Use `assets/visualize/project/quarto/manuscript.py` to initialize an analysis
+website once its synthesis article is in `analyses/index.qmd`. Include report
+pages explicitly and build the site with `render.sh`. The package also ships
+a standalone HTML/PDF example under `assets/visualize/project/quarto/example/`. The
 example reads its retained CSV and compiles one shared PGFPlots source for
 HTML and LuaLaTeX without executing a model.
 

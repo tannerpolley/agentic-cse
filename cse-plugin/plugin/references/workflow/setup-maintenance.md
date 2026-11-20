@@ -102,9 +102,9 @@ Companion state, or remote records only after their required approval.
 ## Optional analysis site
 
 For confirmed `analysis`, confirm purpose, home content, and adoption in the
-same question round. When Quarto is present, use `manuscript.py init` to
-initialize or safely adopt the populated root Quarto analysis site. Preserve an
-existing root instead of migrating it solely to match the default. A `tool`
+same question round. When Quarto is present and the populated synthesis exists
+at `analyses/index.qmd`, run the plugin's `manuscript.py init analyses/`. Preserve
+an existing root instead of migrating it solely to match the default. A `tool`
 gets no site by default. Without the required renderer, finish independent
 setup, report the missing executable, and install nothing.
 

@@ -103,10 +103,9 @@ Use `animate` only after testing the exact viewer and presentation computer.
 
 See `quarto-execution.md` when Quarto is selected. Let Quarto own document assembly, generated
 presentation tables, citations, cross-references, and code highlighting where
-its native feature suffices. Keep document execution disabled by default; an
-explicit presentation profile may read retained results but must not
-run the scientific model. Put stable LaTeX packages and macros in a reviewed
-header file:
+its native feature suffices. Keep document execution disabled and prepare
+presentation inputs from retained results before rendering. Put stable LaTeX
+packages and macros in a reviewed header file:
 
 ```yaml
 format:
