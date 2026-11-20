@@ -1,6 +1,6 @@
 ---
 name: beamer
-description: "Build or revise scientific Beamer slide PDFs with frame-by-frame checks. Use when asked to build a Beamer talk, revise a Beamer deck, or fix an overflowing Beamer slide. Article PDFs go to latex. HTML .qmd views go to quarto. PowerPoint .pptx decks go to pptx."
+description: "Build or revise scientific Beamer PDFs with frame-by-frame checks. Use when asked to \"revise the slide deck\", \"update the presentation\", \"make slides\", \"build a Beamer talk\", or \"fix this overflowing slide\". Route article PDFs to latex, HTML .qmd views to quarto, and PowerPoint .pptx decks to pptx."
 metadata:
   cse-kind: "tool"
   cse-family: "visualize"
