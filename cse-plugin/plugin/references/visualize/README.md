@@ -18,6 +18,8 @@ specialist:
   promoted PDF profile.
 - `beamer` renders a fixed-layout scientific presentation PDF.
 
+Use [slide-decks](slide-decks.md) for shared Beamer, Quarto, and PowerPoint deck defaults and checks.
+
 Use `assets/visualize/project/quarto/manuscript.py` to initialize an analysis
 website once its synthesis article is in `analyses/index.qmd`. Include report
 pages explicitly and build the site with `render.sh`. The package also ships

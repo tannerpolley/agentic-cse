@@ -5,6 +5,7 @@
 - Make ordinary Quarto HTML the living analysis-notebook view.
 - Add a guarded no-execute notebook scaffold and an opt-in LuaLaTeX PDF profile.
 - Remove the retired interactive companion from the active Visualize package.
+- Share slide style defaults and a delivery check across Beamer, Quarto, and PowerPoint.
 
 ## 2.2.1
 

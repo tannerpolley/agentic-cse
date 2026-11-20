@@ -27,6 +27,51 @@ class RenderingBehaviorTests(unittest.TestCase):
             cwd=cwd, env=env or os.environ.copy(), text=True, capture_output=True, check=False,
         )
 
+    def test_beamer_starter_wraps_title_and_bookmarks_each_frame(self):
+        for tool in ("lualatex", "kpsewhich", "mutool", "pdftotext"):
+            if not shutil.which(tool):
+                self.skipTest(f"{tool} is unavailable")
+        for package in ("beamerthememoloch.sty", "bookmark.sty"):
+            if subprocess.run(["kpsewhich", package], capture_output=True).returncode:
+                self.skipTest(f"{package} is unavailable")
+
+        title = "How do the experimental measurements and the reference model compare across the full temperature range?"
+        with tempfile.TemporaryDirectory() as directory:
+            project = Path(directory)
+            header = ROOT / "plugin/assets/visualize/project/beamer/deck-header.tex"
+            shutil.copyfile(header, project / header.name)
+            (project / "deck.tex").write_text(rf"""
+\documentclass[aspectratio=169]{{beamer}}
+\input{{deck-header.tex}}
+\begin{{document}}
+\begin{{frame}}[t]{{Reference case}}
+Body text.
+\end{{frame}}
+\begin{{frame}}[t]{{{title}}}
+Body text.
+\only<2>{{Second overlay.}}
+\end{{frame}}
+\end{{document}}
+""", encoding="utf-8")
+            build = subprocess.run(
+                ["lualatex", "-interaction=nonstopmode", "-halt-on-error", "deck.tex"],
+                cwd=project, capture_output=True, text=True,
+            )
+            self.assertEqual(0, build.returncode, build.stdout + build.stderr)
+            self.assertNotIn("Overfull", (project / "deck.log").read_text(encoding="utf-8"))
+
+            outline = subprocess.check_output(["mutool", "show", "deck.pdf", "outline"], cwd=project, text=True)
+            self.assertEqual([("Reference case", "1"), (title, "2")], re.findall(r'"([^"]+)"\s+#page=(\d+)', outline))
+
+            extracted = subprocess.check_output(["pdftotext", "-layout", "deck.pdf", "-"], cwd=project, text=True)
+            first, second, overlay = [[line.strip() for line in page.splitlines() if line.strip()]
+                                      for page in extracted.rstrip("\f").split("\f")]
+            self.assertEqual(["Reference case", "Body text.", "1"], first)
+            self.assertEqual(title, " ".join(second[:2]))
+            self.assertEqual(["Body text.", "2"], second[2:])
+            self.assertIn("Second overlay.", " ".join(overlay))
+            self.assertEqual("2", overlay[-1])
+
     def test_matplotlib_project_style_renders_scoped_group_mapping(self):
         if importlib.util.find_spec("matplotlib") is None:
             self.skipTest("matplotlib is required for the selected style rendering check")

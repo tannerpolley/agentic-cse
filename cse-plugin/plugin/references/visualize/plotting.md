@@ -40,6 +40,8 @@ resolves its unexplained result.
 
 ## Chart selection
 
+Put quantities with different meanings in separate panels.
+
 Avoid bar charts for continuous scientific comparisons. Prefer a line plus `o`/`x` observations, or points with intervals. Bars are acceptable for inherently categorical counts, compositions, or histogram bins when their baseline and category widths are meaningful; record that reason. Do not use 3-D perspective when a 2-D projection communicates the quantity faithfully.
 
 ## Visual defaults
@@ -99,7 +101,8 @@ starts with 22 pt font/labels, 24 pt title, 20 pt ticks/legend, 2.5 pt lines,
 and 8 pt markers. On a physically smaller Beamer canvas, scale slot dimensions
 and all point sizes by slide-width/13.33, then check the composed slide. A
 12 × 6.75 inch full-slide figure is appropriate only if its slot permits it.
-The actual theme or journal can require different settings.
+The actual theme or journal can require different settings. See
+[slide-decks](slide-decks.md) for sizing slide text and checking the composed deck.
 
 ```python
 from pathlib import Path
