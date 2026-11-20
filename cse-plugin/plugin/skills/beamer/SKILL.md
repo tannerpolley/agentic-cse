@@ -6,15 +6,15 @@ metadata:
   cse-family: "visualize"
   cse-tags: "quarto-pipeline, latex-toolbox"
   cse-routing:
-    direct: [rendering-guide, latex-layout-and-qa]
+    direct: [slide-decks, rendering-guide, latex-layout-and-qa]
     conditional: [latex-packages, latex-figures, quarto-execution, scientific-writing]
 ---
 
 # Beamer presentation tool
 
-For PowerPoint decks (`.pptx` or `.potx`), use the `pptx` skill to read slides, generate thumbnails, validate the file, or make edits.
+For PowerPoint decks (`.pptx` or `.potx`), read [slide-decks](../../references/visualize/slide-decks.md) first. It takes precedence over generic design advice in the `pptx` skill, which handles reading slides, generating thumbnails, validating the file, and making edits.
 
-Read first: [rendering-guide](../../references/visualize/rendering-guide.md), [latex-layout-and-qa](../../references/visualize/latex-layout-and-qa.md).
+Read first: [slide-decks](../../references/visualize/slide-decks.md), [rendering-guide](../../references/visualize/rendering-guide.md), [latex-layout-and-qa](../../references/visualize/latex-layout-and-qa.md).
 
 Inherit core scientific, project, and
 language decisions.
@@ -26,10 +26,9 @@ For deck work, activate [scientific-writing's standing-decision read/update prot
 before editing.
 
 Inspect audience, purpose, source format, theme, aspect ratio, placement,
-figures, notes, and build route. Give each frame one scientific purpose and
-use overlays only when their sequence explains a relation. Design shared
-figures at the narrower placement and use `cse:tikz` as
-appropriate. Do not repair crowding with automatic shrink.
+figures, notes, and build route. Use overlays only when their sequence
+explains a relation. Design shared figures at the narrower placement and use
+`cse:tikz` as appropriate.
 
 For release completion, follow
 [release build verification](../../references/visualize/rendering-guide.md#release-build-verification)
