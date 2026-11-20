@@ -104,37 +104,10 @@ When a document needs Python to format a retained table or draw a plot, use
 `manuscript.py refresh <root> <included.qmd>`. It runs the presentation-only
 `present` entry, then native Quarto with `_quarto-presentation.yml`, invalidates
 the presentation cache, and updates the included notebook page and the home
-page. Refresh and preview select HTML explicitly, keeping a page's optional
-PDF settings out of the website update.
-Quarto preview does not detect arbitrary external-data changes; the
-managed preview bridge checks affected workflows, then publishes a last-checked
-source copy under the user cache (`$XDG_CACHE_HOME/cse-preview`, or
-`~/.cache/cse-preview`). Quarto runs no workflows in this copy. Refused workflows
-contribute no resources; their registered pages and pages including or embedding
-those resources show a typed failure. The home page lists every refusal, including
-workflows without a registered page. Checks remain strict outside this preview.
-Preview requires each presentation workflow in its own folder below the website
-root; a `Snakefile` at the website root stops the preview.
-At startup, the complete checked copy passes native inspection before Quarto
-previews it. Quarto shares its initial project render across pages.
-If that render exits, the bridge renders pages separately, writes diagnostics
-for native render failures, and starts preview with `--no-render`.
+page. Refresh selects HTML explicitly, keeping a page's optional PDF settings
+out of the website update. Rebuild pages on request with `render.sh` or
+`manuscript.py refresh`.
 
-The bridge scans sources every ten seconds, excluding `data/`, `results/`,
-and cache trees. It follows exact include targets, including HTML includes,
-without walking retained trees. Its watcher compares timestamps and sizes, so an
-edit preserving both needs another watched edit or a new preview session. Copying
-always compares bytes, even when timestamps and sizes match. After changing
-arbitrary retained data or results, run `refresh`; these changes are not automatic
-triggers. Writes from a presentation check are absorbed only within that workflow.
-The check-then-copy gap has the same known race as check-then-render.
-
-Every copied source-like text file is conservatively scanned for paths escaping
-the copy, absolute paths into the original tree, and `file://` references. These
-need resource reconciliation. Includes, embeds, and inline images reaching refused
-workflows produce typed failures. Other reference forms, such as front-matter
-bibliographies and reference-style images, can instead show Quarto's missing-file
-render message; refused values are absent from the copy.
 The following
 bare Quarto command shows the
 upstream syntax for the separately authorized presentation-only execution
@@ -190,9 +163,9 @@ python3 assets/visualize/project/quarto/manuscript.py init analyses/ \
   --article-source analyses/index.qmd --source-commit <SHA> --runtime-tree-sha256 <SHA256>
 ```
 
-It replaces `manuscript.py`, `render.sh`, `preview.service`,
-`_quarto-presentation.yml`, and the `.cse-quarto-source.json` source record
-with the current plugin versions, then prints each replaced file. It keeps
+It replaces `manuscript.py`, `render.sh`, `_quarto-presentation.yml`, and the
+`.cse-quarto-source.json` source record with the current plugin versions, then
+prints each replaced file. It removes the retired preview unit template and keeps
 everything the project owns: `_quarto.yml`,
 `_cse-manuscript.json` membership, `site.css`, `index.qmd`, `.gitignore`
 additions, and all sources and retained results. The replacement is validated
@@ -207,72 +180,12 @@ refused rather than rewritten. Migrate it once:
 2. Remove nested Quarto projects (`_quarto.yml` or `_metadata.yml` below the
    root) or move them out of the root.
 3. Remove `_quarto.yml`, `_quarto-presentation.yml`, `_cse-manuscript.json`,
-   `.cse-quarto-source.json`, `manuscript.py`, `render.sh`, and
-   `preview.service`, then rerun `init` with that root's `index.qmd` as
-   `--article-source`.
+   `.cse-quarto-source.json`, `manuscript.py`, and `render.sh`, then rerun
+   `init` with that root's `index.qmd` as `--article-source`.
 4. Include each report again with `include --title <title> [--group <heading>]`.
-5. Render with `render.sh`, then rerun `service` for the preview.
+5. Render with `render.sh`.
 
 Sources and retained results stay in place.
-
-## Main-checkout preview service
-
-During an approved Setup action, first check that `systemctl --user
-show-environment` succeeds. Only then run
-`python3 analyses/manuscript.py service analyses/` once from the main checkout.
-Without a systemd user manager, skip `service` and use the foreground
-`python3 analyses/manuscript.py preview analyses/` fallback.
-It installs and restarts a systemd user unit
-`cse-preview-<repository>-<path hash>.service` that keeps `manuscript.py preview`
-running on `127.0.0.1`, with `Nice=10`, `CPUWeight=10`, and restart on failure
-within a bounded start limit. Outside approved Setup, agents leave this service
-running and use `manuscript.py status analyses/` to report its unit state, URL,
-and port.
-
-`status` also probes the address and prints `answering: yes` or `no`. The unit
-state says only that the process is alive. A start checks every workflow and
-renders every page before the address answers, which takes minutes on a large
-site, so `active` with `answering: no` is normal during a start and `service`
-can report "not answering" for a healthy one. If it persists, read the unit's
-journal. The probe is one connection attempt of at most one second to a
-literal address; a preview bound to a host name gets no `answering` line.
-
-The service uses the checkout's `.venv/bin/python`, never the interpreter that
-happened to run `service`. An explicit `--python <path>` must also belong to
-that project. Prepare that environment with packages providing `jupyter_core`,
-`nbformat`, `nbclient`, `ipykernel`, `jupyter_client`, `jupyter_cache`, and `yaml`
-(package names: `jupyter-core`, `nbformat`, `nbclient`, `ipykernel`,
-`jupyter-client`, `jupyter-cache`, and `PyYAML`). The command does not install
-packages or fall back to a cache environment: it fails with the required module
-list and the import error when imports fail, or an actionable message when the
-project interpreter is missing. Projects with a `Snakefile` also need the
-`snakemake` package in that environment: `service` checks its import and the
-`snakemake` executable on the unit's `PATH`, which preparation invokes.
-The interpreter's directory comes first on
-that `PATH`; the command refuses unit paths containing whitespace, quotes,
-backslash, `%`, or `$`.
-
-To migrate an existing unit during approved Setup, add these packages to the
-project environment, rerun `init` to update the managed root's tooling, then
-rerun `service` from the main checkout.
-
-The port is chosen once from the repository path in the 8800–9799 range,
-skipping ports that are bound or claimed by another preview unit, unless
-`--port` is given. Reruns keep the port and refuse a unit the command did not
-write for that repository. `--dry-run` prints the unit without writing or
-enabling it. Without `systemctl --user`, the command names the foreground
-`manuscript.py preview` fallback and writes no unit. It reports `serving <url>` only after the URL
-answers, otherwise the unit's journal command. User services stop at logout
-unless lingering is enabled (`loginctl enable-linger`).
-
-For an unmerged worktree, run `manuscript.py preview <root>` as a task-owned
-foreground process. It uses the same port allocator, hashing the worktree path
-and skipping bound and claimed ports; `--port` may override it.
-`manuscript.py status <root>` reports the worktree preview state, URL, and port.
-At cleanup, use `manuscript.py stop <root>` to signal that preview, which cleans
-up its Quarto process group. `stop` refuses the main checkout, and a stale PID
-record cannot signal a process that reused the PID. Worktree lifecycle records
-live in the ignored `.quarto/` directory; process identity uses Linux `/proc`.
 
 ## HTML
 

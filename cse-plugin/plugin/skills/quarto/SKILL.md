@@ -41,15 +41,9 @@ PDF view with `render.sh --to pdf`; the standalone example retains its separate
 `promoted-pdf` profile and header. After an adopted analysis completes, use
 `python3 analyses/manuscript.py refresh analyses analyses/<id>/notebook.qmd`; it runs the
 presentation-only `present` target, then refreshes the included notebook page and
-home page with the presentation cache invalidated. Use `manuscript.py preview` to let
-native Quarto serve and reload the local HTML without opening an external
-browser in a task-owned worktree; its bridge watches presentation sources and
-exact include targets that native preview misses, then re-renders affected
-registered sources. The port is allocated automatically. Leave the main-checkout
-service running; use `status` to inspect it and `stop` only for worktree cleanup,
-as described in [quarto-execution](../../references/visualize/quarto-execution.md#main-checkout-preview-service). The
-presentation profile's sole pre-render hook runs presentation-only preparation
-and never calculation. Keep the full customizable LaTeX manuscript route
+home page with the presentation cache invalidated. Rebuild pages on request
+with `render.sh` or `manuscript.py refresh`. The presentation profile's sole
+pre-render hook runs presentation-only preparation and never calculation. Keep the full customizable LaTeX manuscript route
 separate.
 Follow [quarto-execution](../../references/visualize/quarto-execution.md) for JSON-compatible configuration adoption.
 

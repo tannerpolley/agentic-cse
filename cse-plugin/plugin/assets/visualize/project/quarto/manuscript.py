@@ -3,33 +3,22 @@
 from __future__ import annotations
 
 import argparse
-import contextlib
-import html
-import io
-import ipaddress
-import urllib.parse
-import hashlib
 import json
 import os
 from pathlib import Path
 import re
-import shlex
-import signal
 import shutil
-import socket
 import subprocess
 import sys
 import tempfile
-import time
-import urllib.request
 
 ASSET_ROOT = Path(__file__).resolve().parent
 CONFIG_FILES = ("_quarto.yml", "_cse-manuscript.json", "_quarto-presentation.yml")
 # Plugin-owned files that re-running init on a managed root replaces with the current plugin copies.
-TOOLING_FILES = ("_quarto-presentation.yml", "render.sh", "manuscript.py", "preview.service", ".cse-quarto-source.json")
+TOOLING_FILES = ("_quarto-presentation.yml", "render.sh", "manuscript.py", ".cse-quarto-source.json")
 # The shared stylesheet is installed once and then owned by the project, like the configuration.
 SITE_CSS = "site.css"
-REQUIRED_FILES = (*CONFIG_FILES, "index.qmd", "preview.service", ".cse-quarto-source.json",
+REQUIRED_FILES = (*CONFIG_FILES, "index.qmd", ".cse-quarto-source.json",
                   ".gitignore", "render.sh", "manuscript.py", SITE_CSS)
 REQUIRED_IGNORES = ("/.quarto/", "/_site/", "/site_libs/", "/_freeze/", "/notebook.tex")
 SITE_CONFIG = {
@@ -41,23 +30,13 @@ SITE_CONFIG = {
     "execute": {"enabled": False},
 }
 PRESENTATION_PRE_RENDER = "python3 manuscript.py prepare"
-WATCH_INTERVAL_SECONDS = 10.0
-WATCH_SETTLE_SECONDS = 0.25
-IGNORED_WATCH_PARTS = {".git", ".quarto", "_site", "site_libs", "_freeze", "__pycache__", ".ipynb_checkpoints"}
-IGNORED_WATCH_PARTS |= {".snakemake", ".cache", ".venv", ".jupyter_cache", "tmp", "temp", "support"}
-IGNORED_WATCH_SUFFIXES = ("_files", "_support")
-UNSCANNED_WATCH_TREES = {"data", "results"}
-# ponytail: Quarto's internal preview render-request path (the one IDE integrations use);
-# preview ignores mtime-only touches and include changes. Recheck on a Quarto upgrade.
-QUARTO_RENDER_REQUEST = "90B3C9E8-0DBC-4BC0-B164-AA2D5C031B28"
+WORKFLOW_SKIP_DIRS = {
+    ".git", ".quarto", "_site", "site_libs", "_freeze", "__pycache__", ".ipynb_checkpoints",
+    ".snakemake", ".cache", ".venv", ".jupyter_cache", "tmp", "temp", "support", "data", "results",
+}
+WORKFLOW_SKIP_SUFFIXES = ("_files", "_support")
 INCLUDE_RE = re.compile(r"\{\{<\s*include\s+([^\s>]+)")
 INCLUDE_SHORTCODE_RE = re.compile(r"\{\{<\s*include\s+([^\s>]+)\s*>\}\}")
-SERVICE_MARKER = "# Managed by CSE manuscript.py service; do not edit.\n"
-SERVICE_PORT_RE = re.compile(r"--port (\d+)$", re.MULTILINE)
-SERVICE_PORT_BASE, SERVICE_PORT_SPAN = 8800, 1000
-SERVICE_READY_SECONDS = 20
-UNIT_UNSAFE_RE = re.compile(r"[\s\"'\\%$]")
-PREVIEW_IMPORTS = "jupyter_core, nbformat, nbclient, ipykernel, jupyter_client, jupyter_cache, yaml"
 
 
 class ManuscriptError(Exception):
@@ -271,7 +250,7 @@ def check_boundary(root: Path) -> None:
                 "settings and nested Quarto projects, removing _quarto.yml, _quarto-presentation.yml, "
                 "_cse-manuscript.json, .cse-quarto-source.json, manuscript.py, and render.sh, rerunning init "
                 "with --article-source index.qmd, including each notebook again with include --group, then "
-                "running render.sh and service (see references/visualize/quarto-execution.md)")
+                "running render.sh (see references/visualize/quarto-execution.md)")
     output = root / "_site"
     reject_symlink(output)
     require(not output.exists() or output.is_dir(), output, "output is not a directory")
@@ -428,7 +407,7 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
     require(not (root / ".cse-quarto-source.json").exists() or managed,
             root / "_cse-manuscript.json", "cannot reconstruct missing managed membership")
     require(article.suffix == ".qmd", article, "article must be a populated QMD")
-    files = {name: read_file(ASSET_ROOT / name) for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py", "preview.service", SITE_CSS)}
+    files = {name: read_file(ASSET_ROOT / name) for name in ("_quarto-presentation.yml", "render.sh", "manuscript.py", SITE_CSS)}
     files.update({"_quarto.yml": json_bytes(SITE_CONFIG), "index.qmd": read_file(article.absolute()),
                   "_cse-manuscript.json": json_bytes({"project": {"render": ["index.qmd"]},
                                                            "website": {"sidebar": {"style": "docked", "collapse-level": 1,
@@ -478,13 +457,15 @@ def init(root: Path, article: Path, source_commit: str, runtime_tree_sha256: str
                 for path in reversed(installed):
                     path.unlink()
                 raise
+        retired_unit = root / "preview.service"
+        if retired_unit.is_file():
+            retired_unit.unlink()
     return root, replaced
 
 
 def notebook_argument(root: Path, value: Path) -> str:
     relative = inside(root, value)
     require(relative.endswith(".qmd") and relative != "index.qmd", value, "expected analysis QMD notebook")
-    # Quarto's preview render request addresses the page by its raw path, so keep it URL-safe.
     require(re.fullmatch(r"[A-Za-z0-9._/-]+", relative), value,
             "notebook path may contain only letters, digits, '.', '_', '-', and '/'")
     require(read_file(root / relative).strip(), value, "empty notebook")
@@ -566,14 +547,11 @@ def sync(root: Path) -> dict:
 def presentation_workflows(root: Path) -> list[Path]:
     workflows = []
     for directory, dirs, files in os.walk(root, followlinks=False):
-        dirs[:] = [name for name in dirs if not ignored_watch_part(name) and name not in UNSCANNED_WATCH_TREES]
+        dirs[:] = [name for name in dirs
+                   if name not in WORKFLOW_SKIP_DIRS and not name.endswith(WORKFLOW_SKIP_SUFFIXES)]
         if "Snakefile" in files:
             workflows.append(Path(directory))
     return sorted(workflows)
-
-
-def ignored_watch_part(name: str) -> bool:
-    return name in IGNORED_WATCH_PARTS or name.endswith(IGNORED_WATCH_SUFFIXES)
 
 
 def planned_rules(result: subprocess.CompletedProcess) -> set[str] | None:
@@ -632,10 +610,6 @@ def check_presentation_plan(workflow: Path) -> int:
 
 def prepare(root: Path) -> int:
     root = root_path(root)
-    original = os.environ.get("CSE_PREVIEW_ROOT")
-    if original:
-        require(root == preview_path(root_path(Path(original))), root, "preview hook requires checked cache copy")
-        return 0
     workflows = presentation_workflows(root)
     requested = [Path(value) for value in os.environ.get("QUARTO_PROJECT_INPUT_FILES", "").splitlines() if value]
     requested = [path if path.is_absolute() else root / path for path in requested]
@@ -651,351 +625,6 @@ def prepare(root: Path) -> int:
             print(f"presentation failed in {workflow}; retained view is stale", file=sys.stderr)
             return result.returncode
     return 0
-
-
-def literal_text(text: str) -> str:
-    # Encode punctuation before Quarto parses Markdown: even code fences and shortcodes stay inert.
-    return "".join(c if c.isalnum() or c.isspace() else f"&#{ord(c)};" for c in text)
-
-
-def failure_source(page: str, diagnostic: str) -> bytes:
-    message = literal_text(f"Presentation unavailable: {page}\n\n{diagnostic}")
-    return ("---\ntitle: Presentation unavailable\n---\n\n<pre>" + message + "</pre>\n").encode()
-
-
-def preview_path(root: Path) -> Path:
-    cache = Path(os.environ.get("XDG_CACHE_HOME") or Path.home() / ".cache")
-    return cache / "cse-preview" / hashlib.sha256(str(root.resolve()).encode()).hexdigest()
-
-
-def preview_run(command: list[str], cwd: Path, env: dict | None = None) -> subprocess.CompletedProcess:
-    process = subprocess.Popen(command, cwd=cwd, env=env, start_new_session=True,
-                               text=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    try:
-        stdout, stderr = process.communicate()
-        return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
-    finally:
-        stop_process(process)
-
-
-def check_preview_workflows(root: Path, changed: set[Path] | None, failures: dict, snapshot: dict) -> set[Path]:
-    workflows = presentation_workflows(root)
-    affected = {w for w in workflows if changed is None or any(p.is_relative_to(w) for p in changed)}
-    if changed and any(not any(p.is_relative_to(w) for w in workflows) for p in changed):
-        affected = set(workflows)
-    for key in list(failures):
-        if root / key not in workflows:
-            del failures[key]
-    for workflow in sorted(affected):
-        require(workflow != root, workflow, "preview requires workflows below the root; move this Snakefile into an analysis folder")
-        diagnostic = io.StringIO()
-        with contextlib.redirect_stderr(diagnostic):
-            status = check_presentation_plan(workflow)
-        if not status:
-            result = preview_run(["snakemake", "--cores", "1", "present"], workflow)
-            status = result.returncode
-            if status:
-                errors = re.findall(r"^.*(?:Error:|Exception:|FAILED|WARNING:).*$",
-                                    result.stdout + result.stderr, re.MULTILINE)
-                diagnostic.write(f"present integrity/presentation check failed in {workflow} (exit {status})\n"
-                                 + "\n".join(errors))
-        key = workflow.relative_to(root).as_posix()
-        failures.pop(key, None)
-        if status:
-            failures[key] = diagnostic.getvalue().strip()
-            print(failures[key], file=sys.stderr, flush=True)
-        current = watch_snapshot(workflow)
-        # Only this workflow's writes are absorbed; concurrent edits elsewhere remain pending.
-        for path in set(snapshot) | set(current):
-            if path.is_relative_to(workflow):
-                if path in current:
-                    snapshot[path] = current[path]
-                else:
-                    snapshot.pop(path, None)
-    return affected
-
-
-def check_preview_escape(root: Path, source: Path, content: bytes) -> None:
-    text = urllib.parse.unquote(html.unescape(content.decode(errors="ignore")))
-    text = re.sub(r"\\u([0-9a-fA-F]{4})", lambda m: chr(int(m[1], 16)), text).replace("\\", "/")
-    require("file://" not in text.lower() and str(root) not in text, source,
-            "preview resource reconciliation: absolute original path or file:// reference")
-    for value in re.findall(r"\.\./[^\s\"'<>()[\]{},;`]*", text):
-        value = value.split("#")[0]
-        require(Path(os.path.abspath(source.parent / value)).is_relative_to(root), source,
-                "preview resource reconciliation: resource outside preview root")
-
-
-def preview_byproduct(path: Path, root: Path) -> bool:
-    return (any(ignored_watch_part(p) for p in path.relative_to(root).parts)
-            or path.name.endswith(("-preview.html", ".embed.ipynb"))
-            or (path.suffix == ".html" and any(path.with_suffix(s).is_file() for s in (".qmd", ".md", ".ipynb"))))
-
-
-def copy_preview_file(source: Path, target: Path) -> bool:
-    reject_symlink(source)
-    # filecmp caches stat matches; compare bytes directly instead, even at equal mtime/size.
-    if target.is_file() and source.stat().st_size == target.stat().st_size:
-        with source.open("rb") as left, target.open("rb") as right:
-            if all(chunk == right.read(1024 * 1024) for chunk in iter(lambda: left.read(1024 * 1024), b"")):
-                return False
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile(dir=target.parent, prefix=".cse-manuscript-", delete=False) as handle:
-        temporary = Path(handle.name)
-    try:
-        shutil.copy2(source, temporary)
-        os.replace(temporary, target)
-    finally:
-        temporary.unlink(missing_ok=True)
-    return True
-
-
-def populate_preview(original: Path, copy: Path, failures: dict,
-                     changed: set[Path] | None = None, targets: set[Path] | None = None) -> dict:
-    """Validate a complete candidate before publishing in inspection-safe order."""
-    check_boundary(original)
-    files = {name: read_file(original / name) for name in REQUIRED_FILES}
-    validate_configuration(original, files)
-    state = metadata(files["_cse-manuscript.json"], original / "_cse-manuscript.json")
-    pages = state["project"]["render"]
-    candidates = {}
-    workflows = presentation_workflows(original)
-    records = dict(failures)
-    byproducts = {str(Path(page).with_suffix(".html")) for page in pages}
-    for directory, dirs, names in os.walk(original, followlinks=False):
-        dirs[:] = [n for n in dirs if not ignored_watch_part(n)]
-        for name in names:
-            source = Path(directory) / name
-            relative = source.relative_to(original).as_posix()
-            if preview_byproduct(source, original) or relative == ".cse-preview-failures.json":
-                continue
-            if any(source.is_relative_to(original / key) for key in failures):
-                continue
-            reject_symlink(source)
-            if source.suffix.lower() in {".qmd", ".md", ".yml", ".yaml", ".json", ".bib", ".css", ".scss", ".html", ".ipynb", ".tex", ".txt", ".svg", ".js"}:
-                try:
-                    check_preview_escape(original, source, read_file(source))
-                except ManuscriptError as exc:
-                    owner = next((w for w in workflows if source.is_relative_to(w)), None)
-                    owner = owner or source
-                    records[owner.relative_to(original).as_posix()] = str(exc)
-                    continue
-            candidates[relative] = source
-    refused = [original / key for key in records if original / key in workflows]
-    candidates = {name: source for name, source in candidates.items()
-                  if not any(source.is_relative_to(w) for w in refused)}
-    page_failures, sources, unavailable = {}, {}, set()
-    for page in pages:
-        pending, seen = [(original / page, original / page)], set()
-        try:
-            while pending:
-                source, owner = pending.pop()
-                if source in seen:
-                    continue
-                seen.add(source)
-                if targets is not None and any(source == p or source.is_relative_to(p) for p in changed or ()):
-                    targets.add(original / page)
-                reason = next((detail for key, detail in records.items()
-                               if source == original / key or source.is_relative_to(original / key)), None)
-                require(not reason, source, f"preview dependency check failed: refused workflow/resource: {reason}")
-                require(not preview_byproduct(source, original), source,
-                        "preview resource reconciliation: excluded render output")
-                data = read_file(source)
-                check_preview_escape(original, source, data)
-                # Non-shortcode references retain Quarto's missing-file diagnostic, but
-                # must not keep an earlier HTML page containing now-refused resources.
-                for value in re.findall(r"[^\s\"'<>()[\]{},;`]+", data.decode(errors="ignore")) if refused else ():
-                    if "/" not in value or re.match(r"\w+:|#", value):
-                        continue
-                    target = (source.parent / value.split("#")[0]).resolve()
-                    if any(target.is_relative_to(w) for w in refused):
-                        unavailable.add(page)
-                        if targets is not None:
-                            targets.add(original / page)
-                references = re.findall(
-                    r"\{\{<\s*(include|embed)\s+[\"']?([^\s>\"']+)|!\[[^\]]*\]\(\s*<?([^\s)>]+)"
-                    r"|<img\b[^>]*\bsrc\s*=\s*[\"']([^\"']+)", data.decode(errors="ignore"), re.IGNORECASE)
-                for kind, included, image, html_image in references:
-                    value = included or image or html_image
-                    if re.match(r"https?:|data:|#", value):
-                        continue
-                    target = ((owner if kind == "embed" else source).parent / value.split("#")[0]).resolve()
-                    require(target.is_relative_to(original), source, "preview resource reconciliation: resource outside preview root")
-                    require(not preview_byproduct(target, original), source,
-                            "preview resource reconciliation: excluded render output")
-                    if kind or any(target.is_relative_to(w) for w in refused):
-                        pending.append((target, target if kind == "embed" else owner))
-            sources[page] = read_file(original / page)
-        except ManuscriptError as exc:
-            page_failures[page] = str(exc)
-            sources[page] = failure_source(page, str(exc))
-    if records or page_failures:
-        notices = {**records, **page_failures}
-        sources["index.qmd"] += ("\n## Preview failures\n\n" + "\n".join(
-            f"<pre>{literal_text(key + ': ' + detail)}</pre>" for key, detail in notices.items()) + "\n").encode()
-    copy.parent.mkdir(parents=True, exist_ok=True)
-    reject_symlink(copy)
-    if copy.exists():
-        check_boundary(copy)
-    with tempfile.TemporaryDirectory(prefix=".cse-preview-stage-", dir=copy.parent) as directory:
-        stage = Path(directory)
-        for name, source in candidates.items():
-            if name not in {*pages, "_cse-manuscript.json"}:
-                copy_preview_file(source, stage / name)
-        for page, data in sources.items():
-            (stage / page).parent.mkdir(parents=True, exist_ok=True)
-            (stage / page).write_bytes(data)
-        refresh_sections(stage, state)
-        (stage / "_cse-manuscript.json").write_bytes(json_bytes(state))
-        (stage / ".cse-preview-failures.json").write_bytes(json_bytes(records))
-        validate_root(stage)
-        if not copy.exists():
-            stage.rename(copy)
-            return state
-        copy.mkdir(exist_ok=True)
-        retained = {p.relative_to(stage) for p in stage.rglob("*") if p.is_file()}
-        # Failure sources precede deletions; healthy resources precede healthy sources.
-        configs = {p for p in retained if p.name in CONFIG_FILES or
-                   p.name.startswith(("_quarto", "_metadata", "_variables"))}
-        for relative in sorted(retained, key=lambda p: (
-                3 if p in configs else 0 if str(p) in page_failures else 2 if str(p) in pages else 1, str(p))):
-            copy_preview_file(stage / relative, copy / relative)
-        # Retire previously rendered values immediately, before native render requests.
-        for page in page_failures:
-            output = copy / "_site" / Path(page).with_suffix(".html")
-            output.parent.mkdir(parents=True, exist_ok=True)
-            atomic_write(output, b"<html><body>" + sources[page].split(b"---\n", 2)[-1] + b"</body></html>")
-        for directory, dirs, names in os.walk(copy):
-            dirs[:] = [n for n in dirs if not ignored_watch_part(n)]
-            for name in names:
-                path = Path(directory) / name
-                if path.relative_to(copy) not in retained and path.relative_to(copy).as_posix() not in byproducts:
-                    path.unlink()
-        for page in unavailable - page_failures.keys():
-            (copy / "_site" / Path(page).with_suffix(".html")).unlink(missing_ok=True)
-        for workflow in refused:
-            output = copy / "_site" / workflow.relative_to(original)
-            allowed = {copy / "_site" / Path(p).with_suffix(".html") for p in page_failures}
-            for path in output.rglob("*"):
-                if path.is_file() and path not in allowed:
-                    path.unlink()
-    return state
-
-
-
-def is_watchable(path: Path, root: Path) -> bool:
-    try:
-        relative = path.absolute().relative_to(root)
-    except ValueError:
-        return False
-    return not any(ignored_watch_part(part) for part in relative.parts) and not (
-        # Quarto writes these render byproducts beside sources; watching them re-triggers renders.
-        path.name.startswith(".") or (path.suffix == ".html" and any(
-            path.with_suffix(ext).is_file() for ext in (".qmd", ".md", ".ipynb")))
-        or path.name in {"manuscript.py", "render.sh"}
-    )
-
-
-def watch_snapshot(root: Path) -> dict[Path, tuple[int, int]]:
-    snapshot = {}
-    pending = []
-    for directory, dirs, files in os.walk(root, followlinks=False):
-        dirs[:] = [name for name in dirs if not ignored_watch_part(name) and name not in UNSCANNED_WATCH_TREES]
-        pending.extend(Path(directory) / name for name in files)
-    # Follow exact include targets without enumerating retained data or results trees.
-    seen = set()
-    while pending:
-        path = pending.pop()
-        if path in seen or not is_watchable(path, root):
-            continue
-        seen.add(path)
-        try:
-            info = path.stat()
-            if not path.is_file():
-                continue
-            snapshot[path] = (info.st_mtime_ns, info.st_size)
-            if path.suffix in {".qmd", ".md"}:
-                pending.extend((path.parent / target).resolve() for target in INCLUDE_RE.findall(path.read_text()))
-        except (OSError, UnicodeDecodeError):
-            continue
-    return snapshot
-
-
-def changed_paths(before: dict[Path, tuple[int, int]], after: dict[Path, tuple[int, int]]) -> set[Path]:
-    return {path for path in before.keys() | after.keys() if before.get(path) != after.get(path)}
-
-
-def presentation_targets(root: Path, state: dict, changed: set[Path]) -> set[Path]:
-    article = root / "index.qmd"
-    pages = [root / entry["href"] for entry in notebooks(state)]
-    targets = set()
-    for path in changed:
-        if not is_watchable(path, root):
-            continue
-        matched = [page for page in pages if path.is_relative_to(page.parent)]
-        if matched:
-            targets.update(matched)
-            targets.add(article)
-        else:
-            targets.update(pages)
-            targets.add(article)
-    return targets
-
-
-def request_renders(root: Path, targets: set[Path], host: str, port: int) -> None:
-    host = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host
-    for path in sorted(targets):
-        if path.is_file():
-            url = f"http://{host}:{port}/{QUARTO_RENDER_REQUEST}/{path.relative_to(root).as_posix()}"
-            try:
-                with urllib.request.urlopen(url, timeout=30) as response:
-                    if response.read() != b"rendered":
-                        raise OSError(f"preview refused to render {path}")
-            except OSError as exc:
-                print(f"preview render request failed for {path}: {exc}", file=sys.stderr, flush=True)
-
-
-
-def workflows_running(root: Path) -> bool:
-    # Snakemake removes a rule's outputs before running it, so never present mid-calculation.
-    return any(any((workflow / ".snakemake" / "locks").glob("*"))
-               for workflow in presentation_workflows(root))
-
-
-def wait_for_server(process: subprocess.Popen, host: str, port: int) -> None:
-    host = "127.0.0.1" if host in {"0.0.0.0", "::", ""} else host
-    while process.poll() is None:
-        with socket.socket() as probe:
-            if probe.connect_ex((host, port)) == 0:
-                return
-        time.sleep(WATCH_INTERVAL_SECONDS)
-
-
-def stop_process(process: subprocess.Popen) -> None:
-    if process.poll() is not None:
-        return
-    # Snakemake's shells can own separate process groups. Capture descendants before
-    # terminating their parent, so stopping a blocked present leaves no orphan.
-    descendants, pending = [], [process.pid]
-    while pending:
-        pid = pending.pop()
-        try:
-            children = [int(p) for p in Path(f"/proc/{pid}/task/{pid}/children").read_text().split()]
-        except OSError:
-            children = []
-        descendants.extend(children)
-        pending.extend(children)
-    try:
-        os.killpg(process.pid, signal.SIGTERM)
-        process.wait(timeout=5)
-    except ProcessLookupError:
-        pass
-    except subprocess.TimeoutExpired:
-        os.killpg(process.pid, signal.SIGKILL)
-        process.wait()
-    for pid in reversed(descendants):
-        with contextlib.suppress(ProcessLookupError):
-            os.kill(pid, signal.SIGKILL)
 
 
 def refresh(root: Path, notebook: Path) -> int:
@@ -1015,280 +644,10 @@ def refresh(root: Path, notebook: Path) -> int:
     return 0
 
 
-def preview(root: Path, host: str, port: int | None) -> int:
-    root = root_path(root)
-    copy = preview_path(root)
-    require(not copy.resolve().is_relative_to(root), copy, "preview cache must be outside original tree")
-    require(preview_record(root) is None, root, "a preview is already running for this root")
-    if port is None:
-        port = preview_port(git_path(root, "--show-toplevel"), None)
-    require(1 <= port <= 65535, root, "port must be between 1 and 65535")
-    # Quarto silently picks another port when this one is busy, so render requests would miss it.
-    with socket.socket() as probe:
-        require(probe.connect_ex((host if host not in {"0.0.0.0", "::", ""} else "127.0.0.1", port)) != 0,
-                root, f"port {port} is already in use; pass --port with a free port")
-    command = ["quarto", "preview", "--to", "html", "--profile", "presentation", "--no-browser",
-               "--no-watch-inputs", "--host", host, "--port", str(port)]
-    environment = {**os.environ, "CSE_PREVIEW_ROOT": str(root)}
-    process = None
-    def handle_sigterm(signum, frame):
-        raise KeyboardInterrupt
-
-    previous_sigterm = signal.signal(signal.SIGTERM, handle_sigterm)
-    record = root / ".quarto" / "cse-preview.json"
-    try:
-        failures, snapshot = {}, watch_snapshot(root)
-        check_preview_workflows(root, None, failures, snapshot)
-        state = populate_preview(root, copy, failures)
-        process = subprocess.Popen([*command, "--render", "html"], cwd=copy, start_new_session=True, env=environment)
-        record.parent.mkdir(exist_ok=True)
-        atomic_write(record, json_bytes({"pid": os.getpid(), "identity": process_identity(os.getpid()),
-                                        "host": host, "port": port}))
-        wait_for_server(process, host, port)
-        # Keep Quarto's rendered context for first requests; isolate pages on native failure.
-        if process.poll() is not None:
-            for page in state["project"]["render"]:
-                result = preview_run(["quarto", "render", page, "--to", "html", "--profile", "presentation"], copy, environment)
-                if result.returncode:
-                    print(result.stdout + result.stderr, file=sys.stderr)
-                    output = copy / "_site" / Path(page).with_suffix(".html")
-                    output.parent.mkdir(parents=True, exist_ok=True)
-                    atomic_write(output, ("<html><body><pre>" + literal_text(result.stdout + result.stderr)
-                                          + "</pre></body></html>").encode())
-            process = subprocess.Popen([*command, "--no-render"], cwd=copy, start_new_session=True, env=environment)
-            wait_for_server(process, host, port)
-        while process.poll() is None:
-            time.sleep(WATCH_INTERVAL_SECONDS)
-            current = watch_snapshot(root)
-            pending = changed_paths(snapshot, current)
-            snapshot = current
-            if not pending:
-                continue
-            waiting = False
-            while process.poll() is None:
-                time.sleep(WATCH_INTERVAL_SECONDS if waiting else WATCH_SETTLE_SECONDS)
-                current = watch_snapshot(root)
-                new = changed_paths(snapshot, current)
-                snapshot = current
-                running = workflows_running(root)
-                if running and not new and not waiting:
-                    waiting = True
-                    print(f"preview waiting for a Snakemake lock under {root}; if no run is active, "
-                          "run `snakemake --unlock` in that analysis", file=sys.stderr)
-                if not new and not running:
-                    break
-                pending.update(new)
-            try:
-                affected = check_preview_workflows(root, pending, failures, snapshot)
-                targets = {root / "index.qmd"}
-                state = populate_preview(root, copy, failures, pending | affected, targets)
-                targets.update(presentation_targets(root, state, pending | affected))
-                request_renders(copy, {copy / p.relative_to(root) for p in targets}, host, port)
-            except (OSError, ManuscriptError) as exc:
-                print(f"preview refresh failed: {exc}", file=sys.stderr)
-        return process.wait()
-    except KeyboardInterrupt:
-        return 130
-    finally:
-        signal.signal(signal.SIGTERM, previous_sigterm)
-        if process is not None:
-            stop_process(process)
-        record.unlink(missing_ok=True)
-
-
-def git_path(root: Path, *arguments: str) -> Path:
-    result = subprocess.run(["git", "-C", str(root), "rev-parse", "--path-format=absolute", *arguments],
-                            check=False, text=True, capture_output=True)
-    require(not result.returncode, root, f"not a Git checkout: {result.stderr.strip()}")
-    return Path(result.stdout.strip()).resolve()
-
-
-def service_port(unit: Path) -> int | None:
-    match = SERVICE_PORT_RE.search(unit.read_text()) if unit.is_file() else None
-    return int(match.group(1)) if match else None
-
-
-def service_unit(repository: Path) -> Path:
-    digest = hashlib.sha256(str(repository).encode()).hexdigest()[:8]
-    units = Path(os.environ.get("XDG_CONFIG_HOME") or Path.home() / ".config") / "systemd" / "user"
-    return units / f"cse-preview-{re.sub(r'[^A-Za-z0-9_.-]', '-', repository.name)}-{digest}.service"
-
-
-def preview_port(repository: Path, port: int | None, *, keep_service_port: bool = False) -> int:
-    unit = service_unit(repository)
-    current = service_port(unit) if keep_service_port else None
-    claimed = {service_port(other) for other in unit.parent.glob("cse-preview-*.service")
-               if not keep_service_port or other != unit}
-    if port is None:
-        port = current
-    if port is None:
-        digest = int(hashlib.sha256(str(repository).encode()).hexdigest(), 16)
-        candidates = (SERVICE_PORT_BASE + (digest + step) % SERVICE_PORT_SPAN for step in range(SERVICE_PORT_SPAN))
-        port = next((value for value in candidates if value not in claimed and port_free(value)), None)
-        require(port, repository, "no free preview port")
-    require(1 <= port <= 65535 and port not in claimed and (port == current or port_free(port)),
-            repository, f"port {port} is in use or claimed by another preview unit")
-    return port
-
-
-def process_identity(pid: int) -> str | None:
-    # Linux start time prevents a stale record from stopping a reused PID.
-    try:
-        return Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()[19]
-    except FileNotFoundError:
-        return None
-
-
-def preview_record(root: Path) -> dict | None:
-    record = root / ".quarto" / "cse-preview.json"
-    if not record.is_file():
-        return None
-    state = read_json(read_file(record), record)
-    return state if state["identity"] is not None and process_identity(state["pid"]) == state["identity"] else None
-
-
-def listening(host, port) -> bool | None:
-    """Whether the address accepts a connection within one second; None when that cannot be asked."""
-    try:
-        # One literal address and one attempt bound the wait; a host name would need an unbounded lookup.
-        address = ipaddress.ip_address("127.0.0.1" if host in {"0.0.0.0", "::", ""} else host)
-        if getattr(address, "scope_id", None):
-            return None
-        with socket.socket(socket.AF_INET6 if address.version == 6 else socket.AF_INET) as probe:
-            probe.settimeout(1)
-            return probe.connect_ex((str(address), port)) == 0
-    except Exception:
-        return None
-
-
-def status(root: Path) -> int:
-    root = root_path(root)
-    repository = git_path(root, "--show-toplevel")
-    if git_path(root, "--git-dir") != git_path(root, "--git-common-dir"):
-        state = preview_record(root)
-        print(f"unit: none (worktree)\nstate: {'running' if state else 'stopped'}")
-        port = state["port"] if state else None
-        host = state["host"] if state else "127.0.0.1"
-        alive = bool(state)
-    else:
-        unit = service_unit(repository)
-        port = service_port(unit)
-        unit_state = "not installed"
-        if unit.is_file():
-            result = subprocess.run(["systemctl", "--user", "show", unit.name, "--property=ActiveState", "--value"],
-                                    check=True, capture_output=True, text=True)
-            unit_state = result.stdout.strip()
-        print(f"unit: {unit.name}\nstate: {unit_state}")
-        host = "127.0.0.1"
-        alive = unit_state == "active"
-    print(f"port: {port if port is not None else 'unassigned'}\n"
-          f"url: {f'http://{host}:{port}/' if port is not None else 'unassigned'}")
-    # The state above says only that the process is alive; probing the address says whether pages are served.
-    if port is not None and (answer := listening(host, port)) is not None:
-        waiting = " (a running preview renders every page before it answers; failures are in its log)"
-        print(f"answering: {'yes' if answer else 'no' + waiting * alive}")
-    return 0
-
-
-def stop(root: Path) -> int:
-    root = root_path(root)
-    require(git_path(root, "--git-dir") != git_path(root, "--git-common-dir"), root,
-            "stop is only for a task-owned worktree preview; the main-checkout service is always on")
-    state = preview_record(root)
-    if state:
-        try:
-            os.kill(state["pid"], signal.SIGTERM)
-        except ProcessLookupError:
-            pass
-    print("worktree preview stop requested" if state else "worktree preview already stopped")
-    return 0
-
-
-def port_free(port: int) -> bool:
-    with socket.socket() as probe:
-        try:
-            probe.bind(("127.0.0.1", port))
-        except OSError:
-            return False
-    return True
-
-
-def unit_value(value: str, what: str) -> str:
-    require(not UNIT_UNSAFE_RE.search(value), Path(value), f"{what} has characters unsafe in a systemd unit")
-    return value
-
-
-def answering(url: str) -> bool:
-    deadline = time.monotonic() + SERVICE_READY_SECONDS
-    while True:
-        try:
-            with urllib.request.urlopen(url, timeout=1):
-                return True
-        except OSError:
-            if time.monotonic() >= deadline:
-                return False
-            time.sleep(0.5)
-
-
-def service(root: Path, port: int | None, dry_run: bool, python: Path | None = None) -> int:
-    root = root_path(root)
-    sync(root)
-    quarto = shutil.which("quarto")
-    require(quarto, root, "quarto renderer unavailable on PATH")
-    repository = git_path(root, "--show-toplevel")
-    require(git_path(root, "--git-dir") == git_path(root, "--git-common-dir"), root,
-            "the preview service serves the main checkout; run it there, not in a worktree")
-    python = Path(os.path.abspath(python)) if python is not None else repository / ".venv" / "bin" / "python"
-    require(python.is_relative_to(repository) and python.parent.resolve().is_relative_to(repository), python,
-            "interpreter must belong to this project; no cache-environment fallback")
-    path = list(dict.fromkeys([str(python.parent), str(Path(quarto).parent), "/usr/local/bin", "/usr/bin", "/bin"]))
-    for value, what in ((str(repository), "repository path"), (root.relative_to(repository).as_posix(), "manuscript path"),
-                        (str(python), "interpreter path"), *((entry, "PATH entry") for entry in path)):
-        unit_value(value, what)
-    workflows = presentation_workflows(root)
-    modules = PREVIEW_IMPORTS + (", snakemake" if workflows else "")
-    require(python.is_file() and os.access(python, os.X_OK), python,
-            f"project interpreter is missing or not executable; prepare the project .venv with {modules}")
-    imports = subprocess.run([str(python), "-c", f"import {modules}"], check=False, capture_output=True, text=True)
-    require(not imports.returncode, python,
-            f"project interpreter requires {modules} for the presentation profile: {imports.stderr.strip()}")
-    require(not workflows or shutil.which("snakemake", path=":".join(path)), python.parent,
-            "snakemake is required by a presentation workflow but absent from the unit PATH")
-    unit = service_unit(repository)
-    existing = unit.read_text() if unit.is_file() else None
-    require(existing is None or (existing.startswith(SERVICE_MARKER)
-                                 and f"\nWorkingDirectory={repository}\n" in existing),
-            unit, "refusing to overwrite a unit this command did not write for this repository")
-    port = preview_port(repository, port, keep_service_port=True)
-    text = read_file(ASSET_ROOT / "preview.service").decode().format(
-        repository=repository, manuscript=root.relative_to(repository).as_posix(), port=port,
-        python=python, path=":".join(path))
-    url = f"http://127.0.0.1:{port}/"
-    if dry_run:
-        print(f"{unit}\n{text}{url}")
-        return 0
-    try:
-        subprocess.run(["systemctl", "--user", "show-environment"], check=True, capture_output=True)
-    except (OSError, subprocess.CalledProcessError) as exc:
-        command = " ".join(shlex.quote(value) for value in (
-            "python3", str(root / "manuscript.py"), "preview", str(root)))
-        raise ManuscriptError(f"systemd user manager unavailable; run `{command}` instead") from exc
-    if text != existing:
-        unit.parent.mkdir(parents=True, exist_ok=True)
-        atomic_write(unit, text.encode())
-    for action in ("daemon-reload", "enable", "restart"):
-        subprocess.run(["systemctl", "--user", action, *([] if action == "daemon-reload" else [unit.name])], check=True)
-    if answering(url):
-        print(f"{unit.name} serving {url}")
-        return 0
-    print(f"{unit.name} started, not answering at {url}; see `journalctl --user -u {unit.name}`")
-    return 1
-
-
 def main() -> int:
     parser = argparse.ArgumentParser(prog="manuscript.py")
     commands = parser.add_subparsers(dest="command", required=True)
-    for name in ("init", "include", "validate", "sync", "refresh", "preview", "prepare", "service", "status", "stop"):
+    for name in ("init", "include", "validate", "sync", "refresh", "prepare"):
         command = commands.add_parser(name)
         if name == "prepare":
             command.add_argument("root", type=Path, nargs="?", default=Path("."))
@@ -1304,13 +663,6 @@ def main() -> int:
             command.add_argument("--title", required=True)
             command.add_argument("--title-only", action="store_true", help="list the page without heading links")
             command.add_argument("--group", help="optional sidebar group; nest with '/', e.g. 'Bundle/Active formulation'")
-        if name == "preview":
-            command.add_argument("--host", default="127.0.0.1")
-            command.add_argument("--port", type=int)
-        if name == "service":
-            command.add_argument("--port", type=int)
-            command.add_argument("--dry-run", action="store_true")
-            command.add_argument("--python", type=Path, help="project interpreter (default: checkout .venv/bin/python)")
     args = parser.parse_args()
     try:
         if args.command == "init":
@@ -1330,14 +682,6 @@ def main() -> int:
             return prepare(args.root)
         elif args.command == "refresh":
             return refresh(args.root, args.notebook)
-        elif args.command == "status":
-            return status(args.root)
-        elif args.command == "stop":
-            return stop(args.root)
-        elif args.command == "service":
-            return service(args.root, args.port, args.dry_run, args.python)
-        else:
-            return preview(args.root, args.host, args.port)
         return 0
     except (ManuscriptError, OSError, ValueError, TypeError, AttributeError, subprocess.SubprocessError) as exc:
         parser.exit(1, f"manuscript failed: {exc}\n")

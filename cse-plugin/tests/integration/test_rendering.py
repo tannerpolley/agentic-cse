@@ -6,14 +6,10 @@ import os
 import re
 from pathlib import Path
 import shutil
-import signal
-import socket
 import subprocess
 import sys
 import tempfile
-import time
 import unittest
-import urllib.request
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -210,7 +206,6 @@ class RenderingBehaviorTests(unittest.TestCase):
             commands = (
                 [sys.executable, str(script), "validate", str(root)],
                 [sys.executable, str(script), "refresh", str(root), str(notebook)],
-                [sys.executable, str(script), "preview", str(root)],
                 ["bash", "render.sh"],
             )
             for command in commands:
@@ -223,7 +218,7 @@ class RenderingBehaviorTests(unittest.TestCase):
                 self.assertEqual(before, snapshot())
                 self.assertFalse(sentinel.exists())
 
-    def test_example_analysis_renders_and_preview_shows_changed_retained_value(self):
+    def test_example_analysis_renders_and_refreshes_changed_retained_value(self):
         if shutil.which("quarto") is None or shutil.which("snakemake") is None:
             self.skipTest("quarto and snakemake are required for the example site render")
         with tempfile.TemporaryDirectory() as directory:
@@ -311,54 +306,13 @@ class RenderingBehaviorTests(unittest.TestCase):
             for anchor in edge_anchors:
                 self.assertIn(f'id="{anchor}"', edge_page)
             self.assertIn(r"5.000 \times 10^{-3}", notebook)
-            self.assertEqual([], [p.name for p in (root / "_site").rglob("*preview*")])
             self.assertTrue((root / "_site/cooling-fit/results/fit_curve.csv").is_file())
 
-            with socket.socket() as probe:
-                probe.bind(("127.0.0.1", 0))
-                port = probe.getsockname()[1]
-            log = (root.parent / "preview.log").open("w")
-            preview = subprocess.Popen(
-                [sys.executable, "manuscript.py", "preview", ".", "--port", str(port)],
-                cwd=root, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
-            )
-            url = f"http://127.0.0.1:{port}/cooling-fit/notebook.html"
 
-            def page() -> str:
-                try:
-                    with urllib.request.urlopen(url, timeout=5) as response:
-                        return response.read().decode()
-                except OSError:
-                    return ""
-
-            def wait_for(text: str, seconds: float) -> bool:
-                deadline = time.monotonic() + seconds
-                while time.monotonic() < deadline:
-                    if preview.poll() is not None:
-                        return False
-                    if text in page():
-                        return True
-                    time.sleep(1)
-                return False
-
-            try:
-                self.assertTrue(wait_for(r"5.000 \times 10^{-3}", 120), (root.parent / "preview.log").read_text())
-                FIXTURE.write_retained_set(analysis, rate=0.0071, keep_inputs=True)
-                self.assertTrue(wait_for(r"7.100 \times 10^{-3}", 60), (root.parent / "preview.log").read_text())
-                # One change must settle: render byproducts must not re-trigger the bridge.
-                time.sleep(15)
-                settled = (root.parent / "preview.log").read_text().count("Output created")
-                time.sleep(20)
-                self.assertEqual(settled, (root.parent / "preview.log").read_text().count("Output created"))
-            finally:
-                if preview.poll() is None:
-                    os.killpg(preview.pid, signal.SIGTERM)
-                    try:
-                        preview.wait(timeout=15)
-                    except subprocess.TimeoutExpired:
-                        os.killpg(preview.pid, signal.SIGKILL)
-                        preview.wait()
-                log.close()
+            FIXTURE.write_retained_set(analysis, rate=0.0071, keep_inputs=True)
+            run([sys.executable, "manuscript.py", "refresh", ".", "cooling-fit/notebook.qmd"], root)
+            for page in ("index.html", "cooling-fit/notebook.html"):
+                self.assertIn(r"7.100 \times 10^{-3}", (root / "_site" / page).read_text(encoding="utf-8"))
 
 
 if __name__ == "__main__":

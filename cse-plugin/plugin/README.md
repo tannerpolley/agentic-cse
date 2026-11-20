@@ -97,11 +97,8 @@ independent work when useful.
 ## Platform limits
 
 The plugin's commands and validation are tested on Linux. macOS and Windows
-have not been tested. The always-on analysis preview needs a systemd user
-manager; Setup skips that service when unavailable. Use the foreground
-`python3 analyses/manuscript.py preview analyses/` fallback for a prepared
-site. Preview process tracking uses Linux `/proc`; the fallback has not been
-verified on macOS or Windows. No cross-platform support is claimed.
+have not been tested. Rebuild analysis pages on request with `render.sh`
+or `manuscript.py refresh`.
 
 The [public source](https://github.com/tannerpolley/agentic-cse) identifies
 payloads by source commit and content hash. Contributor checks live in the

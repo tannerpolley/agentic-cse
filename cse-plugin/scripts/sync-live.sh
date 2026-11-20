@@ -85,51 +85,6 @@ python3 -c 'import json,sys; value=json.load(sys.stdin); raise SystemExit(0 if v
 plugin_commit="$(git -C "$repository_root" rev-parse HEAD)"
 plugin_identity="$(python3 "$repository_root/scripts/package_inventory.py" stage cse "$transaction/cse" --commit "$plugin_commit")"
 payload_sha256="$(python3 -c 'import json,sys; print(json.load(sys.stdin)["runtimeTreeSha256"])' <<<"$plugin_identity")"
-report_preview_roots() {
-  python3 - "$repository_root/plugin" "$transaction/cse" "$plugin_commit" "$payload_sha256" <<'PY'
-import json
-from pathlib import Path
-import runpy
-import shlex
-import subprocess
-import sys
-
-plugin, payload, commit, digest = sys.argv[1:]
-assets = Path(payload) / "assets/visualize/project/quarto"
-tooling = [name for name in runpy.run_path(str(assets / "manuscript.py"))["TOOLING_FILES"]
-           if name != ".cse-quarto-source.json"]
-try:
-    units = subprocess.run(["systemctl", "--user", "list-units", "--all", "--type=service",
-                            "cse-preview-*.service", "--no-legend", "--plain"],
-                           text=True, capture_output=True, check=True).stdout
-except (OSError, subprocess.CalledProcessError):
-    raise SystemExit(0)
-for line in units.splitlines():
-    unit = line.split()[0]
-    root = None
-    try:
-        details = subprocess.run(["systemctl", "--user", "show", unit, "-p", "WorkingDirectory", "-p", "ExecStart"],
-                                 text=True, capture_output=True, check=True).stdout
-        fields = dict(item.split("=", 1) for item in details.splitlines() if "=" in item)
-        argv = shlex.split(fields["ExecStart"].split("argv[]=", 1)[1].split(" ;", 1)[0])
-        root = Path(fields["WorkingDirectory"]) / argv[argv.index("preview") + 1]
-        json.loads((root / ".cse-quarto-source.json").read_text())
-        changed = [name for name in tooling if not (root / name).is_file()
-                   or (root / name).read_bytes() != (assets / name).read_bytes()]
-        if not changed:
-            continue
-        reason = "older tooling: " + ", ".join(changed)
-    except (OSError, ValueError, KeyError, IndexError, AttributeError, subprocess.CalledProcessError):
-        if root is None:
-            print(f"Preview {unit}: unreadable unit or root")
-            continue
-        reason = "unreadable or missing source record"
-    command = shlex.join(["python3", str(Path(plugin) / "assets/visualize/project/quarto/manuscript.py"),
-                          "init", str(root), "--article-source", str(root / "index.qmd"),
-                          "--source-commit", commit, "--runtime-tree-sha256", digest])
-    print(f"Preview {root}: {reason}; upgrade: {command}")
-PY
-}
 # Refresh user-level hook files only when they are already installed; the
 # installer without --user or --repo leaves every settings registration alone.
 refresh_installed_hooks() {
@@ -176,7 +131,6 @@ if lineage.get("composition_basis") != "pure component":
 if lineage.get("resource", {}).get("sha256") != hashlib.sha256(input_path.read_bytes()).hexdigest():
     raise SystemExit("selected lineage hash does not match the analysis input")
 PY
-  report_preview_roots || echo "Preview-root report did not run (exit $?)." >&2
   identity_json "installed wheel schema and data-register/data-select/query lineage checks passed"
   exit 0
 fi
@@ -318,6 +272,5 @@ fi
 python3 "$repository_root/scripts/check-installed.py"
 committed=1
 refresh_installed_hooks || echo "Installed CSE hook refresh failed (exit $?); installation itself succeeded." >&2
-report_preview_roots || echo "Preview-root report did not run (exit $?)." >&2
 identity_json "installed wheel and schema checks passed"
 echo "Installed cse@cse from the repository marketplace and the Zotero runtime."
