@@ -42,7 +42,7 @@ def write_retained_set(root: Path, *, rate: float = 0.005, keep_inputs: bool = F
 
     ``keep_inputs`` hashes the inputs already in ``root`` (a copied example).
     Each file is written to a temporary name and then replaced, with the summary
-    last, so a watcher never sees a partial set.
+    last.
     """
     paths = {
         "observations": "inputs/observations.csv", "parameters": "inputs/parameters.json",

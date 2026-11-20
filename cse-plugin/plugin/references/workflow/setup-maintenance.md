@@ -108,14 +108,10 @@ existing root instead of migrating it solely to match the default. A `tool`
 gets no site by default. Without the required renderer, finish independent
 setup, report the missing executable, and install nothing.
 
-Before attempting the always-on service, check that `systemctl` exists and
-`systemctl --user show-environment` succeeds. Only with that capability, run
-`python3 analyses/manuscript.py service analyses/` once from the main checkout
-as part of approved Setup, using the project's interpreter. Follow
-[Quarto execution](../visualize/quarto-execution.md#main-checkout-preview-service)
-and report `serving <url>`, the not-answering journal command, or the missing
-capability. Without a systemd user manager, skip `service` and give
-`python3 analyses/manuscript.py preview analyses/` as the foreground fallback.
+For an existing managed site, follow the
+[managed-root upgrade](../visualize/quarto-execution.md#upgrading-a-managed-root).
+Rebuild pages on request with `render.sh` or `manuscript.py refresh`.
+
 Offer Snakemake adoption for a populated analysis only as an option; read
 [Snakemake](snakemake.md) when selected and record the choice.
 
