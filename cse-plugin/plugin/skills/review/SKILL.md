@@ -8,7 +8,7 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model]
-    conditional: [code-surface-review, scientific-method, numerical-testing, failure-triage, scientific-writing, analysis-sets, dependent-scientific-changes]
+    conditional: [code-surface-review, scientific-method, numerical-testing, failure-triage, scientific-writing, analysis-sets, dependent-scientific-changes, slide-decks]
 ---
 
 # Review scientific work
@@ -58,6 +58,7 @@ For manuscripts/decks, the Result lens activates scientific-writing's
 [standing decisions](../../references/workflow/scientific-writing.md#standing-editorial-decisions),
 [editorial compliance](../../references/workflow/scientific-writing.md#editorial-compliance), and
 [manuscript reference coverage](../../references/workflow/scientific-writing.md#manuscript-reference-coverage).
+At a deck's final checkpoint, inspect it read-only against [slide-decks](../../references/visualize/slide-decks.md) and the project's deck decisions.
 Return Supported/Not supported with concrete evidence and limitations.
 
 **Capability lens —** inspect the final implementation tree, complete changed functions,

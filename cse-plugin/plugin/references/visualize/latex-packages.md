@@ -92,9 +92,8 @@ when the document contains the corresponding material.
 ### Beamer deck
 
 Let Beamer own page geometry, navigation, lists, colors, captions, and
-hyperlinks. Use a 16:9 Moloch base, one major claim per frame, no automatic
-shrink, and roughly one main frame per presentation minute unless the speaking
-plan proves otherwise. Share notation commands and selected scientific
+hyperlinks. Use a 16:9 Moloch base and follow [slide-decks](slide-decks.md) for
+deck defaults and checks. Share notation commands and selected scientific
 packages, not the entire article preamble. Add `appendixnumberbeamer` for
 backup-slide numbering and `pdfpc` only for the PDF Presenter Console workflow.
 Use `animate` only after testing the exact viewer and presentation computer.

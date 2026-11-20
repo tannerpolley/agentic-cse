@@ -7,7 +7,7 @@ metadata:
   cse-tags: "matplotlib, latex-toolbox"
   cse-routing:
     direct: [rendering-guide, plotting]
-    conditional: [latex-figures, scientific-writing]
+    conditional: [latex-figures, scientific-writing, slide-decks]
 ---
 
 # Plotting tool
@@ -21,6 +21,7 @@ document-native backend.
 For manuscript/deck figures, activate [scientific-writing's standing-decision protocol](../../references/workflow/scientific-writing.md#standing-editorial-decisions)
 before editing, including capture of new owner directions. Unrelated
 exploratory plots do not load manuscript rules.
+For deck figures, use [slide-decks](../../references/visualize/slide-decks.md) to check the figure in the composed slide.
 
 Name the question, intended use, units, data authority, and series roles. Add a
 comparison limit only when a named authority supplies one. Use a line only for

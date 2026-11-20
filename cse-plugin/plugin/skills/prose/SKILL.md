@@ -7,7 +7,7 @@ metadata:
   cse-tags: "writing-inspection"
   cse-routing:
     direct: [operating-model, scientific-writing, BANNED]
-    conditional: []
+    conditional: [slide-decks]
 ---
 
 # Inspect scientific prose
@@ -42,6 +42,8 @@ identity, missing coverage, or unresolved weak or broken relationships. The
 routine clear message is not a final-check result. Report exact
 [editorial violations](../../references/workflow/scientific-writing.md#editorial-compliance) and follow the shared
 [final-check coordination](../../references/workflow/scientific-writing.md#final-manuscript-checkpoint).
+
+At a deck's final checkpoint, inspect it read-only against [slide-decks](../../references/visualize/slide-decks.md) and the project's deck decisions.
 
 For source, figure, and deck identifier advisories, follow the shared
 [reader-facing identifier check](../../references/workflow/scientific-writing.md#reader-facing-identifiers).

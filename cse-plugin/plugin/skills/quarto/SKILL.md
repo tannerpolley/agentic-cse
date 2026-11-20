@@ -7,7 +7,7 @@ metadata:
   cse-tags: "quarto-pipeline"
   cse-routing:
     direct: [rendering-guide, quarto-execution]
-    conditional: [latex-packages, latex-article-profiles, latex-figures]
+    conditional: [latex-packages, latex-article-profiles, latex-figures, slide-decks]
 ---
 
 # Quarto document manager
@@ -47,6 +47,7 @@ pre-render hook runs presentation-only preparation and never calculation. Keep t
 separate.
 Follow [quarto-execution](../../references/visualize/quarto-execution.md) for JSON-compatible configuration adoption.
 
+For presentation views, follow [slide-decks](../../references/visualize/slide-decks.md) for deck defaults and the delivery check.
 For a selected `.pptx` presentation view, build with the project's own route (including its reference deck and finishing scripts when configured) and load the `pptx` skill to inspect and validate the rendered file.
 
 Render each selected format from the same source revision and compare values,
