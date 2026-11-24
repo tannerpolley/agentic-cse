@@ -1,13 +1,19 @@
 from __future__ import annotations
 
+import importlib.metadata
 import importlib.util
+import json
+import math
 import os
+import platform
 import re
+import runpy
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 
 
@@ -151,6 +157,84 @@ Body text.
                     self.assertEqual(2, plt.rcParams["lines.linewidth"])
                 self.assertEqual(before, {key: plt.rcParams[key] for key in loaded})
                 self.assertEqual([], [str(warning.message) for warning in caught])
+
+    def test_cooling_fit_selects_the_same_solution_in_both_start_orders(self):
+        if importlib.util.find_spec("scipy") is None:
+            self.skipTest("scipy is required for the cooling-fit calculation")
+        import numpy as np
+
+        fit_rate = runpy.run_path(str(EXAMPLE / "scripts/cooling_fit.py"))["fit_rate"]
+        times = np.array([1_000_000.0, 2_000_000.0])
+        observations = np.array([20.0 + 60.0 * math.exp(-t / 1_000_000) for t in times])
+        starts = (0.001, 0.000002)
+        for guesses in (starts, starts[::-1]):
+            with self.subTest(guesses=guesses):
+                fit = fit_rate(times, observations, ambient=20.0, initial=80.0, initial_guesses=guesses)
+                self.assertAlmostEqual(1e-6, fit["cooling_rate_per_s"], delta=1e-12)
+                self.assertAlmostEqual(0.0, fit["residual_rmse_degC"], delta=1e-8)
+                self.assertEqual(
+                    {"first_start_converged": True, "second_start_converged": True},
+                    fit["start_checks"],
+                )
+                self.assertFalse(fit["refit_consistent"])
+
+    def test_cooling_fit_presents_predictions_when_estimates_are_unavailable(self):
+        packages = ("matplotlib", "numpy", "snakemake", "scipy")
+        for package in packages:
+            if importlib.util.find_spec(package) is None:
+                self.skipTest(f"{package} is required for the cooling-fit calculation")
+
+        cases = (
+            ("identifiable", "10,50\n", math.log(2) / 10, "| 10 | 50.000 | 50.000 |"),
+            ("time zero", "0,80\n", None, "| 0 | 80.000 | 80.000 |"),
+            ("saturated", "1000000,20\n2000000,20\n", None, "| 1e+06 | 20.000 | 20.000 |"),
+        )
+        for label, observations, rate, data_row in cases:
+            with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                arguments = FIXTURE.write_retained_set(root)
+                (root / arguments.observations).write_text("time_s,temperature_degC\n" + observations)
+                (root / arguments.parameters).write_text(json.dumps({
+                    "ambient_temperature_degC": 20.0, "initial_temperature_degC": 80.0,
+                    "initial_guesses_per_s": [0.001, 0.02],
+                }))
+                (root / arguments.environment).write_text(json.dumps({
+                    "python": platform.python_version(),
+                    "packages": {name: importlib.metadata.version(name) for name in packages},
+                }))
+                for name in ("script", "helper"):
+                    relative = getattr(arguments, name)
+                    shutil.copyfile(EXAMPLE / relative, root / relative)
+
+                for script, paths in (
+                    ("calculate.py", {name: path for name, path in vars(arguments).items()
+                                      if name not in ("output", "values", "provenance", "views")}),
+                    ("present.py", vars(arguments)),
+                ):
+                    result = self.run_script(
+                        str(EXAMPLE / "scripts" / script),
+                        *FIXTURE.present_command(SimpleNamespace(**paths)), cwd=root,
+                    )
+                    self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+                fit = json.loads((root / arguments.summary).read_text())["fit"]
+                self.assertAlmostEqual(0.0, fit["residual_rmse_degC"])
+                self.assertIsNone(fit["cooling_rate_standard_error_per_s"])
+                self.assertIsNone(fit["cooling_rate_ci95_per_s"])
+                rendered = (root / arguments.output).read_text()
+                self.assertIn(data_row, rendered)
+                self.assertIn("The observed temperature range is zero.", rendered)
+                values = (root / arguments.values).read_text()
+                self.assertIn('rate-standard-error: "unavailable"', values)
+                if rate is None:
+                    self.assertIsNone(fit["cooling_rate_per_s"])
+                    self.assertIsNone(fit["time_constant_s"])
+                    self.assertIn("singular Jacobian", rendered)
+                    self.assertIn('rate: "undetermined"', values)
+                    self.assertIn('time-constant: "undetermined"', values)
+                else:
+                    self.assertAlmostEqual(rate, fit["cooling_rate_per_s"])
+                    self.assertIn("at least two observations", rendered)
 
     def test_example_analysis_renders_and_refreshes_changed_retained_value(self):
         if not shutil.which("quarto") or not shutil.which("snakemake"):

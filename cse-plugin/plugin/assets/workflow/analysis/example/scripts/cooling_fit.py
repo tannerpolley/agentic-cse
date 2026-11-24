@@ -27,11 +27,19 @@ def fit_rate(
                       xtol=1e-14, ftol=1e-14, gtol=1e-14)
         for guess in initial_guesses
     ]
-    if not all(fit.success for fit in fits):
-        raise ValueError("the positive cooling-rate fit did not converge from every start")
-
-    cooling_rate = float(fits[0].x[0])
-    refit_rate = float(fits[1].x[0])
+    sensitivities_squared = [np.dot(fit.jac[:, 0], fit.jac[:, 0]) for fit in fits]
+    eligible = [
+        fit.success and 0 < sensitivity_squared < np.inf
+        for fit, sensitivity_squared in zip(fits, sensitivities_squared)
+    ]
+    # Prefer a usable estimate, then lower residual cost. Break exact ties by rate.
+    selected = min(range(len(fits)), key=lambda i: (not eligible[i], fits[i].cost, fits[i].x[0]))
+    cooling_rate = float(fits[selected].x[0])
+    refit_rate = float(fits[1 - selected].x[0])
+    start_checks = {
+        "first_start_converged": bool(fits[0].success),
+        "second_start_converged": bool(fits[1].success),
+    }
     fitted_temperature = temperature(time_s, cooling_rate, ambient, initial)
     residual_temperature = observed_temperature - fitted_temperature
     rmse = float(np.sqrt(np.mean(residual_temperature ** 2)))
@@ -40,17 +48,29 @@ def fit_rate(
     # independent, equal-variance temperature errors and treats the ambient and
     # initial temperatures as exact, so it omits their contribution.
     degrees_of_freedom = time_s.size - 1
-    if degrees_of_freedom < 1:
-        raise ValueError("the standard error needs at least two observations")
-    jacobian = fits[0].jac[:, 0]
-    residual_variance = float(np.sum(residual_temperature ** 2)) / degrees_of_freedom
-    standard_error = float(np.sqrt(residual_variance / np.dot(jacobian, jacobian)))
-    half_width = float(student_t.ppf(0.975, degrees_of_freedom)) * standard_error
+    standard_error = None
+    interval = None
+    rate_unavailable_reason = None
+    uncertainty_unavailable_reason = None
+    sensitivity_squared = sensitivities_squared[selected]
+    if not fits[selected].success:
+        rate_unavailable_reason = "The selected solver candidate did not converge."
+    elif sensitivity_squared == 0:
+        rate_unavailable_reason = "The fit returned a singular Jacobian at the candidate rate."
+    elif not np.isfinite(sensitivity_squared):
+        rate_unavailable_reason = "The fit returned a non-finite Jacobian norm at the candidate rate."
+    elif degrees_of_freedom < 1:
+        uncertainty_unavailable_reason = "The standard error needs at least two observations."
+    else:
+        residual_variance = float(np.sum(residual_temperature ** 2)) / degrees_of_freedom
+        standard_error = float(np.sqrt(residual_variance / sensitivity_squared))
+        half_width = float(student_t.ppf(0.975, degrees_of_freedom)) * standard_error
+        interval = [cooling_rate - half_width, cooling_rate + half_width]
 
     # Agreement with data is reported, not gated: the RMSE is compared with the
     # observed temperature range because these observations carry no measurement
-    # uncertainty. The refit check is a correctness check whose tolerance comes
-    # from numerical precision at the fitted rate.
+    # uncertainty. The illustrative refit target reports agreement across starts.
+    # See Tolerances in the CSE numerical-testing reference for precision limits.
     observed_range = float(np.ptp(observed_temperature))
     refit_difference = abs(cooling_rate - refit_rate)
     refit_tolerance = max(
@@ -59,11 +79,14 @@ def fit_rate(
     )
 
     return {
-        "cooling_rate_per_s": cooling_rate,
+        "cooling_rate_per_s": None if rate_unavailable_reason else cooling_rate,
+        "candidate_rate_per_s": cooling_rate if rate_unavailable_reason else None,
+        "rate_unavailable_reason": rate_unavailable_reason,
         "refit_rate_per_s": refit_rate,
         "cooling_rate_standard_error_per_s": standard_error,
-        "cooling_rate_ci95_per_s": [cooling_rate - half_width, cooling_rate + half_width],
-        "time_constant_s": 1.0 / cooling_rate if cooling_rate > 0 else None,
+        "cooling_rate_ci95_per_s": interval,
+        "uncertainty_unavailable_reason": uncertainty_unavailable_reason,
+        "time_constant_s": 1.0 / cooling_rate if cooling_rate > 0 and not rate_unavailable_reason else None,
         "observation_count": int(time_s.size),
         "degrees_of_freedom": degrees_of_freedom,
         "residual_rmse_degC": rmse,
@@ -71,5 +94,6 @@ def fit_rate(
         "refit_difference_per_s": refit_difference,
         "refit_tolerance_per_s": refit_tolerance,
         "refit_consistent": refit_difference <= refit_tolerance,
+        "start_checks": start_checks,
         "fitted_temperature": fitted_temperature,
     }

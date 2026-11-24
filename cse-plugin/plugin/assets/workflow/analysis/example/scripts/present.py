@@ -48,17 +48,23 @@ def inline_math(value: str) -> str:
 
 def parameter_table(summary: dict) -> list[str]:
     fit, parameters = summary["fit"], summary["parameters"]
-    low, high = fit["cooling_rate_ci95_per_s"]
     # Rate columns share one power of ten in the header so the cells stay plain numbers.
     rate = fit["cooling_rate_per_s"]
+    time_constant = fit["time_constant_s"]
     power = math.floor(math.log10(abs(rate))) if rate else 0
     scale = 10.0 ** -power
     rate_unit = rf"10^{{{power}}}\,\mathrm{{s^{{-1}}}}" if power else r"\mathrm{s^{-1}}"
+    standard_error = fit.get("cooling_rate_standard_error_per_s")
+    interval = fit.get("cooling_rate_ci95_per_s")
+    interval_cell = r"\text{unavailable}"
+    if interval is not None:
+        low, high = interval
+        interval_cell = f"[{tex_number(low * scale)},\\ {tex_number(high * scale)}]"
     columns = [
-        (r"k", rate_unit, tex_number(rate * scale)),
-        (r"s_k", rate_unit, tex_number(fit["cooling_rate_standard_error_per_s"] * scale, 2)),
-        (r"\mathrm{CI}_{95}(k)", rate_unit, f"[{tex_number(low * scale)},\\ {tex_number(high * scale)}]"),
-        (r"1/k", r"\mathrm{s}", tex_number(fit["time_constant_s"])),
+        (r"k", rate_unit, r"\text{undetermined}" if rate is None else tex_number(rate * scale)),
+        (r"s_k", rate_unit, r"\text{unavailable}" if standard_error is None else tex_number(standard_error * scale, 2)),
+        (r"\mathrm{CI}_{95}(k)", rate_unit, interval_cell),
+        (r"1/k", r"\mathrm{s}", r"\text{undetermined}" if time_constant is None else tex_number(time_constant)),
         (r"\mathrm{RMSE}", r"^{\circ}\mathrm{C}", tex_number(fit["residual_rmse_degC"], 3)),
         (r"T_a", r"^{\circ}\mathrm{C}", tex_number(parameters["ambient_temperature_degC"], 3)),
         (r"T_0", r"^{\circ}\mathrm{C}", tex_number(parameters["initial_temperature_degC"], 3)),
@@ -75,7 +81,7 @@ def parameter_table(summary: dict) -> list[str]:
 
 PARAMETER_CAPTION = (
     "Fitted cooling rate $k$ with its linearized standard error $s_k$ and 95 % Student-$t$ interval "
-    "$\\mathrm{CI}_{95}(k)$; derived time constant $1/k$; residual RMSE; fixed ambient and initial temperatures "
+    "$\\mathrm{CI}_{95}(k)$, when available; derived time constant $1/k$; residual RMSE; fixed ambient and initial temperatures "
     "$T_a$ and $T_0$; $n$ observations and $\\nu$ residual degrees of freedom."
 )
 
@@ -98,23 +104,37 @@ def data_table(curve_path: Path) -> list[str]:
 
 def check_lines(summary: dict) -> tuple[str, list[str]]:
     fit, checks = summary["fit"], summary["checks"]
-    verdict = "passed" if all(checks.values()) else "not passed; diagnose before any negative disposition (failure-triage)"
-    share = 100.0 * fit["residual_rmse_degC"] / fit["observed_range_degC"] if fit["observed_range_degC"] else float("nan")
+    verdict = "refit target met" if checks["refit_consistent"] else "refit target missed"
+    rmse = fit["residual_rmse_degC"]
+    observed_range = fit["observed_range_degC"]
+    range_comparison = "The observed temperature range is zero."
+    if observed_range > 0:
+        share = 100.0 * rmse / observed_range
+        range_comparison = (
+            f"This is {share:.2g} % of the observed temperature range "
+            f"{inline_math(tex_number(observed_range, 3))} {DEGREE_CELSIUS}."
+        )
     lines = [
-        f"- Residual RMSE {inline_math(tex_number(fit['residual_rmse_degC'], 3))} {DEGREE_CELSIUS} "
-        f"is {share:.2g} % of the observed temperature range "
-        f"{inline_math(tex_number(fit['observed_range_degC'], 3))} {DEGREE_CELSIUS}; "
-        "the observations carry no measurement uncertainty to compare it with.",
-        f"- Refit from a second initial guess differs by {inline_math(tex_number(fit['refit_difference_per_s'], 2))} {PER_SECOND} "
-        f"against the tolerance {inline_math(tex_number(fit['refit_tolerance_per_s'], 2))} {PER_SECOND}: "
-        f"**{'passed' if checks['refit_consistent'] else 'not passed'}**.",
+        f"- Residual RMSE is {inline_math(tex_number(rmse, 3))} {DEGREE_CELSIUS}. "
+        f"{range_comparison} The observations carry no measurement uncertainty to compare it with.",
+        f"- The candidate rates from the two starts differ by {inline_math(tex_number(fit['refit_difference_per_s'], 2))} {PER_SECOND} "
+        f"against the target {inline_math(tex_number(fit['refit_tolerance_per_s'], 2))} {PER_SECOND}.",
     ]
+    failed_starts = [name for name in ("first", "second") if not checks.get(f"{name}_start_converged", True)]
+    if failed_starts:
+        verdict = "refit inconclusive"
+        lines.append(f"- The solver stopped before convergence from the {' or '.join(failed_starts)} start.")
+    if reason := fit.get("rate_unavailable_reason"):
+        verdict = "refit inconclusive"
+        lines.append(f"- The rate, time constant, and uncertainty are undetermined. {reason}")
+    if reason := fit.get("uncertainty_unavailable_reason"):
+        lines.append(f"- Rate uncertainty is unavailable. {reason}")
     return verdict, lines
 
 
 def include_fragment(summary: dict, curve_path: Path, figure_path: Path, residual_path: Path) -> str:
     verdict, lines = check_lines(summary)
-    callout = "note" if all(summary["checks"].values()) else "warning"
+    callout = "note" if verdict == "refit target met" else "warning"
     return "\n".join([
         "<!-- Generated by scripts/present.py from the hash-checked retained set. -->",
         "",
@@ -126,7 +146,7 @@ def include_fragment(summary: dict, curve_path: Path, figure_path: Path, residua
         "",
         "## Fit",
         "",
-        f"![Observed temperatures (points) and the one-parameter fit (line).]({figure_path.as_posix()}){{#fig-cooling-fit}}",
+        f"![Observed temperatures and cooling-model evaluations.]({figure_path.as_posix()}){{#fig-cooling-fit}}",
         "",
         "## Residuals",
         "",
@@ -145,7 +165,6 @@ def include_fragment(summary: dict, curve_path: Path, figure_path: Path, residua
         "",
         *lines,
         "",
-        "These checks verify the fit to these observations; they do not validate the model physically.",
         ":::",
         "",
     ])
@@ -154,11 +173,16 @@ def include_fragment(summary: dict, curve_path: Path, figure_path: Path, residua
 def values_fragment(summary: dict) -> str:
     """Return a YAML metadata block; ``{{< meta cooling-fit.* >}}`` quotes it inline."""
     fit = summary["fit"]
+    rate = fit["cooling_rate_per_s"]
+    time_constant = fit["time_constant_s"]
+    standard_error = fit.get("cooling_rate_standard_error_per_s")
     verdict, _ = check_lines(summary)
     values = {
-        "rate": inline_math(f"k = {tex_number(fit['cooling_rate_per_s'])}\\ \\mathrm{{s^{{-1}}}}"),
-        "rate-standard-error": inline_math(f"{tex_number(fit['cooling_rate_standard_error_per_s'], 2)}\\ \\mathrm{{s^{{-1}}}}"),
-        "time-constant": inline_math(f"1/k = {tex_number(fit['time_constant_s'])}\\ \\mathrm{{s}}"),
+        "rate": "undetermined" if rate is None else inline_math(f"k = {tex_number(rate)}\\ \\mathrm{{s^{{-1}}}}"),
+        "rate-standard-error": (
+            "unavailable" if standard_error is None else inline_math(f"{tex_number(standard_error, 2)}\\ \\mathrm{{s^{{-1}}}}")
+        ),
+        "time-constant": "undetermined" if time_constant is None else inline_math(f"1/k = {tex_number(time_constant)}\\ \\mathrm{{s}}"),
         "rmse": inline_math(f"{tex_number(fit['residual_rmse_degC'], 3)}\\ ^{{\\circ}}\\mathrm{{C}}"),
         "observations": str(fit["observation_count"]),
         "checks": verdict,
@@ -217,7 +241,7 @@ def views_notebook(summary: dict, figure_path: Path, residual_path: Path) -> str
         # Quarto would otherwise try to run these cells under an executing profile.
         {"cell_type": "raw", "id": "front-matter", "metadata": {},
          "source": ["---\n", "title: Retained cooling-fit views\n", "execute:\n", "  enabled: false\n", "---\n"]},
-        figure_cell("fig-cooling-fit", "Observed temperatures (points) and the one-parameter fit (line).", figure_path),
+        figure_cell("fig-cooling-fit", "Observed temperatures and cooling-model evaluations.", figure_path),
         figure_cell("fig-cooling-residuals", "Residuals of the one-parameter fit at each observation time.", residual_path),
         {"cell_type": "code", "id": "tbl-cooling-parameters", "metadata": {}, "execution_count": None,
          "source": ["#| label: tbl-cooling-parameters\n",
@@ -286,13 +310,15 @@ def present(args: argparse.Namespace) -> None:
             refuse(f"{path} does not match the retained summary hash")
 
     required = (
-        "cooling_rate_per_s", "cooling_rate_standard_error_per_s", "cooling_rate_ci95_per_s",
-        "time_constant_s", "residual_rmse_degC", "observed_range_degC", "refit_difference_per_s",
+        "residual_rmse_degC", "observed_range_degC", "refit_difference_per_s",
         "refit_tolerance_per_s", "observation_count", "degrees_of_freedom",
     )
     fit = summary.get("fit", {})
     if any(fit.get(quantity) is None for quantity in required) or "refit_consistent" not in checks:
         refuse("the retained fit is missing a required quantity or check")
+    for quantity in ("cooling_rate_per_s", "time_constant_s"):
+        if quantity not in fit or (fit[quantity] is None and not fit.get("rate_unavailable_reason")):
+            refuse(f"the retained fit is missing {quantity} or an explanation")
 
     figure, residual = generated_paths["figure"], generated_paths["residual_figure"]
     write_if_changed(Path(args.output), include_fragment(summary, generated_paths["curve"], figure, residual))

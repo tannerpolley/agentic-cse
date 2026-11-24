@@ -16,7 +16,7 @@ The two execution phases and independent Review checkpoints are:
 
 ```text
 Research and design -- readiness Review --> Execute and deliver -- delivered Review --> endpoint
-        ^                    | Revise/Block              | Not supported
+        ^                    | Revise/Block              | Claim needs work
         +--------------------+----------------------------+
 ```
 
@@ -26,7 +26,8 @@ comparisons a result will be reported against are settled; nothing is built
 there. Execute and deliver contains Build, Analyze, Summarize,
 and authorized Write and delivery. These are ownership groupings, not a demand
 to run every stage. Review independently checks design readiness before Build
-and delivered results or capabilities afterward. Audit and Prose are supporting
+and gives [claim verdicts](../../skills/review/SKILL.md#claim-verdicts) for
+delivered results or capabilities. Audit and Prose are supporting
 tools, not execution phases.
 
 Direct tool requests return to the stage that owns the question or claim.

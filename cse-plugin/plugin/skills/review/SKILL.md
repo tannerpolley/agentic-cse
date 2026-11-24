@@ -15,8 +15,8 @@ metadata:
 
 Read first: [operating-model](../../references/workflow/operating-model.md).
 Activate [scientific-method](../../references/workflow/scientific-method.md) for disputed equations or validity,
-[numerical-testing](../../references/workflow/numerical-testing.md) for reference cases or tolerances,
-[failure-triage](../../references/workflow/failure-triage.md) for failed or incomplete cases, and
+[numerical-testing](../../references/workflow/numerical-testing.md) for reference cases and its [tolerance rule](../../references/workflow/numerical-testing.md#tolerances) when a limit is in question,
+[failure-triage](../../references/workflow/failure-triage.md) for incomplete cases or [test, CI, or run failures](../../references/workflow/failure-triage.md#triage-test-ci-and-run-failures), and
 [dependent-scientific-changes](../../references/workflow/dependent-scientific-changes.md) for leaf dependencies.
 
 Review is independent of the two execution phases and occurs at two moments.
@@ -45,9 +45,8 @@ Read the exact delivered result or capability from the project's `CONTEXT.md`
 default and confirm it from the work at hand. If the implementer requests the
 review, use a separate read-only reviewer against the identified final commit or
 frozen tree and explicit merge base. If independent delegation is unavailable,
-report the review as pending. Return
-**Supported** or **Not supported**, the limitations, required corrections, and
-the next stage: Write, Diagnose, Research, Design, or stop.
+report the review as pending. Apply [claim verdicts](#claim-verdicts) in both
+lenses.
 
 **Result lens —** inspect the complete research notebook, retained values, and
 selected renders. Establish whether each claim follows from the numbers,
@@ -59,27 +58,31 @@ For manuscripts/decks, the Result lens activates scientific-writing's
 [editorial compliance](../../references/workflow/scientific-writing.md#editorial-compliance), and
 [manuscript reference coverage](../../references/workflow/scientific-writing.md#manuscript-reference-coverage).
 At a deck's final checkpoint, inspect it read-only against [slide-decks](../../references/visualize/slide-decks.md) and the project's deck decisions.
-Return Supported/Not supported with concrete evidence and limitations.
 
 **Capability lens —** inspect the final implementation tree, complete changed functions,
 and direct callers and callees using [code-surface-review](../../references/workflow/code-surface-review.md). Check
 that calculations stay with the accepted numerical owner; each result field
-has a named meaning, producer, unit or basis, and availability rule; distinct fields do not reuse one value without identity evidence; missing inputs and silent exits preserve causes and valid outputs; and repeated constants,
-limits, defaults, and tolerances use their existing scientific owner. Confirm
+has a named meaning, producer, unit or basis, and availability rule; distinct fields do not reuse one value without identity evidence; and repeated constants,
+limits, defaults, and tolerances use their existing scientific owner. Apply Build's
+[result retention rule](../build/SKILL.md#result-retention) to every changed
+path that produces, maps, or saves results, including refusals. Confirm
 the accepted correctness check fails without the fix. Passing tests or line accounting
 cannot replace these checks.
 
-For any refused, failed, unavailable, unresolved, limit-gated, or negative
-disposition in either lens, ask whether it could be fixed: return **Not
-supported** unless the retained evidence shows the diagnosis and attempted
-root-cause fix required by
+### Claim verdicts
+
+Give each claim or component its own verdict, with evidence, limitations,
+required corrections, and the next stage. Record each applicable gate as
+**pass**, **decisive miss**, or **unresolved**. Apply
+[Tolerances](../../references/workflow/numerical-testing.md#tolerances) before
+using a missed limit as evidence against a claim.
+
+Use **Supported** where the evidence establishes the stated claim and
+**Not supported** only where the evidence shows that claim fails. Mark a verdict
+**pending** when unresolved evidence prevents a decision. Keep independently
+supported claims visible and list wording-only changes as required corrections.
+For a proposed negative numerical disposition, apply
 [failure-triage](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition).
-Before treating a missed limit as **Not supported**, check its
-[origin](../../references/workflow/numerical-testing.md#tolerances). A claim
-stated by what the numbers show, such as "reproduces the data with 8% average
-error, comparable to the literature model's 7%", is **Supported** with its
-limits even when an earlier target was tighter. Ask for the result to be shown,
-not hidden behind a failed gate.
 
 Review advises on the stated use; it does not promote a notebook to manuscript
 use. Optional hardening does not expand accepted scope. A correction invalidates

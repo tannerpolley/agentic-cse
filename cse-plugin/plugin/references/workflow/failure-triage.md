@@ -1,20 +1,33 @@
-# Numerical failure triage
+# Failure triage
 
-A missing value, status flag, successful process exit, or empty plot is not a
-model result. Preserve the exact input, stopping point, and diagnostic in the
-natural output of the analysis; do not require a key/value failure record.
+## Triage test, CI, and run failures
+
+Record the exact failure signature and the command, inputs, and revision
+needed to identify it. Reproducing the same failure on the base only clears
+the change as its cause. A passing rerun alone leaves the failure unexplained.
+
+Show causal evidence before calling a failure flaky, pre-existing, unrelated,
+environmental, a one-off, or a precision limit. Use evidence such as grouped
+tracebacks, matched timestamps, an alternate start, or a different formulation
+to distinguish causes. Keep unexplained failures open with their signatures.
+State the hypothesis and what would distinguish it before each retry.
 
 ## Require a useful numerical result
 
-Judge completion by the method that actually ran:
+Preserve the exact input, stopping point, and diagnostic in the
+natural output of the analysis.
 
-- an iterative solve genuinely converged and returned the relevant values and
-  diagnostics;
-- a direct calculation evaluated and returned the requested quantity;
-- a fit returned parameters and fit statistics appropriate to the question;
-- an integration reached its interval or returned a scientifically useful,
-  explicitly bounded partial interval; or
-- another method returned equivalent values and diagnostics that address the
+Judge usefulness for the stated claim by the values and diagnostics the
+method actually returned.
+
+- An iterative solve returned a usable endpoint supported by the relevant
+  diagnostics. Record whether it converged and bound any claim made from an
+  endpoint returned before convergence.
+- A direct calculation evaluated and returned the requested quantity.
+- A fit returned parameters and fit statistics appropriate to the question.
+- An integration reached its interval or returned a scientifically useful,
+  explicitly bounded partial interval.
+- Another method returned equivalent values and diagnostics that address the
   question.
 
 Generic success booleans, exit codes, preflight checks, placeholders, and
@@ -25,14 +38,14 @@ Do not report the analysis complete or create a notebook or empty figure.
 
 ## Fix before a negative disposition
 
-A result may not close as refused, failed, unavailable, reference unresolved,
-limit gated, or a supported negative result until its cause is diagnosed and a
-root-cause fix has been attempted and shown impossible, or the case is shown to
-lie outside the stated physical domain, with retained evidence. An imperfect
-but useful result reported with its error and comparisons is not a negative
-disposition, and missing a limit without a
-[named origin](numerical-testing.md#tolerances) does not make it one. Never
-invent a value to avoid a negative outcome.
+Close a negative numerical disposition only with evidence that the case lies
+outside the stated physical domain or that diagnosis and a bounded root-cause
+fix attempt showed no feasible correction. Report only values actually computed.
+Keep valid partial results under
+[Build's retention rule](../../skills/build/SKILL.md#result-retention) and
+report useful values under [Tolerances](numerical-testing.md#tolerances).
+A [review verdict](../../skills/review/SKILL.md#claim-verdicts) can record a
+decisive miss while the cause remains open.
 
 - **Physical finding.** A model that, after diagnosis and fix attempts, still
   does not reproduce data is a legitimate scientific result. It carries the
