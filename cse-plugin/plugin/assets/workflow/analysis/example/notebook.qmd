@@ -19,10 +19,10 @@ this file as an ordinary page beside the root article.
 
 ::: {.callout-important}
 ## Result
-The fitted cooling rate is {{< meta cooling-fit.rate >}} with a linearized
-standard error of {{< meta cooling-fit.rate-standard-error >}}, a time constant of
+The fitted cooling rate is {{< meta cooling-fit.rate >}}, with a time constant of
 {{< meta cooling-fit.time-constant >}}, and a residual RMSE of
 {{< meta cooling-fit.rmse >}} over {{< meta cooling-fit.observations >}} observations.
+The linearized standard error is {{< meta cooling-fit.rate-standard-error >}}.
 Numerical checks: {{< meta cooling-fit.checks >}}.
 :::
 

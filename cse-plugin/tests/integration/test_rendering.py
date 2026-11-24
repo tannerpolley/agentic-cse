@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import importlib.metadata
 import importlib.util
+import json
+import math
 import os
+import platform
 import re
 from pathlib import Path
 import shutil
 import subprocess
 import sys
 import tempfile
+from types import SimpleNamespace
 import unittest
 
 
@@ -151,6 +156,51 @@ Body text.
                     self.assertEqual(2, plt.rcParams["lines.linewidth"])
                 self.assertEqual(before, {key: plt.rcParams[key] for key in loaded})
                 self.assertEqual([], [str(warning.message) for warning in caught])
+
+    def test_single_observation_fit_is_presented_without_uncertainty(self):
+        packages = ("matplotlib", "numpy", "snakemake", "scipy")
+        for package in packages:
+            if importlib.util.find_spec(package) is None:
+                self.skipTest(f"{package} is required for the cooling-fit calculation")
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            arguments = FIXTURE.write_retained_set(root)
+            (root / arguments.observations).write_text("time_s,temperature_degC\n10,50\n")
+            (root / arguments.parameters).write_text(json.dumps({
+                "ambient_temperature_degC": 20.0, "initial_temperature_degC": 80.0,
+                "initial_guesses_per_s": [0.001, 0.02],
+            }))
+            (root / arguments.environment).write_text(json.dumps({
+                "python": platform.python_version(),
+                "packages": {name: importlib.metadata.version(name) for name in packages},
+            }))
+            for name in ("script", "helper"):
+                relative = getattr(arguments, name)
+                shutil.copyfile(EXAMPLE / relative, root / relative)
+
+            for script, paths in (
+                ("calculate.py", {name: path for name, path in vars(arguments).items()
+                                  if name not in ("output", "values", "provenance", "views")}),
+                ("present.py", vars(arguments)),
+            ):
+                result = self.run_script(
+                    str(EXAMPLE / "scripts" / script),
+                    *FIXTURE.present_command(SimpleNamespace(**paths)), cwd=root,
+                )
+                self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+
+            fit = json.loads((root / arguments.summary).read_text())["fit"]
+            self.assertAlmostEqual(math.log(2) / 10, fit["cooling_rate_per_s"])
+            self.assertAlmostEqual(0.0, fit["residual_rmse_degC"])
+            self.assertIsNone(fit["cooling_rate_standard_error_per_s"])
+            self.assertIsNone(fit["cooling_rate_ci95_per_s"])
+            rendered = (root / arguments.output).read_text()
+            self.assertIn("at least two observations", rendered)
+            self.assertIn("| 10 | 50.000 | 50.000 |", rendered)
+            self.assertIn("The observed temperature range is zero.", rendered)
+            values = (root / arguments.values).read_text()
+            self.assertIn('rate-standard-error: "unavailable"', values)
 
     def test_example_analysis_renders_and_refreshes_changed_retained_value(self):
         if not shutil.which("quarto") or not shutil.which("snakemake"):

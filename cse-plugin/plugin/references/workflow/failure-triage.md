@@ -17,15 +17,17 @@ State the hypothesis and what would distinguish it before each retry.
 Preserve the exact input, stopping point, and diagnostic in the
 natural output of the analysis.
 
-Judge completion by the method that actually ran:
+Judge usefulness for the stated claim by the values and diagnostics the
+method actually returned.
 
-- an iterative solve genuinely converged and returned the relevant values and
-  diagnostics;
-- a direct calculation evaluated and returned the requested quantity;
-- a fit returned parameters and fit statistics appropriate to the question;
-- an integration reached its interval or returned a scientifically useful,
-  explicitly bounded partial interval; or
-- another method returned equivalent values and diagnostics that address the
+- An iterative solve returned a usable endpoint supported by the relevant
+  diagnostics. Record whether it converged and bound any claim made from an
+  endpoint returned before convergence.
+- A direct calculation evaluated and returned the requested quantity.
+- A fit returned parameters and fit statistics appropriate to the question.
+- An integration reached its interval or returned a scientifically useful,
+  explicitly bounded partial interval.
+- Another method returned equivalent values and diagnostics that address the
   question.
 
 Generic success booleans, exit codes, preflight checks, placeholders, and
