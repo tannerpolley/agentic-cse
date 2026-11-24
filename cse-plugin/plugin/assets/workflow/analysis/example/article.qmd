@@ -15,16 +15,15 @@ parameter table are embedded from the notebook of retained views that
 
 ## Summary
 
-A one-parameter exponential cooling model fitted to the example observations
-gives {{< meta cooling-fit.rate >}} ({{< meta cooling-fit.time-constant >}}),
-with a residual RMSE of {{< meta cooling-fit.rmse >}}
+The cooling model gives a residual RMSE of {{< meta cooling-fit.rmse >}}
+for the example observations. The cooling rate is {{< meta cooling-fit.rate >}}
+and the time constant is {{< meta cooling-fit.time-constant >}}
 (@tbl-cooling-parameters).
 
 ::: {.callout-important}
 ## Numerical checks: {{< meta cooling-fit.checks >}}
-The checks verify the fit to these observations. The observations have no
-measurement record, so the result demonstrates the method and is not a
-physical validation.
+The refit compares candidate rates across two starting points. The observations
+have no recorded measurement uncertainty.
 :::
 
 ## Model

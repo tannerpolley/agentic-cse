@@ -72,16 +72,22 @@ def write_curve(path: Path, time_s: np.ndarray, observed: np.ndarray, fitted: np
         )
 
 
-def write_figure(path: Path, time_s: np.ndarray, observed: np.ndarray, *, rate: float, ambient: float, initial: float) -> None:
-    dense_time = np.linspace(float(time_s[0]), float(time_s[-1]), 200)
+def write_figure(
+    path: Path, time_s: np.ndarray, observed: np.ndarray, fitted: np.ndarray, *,
+    rate: float | None, ambient: float, initial: float,
+) -> None:
     figure, axis = plt.subplots(figsize=(6.0, 4.0))
     axis.scatter(time_s, observed, color="#1f77b4", label="observations")
-    axis.plot(
-        dense_time,
-        temperature(dense_time, rate, ambient, initial),
-        color="#d62728",
-        label="positive one-parameter fit",
-    )
+    if rate is None:
+        axis.scatter(time_s, fitted, color="#d62728", marker="x", label="model at observed times")
+    else:
+        dense_time = np.linspace(float(time_s[0]), float(time_s[-1]), 200)
+        axis.plot(
+            dense_time,
+            temperature(dense_time, rate, ambient, initial),
+            color="#d62728",
+            label="positive one-parameter fit",
+        )
     axis.set_xlabel("time (s)")
     axis.set_ylabel(r"temperature ($^{\circ}$C)")
     axis.legend()
@@ -146,7 +152,8 @@ def calculate(args: argparse.Namespace) -> None:
             staged_figure,
             time_s,
             observed,
-            rate=float(fit["cooling_rate_per_s"]),
+            fitted,
+            rate=fit["cooling_rate_per_s"],
             ambient=ambient,
             initial=initial,
         )

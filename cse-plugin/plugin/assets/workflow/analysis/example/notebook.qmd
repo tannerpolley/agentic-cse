@@ -70,8 +70,8 @@ fall by a factor of $e$.
 
 ## Results
 
-@tbl-cooling-parameters reports the fitted rate at the minimum of
-@eq-fit-objective. @fig-cooling-fit compares @eq-cooling-model with the
+@tbl-cooling-parameters reports the rate estimated from @eq-fit-objective
+when available. @fig-cooling-fit compares @eq-cooling-model with the
 observations, and @fig-cooling-residuals and @tbl-cooling-data give the
 remaining misfit at each observation time.
 
