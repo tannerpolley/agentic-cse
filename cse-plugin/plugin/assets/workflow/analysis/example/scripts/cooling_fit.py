@@ -49,8 +49,8 @@ def fit_rate(
 
     # Agreement with data is reported, not gated: the RMSE is compared with the
     # observed temperature range because these observations carry no measurement
-    # uncertainty. The refit check is a correctness check whose tolerance comes
-    # from numerical precision at the fitted rate.
+    # uncertainty. The illustrative refit target reports agreement across starts.
+    # See Tolerances in the CSE numerical-testing reference for precision limits.
     observed_range = float(np.ptp(observed_temperature))
     refit_difference = abs(cooling_rate - refit_rate)
     refit_tolerance = max(

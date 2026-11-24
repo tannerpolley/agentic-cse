@@ -98,7 +98,7 @@ def data_table(curve_path: Path) -> list[str]:
 
 def check_lines(summary: dict) -> tuple[str, list[str]]:
     fit, checks = summary["fit"], summary["checks"]
-    verdict = "passed" if all(checks.values()) else "not passed; diagnose before any negative disposition (failure-triage)"
+    verdict = "refit target met" if checks["refit_consistent"] else "refit target missed"
     share = 100.0 * fit["residual_rmse_degC"] / fit["observed_range_degC"] if fit["observed_range_degC"] else float("nan")
     lines = [
         f"- Residual RMSE {inline_math(tex_number(fit['residual_rmse_degC'], 3))} {DEGREE_CELSIUS} "
@@ -106,8 +106,7 @@ def check_lines(summary: dict) -> tuple[str, list[str]]:
         f"{inline_math(tex_number(fit['observed_range_degC'], 3))} {DEGREE_CELSIUS}; "
         "the observations carry no measurement uncertainty to compare it with.",
         f"- Refit from a second initial guess differs by {inline_math(tex_number(fit['refit_difference_per_s'], 2))} {PER_SECOND} "
-        f"against the tolerance {inline_math(tex_number(fit['refit_tolerance_per_s'], 2))} {PER_SECOND}: "
-        f"**{'passed' if checks['refit_consistent'] else 'not passed'}**.",
+        f"against the target {inline_math(tex_number(fit['refit_tolerance_per_s'], 2))} {PER_SECOND}.",
     ]
     return verdict, lines
 
@@ -145,7 +144,7 @@ def include_fragment(summary: dict, curve_path: Path, figure_path: Path, residua
         "",
         *lines,
         "",
-        "These checks verify the fit to these observations; they do not validate the model physically.",
+        "The refit compares the fitted rates obtained from two starting points.",
         ":::",
         "",
     ])
