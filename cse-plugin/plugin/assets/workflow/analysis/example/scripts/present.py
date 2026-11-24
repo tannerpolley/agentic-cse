@@ -120,6 +120,10 @@ def check_lines(summary: dict) -> tuple[str, list[str]]:
         f"- The candidate rates from the two starts differ by {inline_math(tex_number(fit['refit_difference_per_s'], 2))} {PER_SECOND} "
         f"against the target {inline_math(tex_number(fit['refit_tolerance_per_s'], 2))} {PER_SECOND}.",
     ]
+    failed_starts = [name for name in ("first", "second") if not checks.get(f"{name}_start_converged", True)]
+    if failed_starts:
+        verdict = "refit inconclusive"
+        lines.append(f"- The solver stopped before convergence from the {' or '.join(failed_starts)} start.")
     if reason := fit.get("rate_unavailable_reason"):
         verdict = "refit inconclusive"
         lines.append(f"- The rate, time constant, and uncertainty are undetermined. {reason}")

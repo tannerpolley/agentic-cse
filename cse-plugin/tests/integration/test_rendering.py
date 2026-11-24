@@ -7,6 +7,7 @@ import math
 import os
 import platform
 import re
+import runpy
 from pathlib import Path
 import shutil
 import subprocess
@@ -156,6 +157,26 @@ Body text.
                     self.assertEqual(2, plt.rcParams["lines.linewidth"])
                 self.assertEqual(before, {key: plt.rcParams[key] for key in loaded})
                 self.assertEqual([], [str(warning.message) for warning in caught])
+
+    def test_cooling_fit_selects_the_same_solution_in_both_start_orders(self):
+        if importlib.util.find_spec("scipy") is None:
+            self.skipTest("scipy is required for the cooling-fit calculation")
+        import numpy as np
+
+        fit_rate = runpy.run_path(str(EXAMPLE / "scripts/cooling_fit.py"))["fit_rate"]
+        times = np.array([1_000_000.0, 2_000_000.0])
+        observations = np.array([20.0 + 60.0 * math.exp(-t / 1_000_000) for t in times])
+        starts = (0.001, 0.000002)
+        for guesses in (starts, starts[::-1]):
+            with self.subTest(guesses=guesses):
+                fit = fit_rate(times, observations, ambient=20.0, initial=80.0, initial_guesses=guesses)
+                self.assertAlmostEqual(1e-6, fit["cooling_rate_per_s"], delta=1e-12)
+                self.assertAlmostEqual(0.0, fit["residual_rmse_degC"], delta=1e-8)
+                self.assertEqual(
+                    {"first_start_converged": True, "second_start_converged": True},
+                    fit["start_checks"],
+                )
+                self.assertFalse(fit["refit_consistent"])
 
     def test_cooling_fit_presents_predictions_when_estimates_are_unavailable(self):
         packages = ("matplotlib", "numpy", "snakemake", "scipy")

@@ -135,6 +135,7 @@ def calculate(args: argparse.Namespace) -> None:
         initial_guesses=guesses,
     )
     fitted = fit.pop("fitted_temperature")
+    start_checks = fit.pop("start_checks")
     if not isinstance(fitted, np.ndarray):
         raise TypeError("fit owner did not return fitted temperatures")
 
@@ -173,6 +174,7 @@ def calculate(args: argparse.Namespace) -> None:
             },
             "checks": {
                 "refit_consistent": fit["refit_consistent"],
+                **start_checks,
             },
             "inputs": {
                 "observations_sha256": sha256(observations_path),

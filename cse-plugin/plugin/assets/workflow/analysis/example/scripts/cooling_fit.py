@@ -27,11 +27,19 @@ def fit_rate(
                       xtol=1e-14, ftol=1e-14, gtol=1e-14)
         for guess in initial_guesses
     ]
-    if not all(fit.success for fit in fits):
-        raise ValueError("the positive cooling-rate fit did not converge from every start")
-
-    cooling_rate = float(fits[0].x[0])
-    refit_rate = float(fits[1].x[0])
+    sensitivities_squared = [np.dot(fit.jac[:, 0], fit.jac[:, 0]) for fit in fits]
+    eligible = [
+        fit.success and 0 < sensitivity_squared < np.inf
+        for fit, sensitivity_squared in zip(fits, sensitivities_squared)
+    ]
+    # Prefer a usable estimate, then lower residual cost. Break exact ties by rate.
+    selected = min(range(len(fits)), key=lambda i: (not eligible[i], fits[i].cost, fits[i].x[0]))
+    cooling_rate = float(fits[selected].x[0])
+    refit_rate = float(fits[1 - selected].x[0])
+    start_checks = {
+        "first_start_converged": bool(fits[0].success),
+        "second_start_converged": bool(fits[1].success),
+    }
     fitted_temperature = temperature(time_s, cooling_rate, ambient, initial)
     residual_temperature = observed_temperature - fitted_temperature
     rmse = float(np.sqrt(np.mean(residual_temperature ** 2)))
@@ -44,10 +52,13 @@ def fit_rate(
     interval = None
     rate_unavailable_reason = None
     uncertainty_unavailable_reason = None
-    jacobian = fits[0].jac[:, 0]
-    sensitivity_squared = np.dot(jacobian, jacobian)
-    if sensitivity_squared == 0:
+    sensitivity_squared = sensitivities_squared[selected]
+    if not fits[selected].success:
+        rate_unavailable_reason = "The selected solver candidate did not converge."
+    elif sensitivity_squared == 0:
         rate_unavailable_reason = "The fit returned a singular Jacobian at the candidate rate."
+    elif not np.isfinite(sensitivity_squared):
+        rate_unavailable_reason = "The fit returned a non-finite Jacobian norm at the candidate rate."
     elif degrees_of_freedom < 1:
         uncertainty_unavailable_reason = "The standard error needs at least two observations."
     else:
@@ -83,5 +94,6 @@ def fit_rate(
         "refit_difference_per_s": refit_difference,
         "refit_tolerance_per_s": refit_tolerance,
         "refit_consistent": refit_difference <= refit_tolerance,
+        "start_checks": start_checks,
         "fitted_temperature": fitted_temperature,
     }
