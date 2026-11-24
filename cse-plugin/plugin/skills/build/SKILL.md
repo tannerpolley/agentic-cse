@@ -16,8 +16,8 @@ metadata:
 Read first: [operating-model](../../references/workflow/operating-model.md), [code-surface-review](../../references/workflow/code-surface-review.md).
 
 Activate [scientific-method](../../references/workflow/scientific-method.md) for equations, conventions, or validity;
-[numerical-testing](../../references/workflow/numerical-testing.md) for the result-level reference or invariant; and
-[failure-triage](../../references/workflow/failure-triage.md) when failures or incomplete cases are in scope,
+[numerical-testing](../../references/workflow/numerical-testing.md) for the result-level reference or invariant and its [tolerance](../../references/workflow/numerical-testing.md#tolerances); and
+[failure-triage](../../references/workflow/failure-triage.md) for incomplete cases or [test, CI, or run failures](../../references/workflow/failure-triage.md#triage-test-ci-and-run-failures),
 and its [run-cost rule](../../references/workflow/failure-triage.md#run-cost-plausibility)
 for expensive or unexpectedly slow builds or validation runs. Activate
 [github-and-git](../../references/workflow/github-and-git.md) for
@@ -57,3 +57,11 @@ Worker output is evidence, never parent acceptance.
 
 If the correction boundary is not established, return to `cse:diagnose` before
 editing. Continue to `cse:analyze` when numerical evidence must be regenerated.
+
+## Result retention
+
+Record convergence, physical acceptance, derivative availability, and covariance
+availability as separate fields where applicable. Persist each computed
+result with its check outcomes, regardless of acceptance. A failed check or
+unavailable output form leaves other valid values, diagnostics, and persisted
+forms intact. On refusal, carry the cause and any valid partial values.

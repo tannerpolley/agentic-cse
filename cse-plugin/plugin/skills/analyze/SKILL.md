@@ -47,8 +47,9 @@ and failed cases before interpretation. Separate data generation from
 rendering, retain exact plotted values, run only analyses needed by the
 question, and distinguish numerical error, source uncertainty, model
 discrepancy, and named limits for the intended use. Show the best useful result
-(figure and numbers) with its error and comparisons even when it misses a
-target; see [numerical-testing](../../references/workflow/numerical-testing.md#tolerances).
+in numbers and a figure where applicable. Use the
+[tolerance rule](../../references/workflow/numerical-testing.md#tolerances)
+when interpreting and reporting a missed limit.
 
 Apply the claim-led figure rule in [analysis-sets](../../references/workflow/analysis-sets.md) to retained comparisons.
 

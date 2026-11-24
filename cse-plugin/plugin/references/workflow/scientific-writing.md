@@ -242,7 +242,7 @@ Reuse existing checks; compilation proves neither support nor coverage.
    essential content prevent support for the intended final use; a merely
    short or old list does not. Apply the [limit-origin rule](numerical-testing.md#tolerances):
    invent no reference-count, citation-age, or coverage-percentage gate. Use
-   Review's existing Supported/Not supported outcomes with evidence and
+   Review's [claim verdicts](../../skills/review/SKILL.md#claim-verdicts) with evidence and
    limitations. Route discovery to Research, approved bibliography work to
    Zotero, and prose fixes to Write. Never manually edit the bibliography
    snapshot or bypass its existing refresh approval.

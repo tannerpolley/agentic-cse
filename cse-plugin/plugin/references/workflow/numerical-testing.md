@@ -78,14 +78,17 @@ Assign each failure to the smallest durable check that can expose it:
 | figure regeneration or visual completeness | figure validation command |
 | LaTeX, citation, cross-reference, or PDF freshness | manuscript build command |
 
-Before adding a helper, fixture, abstraction, or test, ask whether an existing result-level check or reference case already covers the distinct failure. Keep one check per distinct scientific risk, merge cases with the same oracle and tolerance, and move expensive breadth to an explicit validation command. Simplify by removing duplication, never by silently loosening a limit with a named origin or deleting validation that protects the claim. A limit without one is relabelled a target and the result is shown.
+Before adding a helper, fixture, abstraction, or test, ask whether an existing result-level check or reference case already covers the distinct failure. Keep one check per distinct scientific risk, merge cases with the same oracle and tolerance, and move expensive breadth to an explicit validation command. Simplify by removing duplication and preserve validation that protects the claim. Apply the [tolerance rule](#tolerances) when revising a limit.
 
 ## Tolerances
 
-A limit may fail a result only when its origin is named. A number an agent
+A limit may fail a check only when its origin is named and applies to that
+quantity, method, and intended use. A number an agent
 chose is not an origin, even once written into a plan, issue, test, or
-configuration. Any other limit is a target: report a miss with the achieved
-error, never as a failure.
+configuration. Treat an unjustified limit as a target. Show useful
+results with the achieved error and named comparisons, including any target
+miss. Diagnose implausible values in sign, magnitude, trend, or balance
+regardless of the limit. Preserve justified limits until a change is authorized.
 
 - **Correctness checks** pass or fail: code reproduces an analytic, reference,
   published-model, or independent value; a result converges under grid, step,
@@ -98,7 +101,7 @@ error, never as a failure.
   model's error on the same data, and the previous model or fit. These are
   comparisons, not origins that fail it.
 
-The agent proposes a limit; it gates only once the owner sets it. Separate:
+An agent-proposed acceptance limit gates only once the owner sets it. Separate:
 
 - source rounding and digitization;
 - measurement and reference uncertainty;
@@ -108,6 +111,13 @@ The agent proposes a limit; it gates only once the owner sets it. Separate:
 - scientific acceptance for the intended use.
 
 Prefer a metric tied to the quantity: absolute error near zero, relative error away from zero, weighted or uncertainty-normalized residuals for heterogeneous data, and norm or conservation measures for fields and balances. Avoid one unexplained epsilon across unrelated quantities.
+
+For a precision-based limit, estimate attainable error from the problem's
+conditioning and working precision. As a first estimate, use the condition
+number times unit roundoff for relative error, then express the bound in the
+check's metric and units using a justified quantity scale for absolute error.
+A difference within the bound passes the precision check. Note the difference
+and the bound. Require exact equality only where the method guarantees it.
 
 ## Test order
 

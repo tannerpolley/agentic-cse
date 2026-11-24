@@ -127,8 +127,8 @@ For every added or materially changed scientific execution path, Review checks:
   trace to named meanings, and unavailable values are explicit.
 - **Failure preservation:** every changed `break`, `continue`, early return,
   exception conversion, missing row, `None`, nonfinite value, or fallback is
-  inspected. Unavailability retains its cause and valid diagnostics; mapping
-  does not turn typed failure into omission or apparent success.
+  inspected against [Build's result retention rule](../../skills/build/SKILL.md#result-retention).
+  Mapping keeps typed failure visible.
 - **Single scientific owner:** repeated equations, derivatives, limits,
   constants, bounds, tolerances, and physical defaults trace to their owner;
   secondary views use that owner rather than inline repetition.
@@ -165,4 +165,5 @@ any approved increase independently of the structural conclusion.
 Review reports exact findings and routes Block or Revise to Design. Design
 corrects the route and updates the active issue when its accepted decisions
 change. Build changes the implementation, Analyze regenerates affected
-evidence, and Review runs again.
+evidence, and Review runs again. Apply [claim verdicts](../../skills/review/SKILL.md#claim-verdicts)
+to the delivered evidence.
