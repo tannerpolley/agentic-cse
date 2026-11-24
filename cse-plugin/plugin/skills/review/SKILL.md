@@ -14,7 +14,8 @@ metadata:
 # Review scientific work
 
 Read first: [operating-model](../../references/workflow/operating-model.md).
-Activate [scientific-method](../../references/workflow/scientific-method.md) for disputed equations or validity,
+Activate [scientific-method](../../references/workflow/scientific-method.md) for disputed equations or validity
+and its [model adoption and comparison rule](../../references/workflow/scientific-method.md#model-adoption-and-comparison) for model choices,
 [numerical-testing](../../references/workflow/numerical-testing.md) for reference cases and its [tolerance rule](../../references/workflow/numerical-testing.md#tolerances) when a limit is in question,
 [failure-triage](../../references/workflow/failure-triage.md) for incomplete cases or [test, CI, or run failures](../../references/workflow/failure-triage.md#triage-test-ci-and-run-failures), and
 [dependent-scientific-changes](../../references/workflow/dependent-scientific-changes.md) for leaf dependencies.
