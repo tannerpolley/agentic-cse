@@ -108,6 +108,8 @@ meaning, scope, method, evidence, authority, or the next action. If no material
 choice remains, continue without a ritual question. Obtain confirmation before
 a nontrivial mutation unless the request already grants that authority.
 
+If an option sets a numerical gate, state its origin in the option text.
+
 Before the first scientific write, state the selected starting stage and one
 sentence explaining why it owns the unresolved question. Use approved defaults
 and recorded assumptions for bounded experiments; stop only when a missing

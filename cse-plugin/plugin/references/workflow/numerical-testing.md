@@ -92,16 +92,18 @@ regardless of the limit. Preserve justified limits until a change is authorized.
 
 - **Correctness checks** pass or fail: code reproduces an analytic, reference,
   published-model, or independent value; a result converges under grid, step,
-  or solver refinement; or legitimate methods agree. The tolerance's origin is
-  numerical or solver precision, discretization or sampling error, variation
-  between legitimate methods, or a value the owner set.
-- **Agreement with data**, such as fit quality or agreement with experimental
-  or literature measurements, is never a gate unless the owner set the value.
-  Report it against named comparisons: measurement uncertainty, a literature
-  model's error on the same data, and the previous model or fit. These are
-  comparisons, not origins that fail it.
+  or solver refinement; or legitimate methods agree. Tolerance origins include
+  numerical or solver precision, discretization or sampling error, and variation
+  between legitimate methods.
+- **Agreement with data**, such as fit quality, uses named comparisons such as
+  measurement uncertainty and errors from the previous fit. Offer a pass/fail
+  limit only if the owner asks for one. State the origin of each proposed limit:
+  measurement uncertainty, data scatter, a literature model on the same data,
+  or an intended-use requirement. If the owner picks a number from the agent's
+  options without such an origin, record it as a target. A missed target calls
+  for the [model adoption tradeoff](scientific-method.md#model-adoption-and-comparison).
 
-An agent-proposed acceptance limit gates only once the owner sets it. Separate:
+Separate:
 
 - source rounding and digitization;
 - measurement and reference uncertainty;

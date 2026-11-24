@@ -39,6 +39,18 @@ Create no empty documents to satisfy a shape.
 
 Keep these questions distinct. Agreement with an experiment does not prove the code, and convergence does not prove the physical model.
 
+## Model adoption and comparison
+
+Weigh candidates in this order:
+
+1. Qualitative physics: signs, extrema locations, phase behavior, and limiting behavior.
+2. Errors where the model is used, such as the relevant composition, temperature,
+   and pressure ranges, against data scatter and literature models.
+3. Aggregate metrics.
+
+Run a cheap downstream test that would settle the choice before closing a
+candidate. State the recommendation as a physical tradeoff.
+
 ## Sources
 
 Prefer primary sources, standards, accepted experiments, analytic solutions, and trusted independent implementations. Identify secondary synthesis as synthesis. Record exact page, section, equation, table, figure, or row locators for claims that drive equations, parameters, data, tolerances, or interpretation.
