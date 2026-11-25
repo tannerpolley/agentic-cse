@@ -28,10 +28,7 @@ Keep verification distinct from physical validation, follow project writing
 rules, and remove internal workflow or repository language from scientific
 prose. Check terminology and banned language on every durable edit.
 
-Before a manuscript draft or review round, apply the [method-chain check](../../references/workflow/scientific-writing.md#method-chain)
-and answer “Is every modeling step stated as an equation with consistent units
-and symbols?” in the brief. Use the same check when triaging referee requests
-for reproducibility or a worked example.
+Write Methods for [methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility).
 
 Routine wording, citations, formatting, and local clarity edits remain here;
 rendering does not require a Prose cohesion inspection. Apply the

@@ -163,41 +163,24 @@ Prose and Review remain read-only: read and check the applicable record and
 return missing owner decisions for the authoring task to capture. They do not
 edit the record or turn their own advice into owner policy.
 
-### Method chain
+### Methods reproducibility
 
-Give each modeling step from inputs to reported outputs one compact displayed
-equation in the main-text Methods. Include the governing model, property and
-standard-state or activity definitions, equilibrium or unit relations, process
-coupling, downstream conversion and reported metrics, costing, the optimization
-objective and constraints, and the parameter-fit objective where applicable.
-At each interface, name the quantities passed and label them as outputs of the
-producing model and inputs to the receiving model or unit.
+A reader should be able to rebuild the calculation from the paper alone, a
+standard known as methods reproducibility (Goodman, Fanelli, and Ioannidis,
+*Sci. Transl. Med.* 2016). In a model-based paper the Methods deliver it through
+the model formulation: the governing relations in the order the calculation
+uses them, from the inputs to the reported results, including any fit objective
+and optimization problem. Write each relation as a compact displayed equation
+rather than describing it in prose. As in a degrees-of-freedom analysis, say
+which quantities each model is given and which it computes, especially where
+one model feeds another. Printed equations match what the code computes, with
+consistent units and one meaning per symbol.
 
-Prefer equations for relations and tables or figures for sets of numbers. Use
-short prose to define quantities and explain assumptions and interpretation.
-During trimming, keep the full chain in the main text and use the supplementary
-information for term-level expansions, derivations, long tables, and secondary
-fit detail.
-
-Before a draft or manuscript review round, Write lists the links in computation order,
-including any fit that supplies model parameters. Match each link to its
-main-text equation and verify that equation against the implementation at
-`file:line`, including the definitions and constraints actually used. Check
-dimensions and conversions using the printed units. Give each symbol one
-meaning and define it with its units or basis in the Nomenclature. Record
-missing equations and unverified implementation matches in the brief.
-
-At the final checkpoint, ask whether every modeling step is stated as an
-equation with consistent units and symbols. Review verifies the equations
-against the implementation. Report missing or misstated links as required
-corrections with the exact Methods span. Flag dense passages in Methods or
-Results where a relation or set of values would be clearer as an equation,
-table, or figure.
-
-When a referee requests independent reconstruction, reproducibility, or a
-worked numerical example, check whether the main text leaves any link unclear.
-If you find an exposition gap, address it in the response and manuscript.
-Independently assess whether data or code availability needs attention.
+Prefer equations for relations and tables or figures for sets of numbers.
+Trimming moves derivations, term-by-term expansions, and long tables to the
+supplement, never the formulation itself. A referee request for reconstruction
+or a worked example often means a step is missing from the text, separate from
+any data or code availability.
 
 #### Example: heater operating cost
 
@@ -256,8 +239,8 @@ Put story order there, not in `STYLE.md`. One writer then rewrites from the plan
 After the rewrite, two independent reviewers work in parallel. The science-support
 reviewer applies Review's Result lens to every displayed number and cited claim
 against retained files and cited sources, providing exact replacement text,
-and checks [manuscript reference coverage](#manuscript-reference-coverage). Give
-both reviewers the [method-chain question](#method-chain) in their briefs. The
+and checks [manuscript reference coverage](#manuscript-reference-coverage) and
+[methods reproducibility](#methods-reproducibility). The
 reader-story reviewer applies the final manuscript checkpoint below and checks
 figures, tables, abstract, paragraph placement, and internal language. Write
 applies their fixes as given; science support wins a conflict. Write then makes
@@ -322,10 +305,9 @@ rendering checks: stable unique paragraph identifiers, reconstructable order,
 one sentence per source line, blank-line paragraph boundaries, and resolved
 references, labels, and citations. These checks do not judge the argument.
 
-At this checkpoint, require [editorial compliance](#editorial-compliance), the
-[method-chain check](#method-chain), and Review's
-[reference-coverage result](#manuscript-reference-coverage) for the same source
-revision as Prose.
+At this checkpoint, require [editorial compliance](#editorial-compliance) and
+Review's [reference-coverage result](#manuscript-reference-coverage) for the same
+source revision as Prose.
 
 Prose performs one agent-led cohesion inspection when the user asks for a final check, before
 submission or a named publication handoff. A material change to central claims,

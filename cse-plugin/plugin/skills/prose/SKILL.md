@@ -42,9 +42,6 @@ identity, missing coverage, or unresolved weak or broken relationships. The
 routine clear message is not a final-check result. Report exact
 [editorial violations](../../references/workflow/scientific-writing.md#editorial-compliance) and follow the shared
 [final-check coordination](../../references/workflow/scientific-writing.md#final-manuscript-checkpoint).
-Apply the [method-chain check](../../references/workflow/scientific-writing.md#method-chain)
-and answer “Is every modeling step stated as an equation with consistent units
-and symbols?” in the brief. Flag dense passages using the same check.
 
 At a deck's final checkpoint, inspect it read-only against [slide-decks](../../references/visualize/slide-decks.md) and the project's deck decisions.
 
