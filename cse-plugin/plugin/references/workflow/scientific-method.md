@@ -39,6 +39,8 @@ Create no empty documents to satisfy a shape.
 
 Keep these questions distinct. Agreement with an experiment does not prove the code, and convergence does not prove the physical model.
 
+**Calibration is not validation** (AIAA definitions as quoted by Oberkampf and Trucano 2002): fitting parameters to data is calibration; validation compares the model with data it was not fitted to, for a stated use and range. When every data set was fitted, say so.
+
 ## Model adoption and comparison
 
 Weigh candidates in this order:
@@ -50,6 +52,13 @@ Weigh candidates in this order:
 
 Run a cheap downstream test that would settle the choice before closing a
 candidate. State the recommendation as a physical tradeoff.
+
+Label each reported deviation as **correlation, prediction, or extrapolation**
+by its relation to the fit (Kontogeorgis et al. 2021). A predictive claim rests
+only on data the model never saw, compared on the same points with the same
+statistic. Under **identifiability** (Raue et al. 2009), a fitted parameter is a
+result only if the data determine it; report its correlation or a joint region
+instead of independent ± values ([sources](scientific-writing.md#sources)).
 
 ## Sources
 

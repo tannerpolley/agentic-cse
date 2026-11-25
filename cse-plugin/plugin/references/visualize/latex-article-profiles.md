@@ -35,14 +35,20 @@ select the relevant investigator-promoted results and write a separate manuscrip
   highlighting. Keep execution disabled by default and never run the
   scientific model during document rendering. Keep stable LaTeX notation,
   packages, and semantic figure styles in reviewed headers.
+- **Choosing the display** (Ehrenberg 1977): a relation is an equation, values
+  a reader will compare or reuse are a table, and a pattern is a figure.
+  Tables hold no prose.
 - Present scientific provenance: data source, equations, parameter values,
-  units, assumptions, comparison basis, and uncertainty. Keep agent actions,
+  units, assumptions, comparison basis, and uncertainty. Data are traceable to
+  their origin, and comparison with published values is part of the evidence
+  (Bazyleva et al. 2021; Cummings et al. 2009). Keep agent actions,
   repository operations, build commentary, and chronological work history out
   of rendered scientific prose.
 - Use result-led captions. A figure caption states the quantity, conditions,
   comparison, and supported observation. A table caption states what the
-  values compare. Put figure captions below figures and table captions above
-  tables.
+  values compare. Captions define every symbol, line, and marker so figure and
+  caption stand alone. Put figure captions below figures and table captions
+  above tables.
 - Follow the scientific tables rules in `latex-packages.md`.
 - Apply `latex-layout-and-qa.md` to every selected PDF output. Compilation,
   resolved references, automated visual QA, and full-size page inspection are
@@ -67,24 +73,62 @@ select the relevant investigator-promoted results and write a separate manuscrip
 
 Use the applicable subset in this order:
 
-1. title, authors, affiliations, and date;
-2. abstract stating the question, method, principal result with conditions,
-   and supported implication;
-3. keywords and nomenclature when useful;
-4. introduction;
+1. title, a specific label for the central contribution without novelty
+   adjectives, then authors, affiliations, and date;
+2. an informative abstract stating the question and the gap it fills, the
+   method, principal result with conditions, and supported implication, within
+   the venue's length and without citations;
+3. keywords, and a nomenclature list when the venue uses one; it never
+   replaces definition at first use;
+4. introduction as a **Create a Research Space** (Swales 1990): territory,
+   gap, contribution. The literature review is the evidence for the gap and
+   the baseline the results are compared against;
 5. formulation, theory, or governing equations;
 6. experimental, computational, or analytical methods;
 7. verification, validation, and uncertainty when they support the claims;
 8. results;
 9. discussion;
 10. conclusions;
-11. data, code, funding, or conflict statements when applicable;
-12. references and selected appendices.
+11. the statements the [venue package](../workflow/scientific-writing.md#manuscript-structure-review)
+    requires, such as data, code, funding, or conflicts;
+12. references in the venue's style, and selected appendices.
 
-Merge adjacent sections when the scientific argument is clearer without a
-separate heading. The manuscript remains one continuous story: introduce each
+This is **IMRaD as four questions** (Gastel and Day 2022; Sollaci and Pereira
+2004): why, how, what, and so what, with engineering variants such as a model
+section, combined Results and discussion, or alternating methods and results.
+The discussion interprets and bounds; conclusions pair each finding with its
+consequence or domain of validity. Top-level headings use the field's
+conventional names; subheadings name the system, study, or step, never an
+internal label. Merge adjacent sections when the scientific argument is
+clearer without a separate heading. The manuscript remains one continuous story: introduce each
 result before showing it, interpret it after showing it, and carry only the
 evidence needed for the stated conclusion.
+
+### Skeletons by paper type
+
+A paper starts from the skeleton its type and venue share in published
+papers, and departs when the argument needs to.
+
+- **Thermodynamic model:** a model section named for the theory, split by
+  physics, then results in rising system complexity (pure, binary, ternary).
+- **Process, techno-economic, or optimization:** the problem statement, then
+  unit and cost models, then results by study.
+- **Rate-based column:** **validate, then use**: validation against plant or
+  pilot data comes before sensitivity, design, or case studies.
+- **Software** (JOSS review criteria): need and gap against existing packages,
+  design trade-offs, verification against an independent reference, measured
+  performance, limitations, and availability. Documentation stays in the
+  documentation.
+
+A multi-paper dissertation is one argument, with an integrating introduction
+and conclusion and co-author contributions stated per chapter.
+
+### Supplement
+
+The supplement keeps the main text readable; it is not an archive. It holds
+derivations, extra cases, full tables, data, and notebooks, each cited from the
+main text. It never holds the problem statement, the new model relations, or
+the validation behind a main claim.
 
 ### Evidence guard
 
@@ -189,7 +233,8 @@ Before publication review, correct these general classes:
 
 - Identify every transferred parameter, analogue, correlation, or property value by name, source, exact locator, and applicability; state when transfer to the present system is an assumption.
 - Define every objective, constraint, operating domain, and comparison method before its result or sensitivity appears.
-- Give the rationale for fixed sensitivity cases, selected designs, reference conditions, and reported optima when the choice is not self-evident.
+- Give the rationale for fixed sensitivity cases, selected designs, reference conditions, and reported optima when the choice is not self-evident. Keep **sensitivity versus uncertainty** distinct (Saltelli et al. 2019): one-at-a-time variation shows local leverage, not overall uncertainty, in a nonlinear model.
+- Give every cost its **cost basis** (NETL 2021; Rubin et al. 2013): currency and year, estimate class, capital-cost level, real or nominal financing, scope, and reference plant. Set the **boundary before the metric**: define scope and battery limits first and match the metric to them (Rubin et al. 2013).
 - State phase-volume, composition-basis, standard-state, sign, unit, and normalization conventions instead of saying only that source conventions were retained.
 - Identify the operating conditions associated with large errors, failed checks, rejected states, and non-evaluable cases when they constrain interpretation.
 - Match verbs to the evidence: use “considered during model selection” when alternatives were screened but their comparison is not presented, and reserve “retained for comparison” for comparisons actually shown.
