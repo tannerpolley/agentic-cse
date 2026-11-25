@@ -58,9 +58,7 @@ For manuscripts/decks, the Result lens activates scientific-writing's
 [standing decisions](../../references/workflow/scientific-writing.md#standing-editorial-decisions),
 [editorial compliance](../../references/workflow/scientific-writing.md#editorial-compliance), and
 [manuscript reference coverage](../../references/workflow/scientific-writing.md#manuscript-reference-coverage).
-At a manuscript's final checkpoint, apply the [method-chain check](../../references/workflow/scientific-writing.md#method-chain)
-and answer “Is every modeling step stated as an equation with consistent units
-and symbols?” in the brief. Flag dense passages using the same check.
+For a manuscript, also ask whether a reader could rebuild the calculation from the paper ([methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility)).
 At a deck's final checkpoint, inspect it read-only against [slide-decks](../../references/visualize/slide-decks.md) and the project's deck decisions.
 
 **Capability lens —** inspect the final implementation tree, complete changed functions,
