@@ -163,6 +163,68 @@ Prose and Review remain read-only: read and check the applicable record and
 return missing owner decisions for the authoring task to capture. They do not
 edit the record or turn their own advice into owner policy.
 
+### Method chain
+
+Give each modeling step from inputs to reported outputs one compact displayed
+equation in the main-text Methods. Include the governing model, property and
+standard-state or activity definitions, equilibrium or unit relations, process
+coupling, downstream conversion and reported metrics, costing, the optimization
+objective and constraints, and the parameter-fit objective where applicable.
+At each interface, name the quantities passed and label them as outputs of the
+producing model and inputs to the receiving model or unit.
+
+Prefer equations for relations and tables or figures for sets of numbers. Use
+short prose to define quantities and explain assumptions and interpretation.
+During trimming, keep the full chain in the main text and use the supplementary
+information for term-level expansions, derivations, long tables, and secondary
+fit detail.
+
+Before a draft or manuscript review round, Write lists the links in computation order,
+including any fit that supplies model parameters. Match each link to its
+main-text equation and verify that equation against the implementation at
+`file:line`, including the definitions and constraints actually used. Check
+dimensions and conversions using the printed units. Give each symbol one
+meaning and define it with its units or basis in the Nomenclature. Record
+missing equations and unverified implementation matches in the brief.
+
+At the final checkpoint, ask whether every modeling step is stated as an
+equation with consistent units and symbols. Review verifies the equations
+against the implementation. Report missing or misstated links as required
+corrections with the exact Methods span. Flag dense passages in Methods or
+Results where a relation or set of values would be clearer as an equation,
+table, or figure.
+
+When a referee requests independent reconstruction, reproducibility, or a
+worked numerical example, check whether the main text leaves any link unclear.
+If you find an exposition gap, address it in the response and manuscript.
+Independently assess whether data or code availability needs attention.
+
+#### Example: heater operating cost
+
+For a steady single-phase electric heater with specified inlet and outlet
+temperatures $T_{\mathrm{in}}$ and $T_{\mathrm{out}}$ (K), the property model
+uses constant specific heat capacity $c_p$ (kJ/(kg K)).
+
+$$
+\Delta h = c_p(T_{\mathrm{out}}-T_{\mathrm{in}}).
+$$
+
+The enthalpy rise $\Delta h$ (kJ/kg) is the **property-model output** and a
+**heater input** alongside mass flow $\dot m$ (kg/s). The heater outputs the
+thermal duty $\dot Q$ (kW).
+
+$$
+\dot Q = \dot m\,\Delta h.
+$$
+
+With electrical-to-thermal efficiency $\eta$ (dimensionless) and electricity
+price $p_e$ (currency/kWh), the reported operating cost rate $\dot C$ is in
+currency/h.
+
+$$
+\dot C = p_e\,\dot Q/\eta.
+$$
+
 ### Editorial compliance
 
 At the final checkpoint, Prose and Review check the applicable standing
@@ -194,7 +256,8 @@ Put story order there, not in `STYLE.md`. One writer then rewrites from the plan
 After the rewrite, two independent reviewers work in parallel. The science-support
 reviewer applies Review's Result lens to every displayed number and cited claim
 against retained files and cited sources, providing exact replacement text,
-and checks [manuscript reference coverage](#manuscript-reference-coverage). The
+and checks [manuscript reference coverage](#manuscript-reference-coverage). Give
+both reviewers the [method-chain question](#method-chain) in their briefs. The
 reader-story reviewer applies the final manuscript checkpoint below and checks
 figures, tables, abstract, paragraph placement, and internal language. Write
 applies their fixes as given; science support wins a conflict. Write then makes
@@ -259,9 +322,10 @@ rendering checks: stable unique paragraph identifiers, reconstructable order,
 one sentence per source line, blank-line paragraph boundaries, and resolved
 references, labels, and citations. These checks do not judge the argument.
 
-At this checkpoint, require [editorial compliance](#editorial-compliance) and
-Review's [reference-coverage result](#manuscript-reference-coverage) for the
-same source revision as Prose.
+At this checkpoint, require [editorial compliance](#editorial-compliance), the
+[method-chain check](#method-chain), and Review's
+[reference-coverage result](#manuscript-reference-coverage) for the same source
+revision as Prose.
 
 Prose performs one agent-led cohesion inspection when the user asks for a final check, before
 submission or a named publication handoff. A material change to central claims,
