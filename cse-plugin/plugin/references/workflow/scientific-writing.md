@@ -279,10 +279,10 @@ $$
   first appearance, and cited by phrase as well as number. End punctuation on
   the equation line follows the venue: some styles require it (Mermin 1989)
   and others forbid it (ACS Guide 5.4.2).
-- **Symbols in equations, words in prose** (ACS Guide 5.4.2): equations use
-  single-letter symbols with subscripts, and multi-letter abbreviations stay
-  in the prose. A definition after an equation uses words: "where $T$ is
-  temperature", not "$T$ = temperature".
+- **Symbols in equations, words in prose** (ACS Guide 5.4.2): equations
+  prefer single-letter symbols with subscripts, and multi-letter abbreviations
+  mostly stay in the prose. A definition after an equation uses words: "where
+  $T$ is temperature", not "$T$ = temperature".
 - **Numbers in print, not in code** (ACS Guide 5.4.1, 5.4.2): a manuscript
   writes $2.4 \times 10^{-3}$, not 2.4e-3; a multiplication sign, not an
   asterisk; 8000, not 8k. Printed digits claim precision: 25.0 °C is not 25 °C.
