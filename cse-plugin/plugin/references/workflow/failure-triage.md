@@ -40,7 +40,12 @@ Do not report the analysis complete or create a notebook or empty figure.
 
 Close a negative numerical disposition only with evidence that the case lies
 outside the stated physical domain or that diagnosis and a bounded root-cause
-fix attempt showed no feasible correction. Report only values actually computed.
+fix attempt showed no feasible correction. The same evidence applies when a
+numerical non-result is recorded as a claim limit, a narrowed or provisional
+result, or an undecided item instead: the label changes, the obligation does
+not. Repeating a refused calculation from new starts, draws, or settings counts
+as diagnosis only when it tests a stated hypothesis about the failure.
+Report only values actually computed.
 Keep valid partial results under
 [Build's retention rule](../../skills/build/SKILL.md#result-retention) and
 report useful values under [Tolerances](numerical-testing.md#tolerances).

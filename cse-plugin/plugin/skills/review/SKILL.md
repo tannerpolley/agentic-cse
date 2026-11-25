@@ -83,7 +83,8 @@ Use **Supported** where the evidence establishes the stated claim and
 **Not supported** only where the evidence shows that claim fails. Mark a verdict
 **pending** when unresolved evidence prevents a decision. Keep independently
 supported claims visible and list wording-only changes as required corrections.
-For a proposed negative numerical disposition, apply
+For a proposed negative numerical disposition, or a limit, narrowing, or
+provisional label resting on a numerical non-result, apply
 [failure-triage](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition).
 
 Review advises on the stated use; it does not promote a notebook to manuscript

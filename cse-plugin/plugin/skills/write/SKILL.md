@@ -24,6 +24,12 @@ to CSE source after the Zotero capability is checked.
 Inspect the accepted question, formulation, methods, evidence, notebook,
 sources, audience, and intended endpoint. Build one supported argument from
 cited sources, equations, retained results, uncertainty, and limitations.
+A limitation states a physical finding or the tested domain. Write a numerical
+non-result (a refused, unfinished, or unconverged calculation, or a result
+labelled provisional for that reason) only when its record shows it met
+[fix before a negative disposition](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition);
+otherwise return it to the investigator as a blocker with its record locator
+and leave that sentence unwritten.
 Keep verification distinct from physical validation, follow project writing
 rules, and remove internal workflow or repository language from scientific
 prose. Check terminology and banned language on every durable edit.
@@ -42,7 +48,8 @@ the next final checkpoint.
 
 Immediately before using a reviewed notebook in manuscript work, obtain native
 investigator confirmation bound to the exact notebook commit, intended use,
-and limitations. Record one plain sentence stating that the investigator
+and limitations. Ask about each numerical non-result in that notebook as its
+own item, separate from the limitations. Record one plain sentence stating that the investigator
 promoted that commit for that use subject to those limitations. Do not infer
 promotion from Review Pass and do not create a status file or decision record.
 
