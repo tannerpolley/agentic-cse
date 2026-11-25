@@ -35,9 +35,11 @@ select the relevant investigator-promoted results and write a separate manuscrip
   highlighting. Keep execution disabled by default and never run the
   scientific model during document rendering. Keep stable LaTeX notation,
   packages, and semantic figure styles in reviewed headers.
-- **Choosing the display** (Ehrenberg 1977): a relation is an equation, values
-  a reader will compare or reuse are a table, and a pattern is a figure.
-  Tables hold no prose.
+- **Choosing the display** (Ehrenberg 1977; ACS Guide 4.2.1): a relation is an
+  equation, exact values a reader will compare or reuse are a table, and a
+  trend or pattern is a figure. A table holds short, parallel entries in
+  related rows and columns, with explanation in footnotes or the text; it
+  supplements the text and does not repeat it.
 - Present scientific provenance: data source, equations, parameter values,
   units, assumptions, comparison basis, and uncertainty. Data are traceable to
   their origin, and comparison with published values is part of the evidence
@@ -46,9 +48,11 @@ select the relevant investigator-promoted results and write a separate manuscrip
   of rendered scientific prose.
 - Use result-led captions. A figure caption states the quantity, conditions,
   comparison, and supported observation. A table caption states what the
-  values compare. Captions define every symbol, line, and marker so figure and
-  caption stand alone. Put figure captions below figures and table captions
-  above tables.
+  values compare. So that figure and caption stand alone (ACS Guide 4.1.3,
+  4.1.4), a caption also defines every symbol, line, and marker and says what
+  any error bar or band represents. Where the venue's captions are
+  descriptive, the caption says what the figure shows and the text states the
+  finding. Put figure captions below figures and table captions above tables.
 - Follow the scientific tables rules in `latex-packages.md`.
 - Apply `latex-layout-and-qa.md` to every selected PDF output. Compilation,
   resolved references, automated visual QA, and full-size page inspection are
@@ -74,7 +78,8 @@ select the relevant investigator-promoted results and write a separate manuscrip
 Use the applicable subset in this order:
 
 1. title, a specific label for the central contribution without novelty
-   adjectives, then authors, affiliations, and date;
+   adjectives or specific results, whose first phrase sets its emphasis (ACS
+   Guide 2.3.2), then authors, affiliations, and date;
 2. an informative abstract stating the question and the gap it fills, the
    method, principal result with conditions, and supported implication, within
    the venue's length and without citations;
@@ -96,8 +101,9 @@ Use the applicable subset in this order:
 This is **IMRaD as four questions** (Gastel and Day 2022; Sollaci and Pereira
 2004): why, how, what, and so what, with engineering variants such as a model
 section, combined Results and discussion, or alternating methods and results.
-The discussion interprets and bounds; conclusions pair each finding with its
-consequence or domain of validity. Top-level headings use the field's
+The discussion interprets and bounds; conclusions say what was learned, not
+what was done (ACS Guide 2.3.8), pairing each finding with its consequence or
+domain of validity. Top-level headings use the field's
 conventional names; subheadings name the system, study, or step, never an
 internal label. Merge adjacent sections when the scientific argument is
 clearer without a separate heading. The manuscript remains one continuous story: introduce each
@@ -128,7 +134,9 @@ and conclusion and co-author contributions stated per chapter.
 The supplement keeps the main text readable; it is not an archive. It holds
 derivations, extra cases, full tables, data, and notebooks, each cited from the
 main text. It never holds the problem statement, the new model relations, or
-the validation behind a main claim.
+the validation behind a main claim. Reusable data also goes out as
+machine-readable files, because values in a PDF supplement are hard to reuse
+and get less scrutiny (ACS Guide 3.1.4).
 
 ### Evidence guard
 

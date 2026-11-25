@@ -16,7 +16,11 @@ observations as points and a retained continuous model relationship as a line.
 Parity, residual, influence, sensitivity, and convergence figures are
 diagnostics. Keep them secondary unless the scientific question concerns that
 diagnostic; a deviation or parity figure is primary evidence when the claim is
-accuracy over a data set. Before rendering, state each figure’s question and unique comparison
+accuracy over a data set. **Plot the quantity that exposes the error** (Mathias
+2017, guidelines of the JCED editors): for phase-equilibrium data, chart
+distribution coefficients, relative volatilities, or percent deviations so the
+key result is seen at a glance; charts of state conditions make agreement look
+good and hide errors at low concentrations. Before rendering, state each figure’s question and unique comparison
 in the existing figure record/caption or invoking-stage report, and compare it
 with the other proposed figures. Every figure must show a comparison no other
 figure shows. Remove or merge duplicate views and customary diagnostics that do
@@ -59,7 +63,8 @@ Light uncertainty fills need a distinguishable boundary or another readable
 encoding when the boundary conveys essential information.
 
 Label every axis with the quantity and unit in the venue's form, such as
-$T/\mathrm{K}$ or $T$ (K), and keep one form throughout. Continuous fields use
+$T/\mathrm{K}$ or $T$ (K), and keep one form throughout; a symbol used on an
+axis is defined in the caption. Continuous fields use
 perceptually uniform, ordered colour maps readable in grayscale (Crameri et al.
 2020; [sources](../workflow/scientific-writing.md#sources)). Use linear axes by default, and use log or symlog only when multiplicative behavior, orders of magnitude, or signed dynamic range makes the linear view misleading. Keep legends, grids, annotations, and significant digits purposeful.
 

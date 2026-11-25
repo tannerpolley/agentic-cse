@@ -187,18 +187,28 @@ a paper departs from one when its argument needs it.
 - **Findings first** (Mensh and Kording 2017, Rule 7): results are a chain of
   supported claims, not the path taken. A results paragraph poses its question
   and ends with the answer.
+- **Text density** (ACS Guide 2.1.3): an effective article avoids dense text.
+  Paragraphs stay short, and tables, equations, and graphics carry part of
+  the load.
+- **Every display earns a place in the text** (ACS Guide 4.1.2, 4.2.3): a
+  figure or table is cited and discussed in the text, in order of first
+  mention. One with no natural place to be discussed does not belong.
 - **An archival finding, not design data** (Andrews 2011; Zimmermann et al.
   2020): a paper earns its place by a finding and its consequence. Values
   reported without interpretation read as an engineering report.
 
 ### Methods reproducibility
 
-A reader should be able to rebuild the calculation from the paper alone, a
-standard known as methods reproducibility (Goodman, Fanelli, and Ioannidis,
-*Sci. Transl. Med.* 2016). In a model-based paper the Methods deliver it through
-the model formulation: the governing relations in the order the calculation
-uses them, from the inputs to the reported results, including any fit objective
-and optimization problem. Write each relation as a compact displayed equation
+**Methods reproducibility** (Goodman, Fanelli, and Ioannidis 2016) is giving
+enough detail about the procedures and the data that the same calculation
+could be exactly repeated with the same data and tools. The paper's share is
+the mathematics: a reader can check the reported numbers and rework the
+derivations from what is printed, and the software is named with its version
+(ACS Guide 2.3.8). The data and code are the deposit's share. In a model-based
+paper the Methods deliver the paper's share through the model formulation: the
+governing relations in the order the calculation uses them, from the inputs to
+the reported results, including any fit objective and optimization problem.
+Write each relation as a compact displayed equation
 rather than describing it in prose. As in a degrees-of-freedom analysis, say
 which quantities each model is given and which it computes, especially where
 one model feeds another. Printed equations match what the code computes, with
@@ -224,8 +234,11 @@ consistent units and one meaning per symbol.
   simulator used, and show the conditions lie within their validity ranges.
 - **Paper and deposit carry different halves** (Buckheit and Donoho 1995;
   National Academies 2019): the paper carries the argument and formulation, the
-  deposit regenerates every number, and neither substitutes for the other. A
-  claim names the standard met instead of the bare word "reproducible".
+  deposit regenerates every number, and neither substitutes for the other.
+  For a model, the deposit holds the software and version, the configuration
+  and parameters, the inputs and outputs, and the numbers behind every figure
+  and table as open text files (ACS Guide 3.1.5). A claim names the standard
+  met instead of the bare word "reproducible".
 
 Choose each display by [its job](../visualize/latex-article-profiles.md#shared-article-requirements).
 Trimming moves derivations, term-by-term expansions, and long tables to the
@@ -262,14 +275,26 @@ $$
 ### Equations, quantities, and units
 
 - **Mathematics is prose** (Mermin 1989; Knuth, Larrabee, and Roberts 1989):
-  punctuate displayed equations as part of the sentence, number them, and cite
-  them by phrase as well as number.
+  a displayed equation is read as part of its sentence, numbered in order of
+  first appearance, and cited by phrase as well as number. End punctuation on
+  the equation line follows the venue: some styles require it (Mermin 1989)
+  and others forbid it (ACS Guide 5.4.2).
+- **Symbols in equations, words in prose** (ACS Guide 5.4.2): equations use
+  single-letter symbols with subscripts, and multi-letter abbreviations stay
+  in the prose. A definition after an equation uses words: "where $T$ is
+  temperature", not "$T$ = temperature".
+- **Numbers in print, not in code** (ACS Guide 5.4.1, 5.4.2): a manuscript
+  writes $2.4 \times 10^{-3}$, not 2.4e-3; a multiplication sign, not an
+  asterisk; 8000, not 8k. Printed digits claim precision: 25.0 °C is not 25 °C.
 - **One notation for one thing** (Halmos 1970): one meaning per symbol across
   main text and supplement, defined at first use.
 - **Quantity calculus** (BIPM SI Brochure 2019; NIST SP 811; IUPAC Green
-  Book): physical laws are quantity equations, empirical correlations carry
-  their units inside, as in $\ln(p/\mathrm{kPa})$, and qualifiers attach to the
-  quantity, not the unit.
+  Book): a physical quantity is a number times a unit, so physical laws hold
+  in any units. An empirical correlation states the unit of every variable,
+  inside the equation as in $\ln(p/\mathrm{kPa})$ or in the definitions right
+  after it, whichever the venue uses. Attaching a qualifier to the quantity
+  rather than the unit is the SI and IUPAC convention; it yields to venues
+  that accept forms such as "10 wt %".
 - **Uncertainty statements** (JCGM GUM 2008; NIST TN 1297): standard or
   expanded with its coverage factor, sources justified. Digits follow the
   uncertainty, with extra digits only for parameters a reader must reproduce.
@@ -278,13 +303,20 @@ $$
 
 - **Disclose, share, cite** (TOP Guidelines; FAIR 2016; FAIR4RS 2022): the
   availability statement names the archived version that produced the numbers,
-  by release and persistent identifier; working paths, branches, issue numbers,
-  and commit hashes stay out ([reader-facing identifiers](#reader-facing-identifiers)).
+  preferably with a persistent identifier, or says why the data cannot be
+  shared. Release versions, and a public repository link where the venue asks
+  for one, belong there; working paths, branches, issue numbers, and commit
+  hashes stay out ([reader-facing identifiers](#reader-facing-identifiers)).
 - **Software citation** (Smith, Katz, and Niemeyer 2016): software that shaped
-  a result is cited in the reference list with its version and identifier.
+  a result, including scripts, models, and notebooks, is cited in the reference
+  list with its version and identifier. Cite the software itself, and its
+  paper as well, never the paper in its place.
 - **AI disclosure belongs to the authors:** venues forbid AI authorship and
   require disclosure. An agent records what it drafted and leaves the
   declaration for the authors to confirm.
+- **Every reference is real** (Elsevier generative-AI policy): each reference
+  is checked to exist before submission, because generated references can be
+  fabricated. AI-made figures are disclosed in their captions.
 
 ### Editorial compliance
 
@@ -443,13 +475,15 @@ or replace evidence review and investigator promotion.
 
 A response to referees follows **answer, then show** (Noble 2017): quote each
 comment, answer it directly, quote the changed text, and say what changed. A
-cover letter argues the paper's fit with the journal and does not restate the
-abstract.
+cover letter gives the editor a short summary, not a copy of the abstract: why
+this journal, what is new, and what the editor needs to route the paper (ACS
+Guide 2.4.4).
 
 ### Sources
 
 Principles in the CSE writing references cite these works by author and year.
 
+- American Chemical Society. *ACS Guide to Scholarly Communication.* Cited by section number. doi:10.1021/acsguide
 - Anderson, T. F.; Abrams, D. S.; Grens, E. A. Evaluation of parameters for nonlinear thermodynamic models. *AIChE J.* 1978, 24, 20. doi:10.1002/aic.690240103
 - Andrews, M. J. Guidelines for use of commercial software and diagnostics in articles for JFE. *J. Fluids Eng.* 2011, 133, 010201.
 - Barker, M. et al. Introducing the FAIR principles for research software (FAIR4RS). *Sci. Data* 2022, 9, 622. doi:10.1038/s41597-022-01710-x
@@ -462,6 +496,7 @@ Principles in the CSE writing references cite these works by author and year.
 - Crameri, F.; Shephard, G. E.; Heron, P. J. The misuse of colour in science communication. *Nat. Commun.* 2020, 11, 5444. doi:10.1038/s41467-020-19160-7
 - Cummings, P. T. et al. Joint statement of editors of journals publishing thermophysical property data. *Fluid Phase Equilib.* 2009, 276, 165.
 - Ehrenberg, A. S. C. Rudiments of numeracy. *J. R. Stat. Soc. A* 1977, 140, 277.
+- Elsevier. Generative AI policies for journals, as stated in its guides for authors.
 - Gastel, B.; Day, R. A. *How to Write and Publish a Scientific Paper*, 9th ed. Cambridge University Press, 2022.
 - Goodman, S. N.; Fanelli, D.; Ioannidis, J. P. A. What does research reproducibility mean? *Sci. Transl. Med.* 2016, 8, 341ps12. doi:10.1126/scitranslmed.aaf5027
 - Gopen, G. D.; Swan, J. A. The science of scientific writing. *Am. Sci.* 1990, 78, 550.
@@ -473,6 +508,7 @@ Principles in the CSE writing references cite these works by author and year.
 - Journal of Open Source Software. Review criteria.
 - Knuth, D. E.; Larrabee, T.; Roberts, P. M. *Mathematical Writing.* MAA Notes 14, 1989.
 - Kontogeorgis, G. M. et al. Industrial requirements for thermodynamic and transport properties: 2020. *Ind. Eng. Chem. Res.* 2021, 60, 4987. doi:10.1021/acs.iecr.0c05356
+- Mathias, P. M. Guidelines for the analysis of vapor–liquid equilibrium data. *J. Chem. Eng. Data* 2017, 62, 2231. doi:10.1021/acs.jced.7b00582
 - Mensh, B.; Kording, K. Ten simple rules for structuring papers. *PLoS Comput. Biol.* 2017, 13, e1005619. doi:10.1371/journal.pcbi.1005619
 - Mermin, N. D. What's wrong with these equations? *Phys. Today* 1989, 42(10), 9.
 - National Academies of Sciences, Engineering, and Medicine. *Reproducibility and Replicability in Science.* 2019. doi:10.17226/25303
