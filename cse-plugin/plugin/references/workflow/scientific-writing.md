@@ -21,7 +21,10 @@ document-scoped standing editorial decisions, and `RULES.md` for deterministic
 project writing rules. Do not duplicate terminology preferences there. Apply plugin-wide and scoped prose checks, citations, structure, and the
 selected document profile when a notebook or manuscript is prepared.
 Write direct, active, specific prose and preserve scientific meaning,
-uncertainty, provenance, and limitations.
+uncertainty, provenance, and limitations. Practice **calibrated hedging**
+(Hyland 1996; IEEE Author Center): state a supported finding plainly with its
+conditions and uncertainty, and hedge only what the evidence leaves open.
+Over-qualifying misreports the evidence as surely as inflating it.
 
 `cse:prose` owns writing inspection; `cse:write` owns authoring and correction.
 For file-backed input, Prose runs `scripts/workflow/check_prose.py` with the
@@ -76,10 +79,13 @@ detector score.
 
 ### Reader-facing identifiers
 
-Use scientific descriptions in prose, captions, table cells, legends, axis
-labels, and slides. Internal run/fit codes, issue or pull-request numbers,
-commit hashes, and repository paths need reader-facing inspection. A warning
-is a judgment call, not proof that a scientific label is wrong.
+Write for **a reader outside the project** (Mensh and Kording 2017, Rule 2): a
+term, label, or piece of history a new reader would need explained is defined
+or removed. Use scientific descriptions in prose, captions, table cells,
+legends, axis labels, and slides. Internal run/fit codes, issue or pull-
+request numbers, commit hashes, and repository paths need reader-facing
+inspection. A warning is a judgment call, not proof that a scientific label is
+wrong.
 
 Run `python3 <plugin>/scripts/workflow/check_prose.py --root <project> <sources>`
 on explicit manuscript sources, figure scripts, and deck `.tex`/`.pptx` files.
@@ -140,7 +146,10 @@ Sources: repository-relative main source; supplement; associated figures
 ```
 
 Rows can cover precision, exclusions, audience, and the main-text/supplement
-split. Record only explicit owner directions and preserve their exact meaning:
+split. A row may also record a target-journal requirement that shapes the
+paper (see [venue package](#manuscript-structure-review)), with the guide link
+and access date as authority. Otherwise record only explicit owner directions
+and preserve their exact meaning:
 decimal places and significant digits differ. Use an authority link when
 available; otherwise retain the date and a short exact owner quotation. Do not
 promote agent or reviewer suggestions, or choices inferred from the draft,
@@ -163,20 +172,75 @@ Prose and Review remain read-only: read and check the applicable record and
 return missing owner decisions for the authoring task to capture. They do not
 edit the record or turn their own advice into owner policy.
 
+### Argument
+
+These conventions describe how established papers are built; section order
+and skeletons live in the [manuscript profile](../visualize/latex-article-profiles.md#manuscript-profile).
+A venue requirement or standing editorial decision overrides a convention, and
+a paper departs from one when its argument needs it.
+
+- **Rule of One** (Mensh and Kording 2017, Rule 1): a paper argues one central
+  contribution, and the title carries it.
+- **Outline from the displays** (Whitesides 2004): plan the equations, figures,
+  and tables first, ordered by importance rather than by the order the work
+  was done, then write the text that explains them.
+- **Findings first** (Mensh and Kording 2017, Rule 7): results are a chain of
+  supported claims, not the path taken. A results paragraph poses its question
+  and ends with the answer.
+- **Text density** (ACS Guide 2.1.3): an effective article avoids dense text.
+  Paragraphs stay short, and tables, equations, and graphics carry part of
+  the load.
+- **Every display earns a place in the text** (ACS Guide 4.1.2, 4.2.3): a
+  figure or table is cited and discussed in the text, in order of first
+  mention. One with no natural place to be discussed does not belong.
+- **An archival finding, not design data** (Andrews 2011; Zimmermann et al.
+  2020): a paper earns its place by a finding and its consequence. Values
+  reported without interpretation read as an engineering report.
+
 ### Methods reproducibility
 
-A reader should be able to rebuild the calculation from the paper alone, a
-standard known as methods reproducibility (Goodman, Fanelli, and Ioannidis,
-*Sci. Transl. Med.* 2016). In a model-based paper the Methods deliver it through
-the model formulation: the governing relations in the order the calculation
-uses them, from the inputs to the reported results, including any fit objective
-and optimization problem. Write each relation as a compact displayed equation
+**Methods reproducibility** (Goodman, Fanelli, and Ioannidis 2016) is giving
+enough detail about the procedures and the data that the same calculation
+could be exactly repeated with the same data and tools. The paper's share is
+the mathematics: a reader can check the reported numbers and rework the
+derivations from what is printed, and the software is named with its version
+(ACS Guide 2.3.8). The data and code are the deposit's share. In a model-based
+paper the Methods deliver the paper's share through the model formulation: the
+governing relations in the order the calculation uses them, from the inputs to
+the reported results, including any fit objective and optimization problem.
+Write each relation as a compact displayed equation
 rather than describing it in prose. As in a degrees-of-freedom analysis, say
 which quantities each model is given and which it computes, especially where
 one model feeds another. Printed equations match what the code computes, with
 consistent units and one meaning per symbol.
 
-Prefer equations for relations and tables or figures for sets of numbers.
+- **Standard tool or contribution:** print what is new or chosen in this work
+  and cite standard expressions at their source. A common model needs its
+  name, form, and citation; a model that is the paper's contribution is
+  formulated in full with every parameter printed.
+- **Good reporting practice for property models** (Bazyleva et al. 2021, IUPAC):
+  every parameter with its units, origin, and fitted range, plus check values
+  computed from the printed parameters.
+- **The fit is part of the formulation** (Anderson, Abrams, and Grens 1978;
+  Thol et al. 2019): objective, residuals, and weights, and every data set used,
+  withheld, or excluded, with the same exclusions for every model compared.
+- **Problem statement in standard form** (Biegler 2010): an optimization or
+  design study states its given data, decisions, objective, and constraints
+  once, with size and solver, and says whether the optimum is local or global.
+- **Numerical accuracy** (Journal of Fluids Engineering numerical-accuracy
+  policy; Celik et al. 2008; Andrews 2011): state the solver, tolerances, and
+  stopping criteria, and show the reported quantity is insensitive to
+  refinement. Name the property method, unit models, and correlations a
+  simulator used, and show the conditions lie within their validity ranges.
+- **Paper and deposit carry different halves** (Buckheit and Donoho 1995;
+  National Academies 2019): the paper carries the argument and formulation, the
+  deposit regenerates every number, and neither substitutes for the other.
+  For a model, the deposit holds the software and version, the configuration
+  and parameters, the inputs and outputs, and the numbers behind every figure
+  and table as open text files (ACS Guide 3.1.5). A claim names the standard
+  met instead of the bare word "reproducible".
+
+Choose each display by [its job](../visualize/latex-article-profiles.md#shared-article-requirements).
 Trimming moves derivations, term-by-term expansions, and long tables to the
 supplement, never the formulation itself. A referee request for reconstruction
 or a worked example often means a step is missing from the text, separate from
@@ -208,6 +272,52 @@ $$
 \dot C = p_e\,\dot Q/\eta.
 $$
 
+### Equations, quantities, and units
+
+- **Mathematics is prose** (Mermin 1989; Knuth, Larrabee, and Roberts 1989):
+  a displayed equation is read as part of its sentence, numbered in order of
+  first appearance, and cited by phrase as well as number. End punctuation on
+  the equation line follows the venue: some styles require it (Mermin 1989)
+  and others forbid it (ACS Guide 5.4.2).
+- **Symbols in equations, words in prose** (ACS Guide 5.4.2): equations use
+  single-letter symbols with subscripts, and multi-letter abbreviations stay
+  in the prose. A definition after an equation uses words: "where $T$ is
+  temperature", not "$T$ = temperature".
+- **Numbers in print, not in code** (ACS Guide 5.4.1, 5.4.2): a manuscript
+  writes $2.4 \times 10^{-3}$, not 2.4e-3; a multiplication sign, not an
+  asterisk; 8000, not 8k. Printed digits claim precision: 25.0 °C is not 25 °C.
+- **One notation for one thing** (Halmos 1970): one meaning per symbol across
+  main text and supplement, defined at first use.
+- **Quantity calculus** (BIPM SI Brochure 2019; NIST SP 811; IUPAC Green
+  Book): a physical quantity is a number times a unit, so physical laws hold
+  in any units. An empirical correlation states the unit of every variable,
+  inside the equation as in $\ln(p/\mathrm{kPa})$ or in the definitions right
+  after it, whichever the venue uses. Attaching a qualifier to the quantity
+  rather than the unit is the SI and IUPAC convention; it yields to venues
+  that accept forms such as "10 wt %".
+- **Uncertainty statements** (JCGM GUM 2008; NIST TN 1297): standard or
+  expanded with its coverage factor, sources justified. Digits follow the
+  uncertainty, with extra digits only for parameters a reader must reproduce.
+
+### Data, code, and software
+
+- **Disclose, share, cite** (TOP Guidelines; FAIR 2016; FAIR4RS 2022): the
+  availability statement names the archived version that produced the numbers,
+  preferably with a persistent identifier, or says why the data cannot be
+  shared. Release versions, and a public repository link where the venue asks
+  for one, belong there; working paths, branches, issue numbers, and commit
+  hashes stay out ([reader-facing identifiers](#reader-facing-identifiers)).
+- **Software citation** (Smith, Katz, and Niemeyer 2016): software that shaped
+  a result, including scripts, models, and notebooks, is cited in the reference
+  list with its version and identifier. Cite the software itself, and its
+  paper as well, never the paper in its place.
+- **AI disclosure belongs to the authors:** venues forbid AI authorship and
+  require disclosure. An agent records what it drafted and leaves the
+  declaration for the authors to confirm.
+- **Every reference is real** (Elsevier generative-AI policy): each reference
+  is checked to exist before submission, because generated references can be
+  fabricated. AI-made figures are disclosed in their captions.
+
 ### Editorial compliance
 
 At the final checkpoint, Prose and Review check the applicable standing
@@ -223,12 +333,19 @@ For a new manuscript, rejected draft, new target journal, or material change to
 section order or argument spine, review the structure before writing. Routine
 wording, citation, and formatting edits do not trigger this review.
 
+Start from the **venue package**, the target journal's current guide for
+authors: its limits and required statements are requirements, and where it is
+silent the paper decides. Record those that shape the paper in the document's
+[STYLE section](#standing-editorial-decisions).
+
 Give three independent read-only structure reviewers the same brief and distinct
 identities. One reviewer is enough for a small journal retarget without a
 structural change. Supply the target journal, owner-named model papers, prior
 accepted version, source collection, owner rules, and accepted evidence. Each
-reviewer returns a diagnosis tracing the root cause to planning records, a map
-of the model paper, lessons from similar papers, a literature plan with existing
+reviewer returns a diagnosis tracing the root cause to planning records,
+**measured model papers** (the owner-named model paper and two or three recent
+papers of its type and venue, mapped by headings, where the model sits, and
+what the supplement holds, not from memory), a literature plan with existing
 citation keys, an outline, a jargon list, and only blocking questions.
 
 The accountable lead checks each proposal: citation keys exist in the
@@ -309,6 +426,10 @@ At this checkpoint, require [editorial compliance](#editorial-compliance) and
 Review's [reference-coverage result](#manuscript-reference-coverage) for the same
 source revision as Prose.
 
+Judge sentence links by **reader expectations** (Gopen and Swan 1990), as
+principles rather than rules: old information opens a sentence and new,
+emphasized information closes it.
+
 Prose performs one agent-led cohesion inspection when the user asks for a final check, before
 submission or a named publication handoff. A material change to central claims,
 the abstract, conclusion, section order, or argument spine invalidates the
@@ -349,3 +470,61 @@ remains available. A second independent Prose inspection is needed only under th
 scientific risk rules or for disputed weak or broken relationships, not for
 every final prose check. Cohesion inspection does not establish scientific truth
 or replace evidence review and investigator promotion.
+
+### Revision responses and cover letters
+
+A response to referees follows **answer, then show** (Noble 2017): quote each
+comment, answer it directly, quote the changed text, and say what changed. A
+cover letter gives the editor a short summary, not a copy of the abstract: why
+this journal, what is new, and what the editor needs to route the paper (ACS
+Guide 2.4.4).
+
+### Sources
+
+Principles in the CSE writing references cite these works by author and year.
+
+- American Chemical Society. *ACS Guide to Scholarly Communication.* Cited by section number. doi:10.1021/acsguide
+- Anderson, T. F.; Abrams, D. S.; Grens, E. A. Evaluation of parameters for nonlinear thermodynamic models. *AIChE J.* 1978, 24, 20. doi:10.1002/aic.690240103
+- Andrews, M. J. Guidelines for use of commercial software and diagnostics in articles for JFE. *J. Fluids Eng.* 2011, 133, 010201.
+- Barker, M. et al. Introducing the FAIR principles for research software (FAIR4RS). *Sci. Data* 2022, 9, 622. doi:10.1038/s41597-022-01710-x
+- Bazyleva, A. et al. Good reporting practice for thermophysical and thermochemical property measurements (IUPAC Technical Report). *Pure Appl. Chem.* 2021. doi:10.1515/pac-2020-0403
+- Biegler, L. T. *Nonlinear Programming: Concepts, Algorithms, and Applications to Chemical Processes.* SIAM, 2010.
+- BIPM. *The International System of Units (SI Brochure)*, 9th ed., 2019.
+- Buckheit, J. B.; Donoho, D. L. WaveLab and reproducible research. In *Wavelets and Statistics*, Springer, 1995. doi:10.1007/978-1-4612-2544-7_5
+- Celik, I. B. et al. Procedure for estimation and reporting of uncertainty due to discretization in CFD applications. *J. Fluids Eng.* 2008, 130, 078001.
+- Cohen, E. R. et al. *Quantities, Units and Symbols in Physical Chemistry* (IUPAC Green Book), 3rd ed., 2007.
+- Crameri, F.; Shephard, G. E.; Heron, P. J. The misuse of colour in science communication. *Nat. Commun.* 2020, 11, 5444. doi:10.1038/s41467-020-19160-7
+- Cummings, P. T. et al. Joint statement of editors of journals publishing thermophysical property data. *Fluid Phase Equilib.* 2009, 276, 165.
+- Ehrenberg, A. S. C. Rudiments of numeracy. *J. R. Stat. Soc. A* 1977, 140, 277.
+- Elsevier. Generative AI policies for journals, as stated in its guides for authors.
+- Gastel, B.; Day, R. A. *How to Write and Publish a Scientific Paper*, 9th ed. Cambridge University Press, 2022.
+- Goodman, S. N.; Fanelli, D.; Ioannidis, J. P. A. What does research reproducibility mean? *Sci. Transl. Med.* 2016, 8, 341ps12. doi:10.1126/scitranslmed.aaf5027
+- Gopen, G. D.; Swan, J. A. The science of scientific writing. *Am. Sci.* 1990, 78, 550.
+- Halmos, P. R. How to write mathematics. *Enseign. Math.* 1970, 16, 123.
+- Hyland, K. Writing without conviction? Hedging in science research articles. *Appl. Linguist.* 1996, 17, 433. doi:10.1093/applin/17.4.433
+- IEEE Author Center. Structure your article.
+- JCGM 100:2008. *Evaluation of Measurement Data: Guide to the Expression of Uncertainty in Measurement* (GUM). doi:10.59161/JCGM100-2008E
+- Journal of Fluids Engineering. Editorial policy statement on the control of numerical accuracy (1986; revised 1993).
+- Journal of Open Source Software. Review criteria.
+- Knuth, D. E.; Larrabee, T.; Roberts, P. M. *Mathematical Writing.* MAA Notes 14, 1989.
+- Kontogeorgis, G. M. et al. Industrial requirements for thermodynamic and transport properties: 2020. *Ind. Eng. Chem. Res.* 2021, 60, 4987. doi:10.1021/acs.iecr.0c05356
+- Mathias, P. M. Guidelines for the analysis of vapor–liquid equilibrium data. *J. Chem. Eng. Data* 2017, 62, 2231. doi:10.1021/acs.jced.7b00582
+- Mensh, B.; Kording, K. Ten simple rules for structuring papers. *PLoS Comput. Biol.* 2017, 13, e1005619. doi:10.1371/journal.pcbi.1005619
+- Mermin, N. D. What's wrong with these equations? *Phys. Today* 1989, 42(10), 9.
+- National Academies of Sciences, Engineering, and Medicine. *Reproducibility and Replicability in Science.* 2019. doi:10.17226/25303
+- NETL. *Cost Estimation Methodology for NETL Assessments of Power Plant Performance* (QGESS), NETL-PUB-22580, 2021.
+- Noble, W. S. Ten simple rules for writing a response to reviewers. *PLoS Comput. Biol.* 2017, 13, e1005730. doi:10.1371/journal.pcbi.1005730
+- Oberkampf, W. L.; Trucano, T. G. *Verification and Validation in Computational Fluid Dynamics.* SAND2002-0529, 2002. doi:10.2172/793406
+- Raue, A. et al. Structural and practical identifiability analysis of partially observed dynamical models by exploiting the profile likelihood. *Bioinformatics* 2009, 25, 1923. doi:10.1093/bioinformatics/btp358
+- Rubin, E. S. et al. A proposed methodology for CO2 capture and storage cost estimates. *Int. J. Greenh. Gas Control* 2013, 17, 488. doi:10.1016/j.ijggc.2013.06.004
+- Saltelli, A. et al. Why so many published sensitivity analyses are false. *Environ. Model. Softw.* 2019, 114, 29. doi:10.1016/j.envsoft.2019.01.012
+- Smith, A. M.; Katz, D. S.; Niemeyer, K. E. Software citation principles. *PeerJ Comput. Sci.* 2016, 2, e86. doi:10.7717/peerj-cs.86
+- Sollaci, L. B.; Pereira, M. G. The introduction, methods, results, and discussion (IMRAD) structure: a fifty-year survey. *J. Med. Libr. Assoc.* 2004, 92, 364.
+- Swales, J. M. *Genre Analysis: English in Academic and Research Settings.* Cambridge University Press, 1990.
+- Taylor, B. N.; Kuyatt, C. E. *Guidelines for Evaluating and Expressing the Uncertainty of NIST Measurement Results.* NIST TN 1297, 1994. doi:10.6028/NIST.TN.1297
+- Thol, M. et al. EOS-LNG: a fundamental equation of state for the calculation of thermodynamic properties of liquefied natural gases. *J. Phys. Chem. Ref. Data* 2019, 48, 033102. doi:10.1063/1.5093800
+- Thompson, A.; Taylor, B. N. *Guide for the Use of the International System of Units (SI).* NIST SP 811, 2008.
+- TOP Guidelines (Transparency and Openness Promotion), Center for Open Science, 2025 update.
+- Whitesides, G. M. Whitesides' group: writing a paper. *Adv. Mater.* 2004, 16, 1375. doi:10.1002/adma.200400767
+- Wilkinson, M. D. et al. The FAIR guiding principles for scientific data management and stewardship. *Sci. Data* 2016, 3, 160018. doi:10.1038/sdata.2016.18
+- Zimmermann, A. W. et al. Techno-economic assessment guidelines for CO2 utilization. *Front. Energy Res.* 2020, 8, 5. doi:10.3389/fenrg.2020.00005

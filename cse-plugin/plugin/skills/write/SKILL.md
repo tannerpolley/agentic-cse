@@ -34,6 +34,7 @@ Keep verification distinct from physical validation, follow project writing
 rules, and remove internal workflow or repository language from scientific
 prose. Check terminology and banned language on every durable edit.
 
+Draft or restructure a manuscript from the [argument](../../references/workflow/scientific-writing.md#argument) principles and the [skeletons by paper type](../../references/visualize/latex-article-profiles.md#skeletons-by-paper-type).
 Write Methods for [methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility).
 
 Routine wording, citations, formatting, and local clarity edits remain here;

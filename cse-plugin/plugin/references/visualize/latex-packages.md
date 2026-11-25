@@ -332,6 +332,9 @@ one quantity and unit per column, with the unit in its header. Align numbers
 with `siunitx` S columns or right alignment and consistent precision; retain
 leading zeros. Give each discrete item one row on one line. Use sub-headers
 for a different form or unit, and a dash for an absent term, distinct from zero.
+Digits follow the uncertainty, as in
+[uncertainty statements](../workflow/scientific-writing.md#equations-quantities-and-units).
+Order rows by the scientific variable or by size, whichever the reader needs.
 Put conventions and notes in the caption or `threeparttable` notes, and use
 compact citations as sources. Set reaction rows with a single
 `$\rightleftharpoons$` glyph. Inspect rendered rows for wrapping and columns
