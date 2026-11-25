@@ -195,9 +195,9 @@ Results where a relation or set of values would be clearer as an equation,
 table, or figure.
 
 When a referee requests independent reconstruction, reproducibility, or a
-worked numerical example, check which link the reader cannot reconstruct from
-the main text. Address that exposition gap in the response and manuscript and
-check separately whether data or code availability also needs attention.
+worked numerical example, check whether the main text leaves any link unclear.
+If you find an exposition gap, address it in the response and manuscript.
+Independently assess whether data or code availability needs attention.
 
 #### Example: heater operating cost
 
