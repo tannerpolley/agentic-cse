@@ -8,7 +8,7 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model, scientific-method]
-    conditional: [scientific-writing]
+    conditional: [scientific-writing, numerical-testing]
 ---
 
 # Write papers
@@ -37,6 +37,7 @@ handing back, run `python3 <plugin>/scripts/workflow/check_prose.py --root <proj
 on the draft, where `<plugin>` is the directory holding `skills/`.
 
 Draft or restructure a manuscript from the [argument](../../references/workflow/scientific-writing.md#argument) principles, the [structure](../../references/visualize/latex-article-profiles.md#structure), and the [skeletons by paper type](../../references/visualize/latex-article-profiles.md#skeletons-by-paper-type).
+Report numerical work in [proportion](../../references/workflow/numerical-testing.md#fitness-for-purpose).
 Write Methods for [methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility),
 notation and numbers by [equations, quantities, and units](../../references/workflow/scientific-writing.md#equations-quantities-and-units),
 availability statements by [data, code, and software](../../references/workflow/scientific-writing.md#data-code-and-software),

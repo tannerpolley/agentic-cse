@@ -54,8 +54,9 @@ return `CSE prose is clear.` without rewriting. Inspect writing for:
 - departures from the named principles from [Argument](#argument) through
   [Data, code, and software](#data-code-and-software), and from the display and
   caption rules in [shared article requirements](../visualize/latex-article-profiles.md#shared-article-requirements),
-  including **disproportion**: manuscript text that reports roundoff-scale
-  bookkeeping or repeats one limitation ([fitness for purpose](numerical-testing.md#fitness-for-purpose)).
+  including **disproportion** under its [named forms](numerical-testing.md#fitness-for-purpose),
+  such as manuscript text that reports roundoff-scale bookkeeping or repeats
+  one limitation.
 
 These patterns are not evidence of authorship. Prose returns no AI probability,
 detector score, or authorship verdict and does not optimize text for a detector.
@@ -547,6 +548,7 @@ Principles in the CSE writing references cite these works by author and year.
 - NETL. *Cost Estimation Methodology for NETL Assessments of Power Plant Performance* (QGESS), NETL-PUB-22580, 2021.
 - Noble, W. S. Ten simple rules for writing a response to reviewers. *PLoS Comput. Biol.* 2017, 13, e1005730. doi:10.1371/journal.pcbi.1005730
 - Oberkampf, W. L.; Trucano, T. G. *Verification and Validation in Computational Fluid Dynamics.* SAND2002-0529, 2002. doi:10.2172/793406
+- Parkinson, C. N. *Parkinson's Law, and Other Studies in Administration.* Houghton Mifflin, 1957.
 - Raue, A. et al. Structural and practical identifiability analysis of partially observed dynamical models by exploiting the profile likelihood. *Bioinformatics* 2009, 25, 1923. doi:10.1093/bioinformatics/btp358
 - Rubin, E. S. et al. A proposed methodology for CO2 capture and storage cost estimates. *Int. J. Greenh. Gas Control* 2013, 17, 488. doi:10.1016/j.ijggc.2013.06.004
 - Saltelli, A. et al. Why so many published sensitivity analyses are false. *Environ. Model. Softw.* 2019, 114, 29. doi:10.1016/j.envsoft.2019.01.012

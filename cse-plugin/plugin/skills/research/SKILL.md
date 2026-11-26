@@ -8,7 +8,7 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model, scientific-method]
-    conditional: []
+    conditional: [numerical-testing]
 ---
 
 # Research sources
@@ -28,6 +28,8 @@ Confirm the claim or decision, intended use, source standard, domain limits,
 and endpoint. Search an applicable local corpus with a bounded,
 capability-aware plan; stop when the source question is answered, the corpus
 is unavailable, or further results would not discriminate a real uncertainty.
+When comparing sources or values, differences inside the stated uncertainty
+are agreement ([fitness for purpose](../../references/workflow/numerical-testing.md#fitness-for-purpose)).
 Add a query only when it tests a named unresolved source question. Do not use a
 fixed command or query count as a substitute for that stopping condition.
 

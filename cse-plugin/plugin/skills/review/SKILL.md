@@ -53,7 +53,8 @@ lenses.
 selected renders. Establish whether each claim follows from the numbers,
 provenance, units, uncertainty, and intended-use limits. For figures and
 table-only exceptions, activate the rule's owner, [analysis-sets](../../references/workflow/analysis-sets.md).
-Flag as **disproportion** any stop, gate, rerun, or claim that rests on an
+Flag as **disproportion**, named as false precision, bikeshedding, or
+gold-plating, any stop, gate, rerun, or claim that rests on an
 [immaterial difference](../../references/workflow/numerical-testing.md#fitness-for-purpose),
 such as "not converged" from an objective tolerance while the parameters are
 unchanged at their standard error; the correction is to delete it, move it to

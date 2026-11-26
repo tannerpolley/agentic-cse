@@ -135,7 +135,20 @@ not diligence; it costs time and buries the argument, and comparable papers
 do not report it. A rounding-level value, such as a residual or a sign
 undecided at the roundoff of the computed quantity, is zero for every
 scientific purpose: treat it by the method's guarantee or its working
-precision, never as an open question.
+precision, never as an open question. Pursuing an immaterial difference,
+**disproportion**, takes three forms:
+
+- **False precision:** digits, residuals, or tolerances finer than anything
+  that matters, such as 10⁻¹³ residuals or "agreeing to 7 × 10⁻¹²" in a paper,
+  or a fit called "not converged" from an objective tolerance while its
+  parameters are unchanged at their standard error.
+- **Bikeshedding** (Parkinson 1957, law of triviality): stops, owner
+  questions, or long discussion over trivia that are easy to argue about, such
+  as an owner gate over stability searches whose residuals sit just above the
+  solver tolerance.
+- **Gold-plating:** gates, reruns, certificates, or caveats the result does not
+  need, such as a gate that holds refits whose parameters moved by a
+  ten-thousandth of a standard error.
 
 ## Test order
 

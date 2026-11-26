@@ -53,8 +53,8 @@ Hunt for:
   configuration with no scientific or user-facing reader;
 - software-oriented checks or process-first notebooks that replace an actual
   calculation, result table, diagnostic, uncertainty, or interpretation;
-- disproportion: owner questions, stage stops, gates, or reruns whose options
-  or outcomes differed by less than the
+- disproportion (bikeshedding or gold-plating): owner questions, stage stops,
+  gates, or reruns whose options or outcomes differed by less than the
   [materiality scale](../../references/workflow/numerical-testing.md#fitness-for-purpose); and
 - existing generators, templates, or check seams that repeatedly recreate or
   permit the same problem.

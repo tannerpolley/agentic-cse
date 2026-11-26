@@ -25,7 +25,9 @@ Define the question, model, assumptions, inputs, domain, method, sources,
 reference cases, outputs, claims, limitations, and checks. Name a correctness
 check where code correctness is at stake and the comparisons a result will be
 reported against under the
-[tolerance rule](../../references/workflow/numerical-testing.md#tolerances). For
+[tolerance rule](../../references/workflow/numerical-testing.md#tolerances).
+Set a plan's acceptance checks and stops at the
+[materiality scale](../../references/workflow/numerical-testing.md#fitness-for-purpose), never at an agent-chosen epsilon. For
 candidate models, follow
 [Model adoption and comparison](../../references/workflow/scientific-method.md#model-adoption-and-comparison).
 Preserve a physical finding that meets the

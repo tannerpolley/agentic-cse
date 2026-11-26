@@ -24,7 +24,8 @@ distinction or the smallest bounded next probe.
 Activate [scientific-method](../../references/workflow/scientific-method.md) when equations, units, basis, validity, or claim
 limits are in dispute. Activate [numerical-testing](../../references/workflow/numerical-testing.md) for a reference case,
 invariant, or convergence check. Apply its [tolerance rule](../../references/workflow/numerical-testing.md#tolerances)
-before diagnosing a missed limit.
+before diagnosing a missed limit. A discrepancy at working precision is not a
+failure to diagnose: confirm its scale by [fitness for purpose](../../references/workflow/numerical-testing.md#fitness-for-purpose) and stop.
 
 For [test, CI, or run failures](../../references/workflow/failure-triage.md#triage-test-ci-and-run-failures),
 apply the shared triage rule. For a numerical case, reproduce the disagreement
