@@ -150,6 +150,10 @@ precision, never as an open question. Pursuing an immaterial difference,
   need, such as a gate that holds refits whose parameters moved by a
   ten-thousandth of a standard error.
 
+Materiality cuts both ways: a solver status or a missed agent-chosen tolerance
+does not make a failure either. A case is reported as failed only with
+[numerical proof of its cause](failure-triage.md#bound-the-claim).
+
 ## Test order
 
 1. Encode the result-level expectation and show that the absent or faulty implementation cannot satisfy it.

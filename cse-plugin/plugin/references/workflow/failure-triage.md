@@ -78,6 +78,22 @@ supports only what it directly identifies. Before generalizing from one case,
 run a bounded direct or neighboring-state probe when safe and scientifically
 relevant; if that is impossible, state why.
 
+**A failure needs numerical proof of its cause.** A solver status
+("local infeasibility", "maximum iterations", "restoration failed"), an
+exit code, or a miss of an agent-chosen tolerance only says that something
+got in the way; it is not a finding that the case cannot converge or has no
+feasible design. Before a case is reported as nonconverged, infeasible, or
+undecided, read what the method actually returned: the final residual,
+constraint violation, or objective change and its size against the
+[materiality scale](numerical-testing.md#fitness-for-purpose), and the
+mechanism, such as a Jacobian that stays singular or ill-conditioned after
+scaling (with its condition number), a constraint violation that will not
+reduce, an active bound, a discontinuity, or a start outside the basin. If the
+returned point satisfies the equations to within that scale, it converged for
+every practical purpose and the status was wrong. If the mechanism is fixable,
+it is a defect to fix, as above. Only a case with a demonstrated mechanism is
+a numerical non-result, and it is reported with that mechanism.
+
 Once at least one useful result exists, failed or incomplete cases may remain
 in the retained analysis to bound coverage. Distinguish execution boundaries,
 numerical nonconvergence, invalid physical states, and disagreement with a
