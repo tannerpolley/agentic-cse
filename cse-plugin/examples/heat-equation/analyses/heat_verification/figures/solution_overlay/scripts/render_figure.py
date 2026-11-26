@@ -13,6 +13,7 @@ style = yaml.safe_load((OUTPUT / "solution_overlay.mpl.yaml").read_text())["matp
 plt.rcParams.update(
     {
         "font.family": "serif",
+        "pdf.fonttype": 42,
         "axes.spines.top": False,
         "axes.spines.right": False,
         "svg.hashsalt": "cse-heat-equation-example",
