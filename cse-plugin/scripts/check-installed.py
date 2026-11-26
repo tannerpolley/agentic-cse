@@ -53,7 +53,10 @@ def claude_copies(claude: str, refresh: bool) -> list[dict]:
                 continue
             if refresh:
                 run(home, "update", "cse@cse", "--scope", entry["scope"], "--json", cwd=project)
-            if runtime_payload(Path(entry["installPath"])) != source:
+            installed = runtime_payload(Path(entry["installPath"]))
+            # Claude Code leaves this marker in a cache it refreshes in place; it is not plugin content.
+            installed.pop(".orphaned_at", None)
+            if installed != source:
                 raise RuntimeError(f"Claude copy {entry['installPath']} ({home}, {entry['scope']}) differs from the source payload")
             report.append({"configDir": str(home), "scope": entry["scope"], "installPath": entry["installPath"], "matchesSource": True})
     return report
