@@ -82,7 +82,8 @@ From the `cse-plugin/` folder of a source checkout (not from the installed plugi
 `--check` builds and checks the Zotero runtime without changing host state.
 `--validate` requires a committed source tree, installs the Zotero runtime,
 runs the two commands above, and verifies that `cse@cse` is enabled from this
-checkout with a current cache. On failure it restores the prior Zotero runtime
+checkout with a current cache. It then refreshes and checks the
+[Claude Code copy](claude.md) the same way. On failure it restores the prior Zotero runtime
 and removes a marketplace or `cse@cse` install it created; an existing
 `cse@cse` keeps the refreshed cache because a local marketplace keeps no prior
 copy. Both modes report the source commit and payload hash for content

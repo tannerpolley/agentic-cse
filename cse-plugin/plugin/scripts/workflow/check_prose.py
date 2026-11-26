@@ -244,18 +244,31 @@ IDENTIFIERS = {
     "issue/PR": r"(?i:\b(?:issue|pr)\s*#?\s*\d+\b)",
     "run/fit label": r"(?<![\w/])(?:F|A)\d+(?:[-–](?:[FA])?\d+)?(?![\w/])",
     "hash": r"(?i:\b(?:commit|sha-?256)(?:\s+(?:hash|prefix))?\s*[:=]?\s*[0-9a-f]{6,64}\b|(?<!\w)(?:[0-9a-f]{40}|[0-9a-f]{64})(?!\w))",
-    "repository path": r"(?<![\w/:])(?:\.{1,2}/|/)?(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]+(?![\w/])",
+    "repository path": r"(?<![\w/:])(?:\.{1,2}/|/)?(?:[A-Za-z0-9_.-]+/)+[A-Za-z0-9_.-]*[A-Za-z0-9_-](?![\w/])",
 }
+# Code-style numbers in prose (scientific-writing.md#equations-quantities-and-units).
+PRINT_FORM = re.compile(r"(?<![\w.])(?:0|[1-9]\d*)(?:\.\d+)?[eE][-+]?\d+(?![\w.])|\d\s*\*\s*\d|(?<![\w.])\d+(?:\.\d+)?[kM](?!\w)")
+SUPERSCRIPT = str.maketrans("⁻⁰¹²³⁴⁵⁶⁷⁸⁹", "-0123456789")
+# A magnitude written as mantissa × 10^exponent, E-notation, Unicode superscripts, or a long decimal.
+MAGNITUDE = re.compile(
+    r"(?<![\w.])(?:(?P<m>\d+(?:\.\d+)?)\s*(?:\\times|\\cdot|×|·)\s*)?10\s*"
+    r"(?:\^\s*\{?\s*(?P<e>[-−]\s*\d+)|(?P<u>⁻[⁰¹²³⁴⁵⁶⁷⁸⁹]+))"
+    r"|(?<![\w.])(?P<em>\d+(?:\.\d+)?)[eE](?P<ee>-\d+)(?![\w.])"
+    r"|(?<![\w.])(?P<d>0\.0{5,}\d+)")
+ROUNDOFF_CONTEXT = re.compile(r"(?i)\b(?:residual|toleran|numerical\s+error|round|converg|agree|differ|certificat)")
 
 
 def hide(pattern, text, flags=0):
     return re.sub(pattern, lambda m: re.sub(r"[^\n]", " ", m[0]), text, flags=flags)
 
 
-def visible_lines(text, suffix):
-    """Bounded source extraction; masking retains source line numbers."""
+def visible_lines(text, suffix, math=False):
+    """Bounded source extraction; masking retains source line numbers.
+
+    math=True keeps math and quantity-macro arguments for the roundoff advisory."""
     text = hide(r"<!--.*?-->", text, re.S) if suffix != ".tex" else text
-    text = hide(r"(?s)\$\$.*?\$\$|(?<!\\)\$[^$]*\$|\\\(.*?\\\)|\\\[.*?\\\]", text)
+    if not math:
+        text = hide(r"(?s)\$\$.*?\$\$|(?<!\\)\$[^$]*\$|\\\(.*?\\\)|\\\[.*?\\\]", text)
     fence = environment = None
     metadata = False
     caption = False
@@ -278,7 +291,8 @@ def visible_lines(text, suffix):
             # shortcut: single-line arguments only; inspect assembled output for macros or multiline arguments.
             line = re.sub(r"\\[A-Za-z]*cite[A-Za-z]*\*?(?:\[([^]]*)\])?\{[^}]*\}", lambda m: m[1] or "", line)
             line = hide(r"\\(?:label|(?:eq|auto|page|[cC])?ref|[A-Za-z]*cite[A-Za-z]*|include(?:graphics)?|input|bibliography|usepackage|(?:re)?newcommand|providecommand)\*?(?:\[[^]]*\])*\{[^}]*\}(?:\[[^]]*\])?(?:\{[^}]*\})?", line)
-            line = hide(r"\\(?:ce|ch|si|SI|unit)(?:\[[^]]*\])*\{[^}]*\}(?:\{[^}]*\})?", line)
+            quantities = "" if math else "|si|SI|unit|num|qty|numrange|qtyrange|tablenum|ang"
+            line = hide(r"\\(?:ce|ch" + quantities + r")(?:\[[^]]*\])*\{[^}]*\}(?:\{[^}]*\}){0,2}", line)
             line = hide(r"\\href\{[^}]*\}", line)
             line = hide(r"\\[A-Za-z]+\*?\{", line).replace("}", " ")
             line = line.replace(r"\#", "#").replace(r"\_", "_")
@@ -381,6 +395,36 @@ def scientific_approvals(root, path, warnings):
     return approved
 
 
+def magnitude(match):
+    if match["d"]:
+        return float(match["d"])
+    if match["em"]:
+        return float(match["em"]) * 10 ** int(match["ee"])
+    exponent = match["e"] or match["u"].translate(SUPERSCRIPT)
+    return float(match["m"] or 1) * 10 ** int(re.sub(r"\s", "", exponent).replace("−", "-"))
+
+
+def numerical_warnings(path, lines, numeric_lines):
+    """Advisories for code-style numbers and roundoff-scale detail; never failures."""
+    for location, line in lines:
+        if line is None:
+            continue
+        line = hide(r"(?:[A-Za-z][\w+.-]*://|www\.)\S+|\b10\.\d{4,9}/[^\s}]+|`[^`]*`", line)
+        for match in PRINT_FORM.finditer(line):
+            yield f"{path}:{location}: warning: print form {match[0]!r}: write the printed number (scientific-writing.md#equations-quantities-and-units)"
+    for location, line in numeric_lines:
+        if line is None:
+            continue
+        line = hide(r"(?:[A-Za-z][\w+.-]*://|www\.)\S+|\b10\.\d{4,9}/[^\s}]+", line)
+        for match in MAGNITUDE.finditer(line):
+            if 0 < magnitude(match) <= 1e-6 and ROUNDOFF_CONTEXT.search(line[max(0, match.start() - 80):match.end() + 80]):
+                value = re.sub(r"\{\s*(?=[-−])", "", match[0].strip())
+                yield (f"{path}:{location}: warning: roundoff-scale numerical detail '{value}' in a deliverable: "
+                       "does it change a reported value, a conclusion or a decision? If not, move it to the record "
+                       "(numerical-testing.md#fitness-for-purpose)")
+                break
+
+
 def identifier_warnings(paths, *, root=None):
     root = root or Path.cwd()
     warnings = []
@@ -392,11 +436,13 @@ def identifier_warnings(paths, *, root=None):
             approved = scientific_approvals(root, path, warnings)
             suffix = path.suffix.lower()
             if suffix == ".pptx":
-                lines = slide_text(path)
+                lines = numeric_lines = list(slide_text(path))
             elif suffix == ".py":
-                lines = figure_text(path)
+                lines = numeric_lines = list(figure_text(path))
             else:
-                lines = visible_lines(path.read_text(encoding="utf-8"), suffix)
+                text = path.read_text(encoding="utf-8")
+                lines = list(visible_lines(text, suffix))
+                numeric_lines = visible_lines(text, suffix, math=True)
             for location, line in lines:
                 if line is None:
                     warnings.append(f"{path}:{location}: incomplete scan: dynamic figure label; inspect assembled figure")
@@ -420,6 +466,7 @@ def identifier_warnings(paths, *, root=None):
                             if not (known_start or known_suffix):
                                 continue
                         warnings.append(f"{path}:{location}: warning: {category} {value!r} (scientific-writing.md#reader-facing-identifiers)")
+            warnings.extend(numerical_warnings(path, lines, numeric_lines))
         except (OSError, UnicodeError, ValueError, SyntaxError, zipfile.BadZipFile, ET.ParseError, RuntimeError) as error:
             warnings.append(f"{path}: incomplete scan: {error}")
     return warnings
@@ -453,7 +500,7 @@ def main() -> int:
     if failures:
         print("\n".join(failures))
         return 1
-    print("Identifier advisories require inspection; terminology checks passed." if warnings else "Prose check passed for plugin-wide and scoped rules.")
+    print("Advisories require inspection; terminology checks passed." if warnings else "Prose check passed for plugin-wide and scoped rules.")
     return 0
 
 

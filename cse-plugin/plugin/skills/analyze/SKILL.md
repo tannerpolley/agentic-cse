@@ -49,7 +49,9 @@ question, and distinguish numerical error, source uncertainty, model
 discrepancy, and named limits for the intended use. Show the best useful result
 in numbers and a figure where applicable. Use the
 [tolerance rule](../../references/workflow/numerical-testing.md#tolerances)
-for agreement with data or a missed limit. Follow
+for agreement with data or a missed limit. Before interpreting or chasing a
+residual, a deviation between runs or builds, or a convergence shortfall, apply
+[fitness for purpose](../../references/workflow/numerical-testing.md#fitness-for-purpose). Follow
 [Model adoption and comparison](../../references/workflow/scientific-method.md#model-adoption-and-comparison)
 when comparing or deciding whether to adopt a candidate.
 

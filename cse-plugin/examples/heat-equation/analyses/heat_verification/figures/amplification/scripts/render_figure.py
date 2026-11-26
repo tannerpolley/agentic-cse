@@ -13,6 +13,7 @@ style = yaml.safe_load((OUTPUT / "amplification.mpl.yaml").read_text())["matplot
 plt.rcParams.update(
     {
         "font.family": "serif",
+        "pdf.fonttype": 42,
         "axes.spines.top": False,
         "axes.spines.right": False,
         "svg.hashsalt": "cse-heat-equation-example",

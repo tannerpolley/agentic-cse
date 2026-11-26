@@ -269,8 +269,10 @@ if [[ "${CSE_FAIL_AT:-}" == "late:after-install" ]]; then
   exit 1
 fi
 
-python3 "$repository_root/scripts/check-installed.py"
+# Refresh each Claude Code copy from this checkout, then check Codex and Claude
+# copies against the source payload. A refreshed Claude copy is not rolled back.
+python3 "$repository_root/scripts/check-installed.py" --refresh-claude
 committed=1
 refresh_installed_hooks || echo "Installed CSE hook refresh failed (exit $?); installation itself succeeded." >&2
 identity_json "installed wheel and schema checks passed"
-echo "Installed cse@cse from the repository marketplace and the Zotero runtime."
+echo "Installed cse@cse from the repository marketplace (Codex, and Claude Code where registered) and the Zotero runtime."

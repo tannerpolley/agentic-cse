@@ -78,7 +78,7 @@ select the relevant investigator-promoted results and write a separate manuscrip
 Use the applicable subset in this order:
 
 1. title, a specific label for the central contribution without novelty
-   adjectives or specific results, whose first phrase sets its emphasis (ACS
+   adjectives or numerical results, whose first phrase sets its emphasis (ACS
    Guide 2.3.2), then authors, affiliations, and date;
 2. an informative abstract stating the question and the gap it fills, the
    method, principal result with conditions, and supported implication, within
@@ -117,8 +117,11 @@ papers, and departs when the argument needs to.
 
 - **Thermodynamic model:** a model section named for the theory, split by
   physics, then results in rising system complexity (pure, binary, ternary).
-- **Process, techno-economic, or optimization:** the problem statement, then
-  unit and cost models, then results by study.
+- **Process, techno-economic, or optimization:** the
+  [problem statement](../workflow/scientific-writing.md#methods-reproducibility)
+  in standard form, then unit and cost models, then results by study, with the
+  cost basis, boundary before the metric, and sensitivity versus uncertainty of
+  [manuscript writing](#manuscript-writing-and-source-organization).
 - **Rate-based column:** **validate, then use**: validation against plant or
   pilot data comes before sensitivity, design, or case studies.
 - **Software** (JOSS review criteria): need and gap against existing packages,
@@ -133,8 +136,9 @@ and conclusion and co-author contributions stated per chapter.
 
 The supplement keeps the main text readable; it is not an archive. It holds
 derivations, extra cases, full tables, data, and notebooks, each cited from the
-main text. It never holds the problem statement, the new model relations, or
-the validation behind a main claim. Reusable data also goes out as
+main text. It never holds the problem statement or the new model relations.
+The validation behind a main claim is summarized in the main text; supporting
+detail may go to the supplement. Reusable data also goes out as
 machine-readable files, because values in a PDF supplement are hard to reuse
 and get less scrutiny (ACS Guide 3.1.4).
 

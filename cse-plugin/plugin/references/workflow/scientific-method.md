@@ -60,6 +60,13 @@ statistic. Under **identifiability** (Raue et al. 2009), a fitted parameter is a
 result only if the data determine it; report its correlation or a joint region
 instead of independent ± values ([sources](scientific-writing.md#sources)).
 
+A fit is **converged for reporting** when further iterations cannot change any
+reported parameter by more than a small fraction of its standard error, or any
+prediction at its printed precision. An optimizer stopping tolerance is a
+setting, not an acceptance criterion; missing it is reported only if the
+parameters or predictions are still moving on that scale
+([fitness for purpose](numerical-testing.md#fitness-for-purpose)).
+
 ## Sources
 
 Prefer primary sources, standards, accepted experiments, analytic solutions, and trusted independent implementations. Identify secondary synthesis as synthesis. Record exact page, section, equation, table, figure, or row locators for claims that drive equations, parameters, data, tolerances, or interpretation.

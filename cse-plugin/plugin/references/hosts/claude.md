@@ -84,7 +84,12 @@ claude plugin marketplace list --json
 The catalog's only entry is the local `./plugin` source. A local source can be
 observed in place during development without reinstalling; an installed
 marketplace copy still needs the host's update command when that is how it is
-loaded. `claude plugin validate plugin --json`, run from the source checkout
+loaded. The Codex [`sync-live.sh --validate`](codex.md) also runs those two
+update commands for every Claude Code config home that registers the `cse`
+marketplace (`~/.claude` and `~/.t3/provider-homes/claude` by default, or the
+`CSE_CLAUDE_CONFIG_DIRS` list), then checks each copy against the source
+payload; without the `claude` CLI it skips that step.
+`claude plugin validate plugin --json`, run from the source checkout
 root, is a native metadata check;
 version or author warnings do not authorize adding release numbers to the CSE
 manifests.

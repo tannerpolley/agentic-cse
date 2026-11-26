@@ -1,4 +1,4 @@
-# Optional writing records
+# Scientific writing
 
 When writing is selected, the committed bibliography snapshot lives under
 `docs/scientific/latex/references.bib`. Refresh it only through the approved
@@ -17,8 +17,10 @@ bibliography snapshot by a portable relative path.
 ### Scientific prose
 
 Use `docs/scientific/writing/STYLE.md` for project-wide house style and
-document-scoped standing editorial decisions, and `RULES.md` for deterministic
-project writing rules. Do not duplicate terminology preferences there. Apply plugin-wide and scoped prose checks, citations, structure, and the
+document-scoped standing editorial decisions; do not duplicate terminology
+preferences there. Deterministic project avoid rules live only in the
+`## Prose avoid rules` table that `check_prose.py` reads
+([scientific project records](scientific-projects.md)). Apply plugin-wide and scoped prose checks, citations, structure, and the
 selected document profile when a notebook or manuscript is prepared.
 Write direct, active, specific prose and preserve scientific meaning,
 uncertainty, provenance, and limitations. Practice **calibrated hedging**
@@ -46,9 +48,15 @@ return `CSE prose is clear.` without rewriting. Inspect writing for:
   meta-commentary, and internal repository or workflow language;
 - synonym cycling or terminology drift for one scientific referent;
 - wording or citation scope inconsistent with an accepted claim boundary,
-  tested domain, uncertainty statement, limitation, or causal description; and
+  tested domain, uncertainty statement, limitation, or causal description;
 - over-editing that invents first person, stakes, specifics, mechanisms,
-  contrarian framing, or staccato prose.
+  contrarian framing, or staccato prose; and
+- departures from the named principles from [Argument](#argument) through
+  [Data, code, and software](#data-code-and-software), and from the display and
+  caption rules in [shared article requirements](../visualize/latex-article-profiles.md#shared-article-requirements),
+  including **disproportion** under its [named forms](numerical-testing.md#fitness-for-purpose),
+  such as manuscript text that reports roundoff-scale bookkeeping or repeats
+  one limitation.
 
 These patterns are not evidence of authorship. Prose returns no AI probability,
 detector score, or authorship verdict and does not optimize text for a detector.
@@ -87,10 +95,13 @@ request numbers, commit hashes, and repository paths need reader-facing
 inspection. A warning is a judgment call, not proof that a scientific label is
 wrong.
 
-Run `python3 <plugin>/scripts/workflow/check_prose.py --root <project> <sources>`
-on explicit manuscript sources, figure scripts, and deck `.tex`/`.pptx` files.
+Run `python3 <plugin>/scripts/workflow/check_prose.py --root <project> [--config <personal.toml>] <sources>`,
+where `<plugin>` is the directory holding `skills/`, on explicit manuscript sources, figure scripts, and deck `.tex`/`.pptx` files.
 The scan does not expand TeX includes; name supplements and included sources.
-Identifier advisories never change CLI success or block the Stop hook. Existing
+The same channel carries two numerical advisories: code-style print forms
+([numbers in print](#equations-quantities-and-units)) and roundoff-scale
+detail ([fitness for purpose](numerical-testing.md#fitness-for-purpose)).
+Advisories never change CLI success or block the Stop hook. Existing
 terminology failures still do. The hook attributes changed files to the session,
 but may miss script-generated outputs; run this explicit scan before delivery.
 
@@ -180,7 +191,7 @@ A venue requirement or standing editorial decision overrides a convention, and
 a paper departs from one when its argument needs it.
 
 - **Rule of One** (Mensh and Kording 2017, Rule 1): a paper argues one central
-  contribution, and the title carries it.
+  contribution, and the title names it without numerical results.
 - **Outline from the displays** (Whitesides 2004): plan the equations, figures,
   and tables first, ordered by importance rather than by the order the work
   was done, then write the text that explains them.
@@ -208,8 +219,8 @@ derivations from what is printed, and the software is named with its version
 paper the Methods deliver the paper's share through the model formulation: the
 governing relations in the order the calculation uses them, from the inputs to
 the reported results, including any fit objective and optimization problem.
-Write each relation as a compact displayed equation
-rather than describing it in prose. As in a degrees-of-freedom analysis, say
+Write each relation a reader needs to reconstruct the calculation as a
+compact displayed equation rather than describing it in prose. As in a degrees-of-freedom analysis, say
 which quantities each model is given and which it computes, especially where
 one model feeds another. Printed equations match what the code computes, with
 consistent units and one meaning per symbol.
@@ -228,10 +239,16 @@ consistent units and one meaning per symbol.
   design study states its given data, decisions, objective, and constraints
   once, with size and solver, and says whether the optimum is local or global.
 - **Numerical accuracy** (Journal of Fluids Engineering numerical-accuracy
-  policy; Celik et al. 2008; Andrews 2011): state the solver, tolerances, and
-  stopping criteria, and show the reported quantity is insensitive to
-  refinement. Name the property method, unit models, and correlations a
-  simulator used, and show the conditions lie within their validity ranges.
+  policy; Celik et al. 2008; Andrews 2011): give accuracy evidence suited to
+  the reported quantity, a prediction stable under refinement or, when the
+  error itself is the result, its measured convergence. In proportion, as
+  comparable papers do: the main text names the solver, its stopping
+  tolerance where the algorithm has one, and the stability method, and says in
+  one sentence how convergence was checked. Residuals, certificates, and
+  checks of identities that hold by derivation go to the supplement or deposit
+  only when a reader needs them ([fitness for purpose](numerical-testing.md#fitness-for-purpose)).
+  Name the property method, unit models, and correlations a simulator used,
+  and show the conditions lie within their validity ranges.
 - **Paper and deposit carry different halves** (Buckheit and Donoho 1995;
   National Academies 2019): the paper carries the argument and formulation, the
   deposit regenerates every number, and neither substitutes for the other.
@@ -253,7 +270,7 @@ temperatures $T_{\mathrm{in}}$ and $T_{\mathrm{out}}$ (K), the property model
 uses constant specific heat capacity $c_p$ (kJ/(kg K)).
 
 $$
-\Delta h = c_p(T_{\mathrm{out}}-T_{\mathrm{in}}).
+\Delta h = c_p(T_{\mathrm{out}}-T_{\mathrm{in}}). \tag{1}
 $$
 
 The enthalpy rise $\Delta h$ (kJ/kg) is the **property-model output** and a
@@ -261,15 +278,15 @@ The enthalpy rise $\Delta h$ (kJ/kg) is the **property-model output** and a
 thermal duty $\dot Q$ (kW).
 
 $$
-\dot Q = \dot m\,\Delta h.
+\dot Q = \dot m\,\Delta h. \tag{2}
 $$
 
 With electrical-to-thermal efficiency $\eta$ (dimensionless) and electricity
-price $p_e$ (currency/kWh), the reported operating cost rate $\dot C$ is in
-currency/h.
+price $p_e$ (2024 USD/kWh), the reported operating cost rate $\dot C$ (2024
+USD/h) follows from the duty of Eq. (2).
 
 $$
-\dot C = p_e\,\dot Q/\eta.
+\dot C = p_e\,\dot Q/\eta. \tag{3}
 $$
 
 ### Equations, quantities, and units
@@ -284,8 +301,10 @@ $$
   mostly stay in the prose. A definition after an equation uses words: "where
   $T$ is temperature", not "$T$ = temperature".
 - **Numbers in print, not in code** (ACS Guide 5.4.1, 5.4.2): a manuscript
-  writes $2.4 \times 10^{-3}$, not 2.4e-3; a multiplication sign, not an
-  asterisk; 8000, not 8k. Printed digits claim precision: 25.0 °C is not 25 °C.
+  writes $2.4 \times 10^{-3}$, not `2.4e-3`; a multiplication sign, not an
+  asterisk; 8000, not `8k`. In LaTeX the form is `\num{2.4e-3}`, which
+  typesets the printed form ([no manual unit typography](../visualize/latex-packages.md#selected-defaults)).
+  Printed digits claim precision: 25.0 °C is not 25 °C.
 - **One notation for one thing** (Halmos 1970): one meaning per symbol across
   main text and supplement, defined at first use.
 - **Quantity calculus** (BIPM SI Brochure 2019; NIST SP 811; IUPAC Green
@@ -295,9 +314,11 @@ $$
   after it, whichever the venue uses. Attaching a qualifier to the quantity
   rather than the unit is the SI and IUPAC convention; it yields to venues
   that accept forms such as "10 wt %".
-- **Uncertainty statements** (JCGM GUM 2008; NIST TN 1297): standard or
-  expanded with its coverage factor, sources justified. Digits follow the
-  uncertainty, with extra digits only for parameters a reader must reproduce.
+- **Uncertainty statements** (JCGM GUM 2008; NIST TN 1297): a measurement
+  uncertainty is standard or expanded with its coverage factor, sources
+  justified. A numerical error estimate is described by its construction,
+  assumptions, and scope. Digits follow the uncertainty, with extra digits
+  only for parameters a reader must reproduce.
 
 ### Data, code, and software
 
@@ -311,8 +332,8 @@ $$
   a result, including scripts, models, and notebooks, is cited in the reference
   list with its version and identifier. Cite the software itself, and its
   paper as well, never the paper in its place.
-- **AI disclosure belongs to the authors:** venues forbid AI authorship and
-  require disclosure. An agent records what it drafted and leaves the
+- **AI disclosure belongs to the authors:** whether and where AI use is
+  disclosed follows the venue. An agent records what it drafted and leaves the
   declaration for the authors to confirm.
 - **Every reference is real** (Elsevier generative-AI policy): each reference
   is checked to exist before submission, because generated references can be
@@ -338,12 +359,13 @@ authors: its limits and required statements are requirements, and where it is
 silent the paper decides. Record those that shape the paper in the document's
 [STYLE section](#standing-editorial-decisions).
 
-Give three independent read-only structure reviewers the same brief and distinct
-identities. One reviewer is enough for a small journal retarget without a
-structural change. Supply the target journal, owner-named model papers, prior
+Size the number of independent read-only structure reviewers to the change:
+several for a new or rejected manuscript, one for a small journal retarget
+without a structural change. Each gets the same brief and a distinct identity
+and judges independently. Supply the target journal, owner-named model papers, prior
 accepted version, source collection, owner rules, and accepted evidence. Each
 reviewer returns a diagnosis tracing the root cause to planning records,
-**measured model papers** (the owner-named model paper and two or three recent
+**measured model papers** (the owner-named model paper and a few recent
 papers of its type and venue, mapped by headings, where the model sits, and
 what the supplement holds, not from memory), a literature plan with existing
 citation keys, an outline, a jargon list, and only blocking questions.
@@ -356,10 +378,13 @@ Put story order there, not in `STYLE.md`. One writer then rewrites from the plan
 After the rewrite, two independent reviewers work in parallel. The science-support
 reviewer applies Review's Result lens to every displayed number and cited claim
 against retained files and cited sources, providing exact replacement text,
-and checks [manuscript reference coverage](#manuscript-reference-coverage) and
-[methods reproducibility](#methods-reproducibility). The
+and checks [manuscript reference coverage](#manuscript-reference-coverage),
+[methods reproducibility](#methods-reproducibility),
+[equations, quantities, and units](#equations-quantities-and-units), and
+[data, code, and software](#data-code-and-software). The
 reader-story reviewer applies the final manuscript checkpoint below and checks
-figures, tables, abstract, paragraph placement, and internal language. Write
+figures, tables, [captions](../visualize/latex-article-profiles.md#shared-article-requirements),
+abstract, paragraph placement, and internal language. Write
 applies their fixes as given; science support wins a conflict. Write then makes
 one verification read.
 
@@ -420,7 +445,10 @@ literature-search gate to routine rendering.
 Routine revisions and builds need only the project's existing structural and
 rendering checks: stable unique paragraph identifiers, reconstructable order,
 one sentence per source line, blank-line paragraph boundaries, and resolved
-references, labels, and citations. These checks do not judge the argument.
+references, labels, and citations, read from the final build log by the
+[log check](../visualize/latex-layout-and-qa.md#release-sequence) because a
+LaTeX build can succeed with them unresolved. These checks do not judge the
+argument.
 
 At this checkpoint, require [editorial compliance](#editorial-compliance) and
 Review's [reference-coverage result](#manuscript-reference-coverage) for the same
@@ -440,7 +468,9 @@ do not trigger it or block a routine build.
 Read the authoritative assembled manuscript, including selected inputs and
 appendices. Bind the review to its current source identity and ordered stable
 paragraph identifiers; derive sentence identifiers from paragraph order.
-Record compact judgments rather than copying the manuscript:
+Inspect the whole manuscript, and record the exact weak or broken links with
+their consequences. A full map in compact judgments, rather than a copy of the
+manuscript, is used when it helps diagnose the paper, not required every time:
 
 - Each sentence: short idea label and role in its paragraph.
 - Each adjacent sentence pair: clear, weak, or broken; explain non-clear links.
@@ -474,7 +504,8 @@ or replace evidence review and investigator promotion.
 ### Revision responses and cover letters
 
 A response to referees follows **answer, then show** (Noble 2017): quote each
-comment, answer it directly, quote the changed text, and say what changed. A
+comment and answer it directly. Where the text changed, quote the changed text
+and say what changed; otherwise give the answer with its evidence. A
 cover letter gives the editor a short summary, not a copy of the abstract: why
 this journal, what is new, and what the editor needs to route the paper (ACS
 Guide 2.4.4).
@@ -497,11 +528,13 @@ Principles in the CSE writing references cite these works by author and year.
 - Cummings, P. T. et al. Joint statement of editors of journals publishing thermophysical property data. *Fluid Phase Equilib.* 2009, 276, 165.
 - Ehrenberg, A. S. C. Rudiments of numeracy. *J. R. Stat. Soc. A* 1977, 140, 277.
 - Elsevier. Generative AI policies for journals, as stated in its guides for authors.
+- Eurachem. Magnusson, B.; Örnemark, U., Eds. *The Fitness for Purpose of Analytical Methods: A Laboratory Guide to Method Validation and Related Topics*, 2nd ed., 2014.
 - Gastel, B.; Day, R. A. *How to Write and Publish a Scientific Paper*, 9th ed. Cambridge University Press, 2022.
 - Goodman, S. N.; Fanelli, D.; Ioannidis, J. P. A. What does research reproducibility mean? *Sci. Transl. Med.* 2016, 8, 341ps12. doi:10.1126/scitranslmed.aaf5027
 - Gopen, G. D.; Swan, J. A. The science of scientific writing. *Am. Sci.* 1990, 78, 550.
 - Halmos, P. R. How to write mathematics. *Enseign. Math.* 1970, 16, 123.
 - Hyland, K. Writing without conviction? Hedging in science research articles. *Appl. Linguist.* 1996, 17, 433. doi:10.1093/applin/17.4.433
+- IAASB. *International Standard on Auditing 320: Materiality in Planning and Performing an Audit.*
 - IEEE Author Center. Structure your article.
 - JCGM 100:2008. *Evaluation of Measurement Data: Guide to the Expression of Uncertainty in Measurement* (GUM). doi:10.59161/JCGM100-2008E
 - Journal of Fluids Engineering. Editorial policy statement on the control of numerical accuracy (1986; revised 1993).
@@ -515,6 +548,7 @@ Principles in the CSE writing references cite these works by author and year.
 - NETL. *Cost Estimation Methodology for NETL Assessments of Power Plant Performance* (QGESS), NETL-PUB-22580, 2021.
 - Noble, W. S. Ten simple rules for writing a response to reviewers. *PLoS Comput. Biol.* 2017, 13, e1005730. doi:10.1371/journal.pcbi.1005730
 - Oberkampf, W. L.; Trucano, T. G. *Verification and Validation in Computational Fluid Dynamics.* SAND2002-0529, 2002. doi:10.2172/793406
+- Parkinson, C. N. *Parkinson's Law, and Other Studies in Administration.* Houghton Mifflin, 1957.
 - Raue, A. et al. Structural and practical identifiability analysis of partially observed dynamical models by exploiting the profile likelihood. *Bioinformatics* 2009, 25, 1923. doi:10.1093/bioinformatics/btp358
 - Rubin, E. S. et al. A proposed methodology for CO2 capture and storage cost estimates. *Int. J. Greenh. Gas Control* 2013, 17, 488. doi:10.1016/j.ijggc.2013.06.004
 - Saltelli, A. et al. Why so many published sensitivity analyses are false. *Environ. Model. Softw.* 2019, 114, 29. doi:10.1016/j.envsoft.2019.01.012

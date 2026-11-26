@@ -35,9 +35,9 @@ for corrections, route them to `cse:write`; Prose does not edit. Write may
 request one verification inspection after its minimum effective change.
 
 For an explicit final manuscript check, inspect the authoritative assembled
-source and use the source-identity, complete identifier coverage,
-sentence-to-paragraph-to-section judgments, and argument-spine checkpoint in
-[scientific-writing](../../references/workflow/scientific-writing.md). Return **Revise** with exact identifiers for stale
+source and use the source-identity, whole-manuscript inspection, exact weak
+links, and argument-spine checkpoint in
+[scientific-writing](../../references/workflow/scientific-writing.md#final-manuscript-checkpoint). Return **Revise** with exact identifiers for stale
 identity, missing coverage, or unresolved weak or broken relationships. The
 routine clear message is not a final-check result. Report exact
 [editorial violations](../../references/workflow/scientific-writing.md#editorial-compliance) and follow the shared

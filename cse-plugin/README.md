@@ -17,8 +17,9 @@ the payload; ScienceBench owns live workflow and routing evaluation.
 - Selected rendering check: `python -m unittest discover -s tests/integration -p 'test_rendering.py' -v`
 - Codex runtime check: `./scripts/sync-live.sh --check` builds a task-owned Zotero wheel and verifies its CLI
   schemas. It is not the offline source command.
-- Explicit reviewed Codex installation: `./scripts/sync-live.sh --validate` installs the Zotero runtime and
-  `cse@cse` from this repository's marketplace, the same catalog Claude Code uses.
+- Explicit reviewed installation: `./scripts/sync-live.sh --validate` installs the Zotero runtime and
+  `cse@cse` from this repository's marketplace into Codex, and refreshes registered Claude Code copies from
+  the same catalog.
 
 Prepare source-validation dependencies once without changing host state:
 

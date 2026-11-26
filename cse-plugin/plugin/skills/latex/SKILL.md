@@ -36,6 +36,7 @@ the complete output at intended size.
 For manuscript release completion, follow
 [release build verification](../../references/visualize/rendering-guide.md#release-build-verification).
 Verify embedded fonts are vector using the
-[font check](../../references/visualize/latex-layout-and-qa.md#release-sequence).
+[font check](../../references/visualize/latex-layout-and-qa.md#release-sequence),
+and read the final log for undefined references and citations with its log check.
 Return sources, outputs, commands, retained paths, and limitations. Material
 document or figure changes return to core CSE Review.

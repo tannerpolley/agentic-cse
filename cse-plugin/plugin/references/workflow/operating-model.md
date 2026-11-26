@@ -109,6 +109,9 @@ choice remains, continue without a ritual question. Obtain confirmation before
 a nontrivial mutation unless the request already grants that authority.
 
 If an option sets a numerical gate, state its origin in the option text.
+Never bring the owner a choice whose options differ by less than the
+[materiality scale](numerical-testing.md#fitness-for-purpose): choose, report
+the difference in one line, and continue.
 
 Before the first scientific write, state the selected starting stage and one
 sentence explaining why it owns the unresolved question. Use approved defaults
@@ -137,7 +140,8 @@ the scientific model. Every material output returns to Review.
 
 Continue through the stages needed for the selected endpoint. Stop for a
 material decision, missing authority, unavailable required input or tool, unsafe
-Git state, or an unresolved scientific contradiction. Report the evidence,
+Git state, or an unresolved scientific contradiction. A numerical difference
+warrants a stop only when it changes a result. Report the evidence,
 limitation, and smallest next decision.
 
 A missing external capability is a capability limitation, not a scientific
