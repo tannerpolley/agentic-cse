@@ -93,6 +93,9 @@ Run these gates in order. A later gate does not excuse an earlier failure.
    [release build verification](rendering-guide.md#release-build-verification)
    for manuscript/deck releases. Inspect generated `.tex` when Pandoc, package
    order, or class behavior is uncertain; reject font substitutions.
+   `latexmk` exits 0 with undefined references and citations, so require
+   `rg -n 'Citation.*undefined|There were undefined references' <build>.log`
+   to print nothing on the final log.
 3. **Fonts:** require `pdffonts <pdf> | grep -c 'Type 3'` to report 0. Attribute any Type 3 font to its source, including embedded figures, and fix it before release. For pdfLaTeX, `grep -E '\.[0-9]+pk' <build>.log` helps diagnose bitmap fallback but cannot check other engines.
 4. **Automated visual QA:** run `scripts/visualize/latex_visual_qa.py` on each final PDF.
    It checks text-to-text and text-to-vector geometry, renders color and

@@ -32,10 +32,16 @@ otherwise return it to the investigator as a blocker with its record locator
 and leave that sentence unwritten.
 Keep verification distinct from physical validation, follow project writing
 rules, and remove internal workflow or repository language from scientific
-prose. Check terminology and banned language on every durable edit.
+prose. Check terminology and banned language on every durable edit: before
+handing back, run `python3 <plugin>/scripts/workflow/check_prose.py --root <project> <sources>`
+on the draft, where `<plugin>` is the directory holding `skills/`.
 
-Draft or restructure a manuscript from the [argument](../../references/workflow/scientific-writing.md#argument) principles and the [skeletons by paper type](../../references/visualize/latex-article-profiles.md#skeletons-by-paper-type).
-Write Methods for [methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility).
+Draft or restructure a manuscript from the [argument](../../references/workflow/scientific-writing.md#argument) principles, the [structure](../../references/visualize/latex-article-profiles.md#structure), and the [skeletons by paper type](../../references/visualize/latex-article-profiles.md#skeletons-by-paper-type).
+Write Methods for [methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility),
+notation and numbers by [equations, quantities, and units](../../references/workflow/scientific-writing.md#equations-quantities-and-units),
+availability statements by [data, code, and software](../../references/workflow/scientific-writing.md#data-code-and-software),
+displays and captions by the [shared article requirements](../../references/visualize/latex-article-profiles.md#shared-article-requirements),
+and referee responses and cover letters by [revision responses](../../references/workflow/scientific-writing.md#revision-responses-and-cover-letters).
 
 Routine wording, citations, formatting, and local clarity edits remain here;
 rendering does not require a Prose cohesion inspection. Apply the

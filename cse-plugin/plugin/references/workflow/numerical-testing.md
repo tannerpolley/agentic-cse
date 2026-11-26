@@ -121,6 +121,22 @@ check's metric and units using a justified quantity scale for absolute error.
 A difference within the bound passes the precision check. Note the difference
 and the bound. Require exact equality only where the method guarantees it.
 
+### Fitness for purpose
+
+**Fitness for purpose (materiality)** (Eurachem 2014; IAASB ISA 320): before a
+difference earns a stop, an owner question, a gate, a rerun, or a sentence in a
+deliverable, compare it with the scale that matters for the result:
+measurement uncertainty, the parameter's standard error, the printed precision
+of the reported value, or the decision it would change. A difference that
+cannot change a reported number at its printed precision, a conclusion, or a
+decision is **immaterial**: record it in one line in the run record if at all,
+and move on. Pursuing it is a defect that misses the point of the research,
+not diligence; it costs time and buries the argument, and comparable papers
+do not report it. A rounding-level value, such as a residual or a sign
+undecided at the roundoff of the computed quantity, is zero for every
+scientific purpose: treat it by the method's guarantee or its working
+precision, never as an open question.
+
 ## Test order
 
 1. Encode the result-level expectation and show that the absent or faulty implementation cannot satisfy it.

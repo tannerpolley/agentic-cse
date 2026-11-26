@@ -136,6 +136,39 @@ ax.plot(x, y, label="A3")
             deck.write_bytes(b'broken zip')
             self.assertEqual(2, '\n'.join(identifier_warnings([script, deck], root=root)).count('incomplete scan:'))
 
+    def test_numerical_advisories_flag_print_form_and_roundoff_detail(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paper, notes, plot = root / 'paper.tex', root / 'notes.md', root / 'plot.py'
+            paper.write_text(r'''The fit uses 2.4e-3 and 3 * 4 and 8k samples.
+Masked $2.4e-3$ \num{2.4e-3} \qty{1e-3}{\metre} \SI{5e-3}{\second} \(1e-4\).
+Charge residual (mol) & $-7.739\times 10^{-17}$ \\
+One step lowers the objective by \num{6.6e-8}, above the tolerance.
+The diffusivity is $1.9\times10^{-9}$ m$^2$/s and the rate constant is \num{3e-8}.
+\definecolor{cseGreen}{HTML}{009E73} See docs/file.py.
+''')
+            notes.write_text('Interphase residuals agree to 7 × 10⁻¹².\nCode `1e-3` stays quiet; prose 1e-3 does not.\n')
+            plot.write_text('x = 1e-3\nax.set_xlabel("rate 1e-3")\n')
+            result = subprocess.run([sys.executable, str(PLUGIN / 'scripts/workflow/check_prose.py'), '--root', str(root), str(paper), str(notes), str(plot)], capture_output=True, text=True)
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            out = result.stdout
+            for value in ("'2.4e-3'", "'3 * 4'", "'8k'"):
+                self.assertIn(f'paper.tex:1: warning: print form {value}', out)
+            self.assertIn("notes.md:2: warning: print form '1e-3'", out)
+            self.assertIn("plot.py:2: warning: print form '1e-3'", out)
+            self.assertEqual(5, out.count('print form'))
+            for location in ('paper.tex:3:', 'paper.tex:4:', 'notes.md:1:'):
+                self.assertIn(f'{location} warning: roundoff-scale numerical detail', out)
+            self.assertEqual(3, out.count('roundoff-scale'))
+            self.assertIn("repository path 'docs/file.py' ", out)
+
+    def test_numerical_advisories_are_quiet_on_shipped_examples(self):
+        sys.path.insert(0, str(PLUGIN / 'scripts/workflow'))
+        from check_prose import identifier_warnings
+        result = '\n'.join(identifier_warnings([ROOT / 'examples'], root=ROOT / 'examples'))
+        self.assertNotIn('print form', result)
+        self.assertNotIn('roundoff-scale', result)
+
 
     def test_accepted_pi_reference_passes_prose_check(self):
         result = subprocess.run(
