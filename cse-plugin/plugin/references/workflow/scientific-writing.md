@@ -198,7 +198,7 @@ a paper departs from one when its argument needs it.
 - **Findings first** (Mensh and Kording 2017, Rule 7): results are a chain of
   supported claims, not the path taken. A results paragraph poses its question
   and ends with the answer.
-- **Text density** (ACS Guide 2.1.3, 4.1, 4.2): give every study that runs
+- **A conditions table and a result plot** (ACS Guide 2.1.3, 4.1, 4.2): give every study that runs
   inputs to outputs a conditions table and a result plot. Put inputs on x and
   outputs on y in an X–Y plot. The results paragraph poses the question,
   points to the displays, and states the finding with only the numbers the
