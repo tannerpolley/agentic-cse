@@ -155,11 +155,14 @@ Delivered Review inspects the retained values, figures, and analysis records.
 Review Pass is bounded to the stated use and domain, and material changes to
 the result, figure, method, or interpretation require Review again.
 
-Immediately before Write uses reviewed results in a manuscript, obtain native
-investigator confirmation of the exact result commit, its intended use, and
-its limitations. Ask about each numerical non-result separately from the
-limitations. Record the investigator's promotion in one plain sentence
-without creating a status file or decision record.
+Before Write uses any retained result in a manuscript, send it to Review if
+it lacks delivered review for the intended use. Obtain native investigator
+confirmation to promote the reviewed result's exact commit, intended use, and
+limitations. Apply the same review and promotion to exclusions and non-results
+that define a denominator, justify a choice, or explain a missing point. Ask
+about each numerical non-result separately from the limitations. Record the
+investigator's promotion in one plain sentence without creating a status file
+or decision record.
 
 ## Language and repository boundaries
 

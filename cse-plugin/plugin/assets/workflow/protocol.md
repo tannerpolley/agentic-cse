@@ -19,7 +19,7 @@ the task needs before selecting the evidence-justified route.
 
 {skill_routing}
 
-For a requested retrospective, invoke `cse:audit` and use its retrospective reference.
+For a writing retrospective, invoke the skill for the work under review (`cse:write`, `cse:prose`, or `cse:review`) and read the installed `references/workflow/retrospective.md`. For other retrospectives, invoke `cse:audit` and use the same reference.
 
 Report the engineering result or capability, supporting evidence, meaning,
 and limits before software provenance. Do not invent physical results.

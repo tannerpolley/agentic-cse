@@ -80,9 +80,9 @@ See a [source paragraph example](../workflow/writing-examples.md#example-source-
 
 ### Drafting versus final review
 
-Use the [final manuscript checkpoint](../workflow/manuscript-review.md#final-manuscript-checkpoint)
-for routine mechanical checks and for cohesion review at a requested final
-check or publication handoff.
+Use the [story-spine triggers](../workflow/manuscript-review.md#story-spine-read) during
+revisions and the [final manuscript checkpoint](../workflow/manuscript-review.md#final-manuscript-checkpoint)
+for mechanical checks and cohesion review at a final check or publication handoff.
 
 ### Separate scientific correction from source reflow
 

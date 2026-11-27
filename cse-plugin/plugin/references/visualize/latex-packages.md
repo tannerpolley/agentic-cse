@@ -325,8 +325,9 @@ document passes these checks. Manuscript/deck release acceptance follows
 
 ## Scientific tables
 
-Use `booktabs` rules without vertical or double rules. Put one value per cell,
-one quantity and unit per column, with the unit in its header. Align numbers
+Use `booktabs` rules without vertical or double rules. Put one value per cell.
+Follow the [article display principles](../workflow/scientific-writing.md#shared-article-requirements)
+and put the column's unit in its header. Align numbers
 with `siunitx` S columns or right alignment and consistent precision; retain
 leading zeros. Give each discrete item one row on one line. Use sub-headers
 for a different form or unit, and a dash for an absent term, distinct from zero.

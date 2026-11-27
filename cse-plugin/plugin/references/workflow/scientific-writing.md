@@ -16,10 +16,29 @@ and apply [fitness for purpose](numerical-testing.md#fitness-for-purpose).
   paragraph poses the question, points to the displays, and ends with the finding and only the numbers the claim
   rests on. Use [fitness for purpose](numerical-testing.md#fitness-for-purpose) to decide which values belong
   in the paper. Honor page limits set by the venue and meet them by cutting words while keeping the displays.
-- **Every display earns a place in the text** (ACS Guide 4.1.2, 4.2.3): a figure or table is cited in order of
-  first mention. Its discussion tells the reader what to look for and how it supports the finding.
 - **An archival finding, not design data** (Andrews 2011; Zimmermann et al. 2020): a paper earns its place by
   a finding and its consequence. Values reported without interpretation read as an engineering report.
+
+### Fixing a review finding
+
+Change the claim itself. Narrow its subject, reframe it, cut it, or move supporting detail to a table row,
+figure, or the supplement with one pointer, including details added at a referee's request. Cite that
+location in the response. Keep a qualifier only when the claim would be false without it.
+Before adding text, find where the point already appears. State it once and point to it where needed.
+When a deck or highlights reuse the text, fix the claim at its owner and update the copies from there.
+
+### Emphasis in proportion
+
+Give each point the weight it carries in the paper's one contribution. Read for three forms of disproportion.
+
+- **Misplaced emphasis** gives a minor finding or method detail undue weight in the abstract, highlights,
+  a first or last sentence, or a display.
+- **Repetition** states one point in several places. Apply [Fixing a review finding](#fixing-a-review-finding).
+- **Caveat endings** leave a section or caption on a limitation. Give the necessary condition with the
+  claim and close on the finding.
+
+The records keep the results. The main text carries what the central claim rests on.
+Describe completed work as completed and reserve future work for what remains to be done.
 
 ## Methods reproducibility
 
@@ -87,7 +106,7 @@ when the data and code are available. See the [heater operating-cost example](wr
   typesets the printed form ([no manual unit typography](../visualize/latex-packages.md#selected-defaults)).
   Printed digits claim precision: 25.0 °C is not 25 °C.
 - **One notation for one thing** (Halmos 1970): one meaning per symbol across main text and supplement,
-  defined at first use.
+  defined at first use. Match nomenclature to the symbols and indices as used.
 - **Quantity calculus** (BIPM SI Brochure 2019; NIST SP 811; IUPAC Green Book): a physical quantity is a
   number times a unit, so physical laws hold in any units. An empirical correlation states the unit of every
   variable, inside the equation as in $\ln(p/\mathrm{kPa})$ or in the definitions right after it, whichever
@@ -118,14 +137,19 @@ when the data and code are available. See the [heater operating-cost example](wr
 - **Choosing the display** (Ehrenberg 1977, ACS Guide 4.1 and 4.2): apply the [conditions table and result
   plot principle](#argument). What should a reader see at a glance, or what trend or relationship should they
   see? Use a figure. Which exact values will they compare or reuse, or what detail would take many words to
-  convey? Use a table with short, parallel entries and put explanations in footnotes or the text. Use an
+  convey? Use a table with short, parallel cells and brief notes. Give each column one quantity, unit,
+  and aggregation. Put longer explanations in the text. Use an
   equation to state a mathematical relation. For phase equilibrium, use a ternary diagram with tie lines for a
   liquid split and a phase map with boundaries for a flash grid.
+- **Read displays in both directions** (ACS Guide 4.1.2, 4.2.3 for citing displays): cite displays in order
+  of first mention, with a sentence interpreting each display and each decision-bearing panel or row.
+  Give every multi-condition results paragraph its display.
 - Present scientific provenance: data source, equations, parameter values, units, assumptions, comparison
   basis, and uncertainty. Data are traceable to their origin, and comparison with published values is part of
   the evidence (Bazyleva et al. 2021; Cummings et al. 2009).
 - Use result-led captions. A figure caption states the quantity, conditions, comparison, and supported
-  observation. A table caption states what the values compare. So that figure and caption stand alone (ACS
+  observation. A table caption states what the values compare. A caption formula applies to every row or
+  states its exceptions. So that figure and caption stand alone (ACS
   Guide 4.1.3, 4.1.4), a caption also defines every symbol, line, and marker and says what any error bar or
   band represents. Where the venue's captions are descriptive, the caption says what the figure shows and the
   text states the finding. Put figure captions below figures and table captions above tables.
@@ -139,7 +163,7 @@ Use the applicable subset in this order.
    first phrase (ACS Guide 2.3.2), then authors, affiliations, and date;
 2. an informative abstract stating the question and the gap it fills, the method, principal result with
    conditions, and supported implication, within the venue's length and without citations;
-3. keywords, and a nomenclature list when the venue uses one; it never replaces definition at first use;
+3. keywords, and a nomenclature list when the venue uses one (see [notation](#equations-quantities-and-units));
 4. introduction as a **Create a Research Space** (Swales 1990): territory, gap, contribution. The literature
    review is the evidence for the gap and the baseline the results are compared against;
 5. formulation, theory, or governing equations;
@@ -157,7 +181,7 @@ what, with engineering variants such as a model section, combined Results and di
 methods and results. The discussion interprets and bounds; conclusions say what was learned (ACS Guide 2.3.8),
 pairing each finding with its consequence or domain of validity. Top-level headings use the field's
 conventional names. Subheadings name the system, study, or step, never an internal label. Merge adjacent sections when the scientific
-argument is clearer without a separate heading. Introduce each result before showing it, then interpret it. Carry only the evidence needed for the conclusion.
+argument is clearer without a separate heading. Introduce each result before showing it, then interpret it.
 
 ## Skeletons by paper type
 
@@ -173,8 +197,11 @@ Start from the skeleton shared by published papers of the type and venue.
   against an independent reference, measured performance, limitations, and availability. Documentation stays
   in the documentation.
 
-A multi-paper dissertation is one argument, with an integrating introduction and conclusion and co-author
-contributions stated per chapter.
+- **Multi-paper dissertation:** one argument with an integrating introduction and conclusion and co-author
+  contributions stated per chapter. Each paper's abstract owns its results. A preface gives the reader what
+  they need first, a bridge says what the next paper can use, the dissertation's answer carries the decisive
+  evidence, and the synthesis says what changes when the papers are read together. A claimed handoff names
+  what passed between papers, its version, and what else changed. Label conceptual links and future tests as such.
 
 ## Supplement
 
@@ -186,9 +213,14 @@ scrutiny (ACS Guide 3.1.4).
 
 ## Evidence guard
 
-A result enters the manuscript only when it supports the selected claim order. The manuscript may omit sound
-analyses that do not serve that story. It may condense a promoted analysis result, but reported values,
-conditions, uncertainty, and claim boundaries must remain consistent with the retained results.
+A summary claim keeps its evidence's subject, population and subset, condition, evidential role (fitted,
+withheld, or independent), comparator, statistic, and boundary. Preserve reported values and uncertainty
+when condensing a promoted result.
+
+Test quantifiers and certainty verbs against the least supportive case. Name a case or set for its actual
+membership and say what the endpoints of a range represent. A comparison changes one thing or says what
+else changed. Compare costs for the same product and accounts, using the [stated cost basis](#methods-reproducibility).
+List the inputs a plain-language deliverable needs for its equation.
 
 ## Scientific prose
 
@@ -196,8 +228,9 @@ Write direct, active, specific prose that preserves scientific meaning, uncertai
 Practice **calibrated hedging** (Hyland 1996; IEEE Author Center): state a supported finding
 plainly with its conditions and uncertainty, and hedge only what the evidence leaves open. Over-qualifying
 misreports the evidence as surely as inflating it.
-Write for **a reader outside the project** (Mensh and Kording 2017, Rule 2): a term, label, or piece of
-history a new reader would need explained is defined or removed. Use scientific descriptions in prose,
+Write for **a reader outside the project** (Mensh and Kording 2017, Rule 2): define terms, abbreviations,
+and metrics at first use, treating the abstract as a standalone text. Use each technical term for one
+meaning throughout. Use scientific descriptions in prose,
 captions, table cells, legends, axis labels, and slides. Internal run/fit codes, issue or pull-request
 numbers, commit hashes, and repository paths need [reader-facing inspection](writing-editorial.md#reader-facing-identifiers).
 Keep agent actions, repository operations, build commentary, and chronological work history out of rendered
@@ -218,9 +251,8 @@ Watch for these prose patterns.
   statement, limitation, or causal description;
 - over-editing that invents first person, stakes, specifics, mechanisms, contrarian framing, or staccato
   prose; and
-- departures from the named writing principles, including **disproportion** under its [named
-  forms](numerical-testing.md#fitness-for-purpose), such as manuscript text that reports roundoff-scale
-  bookkeeping or repeats one limitation.
+- departures from the named writing principles, including [numerical disproportion](numerical-testing.md#fitness-for-purpose)
+  and [emphasis out of proportion](#emphasis-in-proportion).
 
 Preserve evidence-calibrated hedging; passive voice when the actor is irrelevant; field-appropriate
 first-person plural; exact technical terms; definitions, equations, symbols, methods, metrics, citations,
@@ -245,6 +277,5 @@ planned, completed, declined, or unresolved.
 
 A response to referees follows **answer, then show** (Noble 2017): quote each comment and answer it directly.
 Where the text changed, quote the changed text and say what changed; otherwise give the answer with its
-evidence. Place details added at a referee's request in a table row, figure, or the supplement and point to
-that location in the response. A cover letter gives the editor a short summary, not a copy of the abstract:
+evidence. A cover letter gives the editor a short summary, not a copy of the abstract:
 why this journal, what is new, and what the editor needs to route the paper (ACS Guide 2.4.4).

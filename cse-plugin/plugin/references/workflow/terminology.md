@@ -31,7 +31,9 @@ _Avoid_: “context” as a phase name or tool when referring to a stage.
 A capability invoked by a workflow stage and normally returning evidence or
 files to that stage. Sources tools are `zotero`, `data`, and
 `digitize`. Visualize tools are `plot`, `tikz`, `latex`, `quarto`,
-and `beamer`. `prose` inspects scientific writing and final manuscript cohesion
+and `beamer`. `prose` inspects scientific writing, including the
+[story-spine read](manuscript-review.md#story-spine-read) during revisions and
+[cohesion at the final checkpoint](manuscript-review.md#final-manuscript-checkpoint),
 without authoring or accepting scientific claims.
 _Avoid_: workflow stage or an extra step in the agent path.
 
