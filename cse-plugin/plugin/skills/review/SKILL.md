@@ -8,7 +8,7 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model]
-    conditional: [code-surface-review, scientific-method, numerical-testing, failure-triage, scientific-writing, analysis-sets, dependent-scientific-changes, slide-decks]
+    conditional: [code-surface-review, scientific-method, numerical-testing, failure-triage, scientific-writing, writing-editorial, manuscript-review, analysis-sets, dependent-scientific-changes, slide-decks]
 ---
 
 # Review scientific work
@@ -25,7 +25,7 @@ Use a fresh reviewer for design readiness before Build and a separate fresh
 reviewer for delivered acceptance. Neither reviewer authored the material it
 checks. CSE requires independence but selects no model, transport, staffing
 pattern, or review cascade; the active coordination guidance owns those choices.
-The manuscript structure review in [scientific-writing](../../references/workflow/scientific-writing.md) specifies independent review jobs; host guidance assigns them.
+The [manuscript structure review](../../references/workflow/manuscript-review.md#manuscript-structure-review) specifies independent review jobs; host guidance assigns them.
 
 ## Design readiness
 
@@ -60,10 +60,10 @@ such as "not converged" from an objective tolerance while the parameters are
 unchanged at their standard error; the correction is to delete it, move it to
 the record, or state it once.
 
-For manuscripts/decks, the Result lens activates scientific-writing's
-[standing decisions](../../references/workflow/scientific-writing.md#standing-editorial-decisions),
-[editorial compliance](../../references/workflow/scientific-writing.md#editorial-compliance), and
-[manuscript reference coverage](../../references/workflow/scientific-writing.md#manuscript-reference-coverage).
+For manuscripts/decks, the Result lens activates the
+[standing decisions](../../references/workflow/writing-editorial.md#standing-editorial-decisions),
+[editorial compliance](../../references/workflow/writing-editorial.md#editorial-compliance), and
+[manuscript reference coverage](../../references/workflow/manuscript-review.md#manuscript-reference-coverage).
 For a manuscript, also ask whether a reader could rebuild the calculation from the paper ([methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility)).
 Ask whether each manuscript input-to-output result has its [conditions table and result plot](../../references/workflow/scientific-writing.md#argument).
 At a deck's final checkpoint, inspect it read-only against [slide-decks](../../references/visualize/slide-decks.md) and the project's deck decisions.
@@ -100,4 +100,4 @@ the affected final-tree conclusion and requires the complete applicable lens
 again; preserve still-valid evidence.
 
 For source, figure, and deck identifier advisories, follow the shared
-[reader-facing identifier check](../../references/workflow/scientific-writing.md#reader-facing-identifiers).
+[reader-facing identifier check](../../references/workflow/writing-editorial.md#reader-facing-identifiers).

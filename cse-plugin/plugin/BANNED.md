@@ -60,4 +60,4 @@ Mark exact identifiers and official filenames as inline code; a filename-like
 word in ordinary prose does not establish an exemption. State a concrete
 meaning using “term means …” or “term: …” when the word itself is necessary.
 
-Internal identifiers use the advisory [reader-facing identifier check](references/workflow/scientific-writing.md#reader-facing-identifiers). Visible monospace labels and hashes remain inspectable there; the literal terminology exemptions above are unchanged.
+Internal identifiers use the advisory [reader-facing identifier check](references/workflow/writing-editorial.md#reader-facing-identifiers). Visible monospace labels and hashes remain inspectable there; the literal terminology exemptions above are unchanged.

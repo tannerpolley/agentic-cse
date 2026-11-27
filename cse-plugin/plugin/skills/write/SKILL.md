@@ -7,74 +7,71 @@ metadata:
   cse-order: "08"
   cse-tags: "workflow"
   cse-routing:
-    direct: [operating-model, scientific-method]
-    conditional: [scientific-writing, latex-article-profiles, numerical-testing]
+    direct: [operating-model, scientific-method, scientific-writing]
+    conditional: [writing-editorial, manuscript-review, latex-article-profiles, failure-triage]
 ---
 
 # Write papers
 
-Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
+## Start
 
-Before the first edit of a manuscript or report draft or revision, read
-[scientific-writing](../../references/workflow/scientific-writing.md) and
-[latex-article-profiles](../../references/visualize/latex-article-profiles.md)
-in full. For routine wording or citation edits, read the applicable sections.
-Before manuscript edits, follow the [standing-decision read/update protocol](../../references/workflow/scientific-writing.md#standing-editorial-decisions).
-Use the manuscript structure review before a new or rejected manuscript, a journal retarget, or a material restructure.
-Use the committed bibliography snapshot read-only; an approved refresh belongs
-to CSE source after the Zotero capability is checked.
+Read [operating-model](../../references/workflow/operating-model.md),
+[scientific-method](../../references/workflow/scientific-method.md), and the
+[scientific writing principles](../../references/workflow/scientific-writing.md)
+in full. Follow the [project prose authorities](../../references/workflow/writing-editorial.md#project-prose-authorities)
+and, before manuscript edits, the [standing editorial decisions procedure](../../references/workflow/writing-editorial.md#standing-editorial-decisions).
+For a new or rejected manuscript, journal retarget, or material restructure,
+follow [manuscript structure review](../../references/workflow/manuscript-review.md#manuscript-structure-review).
+For manuscript citations, use the [bibliography snapshot protocol](../../references/workflow/manuscript-review.md#bibliography-snapshot).
 
 Inspect the accepted question, formulation, methods, evidence, notebook,
-sources, audience, and intended endpoint. Build one supported argument from
-cited sources, equations, retained results, uncertainty, and limitations.
+sources, audience, and intended endpoint. Before relying on a reviewed notebook,
+follow the [promotion procedure](../../references/visualize/latex-article-profiles.md#promotion-between-profiles).
+
+**Complete when** the principles are read, the applicable editorial directions
+and accepted evidence are identified, and the structure plan is accepted for
+work that needs structure review.
+
+## Draft
+
+Build one supported argument from the accepted evidence using the writing
+principles. Keep numerical verification distinct from physical validation.
 A limitation states a physical finding or the tested domain. Write a numerical
 non-result (a refused, unfinished, or unconverged calculation, or a result
 labelled provisional for that reason) only when its record shows it met
-[fix before a negative disposition](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition);
-otherwise return it to the investigator as a blocker with its record locator
-and leave that sentence unwritten.
-Keep verification distinct from physical validation, follow project writing
-rules, and remove internal workflow or repository language from scientific
-prose.
+[fix before a negative disposition](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition).
+Otherwise, return its record locator to the investigator as a blocker and
+leave that sentence unwritten.
 
-Draft or restructure a manuscript from the [argument](../../references/workflow/scientific-writing.md#argument) principles, the [structure](../../references/visualize/latex-article-profiles.md#structure), and the [skeletons by paper type](../../references/visualize/latex-article-profiles.md#skeletons-by-paper-type).
-Use the [conditions table and result plot principle](../../references/workflow/scientific-writing.md#argument) to present each study that runs inputs to outputs.
-Report numerical work in [proportion](../../references/workflow/numerical-testing.md#fitness-for-purpose).
-Write Methods for [methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility),
-notation and numbers by [equations, quantities, and units](../../references/workflow/scientific-writing.md#equations-quantities-and-units),
-availability statements by [data, code, and software](../../references/workflow/scientific-writing.md#data-code-and-software),
-displays and captions by the [shared article requirements](../../references/visualize/latex-article-profiles.md#shared-article-requirements),
-and referee responses and cover letters by [revision responses](../../references/workflow/scientific-writing.md#revision-responses-and-cover-letters).
+For routine wording, citation, formatting, and local clarity edits, follow
+[routine corrections](../../references/workflow/writing-editorial.md#routine-corrections)
+and preserve [revision fidelity](../../references/workflow/scientific-writing.md#scientific-prose).
+When editing LaTeX manuscript source, use [manuscript source organization](../../references/visualize/latex-article-profiles.md#manuscript-writing-and-source-organization).
 
-For routine wording, citations, formatting, and local clarity edits, apply the
-minimal-intervention and fidelity rules in [scientific-writing](../../references/workflow/scientific-writing.md): change only
-diagnosed spans, leave clear prose unchanged, invent no specificity, preserve
-supported content, and perform one verification read. Route explicit wording,
-AI-pattern, comparison, or final manuscript checks to `cse:prose`. A material
-change to the central claims, abstract, conclusion, section order, or argument
-spine makes the prior final inspection stale; inspect the updated argument at
-the next final checkpoint.
+**Complete when** the edited passages and displays support the intended claim
+within its tested domain, and any unresolved numerical non-result is reported
+with its record locator.
 
-Immediately before using a reviewed notebook in manuscript work, obtain native
-investigator confirmation bound to the exact notebook commit, intended use,
-and limitations. Ask about each numerical non-result in that notebook as its
-own item, separate from the limitations. Record one plain sentence stating that the investigator
-promoted that commit for that use subject to those limitations. Do not infer
-promotion from Review Pass and do not create a status file or decision record.
+## Finish
 
-Before handing back any durable edit, run
+For any durable edit, run
 `python3 <plugin>/scripts/workflow/check_prose.py --root <project> <sources>`,
-where `<plugin>` is the directory holding `skills/`.
-For a manuscript or report draft or revision, then render with the selected
-`cse:latex` or `cse:quarto`, inspect the rendered pages, and route the final
-read to `cse:prose`. Routine wording, citation, formatting, and local clarity
-edits need no Prose cohesion inspection.
-Check renderer capability before rendering. Use `cse:beamer`, `cse:tikz`, or
-`cse:plot` for their respective outputs.
-Synchronize a bibliography only through `cse:zotero` with its
-approval gate, never by hand.
-If rendering or source refresh is unavailable, retain accepted prose and report
-the exact missing capability; neither becomes a hidden workflow gate.
+where `<plugin>` is the directory holding `skills/`. Use the printed reference
+for each advisory. For a manuscript or report draft or revision, check renderer
+capability, render with the selected `cse:latex` or `cse:quarto`, inspect the
+pages, then route the final read to `cse:prose`. Use `cse:beamer`, `cse:tikz`,
+or `cse:plot` for their respective outputs. Route explicit wording, AI-pattern,
+comparison, or final manuscript checks to `cse:prose`. Routine wording,
+citation, formatting, and local clarity edits need no cohesion inspection.
 
-For source, figure, and deck identifier advisories, follow the shared
-[reader-facing identifier check](../../references/workflow/scientific-writing.md#reader-facing-identifiers).
+For a rewrite that used structure review, the reader-story reviewer performs that
+Prose read in the [post-rewrite review](../../references/workflow/manuscript-review.md#after-the-rewrite).
+For a requested final check, submission, or named publication handoff, use
+[manuscript reference coverage](../../references/workflow/manuscript-review.md#manuscript-reference-coverage)
+and the [final manuscript checkpoint](../../references/workflow/manuscript-review.md#final-manuscript-checkpoint).
+If rendering or source refresh is unavailable, retain accepted prose and report
+the exact missing capability.
+
+**Complete when** the source check and applicable render, page inspection,
+and Prose read are accounted for, with any missing capability or unresolved
+finding reported.

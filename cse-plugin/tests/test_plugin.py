@@ -67,6 +67,7 @@ print("F8")
                 for value in expected:
                     self.assertIn(repr(value), result.stdout)
                 self.assertNotIn('F8', result.stdout)
+                self.assertIn('writing-editorial.md#reader-facing-identifiers', result.stdout)
                 self.assertIn(f'{path}:2:', result.stdout)
                 self.assertEqual(len(expected), result.stdout.count(': warning:'))
             path.write_text('The schema changed with F2.\n')
@@ -156,6 +157,7 @@ The diffusivity is $1.9\times10^{-9}$ m$^2$/s and the rate constant is \num{3e-8
                 self.assertIn(f'paper.tex:1: warning: print form {value}', out)
             self.assertIn("notes.md:2: warning: print form '1e-3'", out)
             self.assertIn("plot.py:2: warning: print form '1e-3'", out)
+            self.assertIn('scientific-writing.md#equations-quantities-and-units', out)
             self.assertEqual(5, out.count('print form'))
             for location in ('paper.tex:3:', 'paper.tex:4:', 'notes.md:1:'):
                 self.assertIn(f'{location} warning: roundoff-scale numerical detail', out)
@@ -344,13 +346,30 @@ One | Two | Three | Four | Five
         self.assertIn("CSE prose is clear.", prose)
         self.assertIn("Prose does not edit", prose)
         self.assertIn("final manuscript check", prose)
-        write = yaml.safe_load((PLUGIN / "skills/write/SKILL.md").read_text().split("---", 2)[1])
-        self.assertLessEqual({"scientific-writing", "latex-article-profiles"},
-                             set(write["metadata"]["cse-routing"]["conditional"]))
-        profiles = (PLUGIN / "references/visualize/latex-article-profiles.md").read_text()
-        self.assertIn("`cse:prose`", profiles)
-        self.assertNotIn("core Review's manuscript", profiles)
-        self.assertIn("evidence review and investigator promotion", profiles)
+        direct, conditional = "direct", "conditional"
+        writing_routes = {
+            "write": {direct: {"scientific-writing"},
+                      conditional: {"writing-editorial", "manuscript-review", "latex-article-profiles"}},
+            "summarize": {direct: {"analysis-notebook-profile"}},
+            "prose": {direct: {"scientific-writing", "writing-editorial"}, conditional: {"manuscript-review"}},
+            "review": {conditional: {"scientific-writing", "writing-editorial", "manuscript-review"}},
+            "latex": {conditional: {"latex-article-profiles", "analysis-notebook-profile", "manuscript-review"}},
+            "quarto": {conditional: {"latex-article-profiles", "analysis-notebook-profile"}},
+            "beamer": {conditional: {"writing-editorial"}},
+            "plot": {conditional: {"writing-editorial"}},
+        }
+        for skill, expected in writing_routes.items():
+            text = (PLUGIN / f"skills/{skill}/SKILL.md").read_text()
+            frontmatter = yaml.safe_load(text.split("---", 2)[1])
+            routing = frontmatter["metadata"]["cse-routing"]
+            for kind, references in expected.items():
+                with self.subTest(skill=skill, kind=kind):
+                    self.assertLessEqual(references, set(routing[kind]))
+            if skill == "write":
+                self.assertNotIn("latex-article-profiles", routing[direct])
+        checkpoint = (PLUGIN / "references/workflow/manuscript-review.md").read_text()
+        self.assertIn("Prose performs one agent-led cohesion inspection", checkpoint)
+        self.assertIn("evidence review and investigator promotion", checkpoint)
 
     def test_inventory_stages_only_the_unified_payload(self):
         with tempfile.TemporaryDirectory() as directory:

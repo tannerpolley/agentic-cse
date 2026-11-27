@@ -7,7 +7,7 @@ metadata:
   cse-tags: "quarto-pipeline"
   cse-routing:
     direct: [rendering-guide, quarto-execution]
-    conditional: [latex-packages, latex-article-profiles, latex-figures, slide-decks]
+    conditional: [latex-packages, latex-article-profiles, analysis-notebook-profile, scientific-writing, latex-figures, slide-decks]
 ---
 
 # Quarto document manager
@@ -18,7 +18,9 @@ Inherit core scientific, project, and
 language decisions.
 
 Activate [latex-packages](../../references/visualize/latex-packages.md) and [latex-article-profiles](../../references/visualize/latex-article-profiles.md) for promoted PDF or
-article outputs, and [latex-figures](../../references/visualize/latex-figures.md) for shared figures.
+article outputs. For an analysis notebook, use its [output profile](../../references/workflow/analysis-notebook-profile.md).
+For article displays and captions, use the [writing principles](../../references/workflow/scientific-writing.md#shared-article-requirements).
+Activate [latex-figures](../../references/visualize/latex-figures.md) for shared figures.
 
 Inspect the existing project, profiles, source, includes, filters, output
 paths, and render command. Keep shared scientific content in one source.

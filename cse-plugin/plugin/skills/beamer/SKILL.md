@@ -7,7 +7,7 @@ metadata:
   cse-tags: "quarto-pipeline, latex-toolbox"
   cse-routing:
     direct: [slide-decks, rendering-guide, latex-layout-and-qa]
-    conditional: [latex-packages, latex-figures, quarto-execution, scientific-writing]
+    conditional: [latex-packages, latex-figures, quarto-execution, writing-editorial]
 ---
 
 # Beamer presentation tool
@@ -22,7 +22,7 @@ language decisions.
 Activate [latex-packages](../../references/visualize/latex-packages.md) for package choices, [latex-figures](../../references/visualize/latex-figures.md) for shared
 figures, and [quarto-execution](../../references/visualize/quarto-execution.md) for a `.qmd`.
 
-For deck work, activate [scientific-writing's standing-decision read/update protocol](../../references/workflow/scientific-writing.md#standing-editorial-decisions)
+For deck work, activate [standing-decision read/update protocol](../../references/workflow/writing-editorial.md#standing-editorial-decisions)
 before editing.
 
 Inspect audience, purpose, source format, theme, aspect ratio, placement,
@@ -36,4 +36,4 @@ and [frame-by-frame visual QA](../../references/visualize/latex-layout-and-qa.md
 Material changes return to core CSE Review; successful rendering is not Review Pass.
 
 For source, figure, and deck identifier advisories, follow the shared
-[reader-facing identifier check](../../references/workflow/scientific-writing.md#reader-facing-identifiers).
+[reader-facing identifier check](../../references/workflow/writing-editorial.md#reader-facing-identifiers).
