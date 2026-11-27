@@ -8,16 +8,19 @@ metadata:
   cse-tags: "workflow"
   cse-routing:
     direct: [operating-model, scientific-method]
-    conditional: [scientific-writing, numerical-testing]
+    conditional: [scientific-writing, latex-article-profiles, numerical-testing]
 ---
 
 # Write papers
 
 Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
 
-Activate [scientific-writing](../../references/workflow/scientific-writing.md) for project writing rules and retained paths.
-Before manuscript edits, follow its [standing-decision read/update protocol](../../references/workflow/scientific-writing.md#standing-editorial-decisions).
-Use its manuscript structure review before a new or rejected manuscript, a journal retarget, or a material restructure.
+Before the first edit of a manuscript or report draft or revision, read
+[scientific-writing](../../references/workflow/scientific-writing.md) and
+[latex-article-profiles](../../references/visualize/latex-article-profiles.md)
+in full. For routine wording or citation edits, read the applicable sections.
+Before manuscript edits, follow the [standing-decision read/update protocol](../../references/workflow/scientific-writing.md#standing-editorial-decisions).
+Use the manuscript structure review before a new or rejected manuscript, a journal retarget, or a material restructure.
 Use the committed bibliography snapshot read-only; an approved refresh belongs
 to CSE source after the Zotero capability is checked.
 
@@ -32,11 +35,10 @@ otherwise return it to the investigator as a blocker with its record locator
 and leave that sentence unwritten.
 Keep verification distinct from physical validation, follow project writing
 rules, and remove internal workflow or repository language from scientific
-prose. Check terminology and banned language on every durable edit: before
-handing back, run `python3 <plugin>/scripts/workflow/check_prose.py --root <project> <sources>`
-on the draft, where `<plugin>` is the directory holding `skills/`.
+prose.
 
 Draft or restructure a manuscript from the [argument](../../references/workflow/scientific-writing.md#argument) principles, the [structure](../../references/visualize/latex-article-profiles.md#structure), and the [skeletons by paper type](../../references/visualize/latex-article-profiles.md#skeletons-by-paper-type).
+Use the [conditions table and result plot principle](../../references/workflow/scientific-writing.md#argument) to present each study that runs inputs to outputs.
 Report numerical work in [proportion](../../references/workflow/numerical-testing.md#fitness-for-purpose).
 Write Methods for [methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility),
 notation and numbers by [equations, quantities, and units](../../references/workflow/scientific-writing.md#equations-quantities-and-units),
@@ -44,8 +46,7 @@ availability statements by [data, code, and software](../../references/workflow/
 displays and captions by the [shared article requirements](../../references/visualize/latex-article-profiles.md#shared-article-requirements),
 and referee responses and cover letters by [revision responses](../../references/workflow/scientific-writing.md#revision-responses-and-cover-letters).
 
-Routine wording, citations, formatting, and local clarity edits remain here;
-rendering does not require a Prose cohesion inspection. Apply the
+For routine wording, citations, formatting, and local clarity edits, apply the
 minimal-intervention and fidelity rules in [scientific-writing](../../references/workflow/scientific-writing.md): change only
 diagnosed spans, leave clear prose unchanged, invent no specificity, preserve
 supported content, and perform one verification read. Route explicit wording,
@@ -61,9 +62,15 @@ own item, separate from the limitations. Record one plain sentence stating that 
 promoted that commit for that use subject to those limitations. Do not infer
 promotion from Review Pass and do not create a status file or decision record.
 
-After checking the renderer capability, use the selected `cse:latex`,
-`cse:quarto`, `cse:beamer`, `cse:tikz`,
-or `cse:plot` tool for rendering.
+Before handing back any durable edit, run
+`python3 <plugin>/scripts/workflow/check_prose.py --root <project> <sources>`,
+where `<plugin>` is the directory holding `skills/`.
+For a manuscript or report draft or revision, then render with the selected
+`cse:latex` or `cse:quarto`, inspect the rendered pages, and route the final
+read to `cse:prose`. Routine wording, citation, formatting, and local clarity
+edits need no Prose cohesion inspection.
+Check renderer capability before rendering. Use `cse:beamer`, `cse:tikz`, or
+`cse:plot` for their respective outputs.
 Synchronize a bibliography only through `cse:zotero` with its
 approval gate, never by hand.
 If rendering or source refresh is unavailable, retain accepted prose and report

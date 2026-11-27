@@ -162,6 +162,37 @@ The diffusivity is $1.9\times10^{-9}$ m$^2$/s and the rate constant is \num{3e-8
             self.assertEqual(3, out.count('roundoff-scale'))
             self.assertIn("repository path 'docs/file.py' ", out)
 
+    def test_numeric_density_advisory_checks_sentences_outside_displays(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paper, notes = root / 'paper.tex', root / 'notes.qmd'
+            paper.write_text(r'''At 10 and 20 kPa, the yields were 3.2 and 4.1 g after 5 s.
+The yield was 3.2 g after 5 s. The next run used 10, 20, and 30 kPa.
+The four measurements were 1, 2, 3, and 4 with $x=5$ and \num{6} and \qty{7}{\second} \cite[8--9]{source2024}.
+\begin{tabular}{rrrrr}
+1 & 2 & 3 & 4 & 5 \\
+\end{tabular}
+\begin{tikzpicture}
+\draw (1, 2) -- (3, 4) -- (5, 6);
+\end{tikzpicture}
+''')
+            notes.write_text('''At 10 and 20 kPa,
+the yields were 3.2 and 4.1 g after 5 s.
+
+The four measurements were 1, 2, 3, and 4 [@source2024, pp. 5–6].
+
+One | Two | Three | Four | Five
+----|-----|-------|------|-----
+1   | 2   | 3     | 4    | 5
+''')
+            result = subprocess.run([sys.executable, str(PLUGIN / 'scripts/workflow/check_prose.py'), '--root', str(root), str(paper), str(notes)], capture_output=True, text=True)
+            self.assertEqual(0, result.returncode, result.stdout + result.stderr)
+            warnings = [line for line in result.stdout.splitlines() if 'warning: numeric density' in line]
+            self.assertEqual(2, len(warnings), result.stdout)
+            for warning, location in zip(warnings, ('paper.tex:1:', 'notes.qmd:1:')):
+                self.assertIn(location, warning)
+                self.assertIn('scientific-writing.md#argument', warning)
+
     def test_numerical_advisories_are_quiet_on_shipped_examples(self):
         sys.path.insert(0, str(PLUGIN / 'scripts/workflow'))
         from check_prose import identifier_warnings
@@ -313,6 +344,9 @@ The diffusivity is $1.9\times10^{-9}$ m$^2$/s and the rate constant is \num{3e-8
         self.assertIn("CSE prose is clear.", prose)
         self.assertIn("Prose does not edit", prose)
         self.assertIn("final manuscript check", prose)
+        write = yaml.safe_load((PLUGIN / "skills/write/SKILL.md").read_text().split("---", 2)[1])
+        self.assertLessEqual({"scientific-writing", "latex-article-profiles"},
+                             set(write["metadata"]["cse-routing"]["conditional"]))
         profiles = (PLUGIN / "references/visualize/latex-article-profiles.md").read_text()
         self.assertIn("`cse:prose`", profiles)
         self.assertNotIn("core Review's manuscript", profiles)

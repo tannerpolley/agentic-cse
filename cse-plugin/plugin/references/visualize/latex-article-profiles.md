@@ -35,11 +35,15 @@ select the relevant investigator-promoted results and write a separate manuscrip
   highlighting. Keep execution disabled by default and never run the
   scientific model during document rendering. Keep stable LaTeX notation,
   packages, and semantic figure styles in reviewed headers.
-- **Choosing the display** (Ehrenberg 1977; ACS Guide 4.2.1): a relation is an
-  equation, exact values a reader will compare or reuse are a table, and a
-  trend or pattern is a figure. A table holds short, parallel entries in
-  related rows and columns, with explanation in footnotes or the text; it
-  supplements the text and does not repeat it.
+- **Choosing the display** (Ehrenberg 1977, ACS Guide 4.1 and 4.2): apply the
+  [conditions table and result plot principle](../workflow/scientific-writing.md#argument).
+  What should a reader see at a glance, or what trend or relationship should
+  they see? Use a figure. Which exact values will they compare or reuse, or
+  what detail would take many words to convey? Use a table with short,
+  parallel entries and put explanations in footnotes or the text. Use an
+  equation to state a mathematical relation.
+  For phase equilibrium, use a ternary diagram with tie lines for a liquid
+  split and a phase map with boundaries for a flash grid.
 - Present scientific provenance: data source, equations, parameter values,
   units, assumptions, comparison basis, and uncertainty. Data are traceable to
   their origin, and comparison with published values is part of the evidence

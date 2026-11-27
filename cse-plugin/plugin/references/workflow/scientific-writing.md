@@ -198,12 +198,16 @@ a paper departs from one when its argument needs it.
 - **Findings first** (Mensh and Kording 2017, Rule 7): results are a chain of
   supported claims, not the path taken. A results paragraph poses its question
   and ends with the answer.
-- **Text density** (ACS Guide 2.1.3): an effective article avoids dense text.
-  Paragraphs stay short, and tables, equations, and graphics carry part of
-  the load.
+- **A conditions table and a result plot** (ACS Guide 2.1.3, 4.1, 4.2): give every study that runs
+  inputs to outputs a conditions table and a result plot. Put inputs on x and
+  outputs on y in an X–Y plot. The results paragraph poses the question,
+  points to the displays, and states the finding with only the numbers the
+  claim rests on. Use [fitness for purpose](numerical-testing.md#fitness-for-purpose)
+  to decide which values belong in the paper. Honor page limits set by the
+  venue and meet them by cutting words while keeping the displays.
 - **Every display earns a place in the text** (ACS Guide 4.1.2, 4.2.3): a
-  figure or table is cited and discussed in the text, in order of first
-  mention. One with no natural place to be discussed does not belong.
+  figure or table is cited in order of first mention. Its discussion tells
+  the reader what to look for and how it supports the finding.
 - **An archival finding, not design data** (Andrews 2011; Zimmermann et al.
   2020): a paper earns its place by a finding and its consequence. Values
   reported without interpretation read as an engineering report.
@@ -505,8 +509,10 @@ or replace evidence review and investigator promotion.
 
 A response to referees follows **answer, then show** (Noble 2017): quote each
 comment and answer it directly. Where the text changed, quote the changed text
-and say what changed; otherwise give the answer with its evidence. A
-cover letter gives the editor a short summary, not a copy of the abstract: why
+and say what changed; otherwise give the answer with its evidence. Place
+details added at a referee's request in a table row, figure, or the supplement
+and point to that location in the response. A cover letter gives the editor a
+short summary, not a copy of the abstract: why
 this journal, what is new, and what the editor needs to route the paper (ACS
 Guide 2.4.4).
 
