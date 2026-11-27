@@ -109,6 +109,7 @@ def stage(item: dict, destination: Path, commit: str) -> dict:
     skills = sorted(path.name for path in (destination / "skills").iterdir() if path.is_dir())
     if skills != sorted(item["skills"]):
         raise RuntimeError(f"{item['name']} staged skills are {skills}; expected {sorted(item['skills'])}")
+    (destination / "cse-source-commit").write_text(commit + "\n", encoding="ascii")
     identity = {
         "pluginId": item["name"],
         "sourceCommit": commit,

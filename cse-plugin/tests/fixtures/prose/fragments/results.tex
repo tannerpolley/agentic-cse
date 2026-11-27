@@ -1,0 +1,47 @@
+We used the Li/Na/TBAC mixture. The stopping tolerance was \qty{5e-8}{\gram}.
+\lstinputlisting[language=Python,caption={Routine use}]{scripts/schema/F6.py}
+\includegraphics[
+  width=\linewidth
+]{figures/schema/F7.pdf}
+\begin{tikzpicture}
+\begin{axis}
+\addplot coordinates {(1, 2) (3, 4) (5, 6)}; % F8
+\end{axis}
+\end{tikzpicture}
+
+The first and second membranes retained \firstgain{} and \secondgain{} grams.
+The third and fourth membranes retained \thirdgain{} and \fourthgain{} grams.
+The remaining membranes retained \fifthgain{}, \sixthgain{}, and \seventhgain{} grams.
+
+The following measurements describe how the treated surface responded to the change in inlet humidity after we conditioned it at the baseline temperature and then returned it to the test chamber with the reference sample that had already been exposed to the same feed until the response settled at the value we recorded in the experiment and summarized in the associated display.
+The comparison covers the initial uptake as well as the later period when the reference membrane reached its steady response near the outlet.
+Measurements from the inlet and outlet agree within the uncertainty of the calibration established during the reference tests.
+The treatment also changed the distribution of retained water because the surface near the outlet remained exposed for longer during conditioning.
+Changes in uptake on the treated surface were consistent with the measurements of the reference membrane over the same interval.
+The two measurements agreed most closely after the treated membrane reached its steady response.
+
+\begin{table}
+\begin{tabular}{ll}
+\toprule
+Sample & Uptake \\
+\midrule
+Coated &
+\textbf{This cell describes the surface treatment in detail before giving the measured uptake and its uncertainty.} \\
+\bottomrule
+\end{tabular}
+\begin{tablenotes}
+\item[a]
+The note explains the sample preparation and the sequence of measurements after conditioning the membranes in the chamber.
+The reference and treated samples were mounted together to reduce the effect of changes in humidity during the measurement period.
+The treatment was applied during the preceding experiment before the samples were returned to the same chamber to rest overnight in a dry atmosphere.
+\end{tablenotes}
+\end{table}
+
+\captionof{figure}[F9 unprinted short caption]{
+Uptake increased on the coated membrane at steady flow.
+The plot includes measurements from the start of each run and during the period when the reference membrane stopped gaining mass.
+The markers show the individual measurements and the line links the time averages recorded at each level of “inlet humidity.”
+However, the effect may depend on the inlet conditions used for the reference membrane.
+}
+
+The high humidity calculation did not converge.

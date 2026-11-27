@@ -19,13 +19,15 @@ import time
 import tomllib
 
 from cse_hook_common import nearest_context
-from setup_scientific_project import routing_report
+from setup_scientific_project import routing_report, source_commit
 
 
 ROOT = Path(__file__).resolve().parents[2]
 RUNTIME_SOURCE = ROOT / "scripts/workflow/cse-test-gate.py"
 COMMON_SOURCE = ROOT / "scripts/workflow/cse_hook_common.py"
 PROSE_SOURCE = ROOT / "scripts/workflow/check_prose.py"
+MANUSCRIPT_SOURCE = PROSE_SOURCE.with_name("manuscript_text.py")
+SETUP_SOURCE = PROSE_SOURCE.with_name("setup_scientific_project.py")
 STANCE_SOURCE = ROOT / "assets/workflow/scientific-stance.txt"
 ROUTING_SOURCE = ROOT / "assets/workflow/skill-routing.txt"
 CONFIG_SOURCE = ROOT / "assets/workflow/codex/hooks.json"
@@ -44,9 +46,8 @@ class InstallError(RuntimeError):
 
 
 def validate_sources() -> None:
-    compile(RUNTIME_SOURCE.read_text(encoding="utf-8"), str(RUNTIME_SOURCE), "exec")
-    compile(COMMON_SOURCE.read_text(encoding="utf-8"), str(COMMON_SOURCE), "exec")
-    compile(PROSE_SOURCE.read_text(encoding="utf-8"), str(PROSE_SOURCE), "exec")
+    for source in (RUNTIME_SOURCE, COMMON_SOURCE, PROSE_SOURCE, MANUSCRIPT_SOURCE, SETUP_SOURCE):
+        compile(source.read_text(encoding="utf-8"), str(source), "exec")
     stance = STANCE_SOURCE.read_text(encoding="utf-8").strip()
     if not stance or len(stance.split()) > 180:
         raise InstallError("scientific stance must contain 1 to 180 words")
@@ -97,26 +98,33 @@ def atomic_write(target: Path, content: bytes, mode: int) -> None:
 
 def runtime_files(home: Path):
     directory = home.resolve() / RUNTIME_DIRECTORY
-    return (
+    files = (
         (RUNTIME_SOURCE, directory / "cse-test-gate.py", 0o755),
         (COMMON_SOURCE, directory / "cse_hook_common.py", 0o644),
         (PROSE_SOURCE, directory / "check_prose.py", 0o644),
+        (MANUSCRIPT_SOURCE, directory / MANUSCRIPT_SOURCE.name, 0o644),
+        (SETUP_SOURCE, directory / SETUP_SOURCE.name, 0o644),
+        *((ROOT / path, directory / path, 0o644) for path in
+          ("assets/workflow/protocol.md", "assets/workflow/project/AGENTS.md")),
         (ROOT / "BANNED.md", directory / "cse-BANNED.md", 0o644),
         (STANCE_SOURCE, directory / "cse-scientific-stance.txt", 0o644),
         (ROUTING_SOURCE, directory / "cse-skill-routing.txt", 0o644),
+    )
+    return (
+        *((source.read_bytes(), target, mode) for source, target, mode in files),
+        ((source_commit() + "\n").encode("ascii"), directory / "cse-source-commit", 0o644),
     )
 
 
 def install_runtime(home: Path, replace: bool) -> list[tuple[Path, str]]:
     files = runtime_files(home)
     # Check every target before replacing any shared runtime file.
-    for source, target, _ in files:
+    for content, target, _ in files:
         check_target(target)
-        if target.exists() and target.read_bytes() != source.read_bytes() and not replace:
+        if target.exists() and target.read_bytes() != content and not replace:
             raise InstallError(f"stable hook differs: {target}; use --replace-runtime for a deliberate hook update")
     results = []
-    for source, target, mode in files:
-        content = source.read_bytes()
+    for content, target, mode in files:
         if target.is_file() and target.read_bytes() == content:
             results.append((target, "unchanged"))
             continue
@@ -342,7 +350,7 @@ def diagnose(path: Path, home: Path, agent: str) -> dict:
     routing = routing_report(root)
     target = root / CONFIG_PATHS[agent]
     runtime = []
-    for source, installed, _ in runtime_files(home):
+    for content, installed, _ in runtime_files(home):
         try:
             check_target(installed)
         except InstallError as exc:
@@ -350,7 +358,7 @@ def diagnose(path: Path, home: Path, agent: str) -> dict:
                             "sha256": None, "error": str(exc)})
             continue
         runtime.append({"path": str(installed), "matches_source": installed.is_file()
-                        and installed.read_bytes() == source.read_bytes(),
+                        and installed.read_bytes() == content,
                         "sha256": hashlib.sha256(installed.read_bytes()).hexdigest() if installed.is_file() else None})
     paths = ([home / ".codex/hooks.json", home / ".codex/config.toml",
               root / ".codex/hooks.json", root / ".codex/config.toml"] if agent == "codex" else

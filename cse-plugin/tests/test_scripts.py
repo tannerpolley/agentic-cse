@@ -22,6 +22,53 @@ def setUpModule() -> None:
 
 
 class ScriptBehaviorTests(unittest.TestCase):
+    def test_installed_session_start_reports_stale_protocol_and_packaged_commit(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            project = root / "paper"
+            self.hook_fixture(project, "tool")
+            reconciled = self.run_script(
+                "plugin/scripts/workflow/setup_scientific_project.py", "--repo", str(project),
+                "--check-routing", "--apply", "--role", "tool",
+            )
+            self.assertEqual(0, reconciled.returncode, reconciled.stdout + reconciled.stderr)
+            agents = project / "AGENTS.md"
+            current = agents.read_text()
+            commit = "fedcba9876543210" * 2 + "fedcba98"
+            plugin = root / "plugin"
+            staged = self.run_script("scripts/package_inventory.py", "stage", "cse", str(plugin), "--commit", commit)
+            self.assertEqual(0, staged.returncode, staged.stdout + staged.stderr)
+            home = root / "home"
+            installed = subprocess.run(
+                [sys.executable, str(plugin / "scripts/workflow/install_cse_hooks.py"),
+                 "--home", str(home), "--repo", str(project), "--agent", "claude"],
+                text=True, capture_output=True,
+            )
+            self.assertEqual(0, installed.returncode, installed.stdout + installed.stderr)
+            shutil.rmtree(plugin)
+            runtime = home / ".local/share/cse/hooks"
+
+            def session(source):
+                result = subprocess.run(
+                    [sys.executable, str(runtime / "cse-test-gate.py"), "SessionStart"], cwd=project,
+                    input=json.dumps({"cwd": str(project), "session_id": "routing", "source": source}),
+                    text=True, capture_output=True,
+                )
+                self.assertEqual(0, result.returncode, result.stderr)
+                self.assertEqual("", result.stderr)
+                return json.loads(result.stdout)["hookSpecificOutput"]["additionalContext"]
+
+            self.assertTrue(session("startup").endswith(f"\nCSE plugin commit {commit}."))
+            self.assertIn("cse:write", current)
+            agents.write_text(current.replace("cse:write", "cse:retired-stage", 1))
+            changed = session("compact")
+            self.assertIn(f"\nCSE plugin commit {commit}. CSE Protocol block is stale.", changed)
+            self.assertEqual(1, changed.count("CSE Protocol block is stale"))
+            (runtime / "setup_scientific_project.py").unlink()
+            on_error = session("resume")
+            self.assertNotIn("CSE plugin commit", on_error)
+            self.assertNotIn("CSE Protocol block is stale", on_error)
+
     def test_installed_hook_identifier_advisories_never_block(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

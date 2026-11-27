@@ -28,10 +28,13 @@ except ImportError:
     )
 
 
-ROOT = Path(__file__).resolve().parents[2]
+HERE = Path(__file__).resolve().parent
+INSTALLED = (HERE / "cse-source-commit").is_file()
+ROOT = HERE if INSTALLED else HERE.parents[1]
 ASSETS = ROOT / "assets" / "workflow" / "project"
 PROTOCOL_TEMPLATE = ROOT / "assets" / "workflow" / "protocol.md"
-SKILL_ROUTING = ROOT / "assets" / "workflow" / "skill-routing.txt"
+SKILL_ROUTING = (HERE / "cse-skill-routing.txt" if INSTALLED
+                 else ROOT / "assets" / "workflow" / "skill-routing.txt")
 BLOCK_BEGIN = "<!-- CSE:BEGIN PROTOCOL -->"
 BLOCK_END = "<!-- CSE:END PROTOCOL -->"
 AGENT_ROLE_SECTION = re.compile(r"(?ms)^## Agent role[ \t]*\n.*?(?=^#{1,2}[ \t]|\Z)")
@@ -77,6 +80,9 @@ def digest(path: Path) -> str:
 
 
 def source_commit() -> str:
+    identity = ROOT / "cse-source-commit"
+    if identity.is_file():
+        return identity.read_text(encoding="ascii").strip()
     result = subprocess.run(
         ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True,
         capture_output=True, check=False,
@@ -268,7 +274,8 @@ def routing_report(repo: Path, role: str | None = None, agent_role_value: str | 
         after = before.replace(existing, rendered)
     if status == "present" and not role_first(existing):
         missing.append("agent role as the first instruction of the managed block")
-    block_state = status if status != "present" else ("current" if existing == rendered else "stale")
+    block_state = status if status != "present" else (
+        "unverified" if rendered is None else "current" if existing == rendered else "stale")
     targets = {
         f"docs/scientific/{name}": readable_file(repo / "docs/scientific" / name)
         for name in MANDATORY
@@ -1040,6 +1047,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--repo", type=Path, required=True)
     parser.add_argument("--check-routing", action="store_true")
+    parser.add_argument("--status-only", action="store_true", help=argparse.SUPPRESS)
     parser.add_argument("--reconcile", action="store_true")
     parser.add_argument("--approve", "--apply", dest="approve", action="store_true")
     parser.add_argument("--role", choices=sorted(ROLE_VALUES))
@@ -1052,6 +1060,15 @@ def main() -> int:
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--optional", default="")
     args = parser.parse_args()
+    if args.status_only:
+        if not args.check_routing or args.approve or args.reconcile:
+            parser.error("--status-only requires a read-only --check-routing")
+        try:
+            report = routing_report(args.repo)
+            print(json.dumps({"block": report["block"], "commit": source_commit()}))
+        except (OSError, SetupError, ValueError):
+            return 1
+        return 0
     if args.check_routing or args.reconcile:
         if args.approve and args.role is None:
             parser.error("--role is required with --approve/--apply")

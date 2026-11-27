@@ -418,6 +418,24 @@ def test_changes(state: dict, repository: Path, project: Path) -> str:
     return f"CSE: tests {'; '.join(parts)}." if parts else ""
 
 
+def session_routing(project: Path) -> str:
+    """Report the installed identity and Setup's block status, within one second."""
+    try:
+        setup = Path(__file__).resolve().with_name("setup_scientific_project.py")
+        result = subprocess.run(
+            [sys.executable, str(setup), "--repo", str(project), "--check-routing", "--status-only"],
+            capture_output=True, text=True, check=True, timeout=1,
+        )
+        report = json.loads(result.stdout)
+        commit = report["commit"]
+        if not re.fullmatch(r"[0-9a-f]{40,64}", commit):
+            return ""
+        stale = " CSE Protocol block is stale. Run cse:setup to reconcile AGENTS.md." if report["block"] == "stale" else ""
+        return f"\nCSE plugin commit {commit}.{stale}"
+    except (OSError, subprocess.SubprocessError, ValueError, KeyError, TypeError):
+        return ""
+
+
 def main() -> int:
     if len(sys.argv) != 2 or sys.argv[1] not in {"SessionStart", "SubagentStart", "UserPromptSubmit", "Stop"}:
         print("usage: cse-test-gate.py EVENT", file=sys.stderr)
@@ -436,7 +454,7 @@ def main() -> int:
                 start(event, repository, project)
             except (HookError, OSError, subprocess.TimeoutExpired) as exc:
                 stance += f" CSE session record unavailable: {exc}."
-            emit(context(event_name, stance))
+            emit(context(event_name, stance + session_routing(project)))
         elif event_name == "Stop":
             warnings: list[str] = []
             failures: list[str] = []
