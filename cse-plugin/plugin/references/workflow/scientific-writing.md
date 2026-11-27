@@ -10,7 +10,7 @@ and apply [fitness for purpose](numerical-testing.md#fitness-for-purpose).
   names it without numerical results.
 - **Outline from the displays** (Whitesides 2004): plan the equations, figures, and tables first, ordered by
   importance, then write the text that explains them.
-- **Findings first** (Mensh and Kording 2017, Rule 7): results are a chain of supported claims. Apply the paragraph structure below.
+- **Findings first** (Mensh and Kording 2017, Rule 7): results are a chain of supported claims, not the path taken. Apply the paragraph structure below.
 - **A conditions table and a result plot** (ACS Guide 2.1.3, 4.1, 4.2): give every study that runs inputs to
   outputs a conditions table and a result plot. Put inputs on x and outputs on y in an X–Y plot. The results
   paragraph poses the question, points to the displays, and ends with the finding and only the numbers the claim
@@ -156,7 +156,7 @@ This is **IMRaD as four questions** (Gastel and Day 2022; Sollaci and Pereira 20
 what, with engineering variants such as a model section, combined Results and discussion, or alternating
 methods and results. The discussion interprets and bounds; conclusions say what was learned (ACS Guide 2.3.8),
 pairing each finding with its consequence or domain of validity. Top-level headings use the field's
-conventional names. Subheadings name the system, study, or step. Merge adjacent sections when the scientific
+conventional names. Subheadings name the system, study, or step, never an internal label. Merge adjacent sections when the scientific
 argument is clearer without a separate heading. Introduce each result before showing it, then interpret it. Carry only the evidence needed for the conclusion.
 
 ## Skeletons by paper type
