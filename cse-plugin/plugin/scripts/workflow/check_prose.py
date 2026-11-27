@@ -4,6 +4,7 @@
 from __future__ import annotations
 
 import ast
+import json
 import zipfile
 from xml.etree import ElementTree as ET
 import argparse
@@ -836,6 +837,7 @@ def main() -> int:
     parser.add_argument("--config", type=Path)
     parser.add_argument("--since", metavar="REV", help="report findings on lines changed since REV")
     parser.add_argument("--root", type=Path, default=Path.cwd(), help="project root containing GLOSSARY.md or GLOSSARY-MAP.md")
+    parser.add_argument("--summary-json", action="store_true", help="print only the summary counts as JSON")
     args = parser.parse_args()
 
     notices = []
@@ -931,9 +933,12 @@ def main() -> int:
     findings.sort(key=lambda item: (roles[item.path] == "supplement", order[item.path],
                                    int(item.location) if item.location.isdecimal() else 0))
     notices = list(dict.fromkeys(notices))
+    kinds = Counter(item.kind for item in findings)
+    if args.summary_json:
+        print(json.dumps({"kinds": kinds, "scan_notices": len(notices)}, sort_keys=True))
+        return int(bool(failures))
     for message in [*findings, *notices, *failures]:
         print(message)
-    kinds = Counter(item.kind for item in findings)
     files = Counter(relative_path(item.path, args.root) for item in findings)
     ranks = Counter(roles[item.path] for item in findings)
     kind_counts = ", ".join(f"{kind} {count}" for kind, count in sorted(kinds.items())) or "none"
