@@ -15,7 +15,6 @@ SOLUTION = ROOT / "analyses/heat_verification/figures/solution_overlay/output/so
 CASE = json.loads(
     (ROOT / "analyses/heat_verification/inputs/case.json").read_text(encoding="utf-8")
 )
-NOTEBOOK = ROOT / "analyses/heat_verification/notebook.qmd"
 
 refinement = pd.read_csv(REFINEMENT, float_precision="round_trip")
 solution = pd.read_csv(SOLUTION, float_precision="round_trip")
@@ -94,28 +93,6 @@ if not np.all(np.abs(amplification.crank_nicolson_factor) <= 1.0 + 8.0e-15):
 negative_cn = amplification.loc[amplification.diffusion_number > 0.5, "crank_nicolson_factor"]
 if not np.all(negative_cn < 0.0):
     failures.append("Crank-Nicolson worst-mode factor did not become negative above r=0.5")
-
-notebook = NOTEBOOK.read_text(encoding="utf-8")
-
-
-def notebook_scientific(value: float) -> str:
-    mantissa, exponent = f"{value:.6e}".split("e")
-    return f"${mantissa}\\times10^{{{int(exponent)}}}$"
-
-
-for study, method, label in (
-    ("combined", "ftcs", "Combined | FTCS"),
-    ("combined", "crank-nicolson", "Combined | Crank--Nicolson"),
-    ("temporal", "ftcs", "Temporal | FTCS"),
-    ("temporal", "crank-nicolson", "Temporal | Crank--Nicolson"),
-):
-    finest = refinement[(refinement.study == study) & (refinement.method == method)].iloc[-1]
-    expected = (
-        f"| {label} | {notebook_scientific(finest.linf_error)} | "
-        f"{finest.observed_order_linf:.6f} |"
-    )
-    if expected not in notebook:
-        failures.append(f"notebook retained-value row is stale: {study}/{method}")
 
 if failures:
     raise SystemExit("\n".join(failures))

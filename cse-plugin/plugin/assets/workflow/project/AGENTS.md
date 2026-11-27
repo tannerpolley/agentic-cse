@@ -18,9 +18,9 @@ An unexplained numerical result enters Diagnose before implementation changes.
 Use Explore for disposable calculations and Promote for durable methods,
 results, records, or tests. Tests exist only for a numerical tolerance,
 invariant, reference case, or one exact demonstrated failure.
-Create an analysis research notebook only after useful numerical results exist,
-then review the notebook and selected render together. Review advises; only the
-investigator may promote the reviewed notebook for manuscript use.
+Retain useful numerical results with their evidence. Review checks the retained
+values, figures, and analysis records. Only the investigator may promote a
+reviewed result commit for manuscript use, confirming its use and limitations.
 
 Repository-specific scientific decisions live under `docs/scientific/` and
 bounded retained calculations live under root `analyses/<short-id>/`.

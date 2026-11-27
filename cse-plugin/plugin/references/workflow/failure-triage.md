@@ -34,7 +34,7 @@ Generic success booleans, exit codes, preflight checks, placeholders, and
 empty result files do not satisfy this rule. If no useful numerical result
 exists, say so, identify the exact stopping point and diagnostic, route the
 cause to `cse:diagnose`, and continue with the smallest evidence-driven probe.
-Do not report the analysis complete or create a notebook or empty figure.
+Do not report the analysis complete or create an empty figure.
 
 ## Fix before a negative disposition
 
@@ -68,7 +68,7 @@ honest.
 
 An input-readiness question may end with a supported input rejection. That
 answers only the readiness question and is not a numerical disposition: it
-establishes no model behavior and does not justify a results notebook.
+establishes no model behavior.
 
 ## Bound the claim
 

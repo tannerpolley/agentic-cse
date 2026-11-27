@@ -62,7 +62,7 @@ Assess the following dimensions against the repository evidence:
    distinguish code verification, solution verification, model validation,
    numerical uncertainty, and physical uncertainty without overpromising?
 4. **Skill routing and continuity.** Do setup, research, design, build,
-   analyze, summarize, review, and write form a coherent workflow spine? Do
+   analyze, review, and write form a coherent workflow spine? Do
    plot, digitize, zotero, mathpix, tikz, and pgfplots return useful evidence or files to those
    stages? Are the continuation rules useful, or do entrypoint overlap and
    repeated alignment questions create friction?
@@ -73,7 +73,7 @@ Assess the following dimensions against the repository evidence:
    Companion, repository snapshots, and remote search clear?
    Are paper acquisition, exact locators, private attachments, provenance, and
    correction permissions safe and practical?
-7. **Writing and plotting support.** Do the notebook, manuscript, bibliography,
+7. **Writing and plotting support.** Do the retained results, manuscript, bibliography,
    figure, style, and claim-boundary rules support reproducible scientific
    communication? Are important scientific writing or plotting workflows
    missing?
@@ -123,7 +123,7 @@ If a priority level has no findings, say so explicitly.
 
 ### Scientific workflow coverage
 
-Map the nine workflow stages, supporting tools, and the example to the
+Map the eight workflow stages, supporting tools, and the example to the
 work they actually support. Identify
 missing workflows and explain which should be added, clarified, delegated to the
 user's repository, or deliberately left out.

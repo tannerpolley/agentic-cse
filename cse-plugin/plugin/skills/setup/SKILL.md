@@ -20,22 +20,21 @@ never silently install them. Paths below are relative to that root (prefix
 `plugin/` from a contributor checkout).
 
 For record ownership, load [scientific-projects](../../references/workflow/scientific-projects.md);
-for analysis sets and site ownership, load [analysis-sets](../../references/workflow/analysis-sets.md).
+for analysis sets, load [analysis-sets](../../references/workflow/analysis-sets.md).
 
 1. Inspect repository guidance, Git state, scientific records, vocabulary,
    inputs, analyses, documents, and available commands. Recommend `analysis`
    (a repository answering a scientific question) or `tool` (reusable scientific
    software), with a reason. For existing records, migration, vocabulary,
-   tracker reconciliation, a Quarto site, or requested hooks, load
+   tracker reconciliation or requested hooks, load
    [Setup maintenance](../../references/workflow/setup-maintenance.md) only
    for the applicable work; it owns preview, approval, and preservation rules.
 2. Ask one round of native structured questions to confirm the role, purpose,
    scientific discipline and specialization, and one paragraph of project
    responsibilities. Retain confirmed answers on later passes. Offer optional
    records and integrations in that round. First-run defaults when no choice
-   is made: no hooks, source/data adoption `none`, no Snakemake, and a Quarto
-   site only for `analysis` when Quarto is present. Existing decisions survive
-   omitted choices. Use the shared
+   is made: no hooks, source/data adoption `none`, and no Snakemake. Existing
+   decisions survive omitted choices. Use the shared
    [decision-frontier rule](../../references/workflow/operating-model.md#decision-frontier-handoff-and-reference-reuse)
    for unresolved material choices.
 3. Preview the exact files and guidance to be written before mutation:
@@ -56,8 +55,5 @@ for analysis sets and site ownership, load [analysis-sets](../../references/work
    automatic guidance loading.
 4. Verify both core records are readable and `--check-routing` reports the
    correct protocol and roles. Finish approved optional work using Setup
-   maintenance. For an approved analysis site, run the plugin's
-   `manuscript.py init analyses/` after the synthesis exists at `analyses/index.qmd`.
-   Rebuild pages on request with `render.sh` or `manuscript.py refresh`. Report
-   the files, choices, missing capabilities,
-   and next study step (`cse:design`, or `cse:research` / `cse:diagnose` if needed).
+   maintenance. Report the files, choices, missing capabilities, and next study
+   step (`cse:design`, or `cse:research` / `cse:diagnose` if needed).

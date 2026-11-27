@@ -1,6 +1,6 @@
 ---
 name: analyze
-description: "Run accepted studies and interpret numerical results. Use when acting as a test sub-agent, or asked to \"analyze fit results\", \"run the study\", \"run the sweep\", or \"what do these results show\". Check balances, residuals, convergence, failed cases, and uncertainty. Notebook write-up goes to summarize."
+description: "Run accepted studies and interpret numerical results. Use when acting as a test sub-agent, or asked to \"analyze fit results\", \"run the study\", \"run the sweep\", or \"what do these results show\". Check balances, residuals, convergence, failed cases, and uncertainty."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
@@ -29,17 +29,8 @@ For a registered source dataset moving into an analysis, follow the [Zotero
 source/data handoff](../../references/sources/zotero-companion.md#source-and-data-handoff-to-analyze)
 before running the calculation.
 For an adopted analysis with a local Snakefile, use its optional `calculate`
-entry for declared study-level work and hand retained checked outputs to
-Summarize; read the [Snakemake workflow reference](../../references/workflow/snakemake.md).
-Run the calculation and handoff as two commands:
-
-```bash
-snakemake --cores 1 calculate
-python3 analyses/manuscript.py refresh analyses analyses/<id>/notebook.qmd
-```
-
-Refresh runs the report folder's `present` rule if it has a Snakefile, then
-renders the report and home page from retained results.
+entry for declared study-level work and `present` for selected displays from
+retained results. Read the [Snakemake workflow reference](../../references/workflow/snakemake.md).
 
 Inspect the accepted question, model, inputs, method, compute path, prior
 results, and claim limits. Check balances, residuals, invariants, convergence,
@@ -66,7 +57,8 @@ Require a useful, method-specific numerical result as defined by
 [failure-triage](../../references/workflow/failure-triage.md). Reported success, an exit code, completed preflight, placeholder,
 empty result file, or empty plot is not a result. If no useful result exists,
 state that plainly, preserve the exact stopping point and diagnostic, and
-route the cause to `cse:diagnose`; do not report completion or create a
-notebook. A numerical non-result returns through Diagnose to an attempted fix; see
-[failure-triage](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition). Otherwise send the retained results to `cse:summarize` so Review can
-inspect the complete notebook and selected render.
+ask `cse:diagnose` to establish the cause. A numerical non-result returns through
+Diagnose to an attempted fix under
+[failure-triage](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition).
+Otherwise summarize the result, evidence, interpretation, and limitations in
+chat with retained paths, then hand the analysis set to `cse:review`.

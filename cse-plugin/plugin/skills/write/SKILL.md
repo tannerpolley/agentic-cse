@@ -24,9 +24,9 @@ For a new or rejected manuscript, journal retarget, or material restructure,
 follow [manuscript structure review](../../references/workflow/manuscript-review.md#manuscript-structure-review).
 For manuscript citations, use the [bibliography snapshot protocol](../../references/workflow/manuscript-review.md#bibliography-snapshot).
 
-Inspect the accepted question, formulation, methods, evidence, notebook,
-sources, audience, and intended endpoint. Before relying on a reviewed notebook,
-follow the [promotion procedure](../../references/visualize/latex-article-profiles.md#promotion-between-profiles).
+Inspect the accepted question, formulation, methods, evidence, retained results,
+sources, audience, and intended endpoint. Before relying on reviewed results, follow the
+[investigator promotion procedure](../../references/workflow/operating-model.md#continuation-and-investigator-promotion).
 
 **Complete when** the principles are read, the applicable editorial directions
 and accepted evidence are identified, and the structure plan is accepted for

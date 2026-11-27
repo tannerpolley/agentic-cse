@@ -1,7 +1,7 @@
 # Setup reconciliation and optional integrations
 
 Load this reference for existing scientific records, migration, vocabulary,
-tracker reconciliation, a Quarto site, or requested hooks. Preserve accepted
+tracker reconciliation or requested hooks. Preserve accepted
 setup and revise only the unresolved subset. Confirm `analysis` or `tool` on
 reconciliation runs; continuing handoffs inherit an answer. Use
 [scientific-projects](scientific-projects.md) for record ownership,
@@ -25,21 +25,21 @@ one multi-select input when available; pass names as comma-separated
 bibliography belong under `docs/scientific/latex/` when writing is selected.
 Create only populated analysis inputs, scripts, results, and figures; new
 sets use `analyses/<short-id>/{inputs,scripts,results,figures}`.
-Setup creates no substantive per-analysis report; Summarize owns it.
+Setup leaves existing analysis files and sites in place.
 
 Merge content from CSE-format stray `CONTEXT.md` files only when those files
 will be removed. Do not copy prose from files that stay in place.
 
 During Setup in an established repository, detect every competing CSE-created
 record owner, including `docs/`, `docs/latex/`, alternate decision-record
-directories, central notebooks, superseded analysis metadata, generated
+directories, superseded analysis metadata, generated
 reports, and repository-native equivalents. Preview the exact source-to-target
 moves, caller and link updates, retained inputs and outputs, and displaced
 owners to remove. Obtain approval before mutation. Use `git mv` where practical
 to preserve history and ownership, update every real caller and link, verify
 the destination, render selected documents, and remove displaced owners in the
 same change. Leave no alias, duplicate, or redirect and never retain two
-accepted decision record or notebook locations.
+accepted locations for decision records.
 
 Keep the existing literal caller rewriting; changing it is outside this
 migration. Literal rewrites miss code-built paths and fixed parent-directory
@@ -99,18 +99,7 @@ show `project-register` preview for an existing collection or a new one under
 the root, then apply only after approval. Write personal terminology,
 Companion state, or remote records only after their required approval.
 
-## Optional analysis site
-
-For confirmed `analysis`, confirm purpose, home content, and adoption in the
-same question round. When Quarto is present and the populated synthesis exists
-at `analyses/index.qmd`, run the plugin's `manuscript.py init analyses/`. Preserve
-an existing root instead of migrating it solely to match the default. A `tool`
-gets no site by default. Without the required renderer, finish independent
-setup, report the missing executable, and install nothing.
-
-For an existing managed site, follow the
-[managed-root upgrade](../visualize/quarto-execution.md#upgrading-a-managed-root).
-Rebuild pages on request with `render.sh` or `manuscript.py refresh`.
+## Optional Snakemake adoption
 
 Offer Snakemake adoption for a populated analysis only as an option; read
 [Snakemake](snakemake.md) when selected and record the choice.

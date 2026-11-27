@@ -93,7 +93,7 @@ def report() -> str:
         f"Core — {'ready' if core_ready else 'incomplete'}",
         f"  Git: {'present' if git else 'missing'}",
         f"  Python: {python_version} ({'supported' if python_ready else 'Python 3.11 or newer required'})",
-        "  Skills: cse:setup, cse:design, cse:build, cse:analyze, cse:summarize, cse:review",
+        "  Skills: cse:setup, cse:design, cse:build, cse:analyze, cse:review",
         "  Numerical runs also need the repository's selected solver and dependencies.",
         f"Documents — {documents_state}",
         f"  Quarto: {'present' if quarto else 'missing'}; used by cse:quarto and manuscript rendering",

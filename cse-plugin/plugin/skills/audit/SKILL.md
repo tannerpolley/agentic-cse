@@ -112,7 +112,7 @@ findings last. Use these tags:
 - `dedupe`: retain one authoritative copy and derive any secondary view;
 - `move`: relocate unique values to their scientific owner;
 - `replace`: substitute an actual calculation, result table, diagnostic, or
-  notebook interpretation for software ceremony;
+  scientific interpretation for software ceremony;
 - `prevent`: change one existing generator or check seam that caused repeated
   findings;
 - `keep`: record why a tempting construct is scientifically necessary; and

@@ -2,7 +2,7 @@
 
 This repository is the source for the single `cse` plugin. The installable
 payload lives in [`plugin/`](plugin/); contributor checks and setup commands
-live in [`scripts/`](scripts/). Repository-only examples and tests stay outside
+live in [`scripts/`](scripts/). Repository-only examples, tests, and archived material stay outside
 the payload; ScienceBench owns live workflow and routing evaluation.
 
 ## Where to work
@@ -29,7 +29,7 @@ uv pip install --python .venv/bin/python -r requirements-validation.txt
 CSE_VALIDATION_PYTHON=.venv/bin/python ./scripts/validate.sh
 ```
 
-Codex and Claude Code use the same 22 skills and scientific content. See the
+Codex and Claude Code use the same 18 skills and scientific content. See the
 host-specific setup and diagnostics in
 [`plugin/references/hosts/codex.md`](plugin/references/hosts/codex.md) and
 [`plugin/references/hosts/claude.md`](plugin/references/hosts/claude.md).

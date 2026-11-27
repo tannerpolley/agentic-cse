@@ -5,7 +5,7 @@ numerical work, checked results, and a readable explanation. It suits chemical
 engineers and other researchers who work in Git repositories and want to
 check what a calculation can support. You are the **investigator**: the person
 who chooses the question, approves material decisions, and judges whether the
-result is useful. The plugin supplies 19 skills as `cse:<skill>` for Claude
+result is useful. The plugin supplies 18 skills as `cse:<skill>` for Claude
 Code and Codex; external scientific software remains project-specific.
 
 ## Install
@@ -46,8 +46,8 @@ contacts no paid service. The three tiers are independent additions:
 
 | Tier | External tools | What you can do |
 |---|---|---|
-| Core | Git and Python | Setup, research planning, Design, Build, Analyze, Summarize, Review, and writing checks; running a model also needs that project's scientific software |
-| Documents | Quarto; LuaLaTeX and `latexmk`; optional Snakemake | Render notebooks and sites, articles, slides, diagrams, and plots; Snakemake manages adopted calculation steps |
+| Core | Git and Python | Setup, research planning, Design, Build, Analyze, Review, and writing checks; running a model also needs that project's scientific software |
+| Documents | Quarto; LuaLaTeX and `latexmk`; optional Snakemake | Render articles, slides, diagrams, and plots; Snakemake manages adopted calculation steps |
 | Sources | `cse-zotero`; optional Mathpix credentials | Inspect and curate Zotero sources and scientific data; Mathpix transcribes PDFs when needed |
 
 The readiness report distinguishes an executable being present from a complete
@@ -61,7 +61,7 @@ Open your project in the agent host and invoke `/cse:setup` in Claude Code or
 (a study answering a question) or `tool` (reusable scientific software), and
 asks one round of questions. It previews and writes two scientific records
 and a managed protocol in `AGENTS.md`. Defaults are no hooks, no source/data
-adoption, no Snakemake, and an analysis site only when Quarto is present.
+adoption, and no Snakemake.
 
 Then start one bounded study:
 
@@ -74,12 +74,11 @@ Then start one bounded study:
 3. `cse:analyze`: run it and inspect balances, residuals, convergence, and
    failed cases. Keep **retained values**: saved numerical inputs and results
    with their origin, so later figures can be checked against them.
-4. `cse:summarize`: explain those saved results in the research notebook.
-   To **promote** the work is to select supported results for a separate
-   manuscript through `cse:write`; a rendered page alone does not establish
-   scientific acceptance.
-5. `cse:review`: independently check the evidence and the limits of the claim.
-   Review also checks design readiness before Build.
+   Summarize the retained results and limitations in chat.
+4. `cse:review`: independently check the retained evidence and the limits of
+   the claim. Review also checks design readiness before Build.
+5. `cse:write`: use reviewed results in a manuscript after the investigator
+   **promotes** the exact result commit for the stated use and limitations.
 
 These stages may take longer than five minutes; the first session establishes
 the question and next action. See the
@@ -88,7 +87,7 @@ the question and next action. See the
 [terminology](references/workflow/terminology.md) for the plugin's words.
 
 Research and design covers Setup, Research, Diagnose, and Design.
-Execute and deliver covers Build, Analyze, Summarize, and authorized Write
+Execute and deliver covers Build, Analyze, and authorized Write
 and delivery.
 Independent `review` checks scientific support; `prose` checks writing quality.
 Direct execution is the default, with native host delegation for bounded
@@ -97,8 +96,7 @@ independent work when useful.
 ## Platform limits
 
 The plugin's commands and validation are tested on Linux. macOS and Windows
-have not been tested. Rebuild analysis pages on request with `render.sh`
-or `manuscript.py refresh`.
+have not been tested.
 
 The [public source](https://github.com/tannerpolley/agentic-cse) identifies
 payloads by source commit and content hash. Contributor checks live in the

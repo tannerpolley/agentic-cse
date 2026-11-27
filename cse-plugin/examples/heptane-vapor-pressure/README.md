@@ -11,7 +11,7 @@ correlation's stated temperature range, with no parameter fitting.
 
 Use Python 3.11 or newer with NumPy (`python3 -m pip install numpy` in your own
 environment). From **this example directory**, one command regenerates the
-retained result table, model sweep, summary, notebook includes, and one figure:
+retained result table, model sweep, summary, and one figure:
 
 ```bash
 python3 analyses/vapor-pressure/scripts/run.py
@@ -39,17 +39,11 @@ retained outputs. For example: `python3 analyses/vapor-pressure/scripts/run.py /
    `results/comparison.csv` carries each selected measurement, prediction,
    residual, and uncertainty with units in the headers; `model-curve.csv`
    carries all line coordinates. `summary.json` reports agreement as found.
-4. **`cse:summarize` — interpret retained results.** Read
-   [notebook.qmd](analyses/vapor-pressure/notebook.qmd). Rendering cannot run
-   the model: the notebook has no executable cells. `present.py` can separately
-   refresh the figure and includes from retained CSVs. If Quarto is installed,
-   `quarto render analyses/vapor-pressure/notebook.qmd --to html` produces its
-   presentation view; HTML is an optional, ignored build output.
-5. **`cse:review` — independently inspect support.** Check the source tables,
+4. **`cse:review` — independently inspect support.** Check the source tables,
    coefficient conventions, exclusion of the below-range point, residuals,
    figure, tolerance rationale, and limitations together. Independent acceptance
-   is pending with the orchestrator; this notebook is not promoted for manuscript
-   use. Agreement at four states does not establish a design property package.
+   is pending with the orchestrator; these retained results await investigator promotion for
+   manuscript use. Agreement at four states does not establish a design property package.
 
 ## The one result-level test
 

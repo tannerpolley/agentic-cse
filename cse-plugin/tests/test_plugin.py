@@ -13,7 +13,7 @@ import yaml
 ROOT = Path(__file__).resolve().parents[1]
 PLUGIN = ROOT / "plugin"
 SKILLS = {
-    "setup", "research", "diagnose", "design", "build", "analyze", "summarize",
+    "setup", "research", "diagnose", "design", "build", "analyze",
     "review", "write", "prose", "audit", "zotero", "data", "digitize",
     "plot", "tikz", "latex", "quarto", "beamer",
 }
@@ -296,7 +296,7 @@ One | Two | Three | Four | Five
             "setup": "Research and design", "research": "Research and design",
             "diagnose": "Research and design", "design": "Research and design",
             "build": "Execute and deliver", "analyze": "Execute and deliver",
-            "summarize": "Execute and deliver", "write": "Execute and deliver",
+            "write": "Execute and deliver",
         }
         for skill, phase in phase_descriptions.items():
             interface = yaml.safe_load((PLUGIN / "skills" / skill / "agents/openai.yaml").read_text())["interface"]
@@ -324,7 +324,7 @@ One | Two | Three | Four | Five
         self.assertIn("CSE execution mode: direct.", setup)
         self.assertNotIn("CSE execution mode: baton.", setup)
         projects = (PLUGIN / "references/workflow/analysis-sets.md").read_text()
-        self.assertIn("required renderer executable", projects)
+        self.assertIn("required renderer executable", workflow)
         self.assertNotIn("Visualize is absent", projects)
 
     def test_issue_plan_and_prose_owners_are_explicit(self):
@@ -350,11 +350,10 @@ One | Two | Three | Four | Five
         writing_routes = {
             "write": {direct: {"scientific-writing"},
                       conditional: {"writing-editorial", "manuscript-review", "latex-article-profiles"}},
-            "summarize": {direct: {"analysis-notebook-profile"}},
             "prose": {direct: {"scientific-writing", "writing-editorial"}, conditional: {"manuscript-review"}},
             "review": {conditional: {"scientific-writing", "writing-editorial", "manuscript-review"}},
-            "latex": {conditional: {"latex-article-profiles", "analysis-notebook-profile", "manuscript-review"}},
-            "quarto": {conditional: {"latex-article-profiles", "analysis-notebook-profile"}},
+            "latex": {conditional: {"latex-article-profiles", "manuscript-review"}},
+            "quarto": {conditional: {"latex-article-profiles"}},
             "beamer": {conditional: {"writing-editorial"}},
             "plot": {conditional: {"writing-editorial"}},
         }

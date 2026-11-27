@@ -42,9 +42,8 @@ uv run python scripts/validate_project.py quick
 - [Numerical methods](docs/scientific/methods.tex)
 - [Verification and uncertainty](docs/scientific/evidence.tex)
 - [Retained analysis](analyses/heat_verification/README.md)
-- [Research notebook](analyses/heat_verification/notebook.qmd)
 - [Tutorial manuscript](docs/scientific/latex/main.tex)
-- [Ten-skill evaluation](evaluation/README.md)
+- [Behavioral evaluation](evaluation/README.md)
 
 ## Retained findings
 

@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import argparse
-import base64
 import csv
 import hashlib
 import json
@@ -223,41 +222,6 @@ def provenance_fragment(summary: dict, summary_path: Path, paths: dict[str, Path
     ])
 
 
-def views_notebook(summary: dict, figure_path: Path, residual_path: Path) -> str:
-    """Return a non-executable notebook of labeled retained views for ``{{< embed >}}``."""
-    def figure_cell(label: str, caption: str, path: Path) -> dict:
-        return {
-            "cell_type": "code", "id": label, "metadata": {}, "execution_count": None,
-            "source": [f"#| label: {label}\n", f"#| fig-cap: {json.dumps(caption)}\n",
-                       f"# Retained file {path.as_posix()} (sha256 {sha256(path)})"],
-            "outputs": [{"output_type": "display_data", "metadata": {}, "data": {
-                "image/png": base64.b64encode(path.read_bytes()).decode(),
-                "text/plain": [f"<retained figure {path.as_posix()}>"],
-            }}],
-        }
-
-    table = "\n".join(parameter_table(summary)) + "\n"
-    cells = [
-        # Quarto would otherwise try to run these cells under an executing profile.
-        {"cell_type": "raw", "id": "front-matter", "metadata": {},
-         "source": ["---\n", "title: Retained cooling-fit views\n", "execute:\n", "  enabled: false\n", "---\n"]},
-        figure_cell("fig-cooling-fit", "Observed temperatures and cooling-model evaluations.", figure_path),
-        figure_cell("fig-cooling-residuals", "Residuals of the one-parameter fit at each observation time.", residual_path),
-        {"cell_type": "code", "id": "tbl-cooling-parameters", "metadata": {}, "execution_count": None,
-         "source": ["#| label: tbl-cooling-parameters\n",
-                    f"#| tbl-cap: {json.dumps(PARAMETER_CAPTION)}\n",
-                    "# Retained summary results/fit_summary.json"],
-         "outputs": [{"output_type": "display_data", "metadata": {},
-                      "data": {"text/markdown": table, "text/plain": [table]}}]},
-    ]
-    notebook = {
-        "nbformat": 4, "nbformat_minor": 5, "cells": cells,
-        "metadata": {"kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"},
-                     "language_info": {"name": "python"}},
-    }
-    return json.dumps(notebook, indent=1) + "\n"
-
-
 def write_if_changed(path: Path, content: str) -> None:
     data = content.encode()
     if path.is_file() and path.read_bytes() == data:
@@ -325,13 +289,12 @@ def present(args: argparse.Namespace) -> None:
     write_if_changed(Path(args.values), values_fragment(summary))
     write_if_changed(Path(args.provenance), provenance_fragment(
         summary, summary_path, generated_paths, input_paths["helper_sha256"]))
-    write_if_changed(Path(args.views), views_notebook(summary, figure, residual))
 
 
 def main() -> int:
     parser = argparse.ArgumentParser()
     for name in ("observations", "parameters", "environment", "script", "helper", "summary",
-                 "curve", "figure", "residual-figure", "output", "values", "provenance", "views"):
+                 "curve", "figure", "residual-figure", "output", "values", "provenance"):
         parser.add_argument(f"--{name}", required=True)
     present(parser.parse_args())
     return 0

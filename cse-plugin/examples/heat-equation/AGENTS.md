@@ -11,7 +11,7 @@ Keep the chain explicit:
   scientific API;
 - `tests/` protects distinct scientific failure meanings, not helper coverage;
 - `analyses/heat_verification/` owns the retained input snapshot, tables, exact
-  plotted data, SVG, PNG, and PDF figures, and analysis notebook;
+  plotted data and SVG, PNG, and PDF figures;
 - `docs/scientific/` owns shared formulation, method, evidence, uncertainty,
   decision records, and writing rules;
 - `docs/scientific/latex/` owns the self-contained tutorial manuscript;

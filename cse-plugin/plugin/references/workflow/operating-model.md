@@ -23,7 +23,7 @@ Research and design -- readiness Review --> Execute and deliver -- delivered Rev
 Research and design contains Setup when needed, Research, Diagnose, and Design.
 It loops until the question, equations, any correctness check, and the
 comparisons a result will be reported against are settled; nothing is built
-there. Execute and deliver contains Build, Analyze, Summarize,
+there. Execute and deliver contains Build, Analyze,
 and authorized Write and delivery. These are ownership groupings, not a demand
 to run every stage. Review independently checks design readiness before Build
 and gives [claim verdicts](../../skills/review/SKILL.md#claim-verdicts) for
@@ -32,7 +32,7 @@ tools, not execution phases.
 
 Direct tool requests return to the stage that owns the question or claim.
 
-All 19 `cse:<skill>` skills are exposed by one plugin. Source skills supply
+All 18 `cse:<skill>` skills are exposed by one plugin. Source skills supply
 evidence, rendering skills consume retained values or supported claims, and
 Prose inspects scientific writing without authoring it.
 Inspect the requested external capability; never infer Zotero, corpus,
@@ -68,12 +68,12 @@ host-specific coordination wrapper.
 Use **Explore** for disposable calculations, scratch notes, rejected methods,
 and short-lived branches that compare formulations, methods, initializations,
 or solver settings. Explore supports no accepted claim, persistent test, or
-analysis research notebook. Remove rejected implementations and
+durable analysis record. Remove rejected implementations and
 disposable checks when the question is answered.
 
 Use **Promote** when a selected formulation, method, result, record, or test
 becomes durable. Promotion requires the applicable Design, Build, Analyze,
-Summarize, and delivered Review evidence. A persistent
+and delivered Review evidence. A persistent
 repository test is Promote work even when it began as an exploratory check.
 Explore and Promote are evidence boundaries, not additional workflow stages.
 
@@ -146,19 +146,20 @@ limitation, and smallest next decision.
 
 A missing external capability is a capability limitation, not a scientific
 failure. When a source or rendering capability is required, name the missing
-executable, corpus, authentication, or renderer, give the setup step needed,
-and stop before making an unsupported claim.
+executable, corpus, authentication, or renderer and give the setup step needed.
+If a required renderer executable is unavailable, finish independent work and
+stop before making an unsupported claim.
 
-Summarize creates or refreshes the working notebook only after a useful
-method-specific numerical result exists, then renders selected views without
-rerunning the model. Delivered Review inspects that complete notebook and those
-views. Review Pass is bounded to the stated use and domain, and material changes
-to the result, notebook, figure, method, or interpretation require Review again.
+Analyze retains useful method-specific results and summarizes them in chat.
+Delivered Review inspects the retained values, figures, and analysis records.
+Review Pass is bounded to the stated use and domain, and material changes to
+the result, figure, method, or interpretation require Review again.
 
-Review does not authorize manuscript use. Immediately before Write uses a
-reviewed notebook, the investigator confirms the exact notebook commit,
-intended use, and limitations. Record that promotion in one plain sentence;
-do not create a status file or decision record.
+Immediately before Write uses reviewed results in a manuscript, obtain native
+investigator confirmation of the exact result commit, its intended use, and
+its limitations. Ask about each numerical non-result separately from the
+limitations. Record the investigator's promotion in one plain sentence
+without creating a status file or decision record.
 
 ## Language and repository boundaries
 

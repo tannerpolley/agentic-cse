@@ -8,14 +8,13 @@ plugin-wide decisions and choices made only for that example.
 
 ## Unified plugin decision
 
-The `cse` plugin owns all 21 individually callable workflow, source, data, and
+The `cse` plugin owns all 18 individually callable workflow, source, data, and
 rendering skills under the `cse:<skill>` namespace. It is staged from the single
 `plugin/` payload, identified by source commit and payload hash, and installed
 as one package. External Zotero, corpus, authentication, and renderer
 capabilities remain separately checked at use time.
 
-The three canonical phases are Research and design, Build, and Summarize,
-review, and write. Direct execution remains the default; a named skill does
+The two phases are Research and design and Execute and deliver, with independent Review checkpoints. Direct execution remains the default; a named skill does
 not create role tasks unless the user explicitly requests them.
 
 Rejected alternatives are duplicate plugin roots, forwarding skills,
@@ -34,7 +33,7 @@ scientific record.
 
 The product is a behavioral and repository-practice adapter, not a repository
 of scientific facts. It helps users produce scientific tools, numerical
-analyses, research notebooks, figures, and papers while leaving scientific
+analyses, figures, and papers while leaving scientific
 judgment with the user and the applicable domain evidence.
 
 Intended users include computational scientists, engineers, mathematicians,
@@ -87,14 +86,14 @@ versioned references. The [operating model](../../plugin/references/workflow/ope
 doctrine. Sources owns its operational
 [Zotero Companion](../../plugin/references/sources/zotero-companion.md)
 behavior, and Visualize owns its rendering references. Repository-specific
-equations, methods, evidence, notebooks, analyses, and writing rules remain in
+equations, methods, evidence, analyses, and writing rules remain in
 the user repository.
 
 The [terminology reference](../../plugin/references/workflow/terminology.md) is the canonical
 glossary for workflow stages, supporting tools, sources, extraction,
 figures, and claims.
 
-The nine workflow stages form the default agent path:
+The eight workflow stages form the default agent path:
 
 1. [`setup`](../../plugin/skills/setup/SKILL.md) establishes repository vocabulary,
    scientific documents, bibliography, writing rules, and integration paths.
@@ -107,24 +106,21 @@ The nine workflow stages form the default agent path:
 5. [`build`](../../plugin/skills/build/SKILL.md) implements equations, models,
    numerical methods, solvers, and data transformations.
 6. [`analyze`](../../plugin/skills/analyze/SKILL.md) runs studies for convergence,
-   sensitivity, uncertainty, comparison, and figures.
-7. [`summarize`](../../plugin/skills/summarize/SKILL.md) replaces the analysis
-   research notebook with the current retained results and selected render.
-8. [`review`](../../plugin/skills/review/SKILL.md) checks the full scientific chain,
-   including the notebook and selected render.
-9. [`write`](../../plugin/skills/write/SKILL.md) uses only reviewed notebook results
-   the investigator promotes for the named manuscript use.
+   sensitivity, uncertainty, comparison, and figures, then retains the results
+   and summarizes them in chat.
+7. [`review`](../../plugin/skills/review/SKILL.md) checks the full scientific chain,
+   including retained values, figures, and analysis records.
+8. [`write`](../../plugin/skills/write/SKILL.md) uses reviewed results after the
+   investigator confirms the exact result commit, use, and limitations.
 
-The eleven specialist skills are public skills but are not workflow stages:
+The supporting skills are public skills but are not workflow stages:
 
 - Sources: [`zotero`](../../plugin/skills/zotero/SKILL.md),
-  [`mathpix`](../../plugin/skills/mathpix/SKILL.md),
   [`data`](../../plugin/skills/data/SKILL.md), and
   [`digitize`](../../plugin/skills/digitize/SKILL.md) own source
   evidence, extraction, data lineage, and digitization QA.
 - Visualize: [`plot`](../../plugin/skills/plot/SKILL.md),
   [`tikz`](../../plugin/skills/tikz/SKILL.md),
-  [`pgfplots`](../../plugin/skills/pgfplots/SKILL.md),
   [`latex`](../../plugin/skills/latex/SKILL.md),
   [`quarto`](../../plugin/skills/quarto/SKILL.md),
   [`beamer`](../../plugin/skills/beamer/SKILL.md) own figures,
@@ -287,11 +283,10 @@ CSE-created shared scientific records have one owner: `docs/scientific/`.
 Formulation, methods, evidence, writing rules, optional shared LaTeX and Quarto
 sources, bibliography, manuscript, and one numbered decision-record sequence
 stay there. Each bounded analysis instead owns its retained input snapshot with
-provenance, scripts, results, figures, and notebook. New CSE-created
+provenance, scripts, results, and figures. New CSE-created
 sets default to root `analyses/<short-id>/`; established repositories may keep
 a clear repository-owned analysis path and meaningful populated child names.
-Setup never creates an empty analysis root or initial notebook; Summarize
-creates or replaces the notebook after useful results and before Review.
+Setup creates analysis directories only when they have retained content.
 
 Decision records are shared doctrine, not a public workflow stage, external
 skill dependency, or lifecycle store; the system is not a lifecycle database.
@@ -304,11 +299,9 @@ rather than a controller service or lifecycle database.
 
 ## Writing, plotting, and manuscript expectations
 
-Each analysis research notebook is the current view of one coherent question.
-Review checks that complete view; the investigator decides whether to promote
-its reviewed commit for manuscript use. Git and retained results preserve
-history. A manuscript is a selected scientific story, not a replacement for
-the notebook.
+Each analysis set contains retained evidence for one coherent question.
+Review checks that evidence. The investigator decides whether to promote the
+reviewed result commit for manuscript use. Git preserves result history.
 The [project-record reference](../../plugin/references/workflow/scientific-projects.md) expects
 questions and conditions, methods and sources, results, interpretation,
 limitations, claim boundaries, and relevant convergence, uncertainty,

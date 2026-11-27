@@ -19,7 +19,6 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[2]
 EXAMPLE = ROOT / "plugin/assets/workflow/analysis/example"
-MANUSCRIPT = ROOT / "plugin/assets/visualize/project/quarto/manuscript.py"
 _FIXTURE_SPEC = importlib.util.spec_from_file_location("cse_snakemake_fixture", ROOT / "tests/test_snakemake_template.py")
 assert _FIXTURE_SPEC and _FIXTURE_SPEC.loader
 FIXTURE = importlib.util.module_from_spec(_FIXTURE_SPEC)
@@ -236,48 +235,26 @@ Body text.
                     self.assertAlmostEqual(rate, fit["cooling_rate_per_s"])
                     self.assertIn("at least two observations", rendered)
 
-    def test_example_analysis_renders_and_refreshes_changed_retained_value(self):
-        if not shutil.which("quarto") or not shutil.which("snakemake"):
-            self.skipTest("quarto and snakemake are required for the example site render")
+    def test_example_presents_changed_retained_values_without_calculating(self):
+        if not shutil.which("snakemake"):
+            self.skipTest("snakemake is required for the example pipeline")
         with tempfile.TemporaryDirectory() as directory:
-            root = Path(directory) / "analyses"
-            analysis = root / "cooling-fit"
-            shutil.copytree(EXAMPLE, analysis, ignore=shutil.ignore_patterns(
-                "results", "figures", ".snakemake", "__pycache__"))
-            shutil.copyfile(EXAMPLE / "article.qmd", root / "index.qmd")
-            FIXTURE.write_retained_set(analysis, rate=0.005, keep_inputs=True)
+            root = Path(directory)
+            shutil.copytree(EXAMPLE, root, dirs_exist_ok=True)
+            (root / "scripts/calculate.py").write_text('raise RuntimeError("present ran calculate")\n')
 
-            def run(command, cwd=root):
-                result = subprocess.run(command, cwd=cwd, text=True, capture_output=True)
+            for rate, expected in ((0.005, "5.000"), (0.0071, "7.100")):
+                arguments = FIXTURE.write_retained_set(root, rate=rate, keep_inputs=True)
+                retained = (root / arguments.summary).read_bytes()
+                result = subprocess.run(
+                    ["snakemake", "--cores", "1", "present"], cwd=root,
+                    text=True, capture_output=True, check=False,
+                )
                 self.assertEqual(0, result.returncode, result.stdout + result.stderr)
-
-            notebook = analysis / "notebook.qmd"
-            notebook.write_text(notebook.read_text().replace(
-                "resources:\n", "execute:\n  enabled: true\nresources:\n", 1)
-                + '\n```{python}\nraise RuntimeError("render ran Python")\n```\n')
-            (root / "unregistered.qmd").write_text("# Unregistered\n")
-            run(["snakemake", "--cores", "1", "present"], analysis)
-            run([sys.executable, str(MANUSCRIPT), "init", "."])
-            run([sys.executable, "manuscript.py", "include", ".", "cooling-fit/notebook.qmd",
-                 "--title", "Cooling-rate fit", "--group", "Cooling studies"])
-            run(["bash", str(root / "render.sh")], root.parent)
-            self.assertFalse((root / "_site/unregistered.html").exists())
-
-            for target in ("index.html", "cooling-fit/notebook.html"):
-                page = (root / "_site" / target).read_text()
-                sidebar = re.search(r'<nav id="quarto-sidebar".*?</nav>', page, re.DOTALL)[0]
-                for title in ("Home", "Cooling-rate fit", "Cooling studies"):
-                    self.assertIn(f'menu-text">{title}<', sidebar)
-                self.assertNotRegex(sidebar, r'href="[^"]*\.html#')
-                self.assertIn('id="TOC"', page)
-                for label in ("fig-cooling-fit", "fig-cooling-residuals", "tbl-cooling-parameters", "eq-cooling-model"):
-                    self.assertIn(f'id="{label}"', page)
-                self.assertIn(r"5.000 \times 10^{-3}", page)
-
-            FIXTURE.write_retained_set(analysis, rate=0.0071, keep_inputs=True)
-            run([sys.executable, "manuscript.py", "refresh", ".", "cooling-fit/notebook.qmd"])
-            for target in ("index.html", "cooling-fit/notebook.html"):
-                self.assertIn(r"7.100 \times 10^{-3}", (root / "_site" / target).read_text())
+                self.assertIn(expected, (root / arguments.values).read_text())
+                self.assertEqual(retained, (root / arguments.summary).read_bytes())
+                self.assertFalse(list(root.rglob("notebook.qmd")))
+                self.assertFalse(list(root.rglob("*.ipynb")))
 
 
 if __name__ == "__main__":

@@ -40,7 +40,7 @@ user asks for a figure without specifying one.
 - Do not put fitted coefficients, digitized values, or large data arrays in
   figure source as unexplained literals.
 - A figure record should identify its question, backend, source table, columns,
-  units, series roles, output path, and claim or analysis-notebook section it
+  units, series roles, output path, and claim or analysis question it
   supports.
 
 ## Shared styles and semantics
@@ -78,7 +78,7 @@ stable names and a controlled build script; generated cache files belong in
 
 ## Figure checks
 
-Before returning a figure to `write`, `summarize`, or `review`:
+Before returning a figure to `write`, `analyze`, or `review`:
 
 1. Compile the figure and the assembled manuscript with the project command.
 2. Check that every input, table, image, and output path exists.

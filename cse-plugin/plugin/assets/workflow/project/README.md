@@ -3,10 +3,9 @@
 This directory maps the repository's scientific question and retained records.
 Source code, canonical reusable data, and model files remain in their
 repository owners. Each bounded calculation keeps its retained inputs, scripts,
-results, figures, and notebook under root `analyses/<short-id>/`. Summarize
-prepares the notebook and selected render before delivered Review; Prose
-separately inspects writing and final manuscript cohesion. The investigator
-alone promotes reviewed notebooks for manuscript use.
+results, and figures under root `analyses/<short-id>/`. Review checks that
+retained evidence. Prose separately inspects writing and final manuscript
+cohesion. The investigator alone promotes reviewed results for manuscript use.
 
 This is a CSE project. For scientific or engineering work, use the installed
 CSE skills and read this file plus the sections of `CONTEXT.md` the task needs

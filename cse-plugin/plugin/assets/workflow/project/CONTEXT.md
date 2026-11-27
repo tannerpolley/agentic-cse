@@ -24,7 +24,7 @@ analysis, and writing.
 - Methods: `docs/scientific/methods.md` when enabled
 - Verification, validation, and uncertainty: `docs/scientific/evidence.md` when enabled
 - Scientific decisions: `docs/scientific/decisions/` when enabled
-- Analyses and notebooks: root `analyses/<short-id>/`
+- Analyses: root `analyses/<short-id>/`
 - Manuscript sources: `docs/scientific/latex/` when writing is enabled
 - Bibliography: `docs/scientific/latex/references.bib` when writing is enabled
 - Zotero Companion: record the configured capability and project collection,

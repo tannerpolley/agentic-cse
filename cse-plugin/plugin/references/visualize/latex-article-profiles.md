@@ -1,21 +1,17 @@
 # LaTeX article profiles
 
 Use this reference for the LaTeX setup of author-controlled scientific articles.
-Use one profile per rendered document. Choose the [manuscript profile](#manuscript-profile)
-or [analysis-notebook profile](../workflow/analysis-notebook-profile.md) according
-to the document's scientific purpose.
+Use one profile per rendered document. Use the [manuscript profile](#manuscript-profile) for a manuscript.
 
 ## Shared article requirements
 
 - Use LuaLaTeX and KOMA-Script `scrartcl` for the author-controlled default.
   Let KOMA-Script own headings and page furniture. It also owns the manuscript
-  type area; the analysis-notebook profile instead has one explicit margin
-  owner.
+  type area.
 - Keep a one-column body so equations, process diagrams, multipanel figures,
   and scientific tables retain readable width.
 - Use the scientific core from [latex-packages](latex-packages.md). Every article-capable tool
-  in that reference may be used in either profile. A tool belongs to a
-  capability, not to a profile.
+  in that reference is available when the article needs its capability.
 - Load a package or extension only when the document exercises its capability.
   Select one owner for overlapping capabilities and keep profile styling out
   of shared notation and figure source.
@@ -26,7 +22,7 @@ to the document's scientific purpose.
   packages, and semantic figure styles in reviewed headers.
 - Apply [latex-layout-and-qa](latex-layout-and-qa.md) to every selected PDF output. Compilation,
   resolved references, automated visual QA, and full-size page inspection are
-  required for both profiles.
+  required.
 
 Follow the [writing principles](../workflow/scientific-writing.md#shared-article-requirements)
 for display choice, captions, and scientific tables.
@@ -96,19 +92,9 @@ make the one-sentence-per-line conversion as a formatting-only commit. The
 separate diff keeps scientific review focused and makes later source
 reorganization mechanically checkable.
 
-## Promotion between profiles
+## Evidence selection for manuscripts
 
-An analysis research notebook presents one reviewed analysis set. A manuscript
-selects only investigator-promoted notebook results and rewrites that evidence
-into one argument in a separate document. Adding an abstract to a notebook
-does not make it a manuscript.
-Share retained tables, figure sources, notation, and bibliography keys. Do not
-share profile headers, document structure, or rendered workflow language.
-
-Immediately before using a reviewed notebook in manuscript work, obtain native
-investigator confirmation bound to the exact notebook commit, intended use,
-and limitations. Ask about each numerical non-result in that notebook as its
-own item, separate from the limitations. Record one plain sentence stating that
-the investigator promoted that commit for that use subject to those limitations.
-Review Pass alone does not grant promotion. The sentence is sufficient without
-a status file or decision record.
+Select investigator-promoted results and present them as one scientific
+argument. Share retained tables, figure sources, notation, and bibliography
+keys with the analysis where applicable. Follow the
+[investigator promotion procedure](../workflow/operating-model.md#continuation-and-investigator-promotion).
