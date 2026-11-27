@@ -1,6 +1,6 @@
 ---
 name: prose
-description: "Inspect scientific writing read-only. Use when checking clarity, banned language, revision meaning, a rejected draft, a manuscript that reads like a report and needs restructuring, or final cohesion. Routine wording or citation edits go to write; claim support to review."
+description: "Inspect scientific writing read-only. Use when acting as a manuscript review sub-agent, or checking clarity, banned language, revision meaning, a rejected draft, a report-like manuscript, or final cohesion. Routine wording or citation edits go to write; claim support to review."
 metadata:
   cse-kind: "supporting"
   cse-family: "supporting"

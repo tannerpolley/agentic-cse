@@ -1,6 +1,6 @@
 ---
 name: write
-description: "Write scientific manuscripts, reports, and captions from accepted evidence. Use when asked for \"manuscript revision\", \"revise the paper\", a rejected-draft rewrite, restructuring, or wording/citation edits. Read-only critique goes to prose; compilation to latex or quarto."
+description: "Write scientific manuscripts, reports, and captions from accepted evidence. Use when acting as a writer sub-agent, or asked for \"manuscript revision\", \"revise the paper\", a rejected-draft rewrite, restructuring, or wording/citation edits. Critique goes to prose; compilation to latex or quarto."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
