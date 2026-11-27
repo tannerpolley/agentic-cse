@@ -7,6 +7,11 @@ SPACE = re.compile(r"\s*")
 COMMAND = re.compile(r"\\([A-Za-z@]+)\*?|\\[^\n]")
 INCLUDE = re.compile(r"\\(?:input|include)\s*\{([^{}\n]+)\}")
 DEFINITION = re.compile(r"\\(?:newcommand|renewcommand|providecommand|DeclareRobustCommand|def)\*?\s*")
+STORED_DEFINITION = re.compile(
+    r"\\cs_(?:new|set)(?:_[a-z]+)*:[Nc]p?[nex]\s*(?:\\[A-Za-z_:@]+|\{[^{}]*\})(?:\s*#\d+)*"
+    r"|\\expandafter\s*\\def\s*\\csname\b[^\\]*\\endcsname\b"
+)
+VALUE_SETTER = re.compile(r"(?m)^[ \t]*\\resultvalue[ \t]*\{[^{}\n]+\}[ \t]*\{[^{}\n]*\}[ \t]*$")
 TABULAR = r"tabular\*?|tabularx|tabulary|longtable|tblr|longtblr"
 HIDDEN_ENV = (r"verbatim\*?|lstlisting|minted|tikzpicture|pgfpicture|axis|groupplot|"
               r"semilog[xy]axis|loglogaxis|polaraxis|filecontents\*?|comment")
@@ -81,13 +86,18 @@ def commands(text, transform):
 def prepare_tex(text):
     """Hide source-only content and harvest zero-argument macros."""
     text = hide(r"(?<!\\)%[^\n]*", text)
+    # shortcut: recognize standalone resultvalue entries; other project setters need an explicit convention.
+    text = hide(VALUE_SETTER, text)
     # shortcut: mask drawing and code environments as a unit; inspect their embedded labels in print.
     text = hide(r"\\begin\{(" + HIDDEN_ENV + r")\}.*?\\end\{\1\}", text, re.S)
     macros = {}
 
     def prepare(match, source):
         name, end = match[1], match.end()
-        if DEFINITION.fullmatch(match[0]):
+        if definition := STORED_DEFINITION.match(source, match.start()):
+            if body := group(source, definition.end()):
+                end = body[2]
+        elif DEFINITION.fullmatch(match[0]):
             arg = group(source, end)
             macro = source[arg[0]:arg[1]].strip() if arg and name != "def" else None
             cursor = end

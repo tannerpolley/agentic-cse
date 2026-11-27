@@ -168,7 +168,9 @@ The diffusivity is $1.9\times10^{-9}$ m$^2$/s and the rate constant is \num{3e-8
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             paper, notes = root / 'paper.tex', root / 'notes.qmd'
+            background = ('We conditioned the samples under humid air before measuring their steady uptake.\n' * 14)
             paper.write_text(r'''At 10 and 20 kPa, the yields were 3.2 and 4.1 g after 5 s.
+''' + background + r'''
 The yield was 3.2 g after 5 s. The next run used 10, 20, and 30 kPa.
 The four measurements were 1, 2, 3, and 4 with $x=5$ and \num{6} and \qty{7}{\second} \cite[8--9]{source2024}.
 \begin{tabular}{rrrrr}
@@ -180,7 +182,7 @@ The four measurements were 1, 2, 3, and 4 with $x=5$ and \num{6} and \qty{7}{\se
 ''')
             notes.write_text('''At 10 and 20 kPa,
 the yields were 3.2 and 4.1 g after 5 s.
-
+''' + background + '''
 The four measurements were 1, 2, 3, and 4 [@source2024, pp. 5–6].
 
 One | Two | Three | Four | Five

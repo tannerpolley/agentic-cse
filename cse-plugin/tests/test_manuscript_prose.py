@@ -57,6 +57,7 @@ class ManuscriptProseTests(unittest.TestCase):
         self.assertIn("Files: main.tex 4, fragments/results.tex 9, fragments/conclusions.tex 2, extra.tex 3.", original)
         for hidden in ("A1", "F2", "A3", "F4", "F6", "F7", "F8", "F9", "schema", "contract", "5e-8", "Li/Na/TBAC"):
             self.assertNotIn(hidden, original)
+        self.assertNotIn("fragments/values.tex:", original)
 
         main = self.root / "main.tex"
         text = main.read_text()
@@ -84,6 +85,30 @@ Coated & Higher than the reference \\
         self.assertEqual(1, corrected.count(": warning:"), corrected)
         self.assertIn("abstract opener: Does coating a membrane increase water uptake at steady flow?", corrected)
         self.assertIn("Summary: 1 advisory (main 1, supplement 0), 0 terminology violations, 1 scan notice.", corrected)
+
+    def test_print_form_in_standalone_printing_commands(self):
+        (self.root / "paper.tex").write_text(
+            "\\section{Threshold at 1e-3}\n\\caption{Pressure at 2e-3}\n\\footnote{Calibration at 3e-3}\n"
+        )
+        output = self.run_checker(paths=("paper.tex",))
+        for line in range(1, 4):
+            self.assertIn(f"paper.tex:{line}: warning: print form '{line}e-3'", output)
+
+    def test_paragraph_density_takes_precedence_over_sentence_density(self):
+        dense = "The samples retained 1, 2,\n3, 4, and 5 grams.\n"
+        background = (
+            "The treated and reference membranes reached steady uptake under humid air.\n"
+            "The measurements agreed within the calibration uncertainty at the outlet.\n"
+        ) * 9
+        for suffix, heading in (("tex", r"\section{Results}"), ("qmd", "# Results")):
+            with self.subTest(suffix=suffix):
+                name = f"paper.{suffix}"
+                (self.root / name).write_text(heading + "\n" + dense + "\n" + background + dense)
+                output = self.run_checker(paths=(name,))
+                warnings = [line for line in output.splitlines() if "density:" in line]
+                self.assertEqual(2, len(warnings), output)
+                self.assertIn(f"{name}:2: warning: paragraph density:", warnings[0])
+                self.assertIn(f"{name}:23: warning: numeric density:", warnings[1])
 
     def test_abstract_default_limit_and_unqualified_roundoff(self):
         (self.root / "paper.tex").write_text(

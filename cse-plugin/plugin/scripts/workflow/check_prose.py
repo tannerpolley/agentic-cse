@@ -914,8 +914,15 @@ def main() -> int:
                         "repeated-clause", f"repeated clause in {len(occurrences)} files: {' '.join(passage.text.split())}",
                         WRITING + "fixing-a-review-finding"))
         abstract_roundoff = {(item.path, item.location) for item in findings if item.kind == "abstract-roundoff"}
+        dense_paragraphs = defaultdict(list)
+        for item in findings:
+            if item.kind == "paragraph-density":
+                dense_paragraphs[item.path].append((int(item.location), item.end))
         findings = [item for item in dict.fromkeys(findings) if item.on_changed_lines(changed)
-                    and not (item.kind == "roundoff" and (item.path, item.location) in abstract_roundoff)]
+                    and not (item.kind == "roundoff" and (item.path, item.location) in abstract_roundoff)
+                    and not (item.kind == "sentence-density" and any(
+                        start <= item.end <= end
+                        for start, end in dense_paragraphs[item.path]))]
     except (OSError, UnicodeError, ValueError) as error:
         print(f"configuration error: {error}")
         return 2

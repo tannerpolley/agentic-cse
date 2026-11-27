@@ -6,3 +6,12 @@
 \newcommand{\fifthgain}{15}
 \newcommand{\sixthgain}{16}
 \newcommand{\seventhgain}{17}
+\cs_new:Npn \resultvalue #1#2 { \cs_new:cpn { result_#1: } {#2} }
+\cs_set:Npn \storedvalue
+  { 1.2e-3, 2, 3, 4, 5 }
+\resultvalue{test-a}{3.931e-3}
+\resultvalue{test-b}{2}
+\resultvalue{test-c}{3}
+\resultvalue{test-d}{4}
+\resultvalue{test-e}{5}
+\expandafter\def\csname ev@priceMarket\endcsname{1.8e-3, 2, 3, 4, 5}% Stored evidence
