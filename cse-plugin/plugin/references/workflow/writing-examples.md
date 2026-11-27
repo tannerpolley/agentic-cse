@@ -52,7 +52,7 @@ them.
 
 ## Example review row
 
-Generated review output stays outside manuscript source.
+[Cohesion inspection output](manuscript-review.md#final-manuscript-checkpoint).
 
 | Source identifier | Idea | Role | Transition to next | Explanation |
 |---|---|---|---|---|

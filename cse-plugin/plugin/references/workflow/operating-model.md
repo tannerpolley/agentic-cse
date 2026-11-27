@@ -34,7 +34,7 @@ Direct tool requests return to the stage that owns the question or claim.
 
 All 18 `cse:<skill>` skills are exposed by one plugin. Source skills supply
 evidence, rendering skills consume retained values or supported claims, and
-Prose inspects scientific writing without authoring it.
+[Prose](../../skills/prose/SKILL.md) inspects scientific writing.
 Inspect the requested external capability; never infer Zotero, corpus,
 authentication, or renderer readiness from package presence, and never inspect
 plugin caches. Any stage that finds a relevant paper missing from the project's
