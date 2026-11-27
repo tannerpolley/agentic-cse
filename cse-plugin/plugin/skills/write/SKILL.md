@@ -7,8 +7,8 @@ metadata:
   cse-order: "08"
   cse-tags: "workflow"
   cse-routing:
-    direct: [operating-model, scientific-method, scientific-writing]
-    conditional: [writing-editorial, manuscript-review, latex-article-profiles, failure-triage]
+    direct: [operating-model, scientific-method, scientific-writing, writing-editorial]
+    conditional: [manuscript-review, latex-article-profiles, failure-triage]
 ---
 
 # Write papers
@@ -20,12 +20,12 @@ Read [operating-model](../../references/workflow/operating-model.md),
 [scientific writing principles](../../references/workflow/scientific-writing.md)
 in full. Follow the [project prose authorities](../../references/workflow/writing-editorial.md#project-prose-authorities)
 and, before manuscript edits, the [standing editorial decisions procedure](../../references/workflow/writing-editorial.md#standing-editorial-decisions).
-For a new or rejected manuscript, journal retarget, or material restructure,
-follow [manuscript structure review](../../references/workflow/manuscript-review.md#manuscript-structure-review).
+For manuscripts, use the triggers in [manuscript structure review](../../references/workflow/manuscript-review.md#manuscript-structure-review).
+For an internal referee round, use the [brief, triage, and reporting procedure](../../references/workflow/manuscript-review.md#internal-referee-rounds).
 For manuscript citations, use the [bibliography snapshot protocol](../../references/workflow/manuscript-review.md#bibliography-snapshot).
 
 Inspect the accepted question, formulation, methods, evidence, retained results,
-sources, audience, and intended endpoint. Before relying on reviewed results, follow the
+sources, audience, and intended endpoint. Before using any retained result, follow the
 [investigator promotion procedure](../../references/workflow/operating-model.md#continuation-and-investigator-promotion).
 
 **Complete when** the principles are read, the applicable editorial directions
@@ -46,6 +46,8 @@ leave that sentence unwritten.
 For routine wording, citation, formatting, and local clarity edits, follow
 [routine corrections](../../references/workflow/writing-editorial.md#routine-corrections)
 and preserve [revision fidelity](../../references/workflow/scientific-writing.md#scientific-prose).
+Apply [Fixing a review finding](../../references/workflow/scientific-writing.md#fixing-a-review-finding)
+and keep [emphasis in proportion](../../references/workflow/scientific-writing.md#emphasis-in-proportion).
 When editing LaTeX manuscript source, use [manuscript source organization](../../references/visualize/latex-article-profiles.md#manuscript-writing-and-source-organization).
 
 **Complete when** the edited passages and displays support the intended claim
@@ -61,11 +63,12 @@ for each advisory. For a manuscript or report draft or revision, check renderer
 capability, render with the selected `cse:latex` or `cse:quarto`, inspect the
 pages, then route the final read to `cse:prose`. Use `cse:beamer`, `cse:tikz`,
 or `cse:plot` for their respective outputs. Route explicit wording, AI-pattern,
-comparison, or final manuscript checks to `cse:prose`. Routine wording,
-citation, formatting, and local clarity edits need no cohesion inspection.
+comparison, or final manuscript checks to `cse:prose`.
 
-For a rewrite that used structure review, the reader-story reviewer performs that
-Prose read in the [post-rewrite review](../../references/workflow/manuscript-review.md#after-the-rewrite).
+For manuscript revisions, apply the [story-spine triggers](../../references/workflow/manuscript-review.md#story-spine-read)
+across routine edits and larger rounds. For a rewrite that used structure
+review or a round that triggers the post-rewrite pair, route the Prose read
+through the reader-story reviewer in [post-rewrite review](../../references/workflow/manuscript-review.md#after-the-rewrite).
 For a requested final check, submission, or named publication handoff, use
 [manuscript reference coverage](../../references/workflow/manuscript-review.md#manuscript-reference-coverage)
 and the [final manuscript checkpoint](../../references/workflow/manuscript-review.md#final-manuscript-checkpoint).

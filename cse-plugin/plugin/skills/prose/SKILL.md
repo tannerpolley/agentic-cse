@@ -12,14 +12,18 @@ metadata:
 
 # Inspect scientific prose
 
-Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-writing](../../references/workflow/scientific-writing.md), [BANNED](../../BANNED.md).
+Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-writing](../../references/workflow/scientific-writing.md), [writing-editorial](../../references/workflow/writing-editorial.md), [BANNED](../../BANNED.md).
 
 Identify the exact paragraph, section, manuscript, report, reviewer response, or
 original-and-revision pair and follow the [prose inspection procedure](../../references/workflow/writing-editorial.md#prose-inspection).
-Read the applicable [standing editorial decisions](../../references/workflow/writing-editorial.md#standing-editorial-decisions) without editing them.
-Ask whether each input-to-output result has its [conditions table and result plot](../../references/workflow/scientific-writing.md#argument).
-For a new or rejected manuscript, journal retarget, or material restructure, use the
-[manuscript structure review](../../references/workflow/manuscript-review.md#manuscript-structure-review).
+Check [editorial compliance](../../references/workflow/writing-editorial.md#editorial-compliance) against the applicable [standing decisions](../../references/workflow/writing-editorial.md#standing-editorial-decisions).
+For manuscripts, read for [emphasis in proportion](../../references/workflow/scientific-writing.md#emphasis-in-proportion)
+and [display interpretation](../../references/workflow/scientific-writing.md#shared-article-requirements).
+Apply the [story-spine triggers](../../references/workflow/manuscript-review.md#story-spine-read)
+across revisions, including routine edits, and use the
+[manuscript structure review](../../references/workflow/manuscript-review.md#manuscript-structure-review)
+and [internal referee procedure](../../references/workflow/manuscript-review.md#internal-referee-rounds)
+when the assignment calls for them.
 When no routine finding remains, return `CSE prose is clear.` If the user asks
 for corrections, route them to `cse:write`. Prose does not edit. Write may
 request one verification inspection after its minimum effective change.

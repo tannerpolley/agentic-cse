@@ -28,8 +28,10 @@ detector score, or authorship verdict and does not optimize text for a detector.
 
 ### Routine corrections
 
-Change only diagnosed spans, leave clear prose unchanged, invent no specificity or evidence,
-preserve supported content, and perform one verification read. Do not iterate toward a style or detector score.
+Apply [Fixing a review finding](scientific-writing.md#fixing-a-review-finding) within the scope
+of the diagnosed issue. Preserve supported content, invent no specificity or evidence, and perform one
+verification read. Do not iterate toward a style or detector score.
+Apply [editorial compliance](#editorial-compliance) to the material being edited.
 
 ### Original and revision comparison
 
@@ -44,8 +46,8 @@ Before manuscript or deck work, discover existing project guidance. Keep one
 named section per manuscript or deck in `docs/scientific/writing/STYLE.md`,
 identified by repository-relative authoritative source, supplement, and
 associated figure paths. Keep project-wide choices outside document sections.
-If an established manuscript brief or editorial record already owns the
-choices, put only its pointer in the STYLE section; do not copy the decisions.
+If an established framing brief such as `FRAMING.md` or an editorial record
+owns the choices, put its pointer in the STYLE section and read that brief.
 Dated revision reports and the current draft are not automatically standing
 owner instructions. Create the section when document work begins; if there
 are no standing directions, state that none have been recorded.
@@ -72,9 +74,12 @@ choice threshold in [decision-records](decision-records.md); `evidence.md`
 owns scientific evidence, not editorial preferences. Task-specific story order
 stays in the accepted issue plan under manuscript structure review.
 
+When the owner gives a standing editorial direction to any stage, the lead
+ensures it becomes a STYLE row before it is applied or writing is delegated.
 Before editing, Write, Plot, Beamer, and renderers editing document sources or
 associated figures load both project-wide choices and the applicable document
-record. Capture new explicit owner directions there before applying them.
+record. At Write's Start, report the number of rows in the applicable STYLE
+section, including zero.
 A later explicit owner correction replaces only the active scoped row with
 its new authority; Git retains history. Conflicting or ambiguous directions
 need a scoped owner decision, without asking again about settled choices.
@@ -125,9 +130,17 @@ in the checker; this section owns the editorial rule and approval requirements.
 
 ## Editorial compliance
 
-At the [final checkpoint](manuscript-review.md#final-manuscript-checkpoint), Prose and Review check the applicable standing
-editorial decisions against the assembled document, including its supplement,
-figures, and tables. Report exact violations with the source identifier,
+Check applicable standing editorial decisions in ordinary revisions against
+the material edited. At the [final checkpoint](manuscript-review.md#final-manuscript-checkpoint),
+Prose and Review check the assembled document, including its supplement, figures,
+and tables. Report exact violations with the source identifier,
 record path, scoped decision and authority, consequence, and smallest
 correction. Missing or ambiguous directions return to authoring or the owner;
 reviewers do not invent them.
+
+### Project story checkers
+
+When a project keeps a story checker, pin the role of the opening sentence,
+the order of the points, and the subject of the final paragraph. Exact
+phrases can change while those relationships hold. Test that the checker
+fails when a revision breaks the intended story.

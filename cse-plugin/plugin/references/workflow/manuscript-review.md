@@ -19,8 +19,8 @@ bibliography snapshot by a portable relative path.
 ## Manuscript structure review
 
 For a new manuscript, rejected draft, new target journal, or material change to
-section order or argument spine, review the structure before writing. Routine
-wording, citation, and formatting edits do not trigger this review.
+section order or argument spine, review the structure before writing. The
+[cumulative growth trigger](#story-spine-read) also applies to routine rounds.
 
 Start from the **venue package**, the target journal's current guide for
 authors: its limits and required statements are requirements, and where it is
@@ -49,14 +49,55 @@ Two independent reviewers work in parallel. The science-support
 reviewer applies Review's Result lens to every displayed number and cited claim
 against retained files and cited sources, providing exact replacement text,
 and checks [manuscript reference coverage](#manuscript-reference-coverage),
+[comparison reconciliation](#comparison-reconciliation),
 [methods reproducibility](scientific-writing.md#methods-reproducibility),
 [equations, quantities, and units](scientific-writing.md#equations-quantities-and-units), and
 [data, code, and software](scientific-writing.md#data-code-and-software). The
 reader-story reviewer uses `cse:prose` for the [final manuscript checkpoint](#final-manuscript-checkpoint) and checks
 figures, tables, [captions](scientific-writing.md#shared-article-requirements),
-abstract, paragraph placement, and internal language. Write
-applies their fixes as given; science support wins a conflict. Write then makes
-one verification read.
+abstract, paragraph placement, and internal language. Write applies supported
+corrections, giving science support precedence in a conflict, then makes one
+verification read.
+
+## Story-spine read
+
+Across the current round, including accumulated routine edits, read the spine
+whenever the abstract, conclusions, a research question, the section order,
+a headline claim or its verb, the set of studies, or a dissertation map changes.
+Use [structure review](#manuscript-structure-review) when main-text words have
+grown by more than about 20 % since the last accepted plan. Use the
+[post-rewrite pair](#after-the-rewrite) when a round changes more than about
+10 % of the main-text words, even when the overall length stays similar.
+
+In one read, bring together the abstract's opening question and gap, the
+Introduction's questions, the Results headings and displays, and the final
+paragraph. Match each promised question to its answer, in order, and check that
+the conclusions end on the contribution. Apply the [evidence guard](scientific-writing.md#evidence-guard)
+to every “each”, “only”, and “confirmed” against the least supportive section
+or chapter. Can an outside engineer use the headline deliverable and each
+central table from the paper alone?
+
+## Internal referee rounds
+
+Grade a readability-and-proportion row in the referee brief against the
+measured model papers and give a word or page budget. In the writer brief,
+name the one contribution and which points should appear exactly once.
+Give each framing point a single home in the argument.
+
+Each request that adds material names its destination. The lead triages
+requests by what the argument needs and routes fixes through
+[Fixing a review finding](scientific-writing.md#fixing-a-review-finding).
+In the round's report, give the change in main-text words and in the counts
+of tables, figures, and captions. Apply the [story-spine triggers](#story-spine-read)
+across rounds.
+
+## Comparison reconciliation
+
+For each central comparison, read the quantity and phase, case set, basis,
+model and settings, statistic, and population from the caption and table
+alone. Use the caption and figure for a plotted comparison. Reconcile those
+details with the text and Methods and with companion papers that reuse the
+same observations.
 
 ## Manuscript reference coverage
 
@@ -89,10 +130,10 @@ Reuse existing checks; compilation proves neither support nor coverage.
 4. **Bare cross-references:** inspect “see Supplement §…” and “see Part 1”
    semantically. Verify the target exists and that the main manuscript supplies
    the definition, essential method/conditions, result, or interpretation its
-   argument needs. Flag the exact span and missing content when a pointer
-   substitutes for it. A concise self-contained explanation plus a valid
-   pointer for derivation or supporting detail is acceptable; do not ban
-   cross-references or require wholesale duplication.
+   argument needs. Flag the exact span if a pointer substitutes for needed
+   content or repeated pointers interrupt a complete explanation.
+   Use a concise self-contained explanation and one valid pointer for
+   derivation or supporting detail.
 5. **Decision and remediation:** in existing review output, report source
    identity, record path, exact paragraph/frame/key, evidence or missing
    support, consequence, and smallest correction. Separate required corrections
@@ -112,13 +153,12 @@ literature-search gate to routine rendering.
 
 ## Final manuscript checkpoint
 
-Routine revisions and builds need only the project's existing structural and
-rendering checks: stable unique paragraph identifiers, reconstructable order,
-one sentence per source line, blank-line paragraph boundaries, and resolved
-references, labels, and citations, read from the final build log by the
-[log check](../visualize/latex-layout-and-qa.md#release-sequence) because a
-LaTeX build can succeed with them unresolved. These checks do not judge the
-argument.
+For routine revisions, apply the [story-spine triggers](#story-spine-read) and
+the project's existing structural and rendering checks. Maintain stable unique
+paragraph identifiers, reconstructable order, one sentence per source line, and
+blank-line paragraph boundaries. Verify references, labels, and citations in the
+final build log with the [log check](../visualize/latex-layout-and-qa.md#release-sequence)
+because a LaTeX build can succeed with them unresolved.
 
 At this checkpoint, require [editorial compliance](writing-editorial.md#editorial-compliance) and
 Review's [reference-coverage result](#manuscript-reference-coverage) for the same

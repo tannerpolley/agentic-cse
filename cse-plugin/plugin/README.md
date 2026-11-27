@@ -77,8 +77,10 @@ Then start one bounded study:
    Summarize the retained results and limitations in chat.
 4. `cse:review`: independently check the retained evidence and the limits of
    the claim. Review also checks design readiness before Build.
-5. `cse:write`: use reviewed results in a manuscript after the investigator
-   **promotes** the exact result commit for the stated use and limitations.
+5. `cse:write`: bring retained results into a manuscript through
+   [Review and investigator promotion](references/workflow/operating-model.md#continuation-and-investigator-promotion).
+   Use the [story-spine read](references/workflow/manuscript-review.md#story-spine-read)
+   when revisions change the argument.
 
 These stages may take longer than five minutes; the first session establishes
 the question and next action. See the

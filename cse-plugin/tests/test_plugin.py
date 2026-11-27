@@ -348,8 +348,8 @@ One | Two | Three | Four | Five
         self.assertIn("final manuscript check", prose)
         direct, conditional = "direct", "conditional"
         writing_routes = {
-            "write": {direct: {"scientific-writing"},
-                      conditional: {"writing-editorial", "manuscript-review", "latex-article-profiles"}},
+            "write": {direct: {"scientific-writing", "writing-editorial"},
+                      conditional: {"manuscript-review", "latex-article-profiles"}},
             "prose": {direct: {"scientific-writing", "writing-editorial"}, conditional: {"manuscript-review"}},
             "review": {conditional: {"scientific-writing", "writing-editorial", "manuscript-review"}},
             "latex": {conditional: {"latex-article-profiles", "manuscript-review"}},
@@ -366,6 +366,20 @@ One | Two | Three | Four | Five
                     self.assertLessEqual(references, set(routing[kind]))
             if skill == "write":
                 self.assertNotIn("latex-article-profiles", routing[direct])
+        manuscript_routes = {
+            "write": ("scientific-writing.md#fixing-a-review-finding",
+                      "scientific-writing.md#emphasis-in-proportion",
+                      "manuscript-review.md#story-spine-read"),
+            "prose": ("scientific-writing.md#emphasis-in-proportion",
+                      "manuscript-review.md#story-spine-read"),
+            "review": ("manuscript-review.md#comparison-reconciliation",
+                       "scientific-writing.md#shared-article-requirements"),
+        }
+        for skill, targets in manuscript_routes.items():
+            body = (PLUGIN / "skills" / skill / "SKILL.md").read_text()
+            for target in targets:
+                with self.subTest(skill=skill, target=target):
+                    self.assertIn(f"(../../references/workflow/{target})", body)
         checkpoint = (PLUGIN / "references/workflow/manuscript-review.md").read_text()
         self.assertIn("Prose performs one agent-led cohesion inspection", checkpoint)
         self.assertIn("evidence review and investigator promotion", checkpoint)

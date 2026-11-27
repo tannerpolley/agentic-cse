@@ -831,7 +831,7 @@ class ManagedProtocolTests(unittest.TestCase):
         self.assertNotIn(ADOPTION_POINTER, self.block(self.agents()))
         self.assertNotIn("source/data adoption:", self.context())
 
-    def test_unset_source_data_adoption_preserves_pre_feature_block(self):
+    def test_reconcile_refreshes_retrospective_routing_without_changing_adoption(self):
         self.legacy_repository()
         context = self.context().replace(
             "## Claim boundaries",
@@ -841,11 +841,19 @@ class ManagedProtocolTests(unittest.TestCase):
         (self.repo / "docs/scientific/CONTEXT.md").write_text(context, encoding="utf-8")
         block = f"{BEGIN}\n{PRE_FEATURE_PROTOCOL}\n{END}"
         (self.repo / "AGENTS.md").write_text(f"# My project\n\n{block}\n", encoding="utf-8")
-        before = (self.agents(), self.context())
+        check = self.check()
+        self.assertEqual(check.returncode, 1)
+        self.assertIn("Managed CSE Protocol block: stale", check.stdout)
 
         again = self.approve()
         self.assertEqual(again.returncode, 0, again.stderr)
-        self.assertEqual((self.agents(), self.context()), before)
+        self.assertEqual(self.context(), context)
+        updated = self.block(self.agents())
+        self.assertNotIn(ADOPTION_POINTER, updated)
+        line = next(line for line in updated.splitlines() if line.startswith("For a writing retrospective"))
+        for target in ("cse:write", "cse:prose", "cse:review", "references/workflow/retrospective.md", "cse:audit"):
+            self.assertIn(f"`{target}`", line)
+        self.assertEqual(self.check().returncode, 0)
 
     def test_pointer_only_repository_is_diagnosed_then_upgraded_preserving_guidance(self):
         self.legacy_repository()

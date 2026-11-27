@@ -150,6 +150,8 @@ precision, never as an open question. Pursuing an immaterial difference,
   need, such as a gate that holds refits whose parameters moved by a
   ten-thousandth of a standard error.
 
+For the weight a point carries in a manuscript, apply [Emphasis in proportion](scientific-writing.md#emphasis-in-proportion).
+
 Materiality cuts both ways: a solver status or a missed agent-chosen tolerance
 does not make a failure either. A case is reported as failed only with
 [numerical proof of its cause](failure-triage.md#bound-the-claim).
