@@ -19,7 +19,7 @@ PACKAGES = (
         "root": "plugin",
         "skills": (
             "audit", "setup", "research", "diagnose", "design", "build",
-            "analyze", "summarize", "review", "write", "prose", "zotero", "data",
+            "analyze", "review", "write", "prose", "zotero", "data",
             "digitize", "plot", "tikz", "latex", "quarto", "beamer",
         ),
         "include": (

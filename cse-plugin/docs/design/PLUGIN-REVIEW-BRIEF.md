@@ -6,7 +6,7 @@ CSE is a private, MIT-licensed Codex plugin that gives scientific
 and mathematical repository work a science-first working method. It is aimed at
 computational scientists, engineers, mathematicians, researchers, students,
 and maintainers who need to move from a question and evidence to equations,
-numerical methods, analyses, figures, notebooks, papers, or an independent
+numerical methods, analyses, figures, papers, or an independent
 review.
 
 The plugin is a behavioral and repository-practice adapter. It does not claim
@@ -52,7 +52,7 @@ skills stay intentionally thin and route through shared references:
   result-first numerical expectations, independent oracles, metrics, tolerance
   rationale, and risk-based test selection.
 - [`scientific-projects.md`](../../plugin/references/workflow/scientific-projects.md) defines
-  repository records, analysis directories, plots, notebooks, bibliography,
+  repository records, analysis directories, plots, bibliography,
   and manuscript conventions.
 - [`github-and-git.md`](../../plugin/references/workflow/github-and-git.md) defines the
   authoritative GitHub lifecycle and guarded synchronization and cleanup.
@@ -62,7 +62,7 @@ skills stay intentionally thin and route through shared references:
 - [`terminology.md`](../../plugin/references/workflow/terminology.md) defines canonical
   workflow, tool, source, extraction, figure, and claim language.
 
-The nine workflow stages are:
+The eight workflow stages are:
 
 | Entry point | Main endpoint | Next route when work continues |
 | --- | --- | --- |
@@ -71,12 +71,11 @@ The nine workflow stages are:
 | [`diagnose`](../../plugin/skills/diagnose/SKILL.md) | Cause of numerical or scientific disagreement | `design` with the correction boundary |
 | [`design`](../../plugin/skills/design/SKILL.md) | A complete question and native GitHub issue | `build`, `analyze`, or `write` |
 | [`build`](../../plugin/skills/build/SKILL.md) | Equations, models, numerical methods, solvers, or data transformations | `analyze` |
-| [`analyze`](../../plugin/skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `summarize` or `diagnose` |
-| [`summarize`](../../plugin/skills/summarize/SKILL.md) | The working analysis research notebook and selected render | `review` |
-| [`review`](../../plugin/skills/review/SKILL.md) | Whole-chain scientific and repository review, including the notebook and render | Route material corrections to the owning skill or advise Pass for the stated use |
+| [`analyze`](../../plugin/skills/analyze/SKILL.md) | Convergence, sensitivity, uncertainty, comparison, and figures | `review` or `diagnose` |
+| [`review`](../../plugin/skills/review/SKILL.md) | Whole-chain scientific and repository review, including retained values, figures, and analysis records | Route material corrections to the owning skill or advise Pass for the stated use |
 | [`write`](../../plugin/skills/write/SKILL.md) | Evidence-supported papers, reports, captions, and LaTeX | `review` |
 
-The installable package is one `cse` plugin rooted at `plugin/`, with all 21
+The installable package is one `cse` plugin rooted at `plugin/`, with all 18
 skills under the `cse:<skill>` namespace. Source and rendering skills return
 evidence or files to their invoking workflow stage rather than becoming extra
 workflow phases.
@@ -96,7 +95,7 @@ hidden plugin dependencies.
 
 ```text
 plugin/.codex-plugin/plugin.json plugin manifest and interface metadata
-plugin/skills/<skill>/SKILL.md  all 21 callable skills
+plugin/skills/<skill>/SKILL.md  all 18 callable skills
 plugin/references/{workflow,sources,visualize}/ shared doctrine
 scripts/validate.sh             source validation and plugin checks
 scripts/sync-live.sh             guarded source-to-marketplace deployment
@@ -107,7 +106,7 @@ docs/design/                    product decisions and external-review package
 ```
 
 The project keeps user-specific scientific context, equations, methods,
-evidence, analyses, notebooks, and manuscripts in the user's repository rather
+evidence, analyses, and manuscripts in the user's repository rather
 than in the installed plugin. The embedded heat-equation example shows the intended
 project-facing shape in its
 [scientific context](../../examples/heat-equation/docs/scientific/CONTEXT.md),
@@ -133,8 +132,8 @@ percentage as scientific evidence.
 
 The plotting and writing doctrine retains exact plotted values and publication
 formats, labels quantities and units, distinguishes models, observations,
-literature, and uncertainty semantically, and treats the notebook as the
-current reviewed analysis record and the manuscript as a selected story.
+literature, and uncertainty semantically, and treats retained analysis records as the evidence for a reviewed result and
+the manuscript as a selected story.
 
 ## Validation and evaluation evidence
 
@@ -149,7 +148,7 @@ currently:
 
 The plugin checks in
 [`tests/test_plugin.py`](../../tests/test_plugin.py) protect the manifest,
-the exact one-plugin, 21-skill surface, thin
+the exact one-plugin, 18-skill surface, thin
 skills, shared-reference links, opening alignment anchors, numerical doctrine,
 optional GitHub features,
 forbidden runtime workflow names, and the absence of generic coverage
@@ -207,12 +206,12 @@ An external review would be most valuable on these questions:
 - Do the numerical and uncertainty rules distinguish code correctness,
   discretization error, physical validation, and scientific acceptance in
   practice?
-- Do the nine workflow stages form a coherent route with useful continuity,
-  and do the eleven specialist skills avoid becoming competing stages?
+- Do the eight workflow stages form a coherent route with useful continuity,
+  and do the supporting skills avoid becoming competing stages?
 - Is the grilling quality material and adaptive without blocking ordinary work?
 - Is the Zotero and Companion boundary safe, understandable, and useful for
   source-linked research?
-- Do plotting, notebook, manuscript, GitHub, and review expectations support
+- Do plotting, analysis, manuscript, GitHub, and review expectations support
   reproducible science rather than documentation for its own sake?
 - Is the plugin genuinely self-contained and installable, and does the example
   demonstrate the promises it makes?

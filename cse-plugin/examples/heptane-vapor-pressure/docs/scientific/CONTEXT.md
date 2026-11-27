@@ -79,8 +79,7 @@ direct algebraic evaluation. Finite positive results are required.
 - `analyses/vapor-pressure/inputs/` owns the retained input snapshot.
 - `analyses/vapor-pressure/scripts/run.py` owns numerical evaluation and CSVs.
 - `analyses/vapor-pressure/scripts/present.py` reads retained CSVs and owns
-  the single SVG figure and notebook include fragments.
-- [Notebook](../../analyses/vapor-pressure/notebook.qmd) owns interpretation.
+  the single SVG figure.
 - No Zotero, Companion, external corpus, or reusable Engineering package is
   configured or required. Only Python, NumPy, and the standard library are used.
 
@@ -98,7 +97,7 @@ their data with a related NIST correlation; agreement is not a new discovery.
 
 Both primary papers were opened and read in full during preparation; table
 transcriptions were checked against rendered PDF pages. Independent review is
-pending with the orchestrator. The notebook has not been promoted for manuscript
+pending with the orchestrator. The retained results await investigator promotion for manuscript
 use. Unknown parameter covariance, historical temperature-scale effects, raw
 instrument records, and international rights beyond the recorded licence
 findings remain outside the claims.

@@ -7,8 +7,8 @@ presentation request can only consume retained files.
 
 The calculation command should stage its complete result set, validate its
 checks, and replace the named outputs only after staging succeeds. The
-presentation command should validate the retained set before writing its
-Quarto include file. No rule below owns an input directory or a notebook.
+presentation command should validate the retained set before writing
+presentation fragments. No rule below owns an input directory.
 """
 
 import sys
@@ -47,14 +47,12 @@ PRESENTATION_INPUTS = {
     "presentation_script": "scripts/present.py",
     "workflow": "Snakefile",
 }
-# Quarto include fragments: result tables and figures, inline values as a YAML
-# metadata block, provenance with the verified model source, and a notebook of
-# labeled retained views for `{{< embed >}}` in the root article.
+# Include fragments for result tables and figures, inline values as YAML
+# metadata, and provenance with the verified model source.
 PRESENTATION_OUTPUTS = {
     "include": "results/cooling_fit_include.qmd",
     "values": "results/cooling_fit_values.qmd",
     "provenance": "results/cooling_fit_provenance.qmd",
-    "views": "results/cooling_fit_views.ipynb",
 }
 
 
@@ -116,7 +114,7 @@ if _MODE == "present":
             "--summary {input.summary} --curve {input.curve} "
             "--figure {input.figure} --residual-figure {input.residual_figure} "
             "--output {output.include} --values {output.values} "
-            "--provenance {output.provenance} --views {output.views}"
+            "--provenance {output.provenance}"
 else:
     rule calculate:
         input:

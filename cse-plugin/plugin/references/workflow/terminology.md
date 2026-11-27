@@ -24,7 +24,7 @@ scoped or exception-bearing writing rules under `## Prose avoid rules`.
 
 **Workflow stage**:
 One step in the agent path: `setup`, `research`, `diagnose`, `design`, `build`,
-`analyze`, `summarize`, `review`, or `write`.
+`analyze`, `review`, or `write`.
 _Avoid_: “context” as a phase name or tool when referring to a stage.
 
 **Supporting tool**:
@@ -55,7 +55,7 @@ stage.
 
 **Review Pass**:
 Reviewer advice that the active issue, implementation, evidence, claims,
-notebook, and selected outputs support the identified use within the stated
+and selected outputs support the identified use within the stated
 limitations. It is not universal certification or investigator promotion.
 
 ## Scientific work
@@ -136,22 +136,9 @@ Rendering a figure from retained values and explicit visual semantics. It is
 not the numerical analysis that generated those values.
 
 **Analysis set**:
-The retained inputs, scripts, results, figures, notebook, and interpretation
+The retained inputs, scripts, results, figures, and interpretation
 for one coherent scientific question.
-
-**Analysis research notebook**:
-An explicitly included substantive `.qmd` report, rendered as one page of the
-root Quarto analysis site. It reads retained values without rerunning the model
-and is rendered only when its path appears once in both `project.render` and
-`website.sidebar`. It is not a chronology, raw evidence inventory, or
-raw-LaTeX submission draft.
 
 **Manuscript**:
 An author-controlled raw-LaTeX article that selects supported results and
 presents one continuous scientific argument from abstract through conclusion.
-
-**Quarto analysis site**:
-The root Quarto website project whose home page is a populated synthesis article
-and whose other pages are the explicitly included analysis reports, all sharing
-one sidebar. It is the living HTML synthesis/notebook route; Review owns scientific acceptance, while Write owns deliberate promotion
-to the separate raw-LaTeX Manuscript route.

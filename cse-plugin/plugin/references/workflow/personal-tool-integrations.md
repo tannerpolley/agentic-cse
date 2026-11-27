@@ -6,7 +6,7 @@ Read only when this plugin is installed. CSE remains usable without it.
 
 The installed plugin supplies optional engineering skills for software work.
 CSE owns scientific questions, models, sources, data, numerical evidence,
-notebooks, figures, and manuscripts. For overlapping skill names, choose by
+analysis records, figures, and manuscripts. For overlapping skill names, choose by
 subject:
 
 | Subject | CSE | Engineering skill |

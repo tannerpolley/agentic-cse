@@ -47,8 +47,8 @@ otherwise map repository role: `analysis` → result, `tool` → capability. A
 task-level opposite shape remains valid.
 
 - **Experiment plan (result):** question, model, inputs, domain or sweep,
-  named comparisons for the result, expected notebook outputs, and claim
-  limits. It ends at Summarize and Review under the Result lens.
+  named comparisons for the result, expected outputs, and claim
+  limits. It ends at Review under the Result lens.
 - **Tool plan (capability):** defect or missing capability stated as a
   correctness check with input, expected value or relation, tolerance and its
   origin, source, existing owner, passing reference cases, and what gets

@@ -50,14 +50,6 @@ direct_entry_cases:
       Reads retained CSV values, checks monotonic error and observed order,
       evaluates Richardson and floating allowances, and keeps stability,
       monotonicity, and accuracy distinct.
-  - id: summarize-direct
-    entrypoint: cse:summarize
-    prompt: >-
-      Review the cumulative research notebook entry for fidelity to retained
-      results. Do not edit files.
-    expected: >-
-      Traces every reported number to retained results, preserves conditions
-      and limitations, and does not introduce unsupported interpretation.
   - id: write-direct
     entrypoint: cse:write
     prompt: >-
@@ -102,8 +94,8 @@ handoff_cases:
       Handoffs inherit all confirmed decisions. Zotero asks no repeated setup
       questions; Mathpix is skipped because a Markdown child exists; research
       receives exact evidence and resumes the requested endpoint.
-  - id: construct-build-analyze-summarize-write-review
-    route: [construct, build, analyze, summarize, write, review]
+  - id: construct-build-analyze-review-write
+    route: [construct, build, analyze, review, write]
     confirmed_context: >-
       Issue 5 fixes the equation, methods, retained study, tolerance derivation,
       manuscript endpoint, repository authority, and write permission.

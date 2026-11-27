@@ -54,21 +54,18 @@ expected_entrypoints = {
         "construct",
         "build",
         "analyze",
-        "summarize",
         "write",
         "review",
         "zotero",
-        "mathpix",
     )
 }
-require(entrypoints == expected_entrypoints, "evaluation suite must cover all ten public skills")
+require(entrypoints == expected_entrypoints, "evaluation entrypoints disagree with the example suite")
 
 prose_paths = [
     ROOT / "AGENTS.md",
     ROOT / "README.md",
     ROOT / "analyses/README.md",
     ROOT / "analyses/heat_verification/inputs/case.json",
-    ROOT / "analyses/heat_verification/notebook.qmd",
     ROOT / "docs/scientific/CONTEXT.md",
     ROOT / "docs/scientific/writing/STYLE.md",
     ROOT / "docs/scientific/writing/RULES.md",

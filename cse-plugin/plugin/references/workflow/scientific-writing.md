@@ -187,7 +187,7 @@ scrutiny (ACS Guide 3.1.4).
 ## Evidence guard
 
 A result enters the manuscript only when it supports the selected claim order. The manuscript may omit sound
-analyses that do not serve that story. It may condense an analysis-notebook result, but reported values,
+analyses that do not serve that story. It may condense a promoted analysis result, but reported values,
 conditions, uncertainty, and claim boundaries must remain consistent with the retained results.
 
 ## Scientific prose

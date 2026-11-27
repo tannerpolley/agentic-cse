@@ -69,7 +69,7 @@ LaTeX is never used for a scientific record. Temporary source synthesis may
 use the ignored `docs/scientific/.research/` path.
 
 For an analysis role, emphasize data and source authority, retained analyses,
-results, figures or notebooks, uncertainty, and validation. For a tool role,
+results, figures, uncertainty, and validation. For a tool role,
 emphasize equation and implementation owners, interfaces, failure behavior,
 reference cases, tolerances, and numerical verification. Fill the core with the repository's real scientific question, owners, and
 paths; do not copy generic ADR starters or write blank headings or placeholder

@@ -35,7 +35,7 @@ for that case.
   locators, denylist/consent, and separate write gates.
 - Build/analyze: equation fidelity, independent references, residuals,
   refinement, stability, monotonicity, and uncertainty.
-- Summarize/write/review: numerical traceability, citation fidelity, figure
+- Analyze/write/review: numerical traceability, citation fidelity, figure
   provenance, precision, and claim limits.
 
 Generic software-engineering advice is relevant only when it identifies a

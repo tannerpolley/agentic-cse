@@ -20,11 +20,8 @@
 *.vrb
 
 # Generated documents. Retained analysis and shared manuscript figures are not
-# ignored; only document builds and rendered notebook views are disposable.
+# ignored; only document builds are disposable.
 docs/scientific/latex/builds/
-analyses/**/notebook.pdf
-analyses/**/notebook.html
-analyses/**/notebook_files/
 
 # Python and tool caches
 __pycache__/

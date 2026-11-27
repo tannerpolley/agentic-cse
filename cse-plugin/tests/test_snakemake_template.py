@@ -30,7 +30,7 @@ def sha256(path: Path) -> str:
 
 
 def png(red: int) -> bytes:
-    """Return a valid one-pixel PNG so Quarto can render and embed it."""
+    """Return a valid one-pixel PNG for the retained figure fixture."""
     def chunk(kind: bytes, data: bytes) -> bytes:
         return struct.pack(">I", len(data)) + kind + data + struct.pack(">I", zlib.crc32(kind + data))
     header = struct.pack(">IIBBBBB", 1, 1, 8, 2, 0, 0, 0)
@@ -91,7 +91,7 @@ def write_retained_set(root: Path, *, rate: float = 0.005, keep_inputs: bool = F
     # Paths are relative to ``root``, as Snakemake passes them; run present from there.
     return SimpleNamespace(
         **paths, output="results/cooling_fit_include.qmd", values="results/cooling_fit_values.qmd",
-        provenance="results/cooling_fit_provenance.qmd", views="results/cooling_fit_views.ipynb",
+        provenance="results/cooling_fit_provenance.qmd",
     )
 
 
@@ -168,13 +168,13 @@ class SnakemakeTemplateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             arguments = write_retained_set(root)
-            outputs = [root / getattr(arguments, name) for name in ("output", "values", "provenance", "views")]
+            outputs = [root / getattr(arguments, name) for name in ("output", "values", "provenance")]
             with contextlib.chdir(root):
                 PRESENT.present(arguments)
                 for output in outputs:
                     os.utime(output, ns=(1_000_000_000, 1_000_000_000))
                 PRESENT.present(arguments)
-            self.assertEqual([1_000_000_000] * 4, [output.stat().st_mtime_ns for output in outputs])
+            self.assertEqual([1_000_000_000] * 3, [output.stat().st_mtime_ns for output in outputs])
 
 if __name__ == "__main__":
     unittest.main()

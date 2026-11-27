@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Archive the companion analysis notebook and its Quarto site. Review uses
+  retained results, and manuscript promotion confirms the exact result commit.
+
 ## 2.3.0
 
 - Make ordinary Quarto HTML the living analysis-notebook view.

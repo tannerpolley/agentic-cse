@@ -11,7 +11,7 @@ loaded package expands the document requirements and its compatibility surface.
 1. Inspect the document class, venue template, build command, engine, existing
    preamble, and rendered output. A publisher or university template owns any
    choice it specifies.
-2. Classify the output as an author-controlled manuscript, analysis research notebook,
+2. Classify the output as an author-controlled manuscript,
    report or thesis, Beamer deck, venue-controlled submission, or
    Quarto-generated PDF. See `latex-article-profiles.md` for the selected
    article profile.
@@ -38,7 +38,7 @@ already selected another route.
 | Capability | Selected default | Why | Competing choice and exception |
 | --- | --- | --- | --- |
 | Engine and fonts | LuaLaTeX with `fontspec` and `unicode-math` | Unicode input and OpenType text and mathematics | Prefer LuaLaTeX or XeLaTeX when the venue class supports it. Use pdfLaTeX when required; omit both packages and ensure Type 1 coverage for every encoding and family (for T1 Computer Modern, install `cm-super` or use `lmodern`). |
-| Author-controlled class | KOMA-Script `scrartcl` or `scrreprt` | Integrated headings and page furniture; manuscript type area without competing layout packages | The analysis-notebook profile uses its one explicit Quarto margin owner. Use the venue class when required. With a classic `article` or `report` class, `geometry` and `fancyhdr` remain conditional choices. |
+| Author-controlled class | KOMA-Script `scrartcl` or `scrreprt` | Integrated headings and page furniture; manuscript type area without competing layout packages | Use the venue class when required. With a classic `article` or `report` class, `geometry` and `fancyhdr` remain conditional choices. |
 | Mathematics | `mathtools` and `derivative` | Equation structures plus explicit derivative notation | Add `amsthm` and `thmtools` only for theorem-like exposition. |
 | Bold mathematics | `\symbf` from `unicode-math` | Matches the selected Unicode math architecture | Use `bm` in a traditional font workflow, not as a LuaLaTeX default. |
 | Quantities | `siunitx` | One notation for values, units, uncertainty, ranges, and numeric table columns | No manual unit typography. Preserve the project's quantity macros if already established. |
@@ -63,14 +63,12 @@ For T1 venue classes under any engine, set Latin Modern sans and typewriter imme
 
 ## Document profiles
 
-### Author-controlled manuscript and analysis research notebook
+### Author-controlled manuscript
 
 Use LuaLaTeX and KOMA-Script `scrartcl`, then apply the selected structure and
-appearance from `latex-article-profiles.md`. Every article-capable tool in this
-reference may be used in either profile. Add it for an exercised capability,
-not because of the profile name. Keep shared notation, table, and figure
+appearance from `latex-article-profiles.md`. Add tools for capabilities the article exercises. Keep shared notation, table, and figure
 sources independent of the profile header. KOMA-Script owns the manuscript
-type area; the notebook's explicit Quarto margins are its sole geometry owner.
+type area.
 
 ### Venue-controlled submission
 
@@ -121,7 +119,7 @@ Pandoc transformation is uncertain.
 
 ### Quarto HTML output
 
-Ordinary Quarto HTML is the living notebook route. Reuse scientific notation,
+For Quarto HTML, reuse scientific notation,
 retained data, citations, and semantic colors without loading an article or
 Beamer preamble. Use native Quarto layout and HTML for retained figures,
 tables, links, and supporting details. Keep any presentation-only code under

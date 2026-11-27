@@ -104,6 +104,14 @@ class ManagedProtocolTests(unittest.TestCase):
             second = root.parent / f"{root.name}-setup-2.json"
             try:
                 setup.prepare(root, "cooling-fit", data, first, role="analysis", agent_role_value=AGENT_ROLE)
+                analysis = root / "analyses/cooling-fit"
+                preexisting = {
+                    analysis / "notebook.qmd": "# Existing notebook\n",
+                    root / "analyses/_quarto.yml": "project: {type: website}\n",
+                }
+                for path, content in preexisting.items():
+                    self.assertFalse(path.exists())
+                    path.write_text(content)
                 configs = [root / ".codex/hooks.json", root / ".claude/settings.json"]
                 for config in configs:
                     self.assertFalse(config.exists())
@@ -120,10 +128,10 @@ class ManagedProtocolTests(unittest.TestCase):
                 readme = (root / "docs/scientific/README.md").read_text()
                 self.assertIn("Research before Design or Build", readme)
                 self.assertIn("Diagnose first", readme)
-                analysis = root / "analyses/cooling-fit"
                 self.assertTrue((analysis / "inputs/observations.csv").is_file())
                 self.assertTrue((analysis / "inputs/provenance.json").is_file())
-                self.assertFalse((analysis / "notebook.qmd").exists())
+                for path, content in preexisting.items():
+                    self.assertEqual(content, path.read_text())
                 self.assertFalse((analysis / "results").exists())
                 self.assertFalse((root / "docs/scientific/adr/templates").exists())
             finally:

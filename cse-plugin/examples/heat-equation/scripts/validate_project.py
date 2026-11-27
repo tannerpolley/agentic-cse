@@ -54,18 +54,6 @@ def docs() -> None:
                 f"-outdir={temporary}",
                 document,
             )
-        run(
-            "quarto",
-            "render",
-            "analyses/heat_verification/notebook.qmd",
-            "--to",
-            "pdf",
-            "--no-execute",
-            "--output-dir",
-            temporary,
-        )
-        if not (Path(temporary) / "notebook.pdf").is_file():
-            raise SystemExit("analysis notebook render did not produce notebook.pdf")
 
 
 def full() -> None:

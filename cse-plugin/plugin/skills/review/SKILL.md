@@ -49,9 +49,9 @@ frozen tree and explicit merge base. If independent delegation is unavailable,
 report the review as pending. Apply [claim verdicts](#claim-verdicts) in both
 lenses.
 
-**Result lens —** inspect the complete research notebook, retained values, and
-selected renders. Establish whether each claim follows from the numbers,
-provenance, units, uncertainty, and intended-use limits. For figures and
+**Result lens —** inspect the retained values, figures, and analysis records in
+`analyses/<id>/`, including selected displays. Establish whether each claim
+follows from the numbers, provenance, units, uncertainty, and intended-use limits. For figures and
 table-only exceptions, activate the rule's owner, [analysis-sets](../../references/workflow/analysis-sets.md).
 Flag as **disproportion**, named as false precision, bikeshedding, or
 gold-plating, any stop, gate, rerun, or claim that rests on an
@@ -94,8 +94,8 @@ For a proposed negative numerical disposition, or a limit, narrowing, or
 provisional label resting on a numerical non-result, apply
 [failure-triage](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition).
 
-Review advises on the stated use; it does not promote a notebook to manuscript
-use. Optional hardening does not expand accepted scope. A correction invalidates
+Review advises on the stated use. The investigator decides whether to promote
+results for manuscript use. Optional hardening does not expand accepted scope. A correction invalidates
 the affected final-tree conclusion and requires the complete applicable lens
 again; preserve still-valid evidence.
 

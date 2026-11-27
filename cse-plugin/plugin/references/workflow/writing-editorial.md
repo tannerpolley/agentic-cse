@@ -7,7 +7,7 @@ document-scoped standing editorial decisions; do not duplicate terminology
 preferences there. Deterministic project avoid rules live only in the
 `## Prose avoid rules` table that `check_prose.py` reads
 ([scientific project records](scientific-projects.md)). Apply plugin-wide and scoped prose checks, citations, structure, and the
-selected document profile when a notebook or manuscript is prepared.
+selected document profile when a scientific document is prepared.
 
 ## Prose inspection
 

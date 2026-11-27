@@ -1,7 +1,6 @@
-"""Render the one comparison and notebook fragments without running VP-1."""
+"""Render the retained comparison figure without running VP-1."""
 
 import csv
-import json
 from pathlib import Path
 import sys
 
@@ -12,7 +11,6 @@ def present(analysis):
         rows = list(csv.DictReader(stream))
     with (results / "model-curve.csv").open() as stream:
         curve = list(csv.DictReader(stream))
-    summary = json.loads((results / "summary.json").read_text())
 
     # A fixed view of this one experiment keeps the renderer dependency-free.
     def x(temperature):
@@ -67,23 +65,6 @@ def present(analysis):
     figures.mkdir(parents=True, exist_ok=True)
     (figures / "vapor-pressure.svg").write_text("\n".join(svg))
 
-    table = [
-        "| Table 2 row | Temperature (K) | Measured (kPa) | Model (kPa) | Model − measured (kPa) |",
-        "| --- | ---: | ---: | ---: | ---: |",
-    ]
-    for row in rows:
-        table.append(
-            f'| {row["source_row"]} | {float(row["temperature_K"]):.1f} | '
-            f'{float(row["measured_kPa"]):.1f} | {float(row["model_kPa"]):.3f} | '
-            f'{float(row["residual_kPa"]):+.3f} |'
-        )
-    (results / "comparison.qmd").write_text("\n".join(table) + "\n")
-    (results / "summary.qmd").write_text(
-        f'The maximum absolute residual is **{summary["max_absolute_residual_kPa"]:.3f} kPa**, '
-        f'the root mean square residual is **{summary["root_mean_square_residual_kPa"]:.3f} kPa**, '
-        f'and the mean absolute relative residual is **{summary["mean_absolute_relative_residual_percent"]:.2f}%** '
-        f'across {summary["points"]} measurements.\n'
-    )
 
 
 if __name__ == "__main__":
