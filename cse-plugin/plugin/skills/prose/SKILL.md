@@ -17,6 +17,7 @@ Read first: [operating-model](../../references/workflow/operating-model.md), [sc
 Identify the exact paragraph, section, manuscript, report, reviewer response, or
 original-and-revision pair and apply the shared rules in [scientific-writing](../../references/workflow/scientific-writing.md).
 Read the applicable [standing editorial decisions](../../references/workflow/scientific-writing.md#standing-editorial-decisions) without editing them.
+Ask whether each input-to-output result has its [conditions table and result plot](../../references/workflow/scientific-writing.md#argument).
 For a new or rejected manuscript, journal retarget, or material restructure, use its manuscript structure review.
 Default to inspection only. For file-backed input, run the existing deterministic
 prose check with available repository and personal authorities before semantic

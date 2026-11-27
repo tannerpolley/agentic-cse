@@ -256,19 +256,32 @@ MAGNITUDE = re.compile(
     r"|(?<![\w.])(?P<em>\d+(?:\.\d+)?)[eE](?P<ee>-\d+)(?![\w.])"
     r"|(?<![\w.])(?P<d>0\.0{5,}\d+)")
 ROUNDOFF_CONTEXT = re.compile(r"(?i)\b(?:residual|toleran|numerical\s+error|round|converg|agree|differ|certificat)")
+NUMERIC_VALUE = re.compile(
+    r"(?<!\w)[+−-]?(?:\d{1,3}(?:,\d{3})+|\d+|(?=\.\d))(?:\.\d+)?"
+    r"(?:[eE][+−-]?\d+|\s*[×·]\s*10[⁺⁻⁰¹²³⁴⁵⁶⁷⁸⁹]+)?(?!\w|\.\d)"
+)
+SENTENCE_END = re.compile(r"(?<=[.!?])[”’\"')\]]*(?:\s+|$)")
+LINK_TARGET = r"(?:[A-Za-z][\w+.-]*://|www\.)\S+|\b10\.\d{4,9}/[^\s}]+"
 
 
 def hide(pattern, text, flags=0):
     return re.sub(pattern, lambda m: re.sub(r"[^\n]", " ", m[0]), text, flags=flags)
 
 
-def visible_lines(text, suffix, math=False):
+def visible_lines(text, suffix, math=False, prose_only=False):
     """Bounded source extraction; masking retains source line numbers.
 
     math=True keeps math and quantity-macro arguments for the roundoff advisory."""
     text = hide(r"<!--.*?-->", text, re.S) if suffix != ".tex" else text
     if not math:
         text = hide(r"(?s)\$\$.*?\$\$|(?<!\\)\$[^$]*\$|\\\(.*?\\\)|\\\[.*?\\\]", text)
+    if prose_only and suffix == ".tex":
+        text = hide(r"\\begin\{(tabular\*?|tabularx|tabulary|longtable|tblr|longtblr|tikzpicture)\}.*?\\end\{\1\}", text, re.S)
+    elif prose_only:
+        text = hide(r"<table\b[^>]*>.*?</table\s*>", text, re.S | re.I)
+        text = hide(r"(?m)^ {0,3}[^\n]*\|[^\n]*\n"
+                    r" {0,3}\|?[ \t]*:?-+:?(?:[ \t]*\|[ \t]*:?-+:?)*[ \t]*\|?[ \t]*$"
+                    r"(?:\n {0,3}[^\n]*\|[^\n]*)*", text)
     fence = environment = None
     metadata = False
     caption = False
@@ -289,6 +302,8 @@ def visible_lines(text, suffix, math=False):
                 if end:
                     environment = None
             # shortcut: single-line arguments only; inspect assembled output for macros or multiline arguments.
+            if prose_only:
+                line = hide(r"\\[A-Za-z]*cite[A-Za-z]*\*?(?:\[[^]]*\])*\{[^}]*\}", line)
             line = re.sub(r"\\[A-Za-z]*cite[A-Za-z]*\*?(?:\[([^]]*)\])?\{[^}]*\}", lambda m: m[1] or "", line)
             line = hide(r"\\(?:label|(?:eq|auto|page|[cC])?ref|[A-Za-z]*cite[A-Za-z]*|include(?:graphics)?|input|bibliography|usepackage|(?:re)?newcommand|providecommand)\*?(?:\[[^]]*\])*\{[^}]*\}(?:\[[^]]*\])?(?:\{[^}]*\})?", line)
             quantities = "" if math else "|si|SI|unit|num|qty|numrange|qtyrange|tablenum|ang"
@@ -321,6 +336,8 @@ def visible_lines(text, suffix, math=False):
                 continue
             line = hide(r"`[^`]*(?:[A-Za-z_]\w*\(|\s=\s)[^`]*`", line)
             line = hide(r"`+(?:\{[rR]|\{python|python[\d.]*\s|bash\s|git\s|codex\s|uv\s|quarto\s|rg\s)[^`]*`+", line)
+            if prose_only:
+                line = hide(r"\[[^\]\n]*@[\w:.-]+[^\]\n]*\]|\[\d+(?:\s*[,–-]\s*\d+)*\](?!\()", line)
             line = hide(r"(?<=\])\([^)]*\)|(?<=\])\[[^]]*\]|^\s{0,3}\[(?!\^)[^]]+\]:.*|\{[^}]*#[^}]*\}|(?<!\w)@[\w:.-]+", line)
         yield str(number), line
 
@@ -409,13 +426,13 @@ def numerical_warnings(path, lines, numeric_lines):
     for location, line in lines:
         if line is None:
             continue
-        line = hide(r"(?:[A-Za-z][\w+.-]*://|www\.)\S+|\b10\.\d{4,9}/[^\s}]+|`[^`]*`", line)
+        line = hide(LINK_TARGET + r"|`[^`]*`", line)
         for match in PRINT_FORM.finditer(line):
             yield f"{path}:{location}: warning: print form {match[0]!r}: write the printed number (scientific-writing.md#equations-quantities-and-units)"
     for location, line in numeric_lines:
         if line is None:
             continue
-        line = hide(r"(?:[A-Za-z][\w+.-]*://|www\.)\S+|\b10\.\d{4,9}/[^\s}]+", line)
+        line = hide(LINK_TARGET, line)
         for match in MAGNITUDE.finditer(line):
             if 0 < magnitude(match) <= 1e-6 and ROUNDOFF_CONTEXT.search(line[max(0, match.start() - 80):match.end() + 80]):
                 value = re.sub(r"\{\s*(?=[-−])", "", match[0].strip())
@@ -423,6 +440,28 @@ def numerical_warnings(path, lines, numeric_lines):
                        "does it change a reported value, a conclusion or a decision? If not, move it to the record "
                        "(numerical-testing.md#fitness-for-purpose)")
                 break
+
+
+def density_warnings(path, lines):
+    start = previous = count = 0
+    for location, line in lines:
+        number = int(location)
+        line = hide(LINK_TARGET + r"|`[^`]*`", line)
+        if number != previous + 1 or not line.strip():
+            start = count = 0
+        previous = number
+        # shortcut: punctuation and source-line boundaries approximate sentences; inspect the rendered prose for abbreviations or generated text.
+        for index, part in enumerate(SENTENCE_END.split(line)):
+            if index:
+                start = count = 0
+            if not part.strip():
+                continue
+            start = start or number
+            before = count
+            count += sum(1 for _ in NUMERIC_VALUE.finditer(part))
+            if before <= 4 < count:
+                yield (f"{path}:{start}: warning: numeric density: more than four numeric values in one sentence; "
+                       "use the conditions table and result plot principle (scientific-writing.md#argument)")
 
 
 def identifier_warnings(paths, *, root=None):
@@ -447,7 +486,7 @@ def identifier_warnings(paths, *, root=None):
                 if line is None:
                     warnings.append(f"{path}:{location}: incomplete scan: dynamic figure label; inspect assembled figure")
                     continue
-                line = hide(r"(?:[A-Za-z][\w+.-]*://|www\.)\S+|\b10\.\d{4,9}/[^\s}]+", line)
+                line = hide(LINK_TARGET, line)
                 for category, pattern in IDENTIFIERS.items():
                     for match in re.finditer(pattern, line):
                         value = match[0]
@@ -467,6 +506,8 @@ def identifier_warnings(paths, *, root=None):
                                 continue
                         warnings.append(f"{path}:{location}: warning: {category} {value!r} (scientific-writing.md#reader-facing-identifiers)")
             warnings.extend(numerical_warnings(path, lines, numeric_lines))
+            if suffix in {".md", ".qmd", ".tex"}:
+                warnings.extend(density_warnings(path, visible_lines(text, suffix, prose_only=True)))
         except (OSError, UnicodeError, ValueError, SyntaxError, zipfile.BadZipFile, ET.ParseError, RuntimeError) as error:
             warnings.append(f"{path}: incomplete scan: {error}")
     return warnings

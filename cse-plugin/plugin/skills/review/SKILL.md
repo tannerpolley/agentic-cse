@@ -65,6 +65,7 @@ For manuscripts/decks, the Result lens activates scientific-writing's
 [editorial compliance](../../references/workflow/scientific-writing.md#editorial-compliance), and
 [manuscript reference coverage](../../references/workflow/scientific-writing.md#manuscript-reference-coverage).
 For a manuscript, also ask whether a reader could rebuild the calculation from the paper ([methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility)).
+Ask whether each manuscript input-to-output result has its [conditions table and result plot](../../references/workflow/scientific-writing.md#argument).
 At a deck's final checkpoint, inspect it read-only against [slide-decks](../../references/visualize/slide-decks.md) and the project's deck decisions.
 
 **Capability lens —** inspect the final implementation tree, complete changed functions,
