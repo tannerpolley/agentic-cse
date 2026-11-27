@@ -5,7 +5,7 @@ do not run scientific models, mutate retained results, or decide scientific
 claim support.
 
 For manuscript/deck sources and associated figures, follow the
-[standing editorial decision protocol](../workflow/scientific-writing.md#standing-editorial-decisions)
+[standing editorial decision protocol](../workflow/writing-editorial.md#standing-editorial-decisions)
 before editing; build-only invocations read applicable decisions without
 inventing or rewriting them.
 

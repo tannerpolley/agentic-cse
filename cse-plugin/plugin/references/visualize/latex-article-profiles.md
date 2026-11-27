@@ -1,20 +1,9 @@
 # LaTeX article profiles
 
-Use this reference when CSE creates, revises, summarizes into, or reviews a
-manuscript or analysis research notebook. These are two author-controlled scientific
-content profiles. They share the document tool bundle but have different
-selection, structure, and presentation rules.
-
-## Select the profile
-
-| Profile | Scientific purpose | Organizing rule |
-| --- | --- | --- |
-| Manuscript | Present one selected scientific argument from abstract through conclusion | Every section advances the same question and supported conclusion |
-| Analysis research notebook | Present the current view of one coherent scientific question for Review | Every section serves that question |
-
-Use one profile per rendered document and one notebook per analysis set. Do not
-turn an analysis research notebook into a manuscript by adding an abstract;
-select the relevant investigator-promoted results and write a separate manuscript.
+Use this reference for the LaTeX setup of author-controlled scientific articles.
+Use one profile per rendered document. Choose the [manuscript profile](#manuscript-profile)
+or [analysis-notebook profile](../workflow/analysis-notebook-profile.md) according
+to the document's scientific purpose.
 
 ## Shared article requirements
 
@@ -24,45 +13,30 @@ select the relevant investigator-promoted results and write a separate manuscrip
   owner.
 - Keep a one-column body so equations, process diagrams, multipanel figures,
   and scientific tables retain readable width.
-- Use the scientific core from `latex-packages.md`. Every article-capable tool
+- Use the scientific core from [latex-packages](latex-packages.md). Every article-capable tool
   in that reference may be used in either profile. A tool belongs to a
   capability, not to a profile.
 - Load a package or extension only when the document exercises its capability.
   Select one owner for overlapping capabilities and keep profile styling out
   of shared notation and figure source.
-- See `quarto-execution.md` for a Quarto project. Let Quarto own document
+- See [quarto-execution](quarto-execution.md) for a Quarto project. Let Quarto own document
   assembly, presentation tables, citations, cross-references, and code
   highlighting. Keep execution disabled by default and never run the
   scientific model during document rendering. Keep stable LaTeX notation,
   packages, and semantic figure styles in reviewed headers.
-- **Choosing the display** (Ehrenberg 1977, ACS Guide 4.1 and 4.2): apply the
-  [conditions table and result plot principle](../workflow/scientific-writing.md#argument).
-  What should a reader see at a glance, or what trend or relationship should
-  they see? Use a figure. Which exact values will they compare or reuse, or
-  what detail would take many words to convey? Use a table with short,
-  parallel entries and put explanations in footnotes or the text. Use an
-  equation to state a mathematical relation.
-  For phase equilibrium, use a ternary diagram with tie lines for a liquid
-  split and a phase map with boundaries for a flash grid.
-- Present scientific provenance: data source, equations, parameter values,
-  units, assumptions, comparison basis, and uncertainty. Data are traceable to
-  their origin, and comparison with published values is part of the evidence
-  (Bazyleva et al. 2021; Cummings et al. 2009). Keep agent actions,
-  repository operations, build commentary, and chronological work history out
-  of rendered scientific prose.
-- Use result-led captions. A figure caption states the quantity, conditions,
-  comparison, and supported observation. A table caption states what the
-  values compare. So that figure and caption stand alone (ACS Guide 4.1.3,
-  4.1.4), a caption also defines every symbol, line, and marker and says what
-  any error bar or band represents. Where the venue's captions are
-  descriptive, the caption says what the figure shows and the text states the
-  finding. Put figure captions below figures and table captions above tables.
-- Follow the scientific tables rules in `latex-packages.md`.
-- Apply `latex-layout-and-qa.md` to every selected PDF output. Compilation,
+- Apply [latex-layout-and-qa](latex-layout-and-qa.md) to every selected PDF output. Compilation,
   resolved references, automated visual QA, and full-size page inspection are
   required for both profiles.
 
+Follow the [writing principles](../workflow/scientific-writing.md#shared-article-requirements)
+for display choice, captions, and scientific tables.
+
 ## Manuscript profile
+
+The manuscript presents one scientific argument from abstract through conclusion,
+with every section advancing the same question and conclusion. See the
+[writing principles](../workflow/scientific-writing.md#structure) for manuscript
+structure, skeletons, supplement, and evidence selection.
 
 ### Appearance
 
@@ -77,185 +51,14 @@ select the relevant investigator-promoted results and write a separate manuscrip
 - Place figures and tables near their first substantive discussion. Use float
   barriers only at real semantic boundaries.
 
-### Structure
-
-Use the applicable subset in this order:
-
-1. title, a specific label for the central contribution without novelty
-   adjectives or numerical results, whose first phrase sets its emphasis (ACS
-   Guide 2.3.2), then authors, affiliations, and date;
-2. an informative abstract stating the question and the gap it fills, the
-   method, principal result with conditions, and supported implication, within
-   the venue's length and without citations;
-3. keywords, and a nomenclature list when the venue uses one; it never
-   replaces definition at first use;
-4. introduction as a **Create a Research Space** (Swales 1990): territory,
-   gap, contribution. The literature review is the evidence for the gap and
-   the baseline the results are compared against;
-5. formulation, theory, or governing equations;
-6. experimental, computational, or analytical methods;
-7. verification, validation, and uncertainty when they support the claims;
-8. results;
-9. discussion;
-10. conclusions;
-11. the statements the [venue package](../workflow/scientific-writing.md#manuscript-structure-review)
-    requires, such as data, code, funding, or conflicts;
-12. references in the venue's style, and selected appendices.
-
-This is **IMRaD as four questions** (Gastel and Day 2022; Sollaci and Pereira
-2004): why, how, what, and so what, with engineering variants such as a model
-section, combined Results and discussion, or alternating methods and results.
-The discussion interprets and bounds; conclusions say what was learned, not
-what was done (ACS Guide 2.3.8), pairing each finding with its consequence or
-domain of validity. Top-level headings use the field's
-conventional names; subheadings name the system, study, or step, never an
-internal label. Merge adjacent sections when the scientific argument is
-clearer without a separate heading. The manuscript remains one continuous story: introduce each
-result before showing it, interpret it after showing it, and carry only the
-evidence needed for the stated conclusion.
-
-### Skeletons by paper type
-
-A paper starts from the skeleton its type and venue share in published
-papers, and departs when the argument needs to.
-
-- **Thermodynamic model:** a model section named for the theory, split by
-  physics, then results in rising system complexity (pure, binary, ternary).
-- **Process, techno-economic, or optimization:** the
-  [problem statement](../workflow/scientific-writing.md#methods-reproducibility)
-  in standard form, then unit and cost models, then results by study, with the
-  cost basis, boundary before the metric, and sensitivity versus uncertainty of
-  [manuscript writing](#manuscript-writing-and-source-organization).
-- **Rate-based column:** **validate, then use**: validation against plant or
-  pilot data comes before sensitivity, design, or case studies.
-- **Software** (JOSS review criteria): need and gap against existing packages,
-  design trade-offs, verification against an independent reference, measured
-  performance, limitations, and availability. Documentation stays in the
-  documentation.
-
-A multi-paper dissertation is one argument, with an integrating introduction
-and conclusion and co-author contributions stated per chapter.
-
-### Supplement
-
-The supplement keeps the main text readable; it is not an archive. It holds
-derivations, extra cases, full tables, data, and notebooks, each cited from the
-main text. It never holds the problem statement or the new model relations.
-The validation behind a main claim is summarized in the main text; supporting
-detail may go to the supplement. Reusable data also goes out as
-machine-readable files, because values in a PDF supplement are hard to reuse
-and get less scrutiny (ACS Guide 3.1.4).
-
-### Evidence guard
-
-A result enters the manuscript only when it supports the selected claim order.
-The manuscript may omit sound analyses that do not serve that story. It may
-condense an analysis-notebook result, but reported values, conditions,
-uncertainty, and claim boundaries must remain consistent with the retained
-results.
-
-## Analysis-notebook profile
-
-### Output forms
-
-The durable living view is ordinary Quarto HTML. An investigator may select the
-portable LuaLaTeX PDF profile for a paged handoff. Both views render from one
-curated Quarto source or from explicitly shared section, data, and figure
-sources; they are not independent scientific records.
-
-Use ordinary HTML images or tables for the HTML view and TikZ or PGFPlots
-directly in the promoted PDF. Format-specific blocks may change the rendering
-representation but not values, conditions, uncertainty, interpretation, or
-limitations.
-
-### Scope and appearance
-
-- Create one notebook for one coherent scientific question. Use the repository's
-  short analysis identifier rather than a workflow stage or time period.
-- For PDF, use `scrartcl`, 10 pt, one-sided, one column, explicit 0.62 in left
-  and right margins, and explicit 0.55 in top and bottom margins. These margins
-  alone own the notebook type area; do not combine them with `DIV=calc` or a
-  second geometry owner. Use 4 pt table column padding (`\tabcolsep`) and 1.05
-  row spacing (`\arraystretch`) once in the notebook header.
-- Use `\small` or `\footnotesize` locally only when a table requires it. Never
-  use `\scriptsize`, whole-table scaling, clipped cells, or compressed rows as
-  a fit repair; narrow or wrap columns, or use landscape placement. Let figures
-  and tables use the available width when that improves the scientific
-  comparison, without forcing every display to full width.
-- Use a compact title block naming the project and question. Keep related
-  results and floats together; use a table of contents only when it improves
-  navigation.
-- For HTML, use ordinary headings and a continuous result report with focused
-  views for the question, conditions, results, interpretation, limitations,
-  next steps, and provenance.
-- Give plots, diagrams, equations, and tables the available text width. Prefer
-  one strong result display over a dense page of marginal outputs.
-- Omit an abstract and paper-style narrative introduction. Include the
-  pragmatic conclusion and useful next steps supported by the analysis.
-
-### Notebook content
-
-Include only the material needed to review the analysis:
-
-1. **Question:** one precise sentence naming the quantity or comparison.
-2. **Conditions:** a compact table or short block giving inputs, units,
-   assumptions, method, and comparison basis.
-3. **Results:** retained plots, diagrams, equations, tables, and the key
-   numerical values.
-4. **Interpretation:** a concise statement of what the results support.
-5. **Limitations:** only boundaries that materially constrain use of the
-   result.
-6. **Conclusions and next steps:** the pragmatic answer and useful supported
-   continuation.
-7. **Provenance:** exact retained-result and source paths.
-
-Use subsections only when they improve navigation among substantial content.
-Captions and tables should carry most local explanation. Avoid repeated prose
-when the conditions table or figure caption already states the information.
-
-### Evidence guard
-
-Review the completed notebook and selected render against these questions:
-
-- the calculation is reproducible from retained inputs;
-- balances, invariants, convergence, comparisons, and uncertainty required by
-  the question have been checked;
-- every displayed value agrees with its retained result table;
-- every figure and table passes scientific and visual review;
-- captions identify quantities, conditions, and series roles;
-- the primary figures answer the question and diagnostics remain secondary
-  unless the question requires them;
-- a named authoritative limit is applied when one governs the intended use;
-  otherwise the notebook reports the actual comparison and diagnostics;
-- the interpretation stays inside the tested domain.
-
-Keep exploratory plots, malformed tables, duplicate views, raw diagnostics,
-uninterpreted diagnostics, unsupported continuous-looking curves, statistics
-without a comparison basis, and unexplained attempts outside the rendered
-notebook. Include a poor fit or failed model only when it contains useful
-values and diagnostics that constrain the interpretation. An unresolved
-disagreement returns to Analyze or Diagnose before Review Pass.
-Fully replace the prior coherent view; Git and retained results preserve
-history.
-
 ## Manuscript writing and source organization
 
 Treat mechanical correctness as the first check. A manuscript build must have
-no unresolved references, duplicate labels, or missing citation keys. These
-checks do not establish prose completeness; review the assembled manuscript
-for statements whose meaning still depends on information outside the document.
-
-Before publication review, correct these general classes:
-
-- Identify every transferred parameter, analogue, correlation, or property value by name, source, exact locator, and applicability; state when transfer to the present system is an assumption.
-- Define every objective, constraint, operating domain, and comparison method before its result or sensitivity appears.
-- Give the rationale for fixed sensitivity cases, selected designs, reference conditions, and reported optima when the choice is not self-evident. Keep **sensitivity versus uncertainty** distinct (Saltelli et al. 2019): one-at-a-time variation shows local leverage, not overall uncertainty, in a nonlinear model.
-- Give every cost its **cost basis** (NETL 2021; Rubin et al. 2013): currency and year, estimate class, capital-cost level, real or nominal financing, scope, and reference plant. Set the **boundary before the metric**: define scope and battery limits first and match the metric to them (Rubin et al. 2013).
-- State phase-volume, composition-basis, standard-state, sign, unit, and normalization conventions instead of saying only that source conventions were retained.
-- Identify the operating conditions associated with large errors, failed checks, rejected states, and non-evaluable cases when they constrain interpretation.
-- Match verbs to the evidence: use “considered during model selection” when alternatives were screened but their comparison is not presented, and reserve “retained for comparison” for comparisons actually shown.
-- Remove temporal revision language such as “now” unless the manuscript explicitly compares defined versions.
-- Replace repository-ownership terms such as “owner,” “campaign,” and “retained result table” with the actual equation, calculation, validation study, or reported table meant for a reader.
+no unresolved references, duplicate labels, or missing citation keys. Review
+the assembled manuscript for statements whose meaning still depends on
+information outside the document. See the [scientific completeness](../workflow/scientific-writing.md#methods-reproducibility)
+and [scientific prose](../workflow/scientific-writing.md#scientific-prose)
+principles for publication review.
 
 ### Keep one authoritative manuscript edition
 
@@ -277,34 +80,13 @@ prose reviewable without adding rendered structure:
 5. Generate any paragraph- or sentence-cohesion report under `builds/`; do not maintain a duplicated manuscript map.
 6. Do not use `\paragraph{}` or sentence-wrapper macros merely to create tracking identifiers. They add formatting or command semantics without improving the scientific argument.
 
-For example:
-
-```latex
-% P:introduction-05
-Reported batch extraction percentages do not define a process model for this solvent.
-Lithium and sodium partition between two nonideal liquids while the extractants compete for finite inventory.
-The reactive liquid-liquid-equilibrium calculation resolves those coupled effects.
-```
-
-The three source lines render as one paragraph because no blank line separates
-them.
+See a [source paragraph example](../workflow/writing-examples.md#example-source-paragraph).
 
 ### Drafting versus final review
 
-Keep routine builds mechanical: verify paragraph identifiers, source order,
-sentence-per-line layout, blank-line boundaries, and LaTeX references and
-citations. A prose edit does not require an agent review.
-
-At a requested final check or publication handoff, invoke `cse:prose` and use
-the manuscript checkpoint in `references/workflow/scientific-writing.md`.
-That rule follows sentence ideas and roles through paragraph themes, section
-claims, adjacent transitions, and one manuscript argument. Material story
-changes invalidate an earlier final review; local wording changes do not
-create a new drafting gate. Generated judgments use the stable identifiers
-above and stay outside the authoritative manuscript. Mechanical checks may
-verify those judgments' identity and coverage, never invent their meaning.
-This cohesion inspection does not establish scientific truth or replace
-evidence review and investigator promotion.
+Use the [final manuscript checkpoint](../workflow/manuscript-review.md#final-manuscript-checkpoint)
+for routine mechanical checks and for cohesion review at a requested final
+check or publication handoff.
 
 ### Separate scientific correction from source reflow
 
@@ -318,6 +100,15 @@ reorganization mechanically checkable.
 
 An analysis research notebook presents one reviewed analysis set. A manuscript
 selects only investigator-promoted notebook results and rewrites that evidence
-into one argument.
+into one argument in a separate document. Adding an abstract to a notebook
+does not make it a manuscript.
 Share retained tables, figure sources, notation, and bibliography keys. Do not
 share profile headers, document structure, or rendered workflow language.
+
+Immediately before using a reviewed notebook in manuscript work, obtain native
+investigator confirmation bound to the exact notebook commit, intended use,
+and limitations. Ask about each numerical non-result in that notebook as its
+own item, separate from the limitations. Record one plain sentence stating that
+the investigator promoted that commit for that use subject to those limitations.
+Review Pass alone does not grant promotion. The sentence is sufficient without
+a status file or decision record.

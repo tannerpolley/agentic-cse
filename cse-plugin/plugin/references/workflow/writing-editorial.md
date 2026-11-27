@@ -1,0 +1,133 @@
+# Editorial procedures
+
+## Project prose authorities
+
+Use `docs/scientific/writing/STYLE.md` for project-wide house style and
+document-scoped standing editorial decisions; do not duplicate terminology
+preferences there. Deterministic project avoid rules live only in the
+`## Prose avoid rules` table that `check_prose.py` reads
+([scientific project records](scientific-projects.md)). Apply plugin-wide and scoped prose checks, citations, structure, and the
+selected document profile when a notebook or manuscript is prepared.
+
+## Prose inspection
+
+`cse:prose` owns writing inspection; `cse:write` owns authoring and correction.
+For file-backed input, Prose runs `scripts/workflow/check_prose.py` with the
+available project glossary and personal configuration before semantic
+inspection. Pasted input without a declared repository-relative path receives
+plugin-wide and contextual inspection only; state that path-scoped project and
+personal rules were not checked, and create no surrogate file.
+
+Routine Prose findings identify the smallest exact span, classify it as
+`required correction` or `contextual judgment call`, cite the rule source, and
+explain the scientific or communication consequence. If no finding remains,
+return `CSE prose is clear.` without rewriting. Apply the [scientific prose principles](scientific-writing.md#scientific-prose).
+
+The patterns in those principles are not evidence of authorship. Prose returns no AI probability,
+detector score, or authorship verdict and does not optimize text for a detector.
+
+### Routine corrections
+
+Change only diagnosed spans, leave clear prose unchanged, invent no specificity or evidence,
+preserve supported content, and perform one verification read. Do not iterate toward a style or detector score.
+
+### Original and revision comparison
+
+When comparing an original with a revision, check [revision fidelity](scientific-writing.md#scientific-prose). Report exact differences and unresolved risks.
+This semantic inspection neither proves equivalence nor
+decides whether evidence supports a changed scientific claim; route claim
+support to Review's Result lens and unresolved source authority to Research.
+
+## Standing editorial decisions
+
+Before manuscript or deck work, discover existing project guidance. Keep one
+named section per manuscript or deck in `docs/scientific/writing/STYLE.md`,
+identified by repository-relative authoritative source, supplement, and
+associated figure paths. Keep project-wide choices outside document sections.
+If an established manuscript brief or editorial record already owns the
+choices, put only its pointer in the STYLE section; do not copy the decisions.
+Dated revision reports and the current draft are not automatically standing
+owner instructions. Create the section when document work begins; if there
+are no standing directions, state that none have been recorded.
+
+Use this minimal format, with actual document paths and owner directions:
+
+```markdown
+## Manuscript or deck title
+Sources: repository-relative main source; supplement; associated figures
+| Scope | Standing owner decision | Authority |
+| --- | --- | --- |
+```
+
+Rows can cover precision, exclusions, audience, and the main-text/supplement
+split. A row may also record a target-journal requirement that shapes the
+paper (see [venue package](manuscript-review.md#manuscript-structure-review)), with the guide link
+and access date as authority. Otherwise record only explicit owner directions
+and preserve their exact meaning:
+decimal places and significant digits differ. Use an authority link when
+available; otherwise retain the date and a short exact owner quotation. Do not
+promote agent or reviewer suggestions, or choices inferred from the draft,
+into owner policy. Routine editorial choices do not broaden the scientific
+choice threshold in [decision-records](decision-records.md); `evidence.md`
+owns scientific evidence, not editorial preferences. Task-specific story order
+stays in the accepted issue plan under manuscript structure review.
+
+Before editing, Write, Plot, Beamer, and renderers editing document sources or
+associated figures load both project-wide choices and the applicable document
+record. Capture new explicit owner directions there before applying them.
+A later explicit owner correction replaces only the active scoped row with
+its new authority; Git retains history. Conflicting or ambiguous directions
+need a scoped owner decision, without asking again about settled choices.
+Expose any conflict with scientific support, attribution, or required
+limitations; editorial preferences cannot remove those obligations. Build-only
+invocations read applicable decisions without inventing or rewriting them.
+
+Prose and Review remain read-only: read and check the applicable record and
+return missing owner decisions for the authoring task to capture. They do not
+edit the record or turn their own advice into owner policy.
+
+## Reader-facing identifiers
+
+Apply the [reader-outside-the-project principle](scientific-writing.md#scientific-prose). A warning is a judgment call, not proof that a scientific label is wrong.
+
+Run `python3 <plugin>/scripts/workflow/check_prose.py --root <project> [--config <personal.toml>] <sources>`,
+where `<plugin>` is the directory holding `skills/`, on explicit manuscript sources, figure scripts, and deck `.tex`/`.pptx` files.
+The scan does not expand TeX includes; name supplements and included sources.
+The same channel carries two numerical advisories: code-style print forms
+([numbers in print](scientific-writing.md#equations-quantities-and-units)) and roundoff-scale
+detail ([fitness for purpose](numerical-testing.md#fitness-for-purpose)).
+Advisories never change CLI success or block the Stop hook. Existing
+terminology failures still do. The hook attributes changed files to the session,
+but may miss script-generated outputs; run this explicit scan before delivery.
+
+Only explicit owner approval can exempt an exact run/fit label. In the existing
+named STYLE section, use repository-relative paths/globs in both `Sources:` and
+Scope, separated by semicolons, and a nonempty Authority. See the
+[STYLE approval example](writing-examples.md#example-manuscript).
+
+Both Sources and Scope must match. Approval is case-sensitive and exact: F4 does
+not approve F4-0. It cannot suppress issue/path/hash findings or terminology
+failures. Missing STYLE implies no approvals. Malformed approval rows warn and
+suppress nothing. Pointer-only records stay valid; external editorial approval
+requires semantic inspection and is not followed or copied automatically.
+
+Extraction is deliberately bounded: TeX uses line-based command stripping and
+begin/end tracking; multiline command arguments and arbitrary macros require
+assembled-document inspection. Markdown/Quarto keeps visible link text, quoted
+prose and simple monospace labels but hides code, math and non-caption metadata.
+Python inspects literal text at figure-label calls without executing code or
+propagating variables; dynamic expressions and invalid Python produce explicit
+incomplete-scan advisories. PowerPoint joins text runs in slide paragraphs and
+table cells; malformed archives warn. Images, embedded chart/SmartArt labels,
+notes and macro-expanded text require visual inspection. Inspect the assembled
+figure/deck even when the source scan is quiet. Executable patterns live only
+in the checker; this section owns the editorial rule and approval requirements.
+
+## Editorial compliance
+
+At the [final checkpoint](manuscript-review.md#final-manuscript-checkpoint), Prose and Review check the applicable standing
+editorial decisions against the assembled document, including its supplement,
+figures, and tables. Report exact violations with the source identifier,
+record path, scoped decision and authority, consequence, and smallest
+correction. Missing or ambiguous directions return to authoring or the owner;
+reviewers do not invent them.

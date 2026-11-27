@@ -7,7 +7,7 @@ metadata:
   cse-tags: "matplotlib, latex-toolbox"
   cse-routing:
     direct: [rendering-guide, plotting]
-    conditional: [latex-figures, scientific-writing, slide-decks]
+    conditional: [latex-figures, writing-editorial, slide-decks]
 ---
 
 # Plotting tool
@@ -18,7 +18,7 @@ Inherit core scientific, numerical,
 project, and language decisions. Activate [latex-figures](../../references/visualize/latex-figures.md) only for a
 document-native backend.
 
-For manuscript/deck figures, activate [scientific-writing's standing-decision protocol](../../references/workflow/scientific-writing.md#standing-editorial-decisions)
+For manuscript/deck figures, activate [standing-decision protocol](../../references/workflow/writing-editorial.md#standing-editorial-decisions)
 before editing, including capture of new owner directions. Unrelated
 exploratory plots do not load manuscript rules.
 For deck figures, use [slide-decks](../../references/visualize/slide-decks.md) to check the figure in the composed slide.
@@ -41,4 +41,4 @@ checks to the invoking stage. An unexplained disagreement or unsupported curve
 returns to `cse:analyze` or `cse:diagnose`.
 
 For source, figure, and deck identifier advisories, follow the shared
-[reader-facing identifier check](../../references/workflow/scientific-writing.md#reader-facing-identifiers).
+[reader-facing identifier check](../../references/workflow/writing-editorial.md#reader-facing-identifiers).

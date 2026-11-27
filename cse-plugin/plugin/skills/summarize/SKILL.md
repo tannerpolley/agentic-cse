@@ -7,16 +7,17 @@ metadata:
   cse-order: "06"
   cse-tags: "workflow"
   cse-routing:
-    direct: [operating-model, analysis-sets]
-    conditional: [scientific-method, scientific-writing, numerical-testing]
+    direct: [operating-model, analysis-sets, analysis-notebook-profile]
+    conditional: [scientific-method, scientific-writing, writing-editorial, numerical-testing]
 ---
 
 # Summarize results
 
 Read first: [operating-model](../../references/workflow/operating-model.md), [analysis-sets](../../references/workflow/analysis-sets.md).
 
-Activate [scientific-writing](../../references/workflow/scientific-writing.md)
-when preparing or revising notebook prose.
+Use the [analysis-notebook profile](../../references/workflow/analysis-notebook-profile.md)
+for scope, content, and evidence. For notebook prose, apply [scientific prose](../../references/workflow/scientific-writing.md#scientific-prose)
+and the [project prose authorities](../../references/workflow/writing-editorial.md#project-prose-authorities).
 
 Activate [scientific-method](../../references/workflow/scientific-method.md) for interpretation, verification, validation, or
 uncertainty. Return a chat summary of the main points and research

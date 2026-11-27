@@ -58,7 +58,7 @@ by its relation to the fit (Kontogeorgis et al. 2021). A predictive claim rests
 only on data the model never saw, compared on the same points with the same
 statistic. Under **identifiability** (Raue et al. 2009), a fitted parameter is a
 result only if the data determine it; report its correlation or a joint region
-instead of independent ± values ([sources](scientific-writing.md#sources)).
+instead of independent ± values ([sources](writing-sources.md#sources)).
 
 A fit is **converged for reporting** when further iterations cannot change any
 reported parameter by more than a small fraction of its standard error, or any

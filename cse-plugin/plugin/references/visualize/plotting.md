@@ -66,7 +66,7 @@ Label every axis with the quantity and unit in the venue's form, such as
 $T/\mathrm{K}$ or $T$ (K), and keep one form throughout; a symbol used on an
 axis is defined in the caption. Continuous fields use
 perceptually uniform, ordered colour maps readable in grayscale (Crameri et al.
-2020; [sources](../workflow/scientific-writing.md#sources)). Use linear axes by default, and use log or symlog only when multiplicative behavior, orders of magnitude, or signed dynamic range makes the linear view misleading. Keep legends, grids, annotations, and significant digits purposeful.
+2020; [sources](../workflow/writing-sources.md#sources)). Use linear axes by default, and use log or symlog only when multiplicative behavior, orders of magnitude, or signed dynamic range makes the linear view misleading. Keep legends, grids, annotations, and significant digits purposeful.
 
 ## Matplotlib style and sizing
 

@@ -504,7 +504,7 @@ def identifier_warnings(paths, *, root=None):
                                 ".svg", ".pptx", ".whl"}
                             if not (known_start or known_suffix):
                                 continue
-                        warnings.append(f"{path}:{location}: warning: {category} {value!r} (scientific-writing.md#reader-facing-identifiers)")
+                        warnings.append(f"{path}:{location}: warning: {category} {value!r} (writing-editorial.md#reader-facing-identifiers)")
             warnings.extend(numerical_warnings(path, lines, numeric_lines))
             if suffix in {".md", ".qmd", ".tex"}:
                 warnings.extend(density_warnings(path, visible_lines(text, suffix, prose_only=True)))
