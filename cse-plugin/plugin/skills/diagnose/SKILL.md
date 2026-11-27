@@ -1,6 +1,6 @@
 ---
 name: diagnose
-description: "Diagnose scientific failures or implausible run times through reproduction and bounded probes. Use when asked \"why does my solver diverge\", \"why is this run so slow\", or \"why doesn't this match the reference\", or about numerical NaNs and non-convergence. Other software bugs go to diagnosing-bugs."
+description: "Diagnose scientific failures or implausible run times through reproduction and bounded probes. Use when acting as a diagnosis sub-agent, or asked \"why does my solver diverge\", \"why is this run so slow\", or about NaNs and non-convergence. Other software bugs go to diagnosing-bugs."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"

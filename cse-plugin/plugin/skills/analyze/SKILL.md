@@ -1,6 +1,6 @@
 ---
 name: analyze
-description: "Run accepted studies and interpret numerical results. Use when asked to \"analyze fit results\", \"compare fitted parameters\", \"run the study\", \"run the sweep\", or \"what do these results show\". Check balances, residuals, convergence, failed cases, and uncertainty. Notebook write-up goes to summarize."
+description: "Run accepted studies and interpret numerical results. Use when acting as a test sub-agent, or asked to \"analyze fit results\", \"run the study\", \"run the sweep\", or \"what do these results show\". Check balances, residuals, convergence, failed cases, and uncertainty. Notebook write-up goes to summarize."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"

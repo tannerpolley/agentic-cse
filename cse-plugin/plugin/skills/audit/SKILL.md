@@ -1,6 +1,6 @@
 ---
 name: audit
-description: "Audit scientific repos and owner history read-only: ceremony, duplicated values, misplaced records, unsourced names, untraced limits. Use when asked \"what can I delete\", \"audit this repo\", \"audit owner history\", or \"find hard-coded tolerances\". Scientific support goes to review; writing to prose."
+description: "Audit scientific repos and owner history read-only: ceremony, duplicated values, misplaced records, unsourced names, untraced limits. Use when acting as an audit sub-agent, or asked \"what can I delete\", \"audit this repo\", or \"find hard-coded tolerances\". Support goes to review; writing to prose."
 metadata:
   cse-kind: "supporting"
   cse-family: "supporting"
