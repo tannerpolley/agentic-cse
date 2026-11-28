@@ -53,7 +53,9 @@ with its record locator.
 
 ## Finish
 
-For any durable edit, follow the [source scan and advisory procedure](../../references/workflow/writing-editorial.md#reader-facing-identifiers).
+For any durable edit, run
+`python3 <plugin>/scripts/workflow/check_prose.py --root <project> <sources>`
+and handle its advisories as the [source scan procedure](../../references/workflow/writing-editorial.md#reader-facing-identifiers) says.
 For a manuscript or report draft or revision, check renderer
 capability, render with the selected `cse:latex` or `cse:quarto`, inspect the
 pages, then route the final read to `cse:prose`. Use `cse:beamer`, `cse:tikz`,
