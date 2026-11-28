@@ -20,7 +20,7 @@ bibliography snapshot by a portable relative path.
 
 For a new manuscript, rejected draft, new target journal, or material change to
 section order or argument spine, review the structure before writing. The
-[cumulative growth trigger](#story-spine-read) also applies to routine rounds.
+[story-spine read](#story-spine-read) defines the revision triggers.
 
 Start from the **venue package**, the target journal's current guide for
 authors: its limits and required statements are requirements, and where it is
@@ -53,11 +53,10 @@ and checks [manuscript reference coverage](#manuscript-reference-coverage),
 [methods reproducibility](scientific-writing.md#methods-reproducibility),
 [equations, quantities, and units](scientific-writing.md#equations-quantities-and-units), and
 [data, code, and software](scientific-writing.md#data-code-and-software). The
-reader-story reviewer uses `cse:prose` for the [final manuscript checkpoint](#final-manuscript-checkpoint) and checks
-figures, tables, [captions](scientific-writing.md#shared-article-requirements),
-abstract, paragraph placement, and internal language. Write applies supported
-corrections, giving science support precedence in a conflict, then makes one
-verification read.
+reader-story reviewer uses `cse:prose` for the [final manuscript checkpoint](#final-manuscript-checkpoint)
+and checks the abstract and paragraph placement. Write applies supported
+corrections, giving science support precedence in a conflict, then follows the
+[verification read](writing-editorial.md#routine-corrections).
 
 ## Story-spine read
 
@@ -69,27 +68,40 @@ grown by more than about 20 % since the last accepted plan. Use the
 [post-rewrite pair](#after-the-rewrite) when a round changes more than about
 10 % of the main-text words, even when the overall length stays similar.
 
-In one read, bring together the abstract's opening question and gap, the
-Introduction's questions, the Results headings and displays, and the final
-paragraph. Match each promised question to its answer, in order, and check that
-the conclusions end on the contribution. Apply the [evidence guard](scientific-writing.md#evidence-guard)
+Trace each promised question from the Introduction to its answer in the
+Results headings and displays, in order. Use the [storyline report](#storyline-report)
+for the abstract, Conclusions, and emphasis. Apply the [evidence guard](scientific-writing.md#evidence-guard)
 to every “each”, “only”, and “confirmed” against the least supportive section
-or chapter. Can an outside engineer use the headline deliverable and each
-central table from the paper alone?
+or chapter. Apply [methods reproducibility](scientific-writing.md#methods-reproducibility)
+to the headline deliverable and the [display and caption principles](scientific-writing.md#shared-article-requirements)
+to central tables so an engineer can use them from the paper alone.
+
+## Storyline report
+
+End each manuscript review round with these five brief entries. Use the
+assembled manuscript and report any entry the supplied material leaves undecided.
+For a paired review, the lead closes the round with one report using both reviews.
+
+- **Claim.** State what the paper claims using the abstract and Conclusions alone.
+- **Research questions.** State the questions posed in the Introduction.
+- **Match.** Say whether the claim answers those questions and identify any mismatch.
+- **Opening and ending.** Name the abstract's opening point and gap and the paper's closing point.
+  Say whether the closing paragraph lands on the [central contribution](scientific-writing.md#argument).
+- **Disproportion.** Name any point given more space than its result supports, using
+  [emphasis in proportion](scientific-writing.md#emphasis-in-proportion).
 
 ## Internal referee rounds
 
 Grade a readability-and-proportion row in the referee brief against the
 measured model papers and give a word or page budget. In the writer brief,
-name the one contribution and which points should appear exactly once.
-Give each framing point a single home in the argument.
+name the contribution and the points that need a single home under
+[Fixing a review finding](scientific-writing.md#fixing-a-review-finding).
 
 Each request that adds material names its destination. The lead triages
 requests by what the argument needs and routes fixes through
 [Fixing a review finding](scientific-writing.md#fixing-a-review-finding).
-In the round's report, give the change in main-text words and in the counts
-of tables, figures, and captions. Apply the [story-spine triggers](#story-spine-read)
-across rounds.
+Give the change in main-text words and in the counts of tables, figures, and
+captions, then close with the [storyline report](#storyline-report).
 
 ## Comparison reconciliation
 
@@ -131,9 +143,9 @@ Reuse existing checks; compilation proves neither support nor coverage.
    semantically. Verify the target exists and that the main manuscript supplies
    the definition, essential method/conditions, result, or interpretation its
    argument needs. Flag the exact span if a pointer substitutes for needed
-   content or repeated pointers interrupt a complete explanation.
-   Use a concise self-contained explanation and one valid pointer for
-   derivation or supporting detail.
+   content or repeated pointers interrupt a complete explanation. Apply the
+   [supplement principle](scientific-writing.md#supplement) and
+   [Fixing a review finding](scientific-writing.md#fixing-a-review-finding).
 5. **Decision and remediation:** in existing review output, report source
    identity, record path, exact paragraph/frame/key, evidence or missing
    support, consequence, and smallest correction. Separate required corrections
@@ -148,17 +160,17 @@ Reuse existing checks; compilation proves neither support nor coverage.
 
 Bind the conclusion to the reviewed revision. Changed claims, citations,
 sources, or editorial directions require affected conclusions to be refreshed
-at the next final checkpoint; reuse unaffected evidence. This adds no
-literature-search gate to routine rendering.
+at the next [final manuscript checkpoint](#final-manuscript-checkpoint), using
+[Review's rule for corrections](../../skills/review/SKILL.md#claim-verdicts).
+This adds no literature-search gate to routine rendering.
 
 ## Final manuscript checkpoint
 
 For routine revisions, apply the [story-spine triggers](#story-spine-read) and
-the project's existing structural and rendering checks. Maintain stable unique
-paragraph identifiers, reconstructable order, one sentence per source line, and
-blank-line paragraph boundaries. Verify references, labels, and citations in the
-final build log with the [log check](../visualize/latex-layout-and-qa.md#release-sequence)
-because a LaTeX build can succeed with them unresolved.
+the project's existing structural and rendering checks. Use
+[inspectable paragraphs and sentences](../visualize/latex-article-profiles.md#make-paragraphs-and-sentences-inspectable)
+and the [final log check](../visualize/latex-layout-and-qa.md#release-sequence)
+for [mechanical correctness](../visualize/latex-article-profiles.md#manuscript-writing-and-source-organization).
 
 At this checkpoint, require [editorial compliance](writing-editorial.md#editorial-compliance) and
 Review's [reference-coverage result](#manuscript-reference-coverage) for the same
@@ -174,8 +186,8 @@ final checkpoint. Ordinary wording, citation, formatting, and local clarity edit
 do not trigger it or block a routine build.
 
 Read the authoritative assembled manuscript, including selected inputs and
-appendices. Bind the review to its current source identity and ordered stable
-paragraph identifiers; derive sentence identifiers from paragraph order.
+appendices. Bind the review to its current source identity and reconstructable
+order of unique paragraph identifiers, using the source organization above.
 Inspect the whole manuscript, and record the exact weak or broken links with
 their consequences. A full map in compact judgments, rather than a copy of the
 manuscript, is used when it helps diagnose the paper, not required every time:

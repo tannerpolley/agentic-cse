@@ -10,11 +10,12 @@ and apply [fitness for purpose](numerical-testing.md#fitness-for-purpose).
   names it without numerical results.
 - **Outline from the displays** (Whitesides 2004): plan the equations, figures, and tables first, ordered by
   importance, then write the text that explains them.
-- **Findings first** (Mensh and Kording 2017, Rule 7): results are a chain of supported claims, not the path taken. Apply the paragraph structure below.
+- **Findings first** (Mensh and Kording 2017, Rule 7): organize results as a chain of supported claims.
+  Introduce each result before showing it, then interpret it. Apply the results paragraph structure below.
 - **A conditions table and a result plot** (ACS Guide 2.1.3, 4.1, 4.2): give every study that runs inputs to
   outputs a conditions table and a result plot. Put inputs on x and outputs on y in an X–Y plot. The results
-  paragraph poses the question, points to the displays, and ends with the finding and only the numbers the claim
-  rests on. Use [fitness for purpose](numerical-testing.md#fitness-for-purpose) to decide which values belong
+  paragraph poses the question, points to the displays, and ends with the finding and only the numbers the
+  claim rests on. Use [fitness for purpose](numerical-testing.md#fitness-for-purpose) to decide which values belong
   in the paper. Honor page limits set by the venue and meet them by cutting words while keeping the displays.
 - **An archival finding, not design data** (Andrews 2011; Zimmermann et al. 2020): a paper earns its place by
   a finding and its consequence. Values reported without interpretation read as an engineering report.
@@ -143,7 +144,7 @@ when the data and code are available. See the [heater operating-cost example](wr
   liquid split and a phase map with boundaries for a flash grid.
 - **Read displays in both directions** (ACS Guide 4.1.2, 4.2.3 for citing displays): cite displays in order
   of first mention, with a sentence interpreting each display and each decision-bearing panel or row.
-  Give every multi-condition results paragraph its display.
+  Use the [results paragraph structure](#argument) for multi-condition results.
 - Present scientific provenance: data source, equations, parameter values, units, assumptions, comparison
   basis, and uncertainty. Data are traceable to their origin, and comparison with published values is part of
   the evidence (Bazyleva et al. 2021; Cummings et al. 2009).
@@ -181,7 +182,7 @@ what, with engineering variants such as a model section, combined Results and di
 methods and results. The discussion interprets and bounds; conclusions say what was learned (ACS Guide 2.3.8),
 pairing each finding with its consequence or domain of validity. Top-level headings use the field's
 conventional names. Subheadings name the system, study, or step, never an internal label. Merge adjacent sections when the scientific
-argument is clearer without a separate heading. Introduce each result before showing it, then interpret it.
+argument is clearer without a separate heading. Use [Findings first](#argument) for results.
 
 ## Skeletons by paper type
 
@@ -213,9 +214,9 @@ scrutiny (ACS Guide 3.1.4).
 
 ## Evidence guard
 
-A summary claim keeps its evidence's subject, population and subset, condition, evidential role (fitted,
-withheld, or independent), comparator, statistic, and boundary. Preserve reported values and uncertainty
-when condensing a promoted result.
+A summarized or revised claim keeps its evidence's subject, population and subset, condition, evidential role (fitted,
+withheld, or independent), comparator, statistic, and boundary. Preserve numbers and uncertainty when
+revising or condensing a promoted result. State limitations as physical findings or bounds on the tested domain.
 
 Test quantifiers and certainty verbs against the least supportive case. Name a case or set for its actual
 membership and say what the endpoints of a range represent. A comparison changes one thing or says what
@@ -247,9 +248,8 @@ Watch for these prose patterns.
   declarations, business language, chatbot residue, meta-commentary, and internal repository or workflow
   language;
 - synonym cycling or terminology drift for one scientific referent;
-- wording or citation scope inconsistent with an accepted claim boundary, tested domain, uncertainty
-  statement, limitation, or causal description;
-- over-editing that invents first person, stakes, specifics, mechanisms, contrarian framing, or staccato
+- wording or citation scope that fails **Revision fidelity** below or the [evidence guard](#evidence-guard);
+- over-editing that invents first person, stakes, mechanisms, contrarian framing, or staccato
   prose; and
 - departures from the named writing principles, including [numerical disproportion](numerical-testing.md#fitness-for-purpose)
   and [emphasis out of proportion](#emphasis-in-proportion).
@@ -260,12 +260,12 @@ source titles, and genuine domain terms; and occasional semicolons, long sentenc
 carry real logic. Author voice comes from supplied prior writing, and venue calibration requires supplied
 requirements or inspected examples.
 
-**Revision fidelity.** A revision preserves numbers, signs, percentages, ranges, counts, units, equations,
-statistics, citations, citation scope, labels, cross-references, quotations, code, URLs, paths, figure and
-table identity, and technical terminology. Preserve each value's subject, variable, group, denominator,
-condition, and comparison; effect direction and magnitude; negation, modality, aggregation, scope,
-uncertainty, causality, limitations, and exceptions; and whether an author or reviewer action is proposed,
-planned, completed, declined, or unresolved.
+**Revision fidelity.** Preserve supported content without inventing specifics or evidence. Apply the
+[evidence guard](#evidence-guard) to revised claims. Preserve signs, percentages, ranges, counts, units,
+equations, citations, citation scope, labels, cross-references, quotations, code, URLs, paths, figure and
+table identity, and technical terminology. Keep each value tied to its variable and denominator. Preserve
+effect direction and magnitude, negation, modality, aggregation, causality, limitations, exceptions, and
+whether an author or reviewer action is proposed, planned, completed, declined, or unresolved.
 
 - Match verbs to the evidence: use “considered during model selection” when alternatives were screened but
   their comparison is not presented, and reserve “retained for comparison” for comparisons actually shown.

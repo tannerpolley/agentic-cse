@@ -23,9 +23,9 @@ and its [model adoption and comparison rule](../../references/workflow/scientifi
 Review is independent of the two execution phases and occurs at two moments.
 Use a fresh reviewer for design readiness before Build and a separate fresh
 reviewer for delivered acceptance. Neither reviewer authored the material it
-checks. CSE requires independence but selects no model, transport, staffing
-pattern, or review cascade; the active coordination guidance owns those choices.
-The [manuscript structure review](../../references/workflow/manuscript-review.md#manuscript-structure-review) specifies independent review jobs; host guidance assigns them.
+checks. Follow the [manuscript structure review](../../references/workflow/manuscript-review.md#manuscript-structure-review)
+where it specifies independent review jobs. The active coordination guidance
+owns model, transport, assignments, and other staffing choices.
 
 ## Design readiness
 
@@ -64,11 +64,12 @@ For manuscripts/decks, the Result lens activates the
 [standing decisions](../../references/workflow/writing-editorial.md#standing-editorial-decisions),
 [editorial compliance](../../references/workflow/writing-editorial.md#editorial-compliance), and
 [manuscript reference coverage](../../references/workflow/manuscript-review.md#manuscript-reference-coverage).
-For a manuscript, also ask whether a reader could rebuild the calculation from the paper ([methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility)).
-For manuscripts, apply the [evidence guard](../../references/workflow/scientific-writing.md#evidence-guard),
+For manuscripts, apply [methods reproducibility](../../references/workflow/scientific-writing.md#methods-reproducibility),
+the [evidence guard](../../references/workflow/scientific-writing.md#evidence-guard),
 [comparison reconciliation](../../references/workflow/manuscript-review.md#comparison-reconciliation),
 and the [display read](../../references/workflow/scientific-writing.md#shared-article-requirements).
 For an internal referee assignment, use the [round procedure](../../references/workflow/manuscript-review.md#internal-referee-rounds).
+Close manuscript review rounds with the [storyline report](../../references/workflow/manuscript-review.md#storyline-report).
 At a deck's final checkpoint, inspect it read-only against [slide-decks](../../references/visualize/slide-decks.md) and the project's deck decisions.
 
 **Capability lens —** inspect the final implementation tree, complete changed functions,
@@ -97,8 +98,8 @@ For a proposed negative numerical disposition, or a limit, narrowing, or
 provisional label resting on a numerical non-result, apply
 [failure-triage](../../references/workflow/failure-triage.md#fix-before-a-negative-disposition).
 
-Review advises on the stated use. The investigator decides whether to promote
-results for manuscript use. Optional hardening does not expand accepted scope. A correction invalidates
+Review advises on the stated use. Follow the [investigator promotion procedure](../../references/workflow/operating-model.md#continuation-and-investigator-promotion)
+for manuscript use. Optional hardening does not expand accepted scope. A correction invalidates
 the affected final-tree conclusion and requires the complete applicable lens
 again; preserve still-valid evidence.
 

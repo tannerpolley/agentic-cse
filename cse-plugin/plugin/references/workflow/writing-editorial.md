@@ -2,17 +2,15 @@
 
 ## Project prose authorities
 
-Use `docs/scientific/writing/STYLE.md` for project-wide house style and
-document-scoped standing editorial decisions; do not duplicate terminology
-preferences there. Deterministic project avoid rules live only in the
+Keep terminology preferences out of the [standing editorial record](#standing-editorial-decisions).
+Deterministic project avoid rules live only in the
 `## Prose avoid rules` table that `check_prose.py` reads
 ([scientific project records](scientific-projects.md)). Apply plugin-wide and scoped prose checks, citations, structure, and the
 selected document profile when a scientific document is prepared.
 
 ## Prose inspection
 
-`cse:prose` owns writing inspection; `cse:write` owns authoring and correction.
-For file-backed input, Prose runs `scripts/workflow/check_prose.py` with the
+For file-backed input, Prose runs the [source scan](#reader-facing-identifiers) with the
 available project glossary and personal configuration before semantic
 inspection. Pasted input without a declared repository-relative path receives
 plugin-wide and contextual inspection only; state that path-scoped project and
@@ -20,18 +18,19 @@ personal rules were not checked, and create no surrogate file.
 
 Routine Prose findings identify the smallest exact span, classify it as
 `required correction` or `contextual judgment call`, cite the rule source, and
-explain the scientific or communication consequence. If no finding remains,
-return `CSE prose is clear.` without rewriting. Apply the [scientific prose principles](scientific-writing.md#scientific-prose).
+explain the scientific or communication consequence. Apply the
+[scientific prose principles](scientific-writing.md#scientific-prose).
 
 The patterns in those principles are not evidence of authorship. Prose returns no AI probability,
 detector score, or authorship verdict and does not optimize text for a detector.
 
 ### Routine corrections
 
-Apply [Fixing a review finding](scientific-writing.md#fixing-a-review-finding) within the scope
-of the diagnosed issue. Preserve supported content, invent no specificity or evidence, and perform one
-verification read. Do not iterate toward a style or detector score.
-Apply [editorial compliance](#editorial-compliance) to the material being edited.
+Apply [Fixing a review finding](scientific-writing.md#fixing-a-review-finding),
+[revision fidelity](scientific-writing.md#scientific-prose), and
+[editorial compliance](#editorial-compliance) within the scope of the diagnosed issue.
+After corrections, perform one verification read. Do not iterate toward a style
+or detector score.
 
 ### Original and revision comparison
 
@@ -62,17 +61,17 @@ Sources: repository-relative main source; supplement; associated figures
 ```
 
 Rows can cover precision, exclusions, audience, and the main-text/supplement
-split. A row may also record a target-journal requirement that shapes the
-paper (see [venue package](manuscript-review.md#manuscript-structure-review)), with the guide link
-and access date as authority. Otherwise record only explicit owner directions
-and preserve their exact meaning:
+split. For target-journal requirements identified in the
+[venue package](manuscript-review.md#manuscript-structure-review), use the guide
+link and access date as authority. For other decisions, record explicit owner
+directions and preserve their exact meaning:
 decimal places and significant digits differ. Use an authority link when
 available; otherwise retain the date and a short exact owner quotation. Do not
 promote agent or reviewer suggestions, or choices inferred from the draft,
 into owner policy. Routine editorial choices do not broaden the scientific
 choice threshold in [decision-records](decision-records.md); `evidence.md`
-owns scientific evidence, not editorial preferences. Task-specific story order
-stays in the accepted issue plan under manuscript structure review.
+owns scientific evidence, not editorial preferences. Follow
+[manuscript structure review](manuscript-review.md#manuscript-structure-review) for story order.
 
 When the owner gives a standing editorial direction to any stage, the lead
 ensures it becomes a STYLE row before it is applied or writing is delegated.
@@ -96,7 +95,9 @@ edit the record or turn their own advice into owner policy.
 Apply the [reader-outside-the-project principle](scientific-writing.md#scientific-prose). A warning is a judgment call, not proof that a scientific label is wrong.
 
 Run `python3 <plugin>/scripts/workflow/check_prose.py --root <project> [--config <personal.toml>] <sources>`,
-where `<plugin>` is the directory holding `skills/`, on explicit manuscript sources, figure scripts, and deck `.tex`/`.pptx` files.
+where `<plugin>` is the directory holding `skills/`, on explicit sources, including
+manuscript sources, figure scripts, and deck `.tex`/`.pptx` files. Use the printed
+reference for each advisory.
 The scan does not expand TeX includes; name supplements and included sources.
 The same channel carries two numerical advisories: code-style print forms
 ([numbers in print](scientific-writing.md#equations-quantities-and-units)) and roundoff-scale
