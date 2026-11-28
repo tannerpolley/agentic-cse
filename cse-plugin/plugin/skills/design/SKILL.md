@@ -16,7 +16,7 @@ metadata:
 Read first: [operating-model](../../references/workflow/operating-model.md), [scientific-method](../../references/workflow/scientific-method.md).
 
 Activate [code-surface-review](../../references/workflow/code-surface-review.md) for executable changes, replacement, or
-deletion; establish its task budget before Build. Activate [decision-records](../../references/workflow/decision-records.md) for
+deletion. Activate [decision-records](../../references/workflow/decision-records.md) for
 a consequential alternative and [dependent-scientific-changes](../../references/workflow/dependent-scientific-changes.md) for real leaf
 dependencies. Activate [github-and-git](../../references/workflow/github-and-git.md) when tracker publication or Git state is part of the
 endpoint.

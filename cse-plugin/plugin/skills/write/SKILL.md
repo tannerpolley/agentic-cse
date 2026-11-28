@@ -1,34 +1,41 @@
 ---
 name: write
-description: "Write scientific manuscripts, reports, and captions from accepted evidence. Use when acting as a writer sub-agent, or asked for \"manuscript revision\", \"revise the paper\", a rejected-draft rewrite, restructuring, or wording/citation edits. Critique goes to prose; compilation to latex or quarto."
+description: "Write scientific manuscripts, reports, and captions from accepted evidence. Use when acting as a writer sub-agent or asked to draft, rewrite, restructure, or edit scientific wording or citations. Route critique to prose and compilation to latex or quarto."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"
   cse-order: "08"
   cse-tags: "workflow"
   cse-routing:
-    direct: [operating-model, scientific-method, scientific-writing, writing-editorial]
-    conditional: [manuscript-review, latex-article-profiles, failure-triage]
+    direct: [scientific-writing, writing-editorial]
+    conditional: [operating-model, scientific-method, manuscript-review, latex-article-profiles, failure-triage]
 ---
 
 # Write papers
 
 ## Start
 
-Read [operating-model](../../references/workflow/operating-model.md),
-[scientific-method](../../references/workflow/scientific-method.md), and the
-[scientific writing principles](../../references/workflow/scientific-writing.md)
-in full. Follow the [project prose authorities](../../references/workflow/writing-editorial.md#project-prose-authorities)
-and, before manuscript edits, the [standing editorial decisions procedure](../../references/workflow/writing-editorial.md#standing-editorial-decisions).
-For manuscripts, use the triggers in [manuscript structure review](../../references/workflow/manuscript-review.md#manuscript-structure-review).
+For a local edit that leaves the argument intact, read only
+[Revision fidelity](../../references/workflow/scientific-writing.md#revision-fidelity),
+the applicable [standing editorial decisions](../../references/workflow/writing-editorial.md#standing-editorial-decisions),
+and the passage being edited. Follow [routine corrections](../../references/workflow/writing-editorial.md#routine-corrections),
+then go to [Finish](#finish).
+
+For drafts, rewrites, and structural work, read [operating-model](../../references/workflow/operating-model.md),
+[scientific-method](../../references/workflow/scientific-method.md), and
+[scientific writing principles](../../references/workflow/scientific-writing.md) in full.
+Follow the [project prose authorities](../../references/workflow/writing-editorial.md#project-prose-authorities)
+and the applicable standing editorial decisions.
+For manuscripts, follow [structure review](../../references/workflow/manuscript-review.md#manuscript-structure-review)
+and use the [story-spine triggers](../../references/workflow/manuscript-review.md#story-spine-read)
+to select reviews for revisions.
 For an internal referee round, use the [brief, triage, and reporting procedure](../../references/workflow/manuscript-review.md#internal-referee-rounds).
-For manuscript citations, use the [bibliography snapshot protocol](../../references/workflow/manuscript-review.md#bibliography-snapshot).
 
 Inspect the accepted question, formulation, methods, evidence, retained results,
 sources, audience, and intended endpoint. Before using any retained result, follow the
 [investigator promotion procedure](../../references/workflow/operating-model.md#continuation-and-investigator-promotion).
 
-**Complete when** the principles are read, the applicable editorial directions
+**Complete when** the applicable guidance is read, the editorial directions
 and accepted evidence are identified, and the structure plan is accepted for
 work that needs structure review.
 
@@ -41,9 +48,7 @@ Before writing about a numerical non-result, apply
 If the record cannot support the disposition, return its locator as a blocker and
 leave that sentence unwritten.
 
-For routine wording, citation, formatting, and local clarity edits, follow
-[routine corrections](../../references/workflow/writing-editorial.md#routine-corrections).
-For other revisions, apply [Fixing a review finding](../../references/workflow/scientific-writing.md#fixing-a-review-finding)
+For revisions beyond routine corrections, apply [Fixing a review finding](../../references/workflow/scientific-writing.md#fixing-a-review-finding)
 and keep [emphasis in proportion](../../references/workflow/scientific-writing.md#emphasis-in-proportion).
 When editing LaTeX manuscript source, use [manuscript source organization](../../references/visualize/latex-article-profiles.md#manuscript-writing-and-source-organization).
 
@@ -53,26 +58,24 @@ with its record locator.
 
 ## Finish
 
+For manuscript citations, apply the [bibliography snapshot protocol](../../references/workflow/manuscript-review.md#bibliography-snapshot).
 For any durable edit, run
 `python3 <plugin>/scripts/workflow/check_prose.py --root <project> <sources>`
 and handle its advisories as the [source scan procedure](../../references/workflow/writing-editorial.md#reader-facing-identifiers) says.
-For a manuscript or report draft or revision, check renderer
-capability, render with the selected `cse:latex` or `cse:quarto`, inspect the
-pages, then route the final read to `cse:prose`. Use `cse:beamer`, `cse:tikz`,
-or `cse:plot` for their respective outputs. Route explicit wording, AI-pattern,
-comparison, or final manuscript checks to `cse:prose`.
 
-Apply the [story-spine triggers](../../references/workflow/manuscript-review.md#story-spine-read)
-to manuscript revisions. For a rewrite that used structure
-review or a round that triggers the post-rewrite pair, route the Prose read
-through the reader-story reviewer in [post-rewrite review](../../references/workflow/manuscript-review.md#after-the-rewrite).
-For a requested final check, submission, or named publication handoff, use
-the [final manuscript checkpoint](../../references/workflow/manuscript-review.md#final-manuscript-checkpoint).
-For a manuscript review round, hand off the assembled draft to the applicable reviewers for the
-[storyline report](../../references/workflow/manuscript-review.md#storyline-report).
+For a routine edit without a final checkpoint, verify the changed passage and
+run the project build only when the change affects rendering.
+
+For a draft, rewrite, or endpoint named by the [final manuscript checkpoint](../../references/workflow/manuscript-review.md#final-manuscript-checkpoint),
+check renderer capability, render the whole document, and inspect the pages.
+Use `cse:latex` or `cse:quarto` for manuscript and report rendering, and
+`cse:beamer`, `cse:tikz`, or `cse:plot` for their respective outputs. When the
+[post-rewrite pair](../../references/workflow/manuscript-review.md#after-the-rewrite)
+applies, hand off the assembled draft to the pair. Otherwise route the final
+read to `cse:prose`. For manuscript review rounds, hand reviewer findings to
+the lead for the [storyline report](../../references/workflow/manuscript-review.md#storyline-report).
 If rendering or source refresh is unavailable, retain accepted prose and report
 the exact missing capability.
 
-**Complete when** the source check and applicable render, page inspection,
-and Prose read are accounted for, with any missing capability or unresolved
-finding reported.
+**Complete when** the source check and the applicable finish path are
+accounted for, with any missing capability or unresolved finding reported.

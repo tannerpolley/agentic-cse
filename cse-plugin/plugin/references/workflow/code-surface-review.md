@@ -22,15 +22,15 @@ For every material addition, record:
 
 ## Agree the code budget
 
-Before executable changes, Design records an issue-specific ceiling for gross
-added lines in executable files, an explicit base commit, and the rationale
-in the existing task or issue. Use the accounting report's executable additions,
+When the owner sets a ceiling on gross added lines in executable files, Design
+records it, the explicit base commit, and the rationale in the existing task or
+issue. Use the accounting report's executable additions,
 including comments and blanks; report tests, documents, generated files, and
 other changes separately. Inspect classification rather than hiding runtime
 code in another category. There is no universal ceiling, minimum, or target
 to fill. Deletions do not buy extra additions.
 
-At the ceiling, or when an overrun is foreseeable, Build pauses further
+At a set ceiling, or when an overrun is foreseeable, Build pauses further
 additions and proposes the smallest revised ceiling. Account for all additions
 already made and still proposed, grouped by responsibility: what is genuinely
 new relative to the existing code, which accepted requirement needs it, and
@@ -38,8 +38,7 @@ why reuse or replacement cannot avoid it. Novelty means missing capability,
 not an excuse to invent a new algorithm. Identify inspected alternatives and
 remaining obsolete code. The user, or an explicitly delegated acceptance
 authority other than the implementer, must approve the increase in the same
-task or issue before further additions. Missing budgets follow the same
-approval route; agents do not silently choose or raise their own ceiling.
+task or issue before further additions.
 
 Keep the base and counting scope fixed across commits and resumptions. If an
 overrun is discovered late, disclose it and withhold Pass until approved or
@@ -61,8 +60,7 @@ Use `--json` when the report must be retained or consumed by another command.
 The report includes committed, staged, unstaged, and untracked non-ignored
 files from the resolved merge base. It separates executable code, tests,
 documents, generated files, and other files; reports binary changes without
-inventing line counts. Use the executable additions to compare with the
-accepted budget; the script does not approve or enforce a ceiling.
+inventing line counts.
 
 Build reports its changed surface and focused validation. This command
 measures change composition only; it does not decide whether an addition is
@@ -151,8 +149,8 @@ Review repeats the complete semantic ownership pass.
 For replacements, explicitly answer: **Did this replace the responsibility, or
 add another implementation?** Cite the final owner, affected callers, retired
 paths, and exact locations and reasons for any intentional retention. Renaming
-or wrapping the old owner is not retirement. Check the accepted budget and
-any approved increase independently of the structural conclusion.
+or wrapping the old owner is not retirement. If the owner set a ceiling, check
+it and any approved increase independently of the structural conclusion.
 
 - **Block:** unsupported science, numerical risk, unearned code surface, a
   prohibited test, or disagreement with the active issue.

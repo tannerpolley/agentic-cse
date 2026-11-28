@@ -18,9 +18,8 @@ bibliography snapshot by a portable relative path.
 
 ## Manuscript structure review
 
-For a new manuscript, rejected draft, new target journal, or material change to
-section order or argument spine, review the structure before writing. The
-[story-spine read](#story-spine-read) defines the revision triggers.
+For a new manuscript, rejected draft, or new target journal, review the structure
+before writing. The [story-spine read](#story-spine-read) routes other revisions.
 
 Start from the **venue package**, the target journal's current guide for
 authors: its limits and required statements are requirements, and where it is
@@ -61,16 +60,15 @@ corrections, giving science support precedence in a conflict, then follows the
 ## Story-spine read
 
 Across the current round, including accumulated routine edits, read the spine
-whenever the abstract, conclusions, a research question, the section order,
-a headline claim or its verb, the set of studies, or a dissertation map changes.
-Use [structure review](#manuscript-structure-review) when main-text words have
-grown by more than about 20 % since the last accepted plan. Use the
-[post-rewrite pair](#after-the-rewrite) when a round changes more than about
-10 % of the main-text words, even when the overall length stays similar.
+when a question, answer, argument order, scope, set of studies, or headline
+claim changes. Use [structure review](#manuscript-structure-review) before
+changes to the question, order, scope, or set of studies. Use the
+[post-rewrite pair](#after-the-rewrite) after a rewrite from a structure plan
+or a change to the central answer or headline claim.
 
 Trace each promised question from the Introduction to its answer in the
-Results headings and displays, in order. Use the [storyline report](#storyline-report)
-for the abstract, Conclusions, and emphasis. Apply the [evidence guard](scientific-writing.md#evidence-guard)
+Results headings and displays, in order. Reconcile that story with the abstract
+and Conclusions. Apply the [evidence guard](scientific-writing.md#evidence-guard)
 to every “each”, “only”, and “confirmed” against the least supportive section
 or chapter. Apply [methods reproducibility](scientific-writing.md#methods-reproducibility)
 to the headline deliverable and the [display and caption principles](scientific-writing.md#shared-article-requirements)
@@ -78,9 +76,9 @@ to central tables so an engineer can use them from the paper alone.
 
 ## Storyline report
 
-End each manuscript review round with these five brief entries. Use the
-assembled manuscript and report any entry the supplied material leaves undecided.
-For a paired review, the lead closes the round with one report using both reviews.
+Reviewers report each mismatch with its location and consequence within their
+assignment. The lead alone closes the round with one report from the assembled
+manuscript and applicable reviews. Mark entries the material leaves undecided.
 
 - **Claim.** State what the paper claims using the abstract and Conclusions alone.
 - **Research questions.** State the questions posed in the Introduction.
@@ -93,15 +91,15 @@ For a paired review, the lead closes the round with one report using both review
 ## Internal referee rounds
 
 Grade a readability-and-proportion row in the referee brief against the
-measured model papers and give a word or page budget. In the writer brief,
-name the contribution and the points that need a single home under
+measured model papers. Give a word or page budget when length is at issue.
+In the writer brief, name the contribution and the points that need a single home under
 [Fixing a review finding](scientific-writing.md#fixing-a-review-finding).
 
 Each request that adds material names its destination. The lead triages
 requests by what the argument needs and routes fixes through
 [Fixing a review finding](scientific-writing.md#fixing-a-review-finding).
-Give the change in main-text words and in the counts of tables, figures, and
-captions, then close with the [storyline report](#storyline-report).
+Give changes in main-text word count when length is at issue and in table or
+figure counts when display count is at issue.
 
 ## Comparison reconciliation
 
@@ -166,8 +164,7 @@ This adds no literature-search gate to routine rendering.
 
 ## Final manuscript checkpoint
 
-For routine revisions, apply the [story-spine triggers](#story-spine-read) and
-the project's existing structural and rendering checks. Use
+Apply the project's existing structural and rendering checks at this checkpoint. Use
 [inspectable paragraphs and sentences](../visualize/latex-article-profiles.md#make-paragraphs-and-sentences-inspectable)
 and the [final log check](../visualize/latex-layout-and-qa.md#release-sequence)
 for [mechanical correctness](../visualize/latex-article-profiles.md#manuscript-writing-and-source-organization).

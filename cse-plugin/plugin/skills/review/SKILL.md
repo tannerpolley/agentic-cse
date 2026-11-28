@@ -69,7 +69,6 @@ the [evidence guard](../../references/workflow/scientific-writing.md#evidence-gu
 [comparison reconciliation](../../references/workflow/manuscript-review.md#comparison-reconciliation),
 and the [display read](../../references/workflow/scientific-writing.md#shared-article-requirements).
 For an internal referee assignment, use the [round procedure](../../references/workflow/manuscript-review.md#internal-referee-rounds).
-Close manuscript review rounds with the [storyline report](../../references/workflow/manuscript-review.md#storyline-report).
 At a deck's final checkpoint, inspect it read-only against [slide-decks](../../references/visualize/slide-decks.md) and the project's deck decisions.
 
 **Capability lens —** inspect the final implementation tree, complete changed functions,

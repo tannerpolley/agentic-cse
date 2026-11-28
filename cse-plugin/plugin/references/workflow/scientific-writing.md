@@ -260,7 +260,9 @@ source titles, and genuine domain terms; and occasional semicolons, long sentenc
 carry real logic. Author voice comes from supplied prior writing, and venue calibration requires supplied
 requirements or inspected examples.
 
-**Revision fidelity.** Preserve supported content without inventing specifics or evidence. Apply the
+### Revision fidelity
+
+Preserve supported content without inventing specifics or evidence. Apply the
 [evidence guard](#evidence-guard) to revised claims. Preserve signs, percentages, ranges, counts, units,
 equations, citations, citation scope, labels, cross-references, quotations, code, URLs, paths, figure and
 table identity, and technical terminology. Keep each value tied to its variable and denominator. Preserve
