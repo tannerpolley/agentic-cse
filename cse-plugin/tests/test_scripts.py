@@ -156,6 +156,14 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertNotIn("cse:review", assigned)
                 self.assertNotIn("cse:write", assigned)
 
+            with self.subTest(prompt="orchestrator brief"):
+                brief = self.run_hook(project, "UserPromptSubmit", prompt=(
+                    "Act as the review sub-agent for this task.\n\n"
+                    "Use the role-reviewer skill and the cse:prose skill.\nCheck the guidance from cse:write."
+                ))["hookSpecificOutput"]["additionalContext"]
+                self.assertIn("invoke `cse:prose`", brief)
+                self.assertNotIn("cse:review", brief)
+
             with self.subTest(prompt="skill comparison"):
                 comparison = self.run_hook(project, "UserPromptSubmit", prompt=(
                     "Compare cse:write, cse:review and cse:prose without running them."

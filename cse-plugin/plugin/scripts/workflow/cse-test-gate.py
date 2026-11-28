@@ -25,7 +25,7 @@ ROUTING_LEAD = ("CSE skill routing: before doing a stage's work, invoke its skil
 DELEGATED_ROLE = re.compile(r"\A\s*Act as the ([\w-]+) sub-agent\b", re.IGNORECASE)
 ROLES_LINE = "delegated roles — "
 EXPLICIT_SKILL = re.compile(
-    r"^[ \t]*(?:[/$]|(?:please[ \t]+)?(?:use|invoke)[ \t]+(?:the[ \t]+)?`?)cse:([a-z]+)(?![\w-])",
+    r"^[ \t]*(?:[/$]|(?:please[ \t]+)?(?:use|invoke)\b[^\n]*?(?<![/$\w-])`?)cse:([a-z]+)(?![\w-])",
     re.IGNORECASE | re.MULTILINE,
 )
 TEST_PARTS = {"test", "tests", "testing"}
