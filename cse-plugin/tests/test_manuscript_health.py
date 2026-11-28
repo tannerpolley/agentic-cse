@@ -36,6 +36,10 @@ class ManuscriptHealthTests(unittest.TestCase):
         git("init", "-q")
         source.write_text("\\section{Pressure at 1e-3}\n\\section{Flow at 2e-3}\n")
         git("add", "article.tex")
+        # A committed symlink whose target is too long for the filesystem must not break the snapshot.
+        target = subprocess.run(["git", "hash-object", "-w", "--stdin"], cwd=repo, input="x" * 5000,
+                                text=True, capture_output=True, check=True).stdout.strip()
+        git("update-index", "--add", "--cacheinfo", f"120000,{target},notes.md")
         git("commit", "-qm", "Draft")
         bad = git("rev-parse", "HEAD")
         source.write_text("\\section{Pressure at 1e-3}\n")
@@ -73,3 +77,13 @@ drops = ["print-form"]
         self.assertEqual("article.tex", git("diff", "--name-only"))
         self.assertEqual("", git("diff", "--cached", "--name-only"))
         self.assertEqual(edited, source.read_text())
+
+        git("rm", "-qf", "article.tex")
+        git("commit", "-qm", "Retire the article")
+        config.write_text(config.read_text().replace('["abstract-opener"]', '["print-form"]'))
+        run_health(1)  # A source gone from HEAD fails the current scan.
+        config.write_text(config.read_text().replace('path = "article.tex"', 'path = "article.tex"\nhistory_only = true'))
+        retired = run_health(0)
+        self.assertIn("PASS  print-form 2→1", retired)
+        self.assertNotIn("Manuscript", retired)
+        self.assertEqual(3, len(history.read_text().splitlines()))
