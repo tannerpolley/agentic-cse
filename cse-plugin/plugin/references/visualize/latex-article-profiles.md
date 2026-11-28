@@ -10,8 +10,7 @@ Use one profile per rendered document. Use the [manuscript profile](#manuscript-
   type area.
 - Keep a one-column body so equations, process diagrams, multipanel figures,
   and scientific tables retain readable width.
-- Use the scientific core from [latex-packages](latex-packages.md). Every article-capable tool
-  in that reference is available when the article needs its capability.
+- When choosing or debugging packages, use the scientific core in [latex-packages](latex-packages.md).
 - Load a package or extension only when the document exercises its capability.
   Select one owner for overlapping capabilities and keep profile styling out
   of shared notation and figure source.

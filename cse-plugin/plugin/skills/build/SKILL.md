@@ -1,6 +1,6 @@
 ---
 name: build
-description: "Implement an agreed scientific model, numerical method, data transformation, or manuscript correction from an accepted Design handoff. Use when implementing a scientific issue as a sub-agent, or asked to \"code this model\". An unexplained numerical failure goes to diagnose first."
+description: "Implement scientific models, numerical methods, and data transformations from an accepted Design handoff. Use when implementing one of these changes as a sub-agent or asked to code a model. Route unexplained numerical failures to diagnose."
 metadata:
   cse-kind: "workflow"
   cse-family: "workflow"

@@ -1,18 +1,20 @@
 ---
 name: latex
-description: "Build and check scientific LaTeX PDFs. Use when asked for \"manuscript revision\" in LaTeX, \"build the paper PDF\", \"fix the manuscript layout\", \"my LaTeX won't compile\", or overfull boxes. Prose edits use write; slides go to beamer; .qmd to quarto; native figures to tikz."
+description: "Compile and check scientific LaTeX PDFs. Use when building a paper PDF, fixing manuscript layout or overfull boxes, or debugging LaTeX compilation. Route prose to write, slides to beamer, .qmd to quarto, and native figures to tikz."
 metadata:
   cse-kind: "tool"
   cse-family: "visualize"
   cse-tags: "quarto-pipeline, latex-toolbox"
   cse-routing:
-    direct: [rendering-guide, latex-packages]
-    conditional: [latex-layout-and-qa, latex-article-profiles, scientific-writing, manuscript-review, quarto-execution, latex-figures]
+    direct: [rendering-guide]
+    conditional: [latex-packages, latex-layout-and-qa, latex-article-profiles, scientific-writing, manuscript-review, quarto-execution, latex-figures]
 ---
 
 # LaTeX document workflow
 
-Read first: [rendering-guide](../../references/visualize/rendering-guide.md), [latex-packages](../../references/visualize/latex-packages.md).
+Read [rendering-guide](../../references/visualize/rendering-guide.md).
+Activate [latex-packages](../../references/visualize/latex-packages.md) when
+choosing or debugging packages.
 
 Inherit core scientific, project, and
 language decisions.
@@ -26,7 +28,7 @@ or figure lineage.
 For manuscript creation or revision, use the manuscript writing and
 source-organization protocol in [LaTeX article profiles](../../references/visualize/latex-article-profiles.md#manuscript-writing-and-source-organization).
 Route prose edits to `cse:write`.
-For manuscript structure, use the [writing principles](../../references/workflow/scientific-writing.md#structure).
+For manuscript structure work, read the [writing principles](../../references/workflow/scientific-writing.md) in full.
 
 For final manuscript review, use the [manuscript checkpoint](../../references/workflow/manuscript-review.md#final-manuscript-checkpoint).
 

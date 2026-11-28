@@ -27,29 +27,29 @@ detector score, or authorship verdict and does not optimize text for a detector.
 ### Routine corrections
 
 Apply [Fixing a review finding](scientific-writing.md#fixing-a-review-finding),
-[revision fidelity](scientific-writing.md#scientific-prose), and
+[revision fidelity](scientific-writing.md#revision-fidelity), and
 [editorial compliance](#editorial-compliance) within the scope of the diagnosed issue.
 After corrections, perform one verification read. Do not iterate toward a style
 or detector score.
 
 ### Original and revision comparison
 
-When comparing an original with a revision, check [revision fidelity](scientific-writing.md#scientific-prose). Report exact differences and unresolved risks.
+When comparing an original with a revision, check [revision fidelity](scientific-writing.md#revision-fidelity). Report exact differences and unresolved risks.
 This semantic inspection neither proves equivalence nor
 decides whether evidence supports a changed scientific claim; route claim
 support to Review's Result lens and unresolved source authority to Research.
 
 ## Standing editorial decisions
 
-Before manuscript or deck work, discover existing project guidance. Keep one
-named section per manuscript or deck in `docs/scientific/writing/STYLE.md`,
+Before manuscript or deck work, discover existing project guidance. Create a
+named section in `docs/scientific/writing/STYLE.md` when the document has its first
+standing editorial decision to record. Keep one section per manuscript or deck,
 identified by repository-relative authoritative source, supplement, and
 associated figure paths. Keep project-wide choices outside document sections.
 If an established framing brief such as `FRAMING.md` or an editorial record
 owns the choices, put its pointer in the STYLE section and read that brief.
 Dated revision reports and the current draft are not automatically standing
-owner instructions. Create the section when document work begins; if there
-are no standing directions, state that none have been recorded.
+owner instructions.
 
 Use this minimal format, with actual document paths and owner directions:
 
@@ -77,8 +77,7 @@ When the owner gives a standing editorial direction to any stage, the lead
 ensures it becomes a STYLE row before it is applied or writing is delegated.
 Before editing, Write, Plot, Beamer, and renderers editing document sources or
 associated figures load both project-wide choices and the applicable document
-record. At Write's Start, report the number of rows in the applicable STYLE
-section, including zero.
+record.
 A later explicit owner correction replaces only the active scoped row with
 its new authority; Git retains history. Conflicting or ambiguous directions
 need a scoped owner decision, without asking again about settled choices.
@@ -98,13 +97,14 @@ Run `python3 <plugin>/scripts/workflow/check_prose.py --root <project> [--config
 where `<plugin>` is the directory holding `skills/`, on explicit sources, including
 manuscript sources, figure scripts, and deck `.tex`/`.pptx` files. Use the printed
 reference for each advisory.
-The scan does not expand TeX includes; name supplements and included sources.
+The CLI follows literal `\input` and `\include` commands. Name separate
+supplements as scan inputs.
 The same channel carries two numerical advisories: code-style print forms
 ([numbers in print](scientific-writing.md#equations-quantities-and-units)) and roundoff-scale
 detail ([fitness for purpose](numerical-testing.md#fitness-for-purpose)).
 Advisories never change CLI success or block the Stop hook. Existing
-terminology failures still do. The hook attributes changed files to the session,
-but may miss script-generated outputs; run this explicit scan before delivery.
+terminology failures still do. The Stop hook scans only files changed in the
+session and may miss script-generated outputs. Run the explicit scan before delivery.
 
 Only explicit owner approval can exempt an exact run/fit label. In the existing
 named STYLE section, use repository-relative paths/globs in both `Sources:` and
