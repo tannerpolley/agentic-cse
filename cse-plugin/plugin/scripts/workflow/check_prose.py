@@ -484,8 +484,13 @@ class Finding:
     message: str
     end: int | None = None
 
+    @property
+    def is_advisory(self):
+        return self.kind != "abstract-opener"
+
     def __str__(self):
-        return f"{self.path}:{self.location}: warning: {self.message}"
+        label = "warning" if self.is_advisory else "inspection"
+        return f"{self.path}:{self.location}: {label}: {self.message}"
 
     def on_changed_lines(self, changed):
         if changed is None:
@@ -629,7 +634,7 @@ NON_RESULT = re.compile(r"\b(?:did not converge|not established|unconverged|caus
 HEDGE = re.compile(r"\b(?:however|nevertheless|only|may|might|could|subject to|except|"
                    r"caveat|limitation|remains? uncertain|should be interpreted with caution)\b", re.I)
 # Review coverage terms in abstracts and conclusions, where they can broaden the headline claim.
-CERTAINTY = re.compile(r"\b(?:every|all|confirmed|verified|independent)\b", re.I)
+CERTAINTY = re.compile(r"\b(?:every|all|confirmed|verified)\b", re.I)
 CONCLUSIONS = re.compile(r"(?i)^(?:(?:summary|discussion) and )?conclusions?\b")
 
 
@@ -740,10 +745,9 @@ def manuscript_findings(events, roles, styles, repeated):
             if words > 150 and roles[passage.path] == "main":
                 yield passage.finding("paragraph-length", f"paragraph length: {words} words (limit 150)",
                                       WRITING + "argument")
-            if words and (values > 6 or values * 100 > 3 * words):
+            if values > 6:
                 yield passage.finding("paragraph-density",
-                                      f"paragraph density: {values} {'value' if values == 1 else 'values'} in {words} words "
-                                      "(over 6 or over 3 per 100 words)",
+                                      f"paragraph density: {values} values in {words} words (over 6)",
                                       WRITING + "argument")
             if abstract is not None:
                 abstract.append(passage)
@@ -933,17 +937,18 @@ def main() -> int:
     findings.sort(key=lambda item: (roles[item.path] == "supplement", order[item.path],
                                    int(item.location) if item.location.isdecimal() else 0))
     notices = list(dict.fromkeys(notices))
-    kinds = Counter(item.kind for item in findings)
+    advisories = [item for item in findings if item.is_advisory]
+    kinds = Counter(item.kind for item in advisories)
     if args.summary_json:
         print(json.dumps({"kinds": kinds, "scan_notices": len(notices)}, sort_keys=True))
         return int(bool(failures))
     for message in [*findings, *notices, *failures]:
         print(message)
-    files = Counter(relative_path(item.path, args.root) for item in findings)
-    ranks = Counter(roles[item.path] for item in findings)
+    files = Counter(relative_path(item.path, args.root) for item in advisories)
+    ranks = Counter(roles[item.path] for item in advisories)
     kind_counts = ", ".join(f"{kind} {count}" for kind, count in sorted(kinds.items())) or "none"
     file_counts = ", ".join(f"{file} {count}" for file, count in files.items()) or "none"
-    print(f"Summary: {len(findings)} {'advisory' if len(findings) == 1 else 'advisories'} "
+    print(f"Summary: {len(advisories)} {'advisory' if len(advisories) == 1 else 'advisories'} "
           f"(main {ranks['main']}, supplement {ranks['supplement']}), "
           f"{len(failures)} terminology {'violation' if len(failures) == 1 else 'violations'}, "
           f"{len(notices)} scan {'notice' if len(notices) == 1 else 'notices'}. "

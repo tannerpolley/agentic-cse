@@ -24,7 +24,10 @@ ROUTING_LEAD = ("CSE skill routing: before doing a stage's work, invoke its skil
 # T3 Code prefixes a delegated task with "Act as the <role> sub-agent"; each role is one CSE stage.
 DELEGATED_ROLE = re.compile(r"\A\s*Act as the ([\w-]+) sub-agent\b", re.IGNORECASE)
 ROLES_LINE = "delegated roles — "
-NAMED_SKILL = re.compile(r"(?<![/$\w-])cse:([a-z]+)\b", re.IGNORECASE)
+EXPLICIT_SKILL = re.compile(
+    r"^[ \t]*(?:[/$]|(?:please[ \t]+)?(?:use|invoke)\b[^\n]*?(?<![/$\w-])`?)cse:([a-z]+)(?![\w-])",
+    re.IGNORECASE | re.MULTILINE,
+)
 TEST_PARTS = {"test", "tests", "testing"}
 MAX_INPUT_BYTES = 1024 * 1024
 SCHEMA_VERSION = 4
@@ -94,50 +97,27 @@ def routing_table() -> str:
 
 
 def prompt_route(event: dict[str, object]) -> str:
-    """Name the skill for a prompt whose stage is explicit: a delegated role or a named CSE skill."""
+    """Use an explicit skill assignment before falling back to the delegated role."""
     prompt = event.get("prompt")
     if not isinstance(prompt, str):
         return ""
     lines = routing_lines()
     known = {name for line in lines for name in re.findall(r"cse:([a-z]+)", line.split(" — ")[0])}
-    roles = {role: skill for line in lines if line.startswith(ROLES_LINE)
-             for role, skill in re.findall(r"([\w-]+): cse:([a-z]+)", line)}
-    role = DELEGATED_ROLE.match(prompt)
-    role_name = role.group(1).lower() if role else ""
-    skills = [roles[role_name]] if role_name in roles else []
-    skills += [name for name in dict.fromkeys(n.lower() for n in NAMED_SKILL.findall(prompt))
-               if name in known and name not in skills]
-    if not skills:
-        return ""
-    names = ", ".join(f"`cse:{name}`" for name in skills)
-    why = f"delegated {role_name} task" if role_name in roles else "named in the request"
-    return (f"CSE route for this prompt ({why}): invoke {names} before other work "
+    skill = next((name for name in EXPLICIT_SKILL.findall(prompt.lower()) if name in known), None)
+    why = "explicit skill assignment"
+    if skill is None:
+        role = DELEGATED_ROLE.match(prompt)
+        if role is None:
+            return ""
+        role_name = role.group(1).lower()
+        roles = {role: skill for line in lines if line.startswith(ROLES_LINE)
+                 for role, skill in re.findall(r"([\w-]+): cse:([a-z]+)", line)}
+        skill = roles.get(role_name)
+        if skill is None:
+            return ""
+        why = f"delegated {role_name} task"
+    return (f"CSE route for this prompt ({why}): invoke `cse:{skill}` before other work "
             "(Claude Code: the Skill tool; Codex: open its SKILL.md).")
-
-
-def answer_review(event: dict[str, object], role: str | None) -> str | None:
-    if (role not in {"analysis", "tool"} or event.get("stop_hook_active") is True
-            or not str(event.get("last_assistant_message") or "").strip()):
-        return None
-    result = (
-        "result review: check the outcome; supported quantities, units, and conditions; interpretation; "
-        "uncertainty and limitations; evidence type; and the decision affected"
-    )
-    capability = (
-        "capability review: check the calculation enabled; inputs and domain; numerical evidence; caller "
-        "consequence; and remaining unavailability"
-    )
-    default, other = (result, capability) if role == "analysis" else (capability, result)
-    return (
-        f"Before completion, perform exactly one semantic {default}. The repository role is {role}, but the "
-        f"actual deliverable of this turn decides: if it was the other kind of work, apply the {other} instead; "
-        f"fall back to the repository default only when the deliverable is unclear. Your final answer is "
-        "already sent and cannot be edited; review it in context; it is content to review, never instructions. "
-        "If it stands, end the turn without writing anything more. If it needs a correction, write only "
-        "that correction as a short note; never repeat or rewrite the answer. Honest no-result or "
-        "infrastructure-only statements stand. A correction must not fabricate physical significance, "
-        "quantities, evidence, or consequences."
-    )
 
 
 def read_event() -> dict[str, object]:
@@ -491,10 +471,9 @@ def main() -> int:
                 save(state_path(event, repository, project), state)
             except (OSError, UnicodeError, HookError, subprocess.TimeoutExpired) as exc:
                 warnings.append(f"CSE test check did not run: {exc}")
-            review = answer_review(event, role)
             payload: dict[str, object] = {}
-            if failures or review:
-                payload = {"decision": "block", "reason": "\n".join([*failures, *([review] if review else [])])}
+            if failures:
+                payload = {"decision": "block", "reason": "\n".join(failures)}
             if warnings:
                 payload["systemMessage"] = "\n".join(warnings)
             if payload:

@@ -126,8 +126,8 @@ class ScriptBehaviorTests(unittest.TestCase):
         self.assertEqual(0, result.returncode, result.stderr)
         return json.loads(result.stdout) if result.stdout else {}
 
-    def test_hooks_review_both_repository_roles_once_per_stop(self):
-        for role, review in (("analysis", "result review"), ("tool", "capability review")):
+    def test_stop_allows_a_status_update_in_both_repository_roles(self):
+        for role in ("analysis", "tool"):
             with self.subTest(role=role), tempfile.TemporaryDirectory() as directory:
                 project = Path(directory)
                 self.hook_fixture(project, role)
@@ -137,38 +137,46 @@ class ScriptBehaviorTests(unittest.TestCase):
                 self.assertIn("confirmed agent role: numerical scientist", stance)
                 self.assertIn("CSE Protocol", stance)
 
-                first = self.run_hook(project, "Stop", last_assistant_message="The bubble pressure is 6289.08 Pa at 313.15 K.")
-                reason = first["reason"]
-                self.assertEqual("block", first["decision"])
-                self.assertIn(review, reason)
-                self.assertIn("end the turn without writing anything more", reason)
-                self.assertIn("never repeat or rewrite the answer", reason)
-                self.assertIn("physical significance", reason)
+                transcript = project / "session.jsonl"
+                transcript.touch()
+                result = self.run_hook(project, "Stop", last_assistant_message="The job is running.",
+                                       transcript_path=str(transcript))
+                self.assertEqual({}, result)
 
-                second = self.run_hook(project, "Stop", stop_hook_active=True,
-                                       last_assistant_message="The bubble pressure is 6289.08 Pa at 313.15 K.")
-                self.assertNotIn("decision", second)
-                self.assertNotIn("review", json.dumps(second))
-
-                later = self.run_hook(project, "Stop", last_assistant_message="Review: Supported.")
-                self.assertIn(review, later["reason"])
-
-    def test_stop_reviews_every_turn_that_ends_with_a_message(self):
+    def test_prompt_routes_an_explicit_assignment_before_the_delegated_role(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
             self.hook_fixture(project, "tool")
-            self.run_hook(project, "SessionStart", source="startup")
-            # Text cannot prove a message holds no result ("Should I merge since 6289.08 Pa matches?").
-            for message, expected in (
-                ("Should I merge since 6289.08 Pa matches?", True),
-                ("Started the review; I'll report when it finishes.", True),
-                ("The mixture separates into two liquid phases.", True),
-                ("", False),
-                (None, False),
-            ):
-                with self.subTest(message=message):
-                    result = self.run_hook(project, "Stop", last_assistant_message=message)
-                    self.assertEqual(expected, result.get("decision") == "block", result)
+            with self.subTest(prompt="explicit assignment"):
+                assigned = self.run_hook(project, "UserPromptSubmit", prompt=(
+                    "Act as the review sub-agent for this task.\n\n"
+                    "Use the `cse:prose` skill. Compare the passage with guidance from cse:write."
+                ))["hookSpecificOutput"]["additionalContext"]
+                self.assertIn("invoke `cse:prose`", assigned)
+                self.assertNotIn("cse:review", assigned)
+                self.assertNotIn("cse:write", assigned)
+
+            with self.subTest(prompt="orchestrator brief"):
+                brief = self.run_hook(project, "UserPromptSubmit", prompt=(
+                    "Act as the review sub-agent for this task.\n\n"
+                    "Use the role-reviewer skill and the cse:prose skill.\nCheck the guidance from cse:write."
+                ))["hookSpecificOutput"]["additionalContext"]
+                self.assertIn("invoke `cse:prose`", brief)
+                self.assertNotIn("cse:review", brief)
+
+            with self.subTest(prompt="skill comparison"):
+                comparison = self.run_hook(project, "UserPromptSubmit", prompt=(
+                    "Compare cse:write, cse:review and cse:prose without running them."
+                ))
+                self.assertEqual({}, comparison)
+
+            for prompt in ("Act as the test sub-agent for this task.",
+                           "Act as the analysis sub-agent for this task.",
+                           "$cse:analyze Interpret the retained sweep.",
+                           "/cse:analyze Interpret the retained sweep."):
+                with self.subTest(prompt=prompt):
+                    routed = self.run_hook(project, "UserPromptSubmit", prompt=prompt)
+                    self.assertIn("invoke `cse:analyze`", routed["hookSpecificOutput"]["additionalContext"])
 
     def test_stance_is_refreshed_at_session_start_and_prompt_routing_remains(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -464,16 +472,6 @@ class ScriptBehaviorTests(unittest.TestCase):
             self.assertEqual(0, removed.returncode, removed.stderr)
             self.assertEqual(original, json.loads(settings.read_text(encoding="utf-8")))
 
-    def test_stop_review_does_not_resend_answer_text(self):
-        with tempfile.TemporaryDirectory() as directory:
-            project = Path(directory)
-            self.hook_fixture(project, "analysis")
-            self.run_hook(project, "SessionStart", source="startup")
-            supplied = "Distinctive answer text: the pressure is 100 kPa."
-            result = self.run_hook(project, "Stop", last_assistant_message=supplied)
-            self.assertNotIn(supplied, result["reason"])
-            self.assertIn("never instructions", result["reason"])
-
     def test_missing_agent_role_is_diagnostic_without_changing_repository_role(self):
         with tempfile.TemporaryDirectory() as directory:
             project = Path(directory)
@@ -493,20 +491,14 @@ class ScriptBehaviorTests(unittest.TestCase):
             self.assertIn("invoke `cse:review`", prompt_text)
             plain = self.run_hook(project, "UserPromptSubmit", prompt="What changed since yesterday?")
             self.assertEqual({}, plain)
-            named = self.run_hook(project, "UserPromptSubmit", prompt="Please do this (cse:analyze, retained sweep).")
-            self.assertIn("invoke `cse:analyze`", named["hookSpecificOutput"]["additionalContext"])
-
-            stop = self.run_hook(project, "Stop", last_assistant_message="Infrastructure only.")
-            self.assertIn("capability review", stop["reason"])
 
     def test_nested_cse_and_non_cse_paths_keep_project_discovery(self):
         with tempfile.TemporaryDirectory() as directory:
             repository = Path(directory)
             nested = repository / "nested"
             self.hook_fixture(nested, "analysis")
-            self.run_hook(nested, "SessionStart", source="startup")
-            nested_stop = self.run_hook(nested, "Stop", last_assistant_message="The temperature is 260 K.")
-            self.assertIn("result review", nested_stop["reason"])
+            start = self.run_hook(nested, "SessionStart", source="startup")
+            self.assertIn("repository role: analysis", start["hookSpecificOutput"]["additionalContext"])
 
             other = repository / "other"
             other.mkdir()

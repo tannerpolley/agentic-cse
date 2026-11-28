@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 import shutil
 import subprocess
@@ -12,8 +13,7 @@ FIXTURE = ROOT / "tests/fixtures/prose"
 
 DEFECTS = [
     ("main.tex:7", "abstract length: 47 words (limit 35)"),
-    ("main.tex:7", "abstract opener: The control sample was scanned"),
-    ("main.tex:8", "certainty words: verified, all, independent"),
+    ("main.tex:8", "certainty words: verified, all"),
     ("main.tex:9", "abstract roundoff: '2e-8'"),
     ("fragments/results.tex:12", "paragraph density: 7 values in 22 words"),
     ("fragments/results.tex:16", "paragraph length: 158 words (limit 150)"),
@@ -26,7 +26,6 @@ DEFECTS = [
     ("fragments/results.tex:47", "non-result wording 'did not converge'"),
     ("fragments/conclusions.tex:2", "repeated clause in 3 files"),
     ("fragments/conclusions.tex:3", "caveat ending"),
-    ("extra.tex:2", "paragraph density: 1 value in 18 words"),
     ("extra.tex:3", "caveat ending"),
     ("extra.tex:3", "repeated clause in 3 files"),
 ]
@@ -53,8 +52,8 @@ class ManuscriptProseTests(unittest.TestCase):
         for line, (location, message) in zip(warnings, DEFECTS):
             self.assertIn(f"{location}: warning: {message}", line)
         self.assertEqual(1, original.count("external editorial approval requires inspection"))
-        self.assertIn("Summary: 18 advisories (main 15, supplement 3), 0 terminology violations, 1 scan notice.", original)
-        self.assertIn("Files: main.tex 4, fragments/results.tex 9, fragments/conclusions.tex 2, extra.tex 3.", original)
+        self.assertIn("Summary: 16 advisories (main 14, supplement 2), 0 terminology violations, 1 scan notice.", original)
+        self.assertIn("Files: main.tex 3, fragments/results.tex 9, fragments/conclusions.tex 2, extra.tex 2.", original)
         for hidden in ("A1", "F2", "A3", "F4", "F6", "F7", "F8", "F9", "schema", "contract", "5e-8", "Li/Na/TBAC"):
             self.assertNotIn(hidden, original)
         self.assertNotIn("fragments/values.tex:", original)
@@ -82,9 +81,28 @@ Coated & Higher than the reference \\
         (self.root / "fragments/conclusions.tex").write_text("Coating increased membrane uptake at steady flow.\n")
         (self.root / "extra.tex").write_text("\\section{Additional conditions}\nThe inlet pressure stayed fixed.\n")
         corrected = self.run_checker()
-        self.assertEqual(1, corrected.count(": warning:"), corrected)
+        self.assertEqual(0, corrected.count(": warning:"), corrected)
         self.assertIn("abstract opener: Does coating a membrane increase water uptake at steady flow?", corrected)
-        self.assertIn("Summary: 1 advisory (main 1, supplement 0), 0 terminology violations, 1 scan notice.", corrected)
+        self.assertIn("Summary: 0 advisories (main 0, supplement 0), 0 terminology violations, 1 scan notice.", corrected)
+
+    def test_abstract_opener_is_printed_without_an_advisory(self):
+        sentence = "Two independent instruments measured the concentration."
+        (self.root / "paper.tex").write_text(f"\\begin{{abstract}}\n{sentence}\n\\end{{abstract}}\n")
+        output = self.run_checker(paths=("paper.tex",))
+        self.assertIn(f"abstract opener: {sentence}", output)
+        with self.subTest(check="certainty"):
+            self.assertNotIn("certainty words", output)
+        with self.subTest(check="advisory counts"):
+            kinds = json.loads(self.run_checker("--summary-json", paths=("paper.tex",)))["kinds"]
+            self.assertNotIn("abstract-opener", kinds)
+            self.assertIn("Summary: 0 advisories (main 0, supplement 0)", output)
+            self.assertIn("Kinds: none. Files: none.", output)
+
+    def test_paragraph_with_one_measurement_is_not_numerically_dense(self):
+        (self.root / "paper.tex").write_text("The mean temperature was 300 K.\n")
+        output = self.run_checker(paths=("paper.tex",))
+        self.assertNotIn("paragraph density", output)
+        self.assertIn("Summary: 0 advisories", output)
 
     def test_print_form_in_standalone_printing_commands(self):
         (self.root / "paper.tex").write_text(
@@ -103,7 +121,8 @@ Coated & Higher than the reference \\
         for suffix, heading in (("tex", r"\section{Results}"), ("qmd", "# Results")):
             with self.subTest(suffix=suffix):
                 name = f"paper.{suffix}"
-                (self.root / name).write_text(heading + "\n" + dense + "\n" + background + dense)
+                (self.root / name).write_text(heading + "\n" + dense.replace("and 5", "5, 6, and 7")
+                                              + "\n" + background + dense)
                 output = self.run_checker(paths=(name,))
                 warnings = [line for line in output.splitlines() if "density:" in line]
                 self.assertEqual(2, len(warnings), output)
