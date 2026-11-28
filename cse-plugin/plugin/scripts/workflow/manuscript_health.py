@@ -15,11 +15,13 @@ import tomllib
 
 
 CHECKER = Path(__file__).with_name("check_prose.py").resolve()
+SOURCE_SUFFIXES = {".tex", ".md", ".qmd", ".toml", ".bib", ".sty", ".cls"}
 CONFIG_EXAMPLE = """Config example:
   [[manuscripts]]
   name = "Example"
   root = "~/work/example"
   path = "paper/main.tex"  # Relative to root.
+  history_only = false  # Optional. true for a source gone from HEAD: run only its pairs.
 
   # Optional. Repeat to compare more revisions of this manuscript.
   [[manuscripts.pairs]]
@@ -50,9 +52,17 @@ def commit_at(root, revision):
 
 
 def scan_commit(root, path, commit):
+    # Only the text sources the checker reads: a whole-repository archive is slow and can hold unextractable data files.
+    entries = subprocess.check_output(
+        ["git", "-C", str(root), "ls-tree", "-r", "-z", commit], stderr=subprocess.PIPE,
+    ).decode().split("\0")
+    sources = [  # Regular files only: a committed symlink can carry a target too long to create.
+        f":(literal){name}" for mode, _, name in (entry.partition("\t") for entry in entries if entry)
+        if mode.startswith("100") and Path(name).suffix.lower() in SOURCE_SUFFIXES
+    ]
     with tempfile.TemporaryDirectory(prefix="cse-manuscript-") as directory, tempfile.TemporaryFile() as archive:
         subprocess.run(
-            ["git", "-C", str(root), "archive", "--format=tar", commit],
+            ["git", "-C", str(root), "archive", "--format=tar", commit, "--", *sources],
             stdout=archive, stderr=subprocess.PIPE, text=True, check=True,
         )
         archive.seek(0)
@@ -117,6 +127,8 @@ def main():
             name, root, path = item["name"], Path(item["root"]).expanduser().resolve(), Path(item["path"])
             key = str((root / path).resolve())
             comparisons.extend((name, root, path, pair) for pair in item.get("pairs", []))
+            if item.get("history_only"):  # A retired source: run its pairs, skip the current scan.
+                continue
             try:
                 commit = commit_at(root, "HEAD")
                 current[key] = {"name": name, "commit": commit, **scan(root, path)}
